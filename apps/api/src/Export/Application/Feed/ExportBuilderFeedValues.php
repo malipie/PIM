@@ -73,7 +73,21 @@ final class ExportBuilderFeedValues implements FeedProductValues
             ? $this->objects->findRootObjectIds($objectType, $tenant)
             : $this->filterIds($scope, $tenant, $objectType);
 
-        foreach (array_chunk($ids, self::CLEAR_INTERVAL) as $page) {
+        // XMLF-P3-03 — flat variants (plan §6.6): a master WITH variants is
+        // represented by its variants (each becomes its own <item>, carrying
+        // the master's SKU in the `parent_sku` built-in for item_group_id);
+        // a master without variants stays a single item. One grouped id query
+        // for the whole scope — the sync runner's emit-id-plan pattern.
+        $childIdsByParent = $this->objects->findChildIdsByParentIds($ids, $tenant);
+        $emitIds = [];
+        foreach ($ids as $id) {
+            $children = $childIdsByParent[$id] ?? [];
+            foreach ([] === $children ? [$id] : $children as $emitId) {
+                $emitIds[] = $emitId;
+            }
+        }
+
+        foreach (array_chunk($emitIds, self::CLEAR_INTERVAL) as $page) {
             $this->reattachTenant($session, $tenantId);
             foreach ($this->builder->build($this->hydrateInOrder($page), $session) as $row) {
                 yield $this->toAttributeMap($row, $scope);

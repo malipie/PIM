@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Export\Feed;
 
+use App\Channel\Contracts\ChannelCategoryExternalCodeResolverInterface;
 use App\Export\Contracts\FeedProductScope;
 use App\Export\Contracts\FeedProductValues;
 use App\Export\Feed\Application\Delivery\FeedCacheStorage;
@@ -107,7 +108,14 @@ final class FeedRegeneratorTest extends TestCase
             }
         };
 
-        return new FeedGenerator($source, new FeedItemMapper(new FeedTransformApplier()), new FeedRequiredValidator(), $runRepo, $logRepo);
+        $externalCodes = new class implements ChannelCategoryExternalCodeResolverInterface {
+            public function resolveExternalCodes(Uuid $channelId, array $masterCategoryIds): array
+            {
+                return [];
+            }
+        };
+
+        return new FeedGenerator($source, new FeedItemMapper(new FeedTransformApplier()), new FeedRequiredValidator(), $runRepo, $logRepo, $externalCodes);
     }
 
     private function repo(FeedProfile $profile): FeedProfileRepositoryInterface

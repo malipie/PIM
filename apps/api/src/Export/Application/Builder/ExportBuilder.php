@@ -116,13 +116,33 @@ final class ExportBuilder
             array_map(static fn (CatalogObject $o): Uuid => $o->getId(), $page),
         );
         $relationCodesByColumn = $this->prefetchRelationCodes($pageIds, $attributeMap);
-        $categoryCodesByObjectId = $this->needsCategoryColumn($columns)
-            ? $this->prefetchCategoryCodes($pageIds)
-            : [];
+        $categoriesByObjectId = [];
+        if ($this->needsCategoryColumn($columns)) {
+            // XMLF-P3-03 — variants are not categorised independently: an
+            // uncategorised child inherits its master's categories (flat feed
+            // items need the marketplace category on EVERY variant row), so
+            // the prefetch covers the page's parents too.
+            $parentIds = [];
+            foreach ($page as $object) {
+                $parent = $object->getParent();
+                if (null !== $parent) {
+                    $parentIds[$parent->getId()->toRfc4122()] = true;
+                }
+            }
+            $categoriesByObjectId = $this->prefetchCategories(
+                array_values(array_unique([...$pageIds, ...array_keys($parentIds)])),
+            );
+        }
 
+        $empty = ['codes' => [], 'ids' => []];
         $primaryLocale = $tenant->getPrimaryLocale();
         foreach ($page as $object) {
             $objectId = $object->getId()->toRfc4122();
+            $categories = $categoriesByObjectId[$objectId] ?? $empty;
+            $parent = $object->getParent();
+            if ([] === $categories['ids'] && null !== $parent) {
+                $categories = $categoriesByObjectId[$parent->getId()->toRfc4122()] ?? $empty;
+            }
             yield $this->renderRow(
                 $object,
                 $columns,
@@ -131,7 +151,7 @@ final class ExportBuilder
                 $attributeMap,
                 $valuesByObjectId[$objectId] ?? [],
                 $relationCodesByColumn,
-                $categoryCodesByObjectId[$objectId] ?? [],
+                $categories,
             );
         }
     }
@@ -167,18 +187,26 @@ final class ExportBuilder
 
     /**
      * AUD-016 (#1632) — one `findByProductIds()` for the whole page, reduced to
-     * category CODES keyed by object id. The ObjectCategory graph is consumed
-     * here so the row pipeline only ever handles strings.
+     * category CODES + IDS keyed by object id. The ObjectCategory graph is
+     * consumed here so the row pipeline only ever handles strings. IDs feed the
+     * `category_ids` built-in (XMLF-P3-03) — the feed generator resolves them
+     * to marketplace external codes through the Channel contract.
      *
      * @param list<string> $pageIds
      *
-     * @return array<string, list<string>>
+     * @return array<string, array{codes: list<string>, ids: list<string>}>
      */
-    private function prefetchCategoryCodes(array $pageIds): array
+    private function prefetchCategories(array $pageIds): array
     {
         $byObject = [];
         foreach ($this->categories->findByProductIds($pageIds) as $objectId => $assignments) {
-            $byObject[$objectId] = array_map(static fn ($assignment): string => $assignment->getCategory()->getCode(), $assignments);
+            $codes = [];
+            $ids = [];
+            foreach ($assignments as $assignment) {
+                $codes[] = $assignment->getCategory()->getCode();
+                $ids[] = $assignment->getCategory()->getId()->toRfc4122();
+            }
+            $byObject[$objectId] = ['codes' => $codes, 'ids' => $ids];
         }
 
         return $byObject;
@@ -190,7 +218,7 @@ final class ExportBuilder
     private function needsCategoryColumn(array $columns): bool
     {
         foreach ($columns as $column) {
-            if ($column->isBuiltIn() && 'category' === $column->code) {
+            if ($column->isBuiltIn() && \in_array($column->code, ['category', 'category_ids'], true)) {
                 return true;
             }
         }
@@ -238,12 +266,12 @@ final class ExportBuilder
     }
 
     /**
-     * @param array<int, ColumnDefinition>               $columns
-     * @param array<string, string>                      $channelIdByCode       channel code => UUID RFC 4122 (#1229)
-     * @param array<string, Attribute>                   $attributeMap          attribute column code => Attribute (#1471)
-     * @param list<ObjectValue>                          $objectValues          this object's prefetched values (#1632)
-     * @param array<string, array<string, list<string>>> $relationCodesByColumn attributeCode => [sourceId => target codes] (#1632)
-     * @param list<string>                               $categoryCodes         this object's prefetched category codes (#1632)
+     * @param array<int, ColumnDefinition>                  $columns
+     * @param array<string, string>                         $channelIdByCode       channel code => UUID RFC 4122 (#1229)
+     * @param array<string, Attribute>                      $attributeMap          attribute column code => Attribute (#1471)
+     * @param list<ObjectValue>                             $objectValues          this object's prefetched values (#1632)
+     * @param array<string, array<string, list<string>>>    $relationCodesByColumn attributeCode => [sourceId => target codes] (#1632)
+     * @param array{codes: list<string>, ids: list<string>} $categories            this object's prefetched categories (#1632, XMLF-P3-03)
      *
      * @return array<string, string>
      */
@@ -255,13 +283,13 @@ final class ExportBuilder
         array $attributeMap,
         array $objectValues,
         array $relationCodesByColumn,
-        array $categoryCodes,
+        array $categories,
     ): array {
         $valueIndex = $this->indexValuesByObject($objectValues);
         $row = [];
 
         foreach ($columns as $column) {
-            $row[$column->key] = $this->cellFor($object, $column, $valueIndex, $channelIdByCode, $primaryLocale, $attributeMap, $relationCodesByColumn, $categoryCodes);
+            $row[$column->key] = $this->cellFor($object, $column, $valueIndex, $channelIdByCode, $primaryLocale, $attributeMap, $relationCodesByColumn, $categories);
         }
 
         return $row;
@@ -293,11 +321,11 @@ final class ExportBuilder
     }
 
     /**
-     * @param array<string, ObjectValue>                 $valueIndex
-     * @param array<string, string>                      $channelIdByCode       channel code => UUID RFC 4122 (#1229)
-     * @param array<string, Attribute>                   $attributeMap          attribute column code => Attribute (#1471)
-     * @param array<string, array<string, list<string>>> $relationCodesByColumn attributeCode => [sourceId => target codes] (#1632)
-     * @param list<string>                               $categoryCodes         this object's prefetched category codes (#1632)
+     * @param array<string, ObjectValue>                    $valueIndex
+     * @param array<string, string>                         $channelIdByCode       channel code => UUID RFC 4122 (#1229)
+     * @param array<string, Attribute>                      $attributeMap          attribute column code => Attribute (#1471)
+     * @param array<string, array<string, list<string>>>    $relationCodesByColumn attributeCode => [sourceId => target codes] (#1632)
+     * @param array{codes: list<string>, ids: list<string>} $categories            this object's prefetched categories (#1632, XMLF-P3-03)
      */
     private function cellFor(
         CatalogObject $object,
@@ -307,10 +335,10 @@ final class ExportBuilder
         string $primaryLocale,
         array $attributeMap,
         array $relationCodesByColumn,
-        array $categoryCodes,
+        array $categories,
     ): string {
         if ($column->isBuiltIn()) {
-            return $this->builtIn($object, $column->code, $categoryCodes);
+            return $this->builtIn($object, $column->code, $categories);
         }
 
         $attribute = $attributeMap[$column->code] ?? null;
@@ -374,9 +402,9 @@ final class ExportBuilder
     }
 
     /**
-     * @param list<string> $categoryCodes prefetched per page (#1632)
+     * @param array{codes: list<string>, ids: list<string>} $categories prefetched per page (#1632, XMLF-P3-03)
      */
-    private function builtIn(CatalogObject $object, string $code, array $categoryCodes): string
+    private function builtIn(CatalogObject $object, string $code, array $categories): string
     {
         return match ($code) {
             'sku' => $this->serializer->serializeScalar($object->getCode()),
@@ -386,7 +414,10 @@ final class ExportBuilder
             'completeness_pct' => $this->serializer->serializeScalar($object->getCompletenessPct()),
             'created_at' => $this->serializer->serializeScalar($object->getCreatedAt()),
             'updated_at' => $this->serializer->serializeScalar($object->getUpdatedAt()),
-            'category' => implode(ValueSerializer::MULTI_VALUE_GLUE, $categoryCodes),
+            'category' => implode(ValueSerializer::MULTI_VALUE_GLUE, $categories['codes']),
+            // XMLF-P3-03 — master category ids for the feed generator's
+            // channel external-code resolution (bare cross-BC ids, ADR-0015).
+            'category_ids' => implode(ValueSerializer::MULTI_VALUE_GLUE, $categories['ids']),
             'variant_axes' => $this->serializeVariantAxes($object),
             default => '',
         };

@@ -76,6 +76,11 @@ final class FeedTemplateCatalog
             ['slot' => 'g:mpn', 'source' => ['kind' => 'attribute', 'ref' => 'mpn']],
             ['slot' => 'g:condition', 'source' => ['kind' => 'static', 'value' => 'new']],
             ['slot' => 'g:google_product_category', 'source' => ['kind' => 'attribute', 'ref' => 'google_category']],
+            // XMLF-P3-03 — variants enter flat: each variant is its own <item>
+            // whose g:item_group_id carries the master's SKU (`parent_sku`
+            // built-in column); masters without variants render it empty and
+            // the writer omits the optional slot.
+            ['slot' => 'g:item_group_id', 'source' => ['kind' => 'attribute', 'ref' => 'parent_sku']],
         ];
 
         return new FeedTemplate(FeedTemplateKind::GoogleShopping, $descriptor, $mappings);
