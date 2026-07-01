@@ -13047,6 +13047,32 @@
                 "x-cortex-permission": "integration.admin"
             }
         },
+        "/api/feeds/preview": {
+            "post": {
+                "operationId": "api_feeds_preview_post",
+                "tags": [
+                    "feeds"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api feeds preview",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
+            }
+        },
         "/api/feeds/{id}": {
             "get": {
                 "operationId": "api_feeds_id_get",
@@ -13197,6 +13223,45 @@
                 ],
                 "x-pim-source": "custom-route",
                 "x-cortex-permission": "integration.admin"
+            }
+        },
+        "/api/feeds/{id}/preview": {
+            "get": {
+                "operationId": "api_feeds_id_preview_get",
+                "tags": [
+                    "feeds"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api feeds id preview",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
             }
         },
         "/api/feeds/{id}/resume": {
