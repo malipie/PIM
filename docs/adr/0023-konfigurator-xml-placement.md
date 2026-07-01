@@ -1,10 +1,10 @@
 # 0023. Konfigurator XML — umiejscowienie, model serializacji i autoryzacja feedu
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-07-01
 - **Deciders:** Marcin (operator), architekt rozwiązań (agent)
 
-> **Uwaga:** to szkic do finalizacji w tickecie XMLF-P0-01 (epik XMLF). Po akceptacji status → `accepted` i streszczenie trafia do `01-architektura-pim.md` §13.
+> Finalizowany w tickecie XMLF-P0-01 (epik XMLF). Streszczenie w `01-architektura-pim.md` §13. Wszystkie 7 decyzji rozstrzygnięte; otwarte kwestie przesunięte do hooków §7 planu.
 
 ## Context and Problem Statement
 
