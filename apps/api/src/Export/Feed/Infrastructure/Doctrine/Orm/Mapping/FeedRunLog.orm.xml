@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                                      https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="App\Export\Feed\Domain\Entity\FeedRunLog"
+            table="feed_run_logs"
+            repository-class="App\Export\Feed\Infrastructure\Doctrine\Repository\DoctrineFeedRunLogRepository">
+
+        <indexes>
+            <index name="feed_run_logs_run_idx" columns="feed_run_id"/>
+        </indexes>
+
+        <id name="id" type="uuid" column="id">
+            <generator strategy="NONE"/>
+        </id>
+
+        <many-to-one field="tenant" target-entity="App\Shared\Domain\Tenant">
+            <join-column name="tenant_id" referenced-column-name="id" nullable="false" on-delete="RESTRICT"/>
+        </many-to-one>
+
+        <field name="feedRunId" type="uuid" column="feed_run_id"/>
+        <field name="level" type="string" length="8"/>
+        <field name="objectSku" type="string" length="255" column="object_sku" nullable="true"/>
+        <field name="slot" type="string" length="64" nullable="true"/>
+        <field name="message" type="text"/>
+        <field name="createdAt" type="datetime_immutable" column="created_at"/>
+
+    </entity>
+
+</doctrine-mapping>

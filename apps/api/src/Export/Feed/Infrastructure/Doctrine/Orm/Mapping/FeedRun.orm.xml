@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                                      https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="App\Export\Feed\Domain\Entity\FeedRun"
+            table="feed_runs"
+            repository-class="App\Export\Feed\Infrastructure\Doctrine\Repository\DoctrineFeedRunRepository">
+
+        <indexes>
+            <index name="feed_runs_profile_idx" columns="feed_profile_id,started_at"/>
+        </indexes>
+
+        <id name="id" type="uuid" column="id">
+            <generator strategy="NONE"/>
+        </id>
+
+        <many-to-one field="tenant" target-entity="App\Shared\Domain\Tenant">
+            <join-column name="tenant_id" referenced-column-name="id" nullable="false" on-delete="RESTRICT"/>
+        </many-to-one>
+
+        <field name="feedProfileId" type="uuid" column="feed_profile_id"/>
+        <field name="trigger" type="string" length="16"/>
+        <field name="status" type="string" length="16"/>
+
+        <field name="itemCount" type="integer" column="item_count"><options><option name="default">0</option></options></field>
+        <field name="skippedCount" type="integer" column="skipped_count"><options><option name="default">0</option></options></field>
+        <field name="warningCount" type="integer" column="warning_count"><options><option name="default">0</option></options></field>
+
+        <field name="filePath" type="text" column="file_path" nullable="true"/>
+        <field name="fileSizeBytes" type="bigint" column="file_size_bytes" nullable="true"/>
+        <field name="durationMs" type="integer" column="duration_ms" nullable="true"/>
+        <field name="errorMessage" type="text" column="error_message" nullable="true"/>
+
+        <field name="startedAt" type="datetime_immutable" column="started_at"/>
+        <field name="completedAt" type="datetime_immutable" column="completed_at" nullable="true"/>
+
+    </entity>
+
+</doctrine-mapping>
