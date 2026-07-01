@@ -13,7 +13,7 @@ export interface ExportSessionRow {
     | 'categories'
     | string;
   object_type_id: string | null;
-  format: 'xlsx' | 'csv';
+  format: 'xlsx' | 'csv' | 'xml';
   target_scope: string;
   target_count: number;
   success_count: number;

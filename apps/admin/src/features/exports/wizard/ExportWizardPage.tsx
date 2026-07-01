@@ -95,7 +95,10 @@ function WizardContent() {
           profileName: profile.name,
           entityType: profile.entity_type,
           objectTypeId: profile.object_type_id,
-          format: profile.config.format === 'csv' ? 'csv' : 'xlsx',
+          format:
+            profile.config.format === 'csv' || profile.config.format === 'xml'
+              ? profile.config.format
+              : 'xlsx',
           columns: profile.config.selected_columns ?? [],
           locales: profile.config.locales ?? null,
           channels: profile.config.channels ?? null,

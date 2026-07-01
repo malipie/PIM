@@ -3091,16 +3091,15 @@
       "format_group_aria": "File format",
       "format_desc": {
         "xlsx": "Excel spreadsheet",
-        "csv": "Comma-separated values"
+        "csv": "Comma-separated values",
+        "xml": "Hierarchical XML feed (generic wrapper)"
       },
       "format_soon": {
-        "xml": "XML",
         "json": "JSON",
         "gsheets": "Google Sheets",
         "pdf": "PDF"
       },
       "format_soon_desc": {
-        "xml": "Hierarchical feed",
         "json": "Structured data / API",
         "gsheets": "Cloud spreadsheet",
         "pdf": "Catalog / price list"

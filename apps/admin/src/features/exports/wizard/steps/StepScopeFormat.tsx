@@ -44,10 +44,11 @@ interface ProfilesResponse {
 const ACTIVE_FORMATS: Array<{ id: ExportFormat; descKey: string }> = [
   { id: 'xlsx', descKey: 'exports.wizard.format_desc.xlsx' },
   { id: 'csv', descKey: 'exports.wizard.format_desc.csv' },
+  { id: 'xml', descKey: 'exports.wizard.format_desc.xml' },
 ];
 
 /** D1 — visible but disabled format tiles ("wkrótce"), never sent in payloads. */
-const SOON_FORMATS = ['xml', 'json', 'gsheets', 'pdf'] as const;
+const SOON_FORMATS = ['json', 'gsheets', 'pdf'] as const;
 
 /**
  * EXR-10 — wizard step 2 (screen 3): saved profile select, format
@@ -105,7 +106,10 @@ export function StepScopeFormat() {
   const applyProfile = (profileId: string) => {
     const profile = matchingProfiles.find((row) => row.id === profileId);
     if (!profile) return;
-    const format = profile.config.format === 'csv' ? 'csv' : 'xlsx';
+    const format =
+      profile.config.format === 'csv' || profile.config.format === 'xml'
+        ? profile.config.format
+        : 'xlsx';
     const filterDsl = profile.config.filter ?? null;
     dispatch({
       type: 'APPLY_PROFILE',
