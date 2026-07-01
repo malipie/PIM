@@ -854,4 +854,22 @@ Status: 5/5 zamknięte (PR #634..#638).
 
 ---
 
+## Epik XMLF — Konfigurator XML (feedy produktowe, Faza 1 — 2026-07-01)
+
+Domknięcie luki zapowiadanej w epik-04 „Feeds" i epiku 0.10 („XML feeds + Google Shopping predef"); PRD eksportów (§6.3) i uniwersalny konfigurator API (§7) świadomie wycięły XML do Fazy 1. Ten epik to realizacja.
+
+**Co:** feedy produktowe XML (Google Shopping / Ceneo / Meta / custom B2B) — szablon + mapowanie atrybutów PIM na węzły XML + filtr asortymentu + scope (locale/kanał/waluta) + harmonogram regeneracji (cron) + stabilny URL z tokenem + monitoring runów; **oraz** XML jako format eksportu ad-hoc (obok XLSX/CSV). Architektura: warstwa „szablon + mapowanie + transformacje + delivery" NAD silnikiem Export (reuse `ExportBuilder`; nowy asocjacyjny `ItemWriter`; pod-obszar `src/Export/Feed/`; delivery pull cache-and-serve przez MinIO + publiczny URL z tokenem).
+
+**Tracking:** GitHub label `epik-XMLF` + milestone'y M0–M6 (#34–#40) + 38 issues #1902–#1939.
+- Plan/architektura: [`Project Plan/feature-konfigurator-xml-plan.md`](feature-konfigurator-xml-plan.md).
+- Backlog (single source of truth): [`Project Plan/feature-konfigurator-xml-tickets.md`](feature-konfigurator-xml-tickets.md) (38 ticketów, prefix `XMLF`).
+- Decyzja: **ADR-0023** (`docs/adr/0023-konfigurator-xml-placement.md`, draft → finalizacja w XMLF-P0-01).
+- Designy UI: `Zrodla/Front_Claude_Design/NOWY UI/PIM-nowoczesny/Feedy.html` + `feedy/*.jsx`.
+
+**Estymacja:** ~340–470h (7 milestone'ów: M0 fundament + ad-hoc XML · M1 model feedu · M2 descriptor/szablony/silnik · M3 mapowanie/scope/delivery · M4 harmonogram/monitor/preview · M5 UI · M6 hardening). Tryb 2 (ad-hoc XML, M0) dostarcza wartość niezależnie od reszty.
+
+**Sequencing:** Faza 1 (razem z integracjami / po MVP-Final). Bez zależności od agenta (0.7). Reuse silników Export/Channel/Import(schedule)/ApiConfigurator(token) — realnie nowego kodu domenowego niewiele.
+
+---
+
 *Koniec planu projektu. Dokument żyjący — aktualizowany co fazę.*

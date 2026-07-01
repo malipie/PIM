@@ -8,6 +8,7 @@
 - **Backlog ticketów (source of truth speców):** `Project Plan/feature-api-configurator-tickets.md` (Issues #1756–#1803).
 - **Stan (2026-06-29):** **CAŁY EPIK APIC KOD-KOMPLETNY i zmergowany do main (M0→M5).** M1+M2+M3 (Sync Engines) + M4 (Monitor + Producent, P4-01..08) + **M5 Hardening (P5-01..05) zmergowane**. Tickety [PM] cross-context (P3-04/05/06/08) wykonane: inbound przez Catalog `InboundRecordWriter` contract + `BatchValueWriter.writeMany(Provenance::Integration)`; outbound przez Export `OutboundRecordReader`; transport `import` (TenantAwareMessage + rebinding/RLS-GUC middleware); ConflictResolver LWW/pim_wins/remote_wins + anti-loop.
 - **✅ Dług bookkeepingu issue — ZRECONCYLIOWANY (2026-06-29):** 18 issues APIC (P1-07/08 + całe M2 #1770–1778 + M3-early #1779–1785) były OPEN mimo zmergowanej pracy (slip `Closes #N` z wcześniejszych sesji). Każdy zmapowany 1:1 na swój merged PR (#1816–#1829, #1857–#1860) i zamknięty z proofem merged-PR (decyzja operatora: reconcile z merged-PR zamiast pełnego live-smoke). **Wszystkie 6 milestone'ów APIC: open=0.** Epik APIC = 0 open issues.
+- **🆕 Epik XMLF — Konfigurator XML (2026-07-01):** backlog utworzony, implementacja niezaczęta. [backlog](../Project%20Plan/feature-konfigurator-xml-tickets.md), ADR-0023 (draft), 38 Issues #1902–#1939, milestone'y #34–#40 (M0–M6). Feedy produktowe XML (Google/Ceneo/Meta/custom) + XML jako format eksportu ad-hoc, jako warstwa NAD silnikiem Export. **Następny krok:** XMLF-P0-01 (finalizacja ADR-0023) → P0-02 (Deptrac Export/Feed) → P0-03 (XmlWriterCore).
 
 ## APIC — postęp implementacji (2026-06-28/29)
 - **M1 Consumer Foundation:** P1-01..09 + P1-07 hub (#1816), P1-08 wizard 1–2 (#1817).
@@ -21,6 +22,14 @@
 ## (poprzedni epik) IMP2 — Import/Export v2 engine
 - **Epik:** IMP2 ([#1499](https://github.com/malipie/PIM/issues/1499), ADR-0019). Kontrakty silnika + warstwy Deptrac Import/Export.
 - **Backlog ticketów (source of truth speców):** `Project Plan/UI/feature-imports-v2-tickets.md` (Issues #1460–#1499).
+
+## 2026-07-01: Epik XMLF — Konfigurator XML (backlog utworzony, implementacja niezaczęta)
+- **Co:** rozpisanie planu `feature-konfigurator-xml-plan.md` + zaprojektowanych widoków (`Feedy.html` + `feedy/*.jsx`) na wykonalny backlog (brief §10). Cel: feedy produktowe XML (Google Shopping / Ceneo / Meta / custom B2B) z mapowaniem, filtrem, harmonogramem i stabilnym URL + XML jako format eksportu ad-hoc — jako warstwa „szablon + mapowanie + transformacje + delivery" NAD silnikiem Export (reuse `ExportBuilder`, nowy `ItemWriter` asocjacyjny, `Export/Feed` pod-obszar).
+- **Deliverables:** **ADR-0023** (`docs/adr/0023-konfigurator-xml-placement.md`, draft do finalizacji w P0-01). Backlog **`Project Plan/feature-konfigurator-xml-tickets.md`** = 38 ticketów, prefix `XMLF`, 7 milestone'ów M0–M6. Designy: `Zrodla/.../PIM-nowoczesny/feedy/*.jsx` (hub, kreator 5-krokowy, mapper, preview, monitor).
+- **GitHub:** label `epik-XMLF` + milestone'y M0–M6 (#34–#40) + 38 issues #1902–#1939 (cross-linki blocked_by/blocks jako `#refs`). Hooki §7 (import XML, push FTP, Allegro, AI-mapping, adaptive scheduling) bez issue do czasu wejścia w scope.
+- **Proces przygotowawczy:** stan as-is zweryfikowany 3 agentami Explore (silnik Export, Channel/Schedule/Filter, security/infra); backlog przepuszczony przez 2 adwersarialnych krytyków (kompletność + graf zależności) → 4 luki domknięte (edytor struktury custom P2-07/P5-06, telemetria pobrań P3-06, globalny monitor P5-07), własność kształtu descriptora rozstrzygnięta (P2-01 VO kanoniczny), twarde prereq serializacji P0-03/P0-04→P2-04/P2-05 dodane.
+- **Następny krok:** XMLF-P0-01 (finalizacja ADR-0023, [PM]) → P0-02 (Deptrac `Export_Feed`) → P0-03 (XmlWriterCore, [SEC]) → P0-04/05/06 (ItemWriter + ExportFormat::Xml + odblokowany kafelek EXR = tryb 2 dostarcza wartość najwcześniej).
+- **Blokery:** brak. Tickety [PM]: P0-01, P1-01, P1-04, P2-04, P2-07, P3-04, P3-05, P4-04, P6-02 — wymagają Plan Mode przed implementacją.
 
 ## 2026-06-26: Epik APIC — Uniwersalny Konfigurator API (backlog utworzony, implementacja niezaczęta)
 - **Co:** rozpisanie planu `feature-api-configurator-uniwersalny-plan.md` na wykonalny backlog (brief §10). Cel: warstwa mapująca PIM ↔ dowolne REST/JSON API (oba kierunki, harmonogram), konsument (`src/Integration/Generic/`, greenfield) + producent (`src/ApiConfigurator/`, domknięcie zalążka).
