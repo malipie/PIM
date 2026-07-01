@@ -379,6 +379,9 @@ final class FeedProfileController
             'cached_item_count' => $feed->getCachedItemCount(),
             'cached_at' => $feed->getCachedAt()?->format(DateTimeInterface::ATOM),
             'last_pulled_at' => $feed->getLastPulledAt()?->format(DateTimeInterface::ATOM),
+            // The plaintext token is never persisted (P3-04); the hub only
+            // needs to know whether a URL exists to offer rotate vs mint copy.
+            'has_token' => null !== $feed->getTokenHash(),
             'last_run_id' => $feed->getLastRunId()?->toRfc4122(),
             'created_at' => $feed->getCreatedAt()->format(DateTimeInterface::ATOM),
             'updated_at' => $feed->getUpdatedAt()->format(DateTimeInterface::ATOM),

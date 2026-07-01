@@ -1720,11 +1720,77 @@
     }
   },
   "api_configurator": {
+    "feeds": {
+      "template": {
+        "google_shopping": "Google Shopping",
+        "ceneo": "Ceneo",
+        "meta": "Meta",
+        "custom": "Custom"
+      },
+      "status": {
+        "active": "Active",
+        "paused": "Paused",
+        "error": "Error"
+      },
+      "kpi": {
+        "feeds": "Feeds",
+        "items": "Products in feeds",
+        "items_hint": "syndicated to channels",
+        "pulls": "Feed pulls / 24h"
+      },
+      "hub": {
+        "title": "Product feeds",
+        "subtitle": "Static XML projections for channel crawlers · {{count}} configured",
+        "search_placeholder": "name or code…",
+        "search_aria": "Search feeds",
+        "filter_aria": "Filter feeds by status",
+        "filter": {
+          "all": "all",
+          "active": "active",
+          "paused": "paused",
+          "error": "error"
+        },
+        "new_feed": "New feed",
+        "new_feed_hint": "Pick a template (Google Shopping, Ceneo, Meta) or build your own. Mapping, filter, preview and a stable URL — no developer needed.",
+        "adhoc_title": "Need a one-off XML dump?",
+        "adhoc_hint": "The XML format is also available in the export wizard — next to XLSX/CSV. Generic wrapper, free column choice, one-time download. No template, mapping or schedule."
+      },
+      "card": {
+        "copy_url": "Copy feed URL",
+        "rotate": "Rotate token",
+        "rotate_success": "New token minted — the URL below is shown once, copy it now.",
+        "regenerate": "Regenerate",
+        "regenerate_started": "Regeneration queued.",
+        "pause": "Pause",
+        "resume": "Resume",
+        "open": "Open",
+        "action_error": "The action failed. Try again.",
+        "url_masked": "https://…/api/feeds/pull/… (token hidden — rotate to mint a new URL)",
+        "url_none": "no token yet — rotate to mint the feed URL",
+        "items": "Products in feed",
+        "schedule": "Schedule",
+        "schedule_manual": "manual only",
+        "coverage": "Mapping coverage",
+        "coverage_aria": "Mapping coverage: {{mapped}} of {{total}} slots",
+        "last_pull": "Last pull",
+        "last_regen": "Last regen."
+      },
+      "wizard": {
+        "placeholder_title": "Feed wizard — coming in the next ticket",
+        "placeholder_hint": "The 5-step creator (template, scope, mapping, delivery, review) lands with XMLF-P5-02..04.",
+        "back_to_hub": "Back to feeds"
+      },
+      "detail": {
+        "placeholder_title": "Feed detail — coming in the next ticket",
+        "placeholder_hint": "The pipeline view, run history and per-product log drill-down land with XMLF-P5-05."
+      }
+    },
     "shell": {
       "tabs_aria": "API Configurator sections",
       "tabs": {
         "connections": "Connections",
         "producer": "My API",
+        "feeds": "Feeds",
         "monitor": "Monitor"
       },
       "connections_soon_title": "Connections — coming soon",
