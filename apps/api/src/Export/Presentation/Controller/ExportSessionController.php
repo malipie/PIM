@@ -430,13 +430,14 @@ final class ExportSessionController
 
     private function contentTypeFor(ExportSession $session): string
     {
-        if (\App\Export\Domain\Enum\ExportFormat::Xlsx === $session->getFormat()) {
-            return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-        }
-        $encoding = $session->getEncoding();
-        $charset = \App\Export\Domain\Enum\ExportEncoding::Windows1250 === $encoding ? 'windows-1250' : 'utf-8';
-
-        return sprintf('text/csv; charset=%s', $charset);
+        return match ($session->getFormat()) {
+            \App\Export\Domain\Enum\ExportFormat::Xlsx => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            \App\Export\Domain\Enum\ExportFormat::Xml => 'application/xml; charset=utf-8',
+            \App\Export\Domain\Enum\ExportFormat::Csv => sprintf(
+                'text/csv; charset=%s',
+                \App\Export\Domain\Enum\ExportEncoding::Windows1250 === $session->getEncoding() ? 'windows-1250' : 'utf-8',
+            ),
+        };
     }
 
     /**

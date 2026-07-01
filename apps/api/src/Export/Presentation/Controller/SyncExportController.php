@@ -247,11 +247,11 @@ final class SyncExportController
     {
         $value = $payload['format'] ?? null;
         if (!\is_string($value)) {
-            throw new BadRequestHttpException('format is required (xlsx|csv).');
+            throw new BadRequestHttpException('format is required (xlsx|csv|xml).');
         }
         $format = ExportFormat::tryFrom($value);
         if (null === $format) {
-            throw new BadRequestHttpException(sprintf('Unsupported format "%s" — expected xlsx or csv.', $value));
+            throw new BadRequestHttpException(sprintf('Unsupported format "%s" — expected xlsx, csv or xml.', $value));
         }
 
         return $format;
@@ -279,7 +279,8 @@ final class SyncExportController
      */
     private function parseEncoding(array $payload, ExportFormat $format): ?ExportEncoding
     {
-        if (ExportFormat::Xlsx === $format) {
+        // Encoding is a CSV-only concern; XLSX and XML are always UTF-8.
+        if (ExportFormat::Xlsx === $format || ExportFormat::Xml === $format) {
             return null;
         }
         $value = $payload['encoding'] ?? ExportEncoding::Utf8Bom->value;
@@ -431,11 +432,13 @@ final class SyncExportController
 
     private function contentTypeFor(ExportFormat $format, ?ExportEncoding $encoding): string
     {
-        if (ExportFormat::Xlsx === $format) {
-            return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-        }
-        $charset = ExportEncoding::Windows1250 === $encoding ? 'windows-1250' : 'utf-8';
-
-        return sprintf('text/csv; charset=%s', $charset);
+        return match ($format) {
+            ExportFormat::Xlsx => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ExportFormat::Xml => 'application/xml; charset=utf-8',
+            ExportFormat::Csv => sprintf(
+                'text/csv; charset=%s',
+                ExportEncoding::Windows1250 === $encoding ? 'windows-1250' : 'utf-8',
+            ),
+        };
     }
 }
