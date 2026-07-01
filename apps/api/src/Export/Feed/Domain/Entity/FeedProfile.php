@@ -85,6 +85,8 @@ class FeedProfile extends AggregateRoot implements TenantScoped
 
     private ?DateTimeImmutable $cachedAt = null;
 
+    private ?DateTimeImmutable $lastPulledAt = null;
+
     private DateTimeImmutable $createdAt;
 
     private DateTimeImmutable $updatedAt;
@@ -359,6 +361,17 @@ class FeedProfile extends AggregateRoot implements TenantScoped
             $this->status = FeedStatus::Active->value;
         }
         $this->touch();
+    }
+
+    /**
+     * Last hit on the public pull URL (XMLF-P3-06). Written by the telemetry
+     * repository with a raw per-row UPDATE on the public request path — not
+     * through the ORM and deliberately without touch(): a crawler poll is
+     * telemetry, not a configuration change, and must not churn `updated_at`.
+     */
+    public function getLastPulledAt(): ?DateTimeImmutable
+    {
+        return $this->lastPulledAt;
     }
 
     public function getCreatedAt(): DateTimeImmutable

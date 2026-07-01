@@ -135,8 +135,27 @@ framework:
             limit: 10
             interval: '15 minutes'
 
+        # XMLF-P3-06 [SEC] — public feed URL pulls, keyed per feed (one active
+        # token per feed, so per-feed == per-token). The endpoint only ever
+        # streams the cached artifact (the real anti-DoS), so this limiter
+        # guards MinIO read bandwidth, not CPU. 120/h absorbs several crawlers
+        # sharing one URL (Google polls ~1/h) while clamping a hammering loop.
+        # 429 + Retry-After — marketplace fetchers honour it.
+        feed_pull:
+            policy: 'sliding_window'
+            limit: 120
+            interval: '1 hour'
+
 when@test:
     framework:
         test: true
         session:
             storage_factory_id: session.storage.factory.mock_file
+        # Keep the feed-pull 429 path testable — 120 kernel requests in one
+        # ApiTestCase would be pure wall-clock waste. Buckets are keyed per
+        # feed and every test mints a fresh feed, so tests never interfere.
+        rate_limiter:
+            feed_pull:
+                policy: 'sliding_window'
+                limit: 5
+                interval: '1 hour'

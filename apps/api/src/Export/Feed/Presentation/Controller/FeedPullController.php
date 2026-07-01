@@ -9,17 +9,23 @@ use App\Export\Feed\Application\Delivery\FeedEtag;
 use App\Export\Feed\Application\Delivery\FeedTokenService;
 use App\Export\Feed\Domain\Entity\FeedProfile;
 use App\Export\Feed\Domain\Repository\FeedProfileRepositoryInterface;
+use App\Export\Feed\Domain\Repository\FeedPullStatsRepositoryInterface;
 use App\Identity\Contracts\Attribute\NoPermissionRequired;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
+use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Uid\Uuid;
+use Throwable;
 
 /**
  * Public feed URL — cache-and-serve (ADR-0023 §6.9, XMLF-P3-05 [SEC]).
@@ -45,6 +51,9 @@ final class FeedPullController
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantContext $tenantContext,
         private readonly Connection $connection,
+        private readonly FeedPullStatsRepositoryInterface $pullStats,
+        private readonly RateLimiterFactoryInterface $feedPullLimiter,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -69,11 +78,21 @@ final class FeedPullController
             throw $this->notFound();
         }
 
+        // Per-token budget (one active token per feed → keyed by feed id).
+        // After token verification so unauthenticated probes cannot exhaust a
+        // feed's budget, before any storage read so a hammering loop cannot
+        // saturate MinIO bandwidth (XMLF-P3-06 [SEC]).
+        $this->enforceRateLimit($feed);
+
         $key = $feed->getCachedFilePath();
         if (null === $key || !$this->cache->exists($key)) {
             // Never regenerated (or cache swept) — do not generate on pull.
             throw $this->notFound();
         }
+
+        // Both 200 and 304 count: a conditional revalidation still proves the
+        // crawler polls the URL (that is the signal the monitor cares about).
+        $this->recordPull($feed);
 
         $etag = FeedEtag::forCache($feed->getCachedAt(), $feed->getCachedFileSize(), $feed->getCachedItemCount());
         if ($this->matchesIfNoneMatch($request, $etag)) {
@@ -81,6 +100,39 @@ final class FeedPullController
         }
 
         return $this->stream($feed, $key, $etag);
+    }
+
+    private function enforceRateLimit(FeedProfile $feed): void
+    {
+        $limiter = $this->feedPullLimiter->create('feed-pull:'.$feed->getId()->toRfc4122());
+        $consumed = $limiter->consume();
+        if ($consumed->isAccepted()) {
+            return;
+        }
+
+        $secondsUntilReset = max(1, $consumed->getRetryAfter()->getTimestamp() - time());
+
+        throw new TooManyRequestsHttpException(
+            $secondsUntilReset,
+            'Feed pull rate limit exceeded. Try again later.',
+            null,
+            0,
+            ['Retry-After' => (string) $secondsUntilReset],
+        );
+    }
+
+    private function recordPull(FeedProfile $feed): void
+    {
+        try {
+            $this->pullStats->record($feed, new DateTimeImmutable());
+        } catch (Throwable $error) {
+            // Telemetry must never take the public URL down — serve anyway.
+            // Log by feed id only; the token never reaches the telemetry path.
+            $this->logger->warning('Feed pull telemetry failed; serving the feed anyway.', [
+                'feed_id' => $feed->getId()->toRfc4122(),
+                'error' => $error->getMessage(),
+            ]);
+        }
     }
 
     private function scopeToTenant(Uuid $tenantId): void
