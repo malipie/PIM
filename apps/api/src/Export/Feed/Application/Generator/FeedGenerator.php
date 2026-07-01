@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Export\Feed\Application\Generator;
 
+use App\Export\Contracts\FeedProductScope;
+use App\Export\Contracts\FeedProductValues;
 use App\Export\Feed\Domain\Descriptor\FeedDescriptor;
 use App\Export\Feed\Domain\Entity\FeedProfile;
 use App\Export\Feed\Domain\Entity\FeedRun;
@@ -11,7 +13,6 @@ use App\Export\Feed\Domain\Entity\FeedRunLog;
 use App\Export\Feed\Domain\Enum\FeedRunLogLevel;
 use App\Export\Feed\Domain\Enum\FeedRunTrigger;
 use App\Export\Feed\Domain\Enum\FeedValidationPolicy;
-use App\Export\Feed\Domain\Generator\FeedProductValues;
 use App\Export\Feed\Domain\Generator\FeedRequiredValidator;
 use App\Export\Feed\Domain\Mapping\FeedFieldMapping;
 use App\Export\Feed\Domain\Mapping\FeedItemMapper;
@@ -54,6 +55,7 @@ final class FeedGenerator
         $descriptor = FeedDescriptor::fromArray($profile->getDescriptor());
         $mappings = FeedFieldMapping::listFromArray($profile->getFieldMappings());
         $context = $this->context($profile);
+        $scope = $this->scope($profile, $mappings);
         $skip = FeedValidationPolicy::SkipInvalid === $profile->getValidationPolicy();
 
         $xml = XmlWriterCore::toUri($targetPath);
@@ -68,7 +70,7 @@ final class FeedGenerator
         $startedAt = hrtime(true);
 
         try {
-            foreach ($this->values->forProfile($profile) as $attributes) {
+            foreach ($this->values->forScope($scope) as $attributes) {
                 $item = $this->mapper->map($mappings, $attributes, $context);
                 $violations = $this->validator->check($descriptor, $item);
                 $sku = $attributes['sku'] ?? null;
@@ -122,6 +124,27 @@ final class FeedGenerator
         }
 
         return $buffer;
+    }
+
+    /**
+     * @param list<FeedFieldMapping> $mappings
+     */
+    private function scope(FeedProfile $profile, array $mappings): FeedProductScope
+    {
+        $codes = ['sku' => true]; // always needed for the FeedRunLog object_sku
+        foreach ($mappings as $mapping) {
+            if ('attribute' === $mapping->sourceKind && null !== $mapping->sourceRef) {
+                $codes[$mapping->sourceRef] = true;
+            }
+        }
+
+        return new FeedProductScope(
+            objectTypeId: $profile->getObjectTypeId(),
+            attributeCodes: array_keys($codes),
+            locale: $profile->getLocale(),
+            channel: $profile->getPublicationChannel(),
+            filter: $profile->getFilter(),
+        );
     }
 
     /**
