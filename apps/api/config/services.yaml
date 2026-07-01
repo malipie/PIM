@@ -360,6 +360,13 @@ services:
         arguments:
             $exportsStorage: '@exports.storage'
 
+    # XMLF-P3-04/P3-05 — feed URL token HMAC. Keyed with the app secret so the
+    # stored token_hash cannot be forged without the server key; the plaintext
+    # token is shown once at mint/rotate and never persisted.
+    App\Export\Feed\Application\Delivery\FeedTokenService:
+        arguments:
+            $secret: '%env(APP_SECRET)%'
+
     # EXP-08 (#587) — sessions controller streams the file back from
     # MinIO through PHP (no presigned URL in MVP).
     App\Export\Presentation\Controller\ExportSessionController:

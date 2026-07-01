@@ -16,6 +16,14 @@ interface FeedProfileRepositoryInterface
 
     public function findById(Uuid $id): ?FeedProfile;
 
+    /**
+     * Resolve a feed by its stored token HMAC (XMLF-P3-05 public URL). The
+     * caller MUST have already established the tenant context / RLS scope from
+     * the URL, so this only returns a hit inside the current tenant — a token
+     * from tenant A can never resolve a feed of tenant B.
+     */
+    public function findByTokenHash(string $tokenHash): ?FeedProfile;
+
     public function findByTenantAndCode(Tenant $tenant, string $code): ?FeedProfile;
 
     /**

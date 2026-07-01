@@ -40,6 +40,14 @@ class DoctrineFeedProfileRepository extends ServiceEntityRepository implements F
         return parent::find($id->toRfc4122());
     }
 
+    public function findByTokenHash(string $tokenHash): ?FeedProfile
+    {
+        // Tenant scoping is enforced upstream (RLS GUC + TenantFilter set by the
+        // public controller from the URL); this is a plain indexed lookup that
+        // only sees the current tenant's rows.
+        return $this->findOneBy(['tokenHash' => $tokenHash]);
+    }
+
     public function findByTenantAndCode(Tenant $tenant, string $code): ?FeedProfile
     {
         return $this->findOneBy(['tenant' => $tenant, 'code' => $code]);
