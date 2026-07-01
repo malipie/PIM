@@ -79,6 +79,7 @@
         <field name="cachedFileSize" type="bigint" column="cached_file_size" nullable="true"/>
         <field name="cachedItemCount" type="integer" column="cached_item_count" nullable="true"/>
         <field name="cachedAt" type="datetime_immutable" column="cached_at" nullable="true"/>
+        <field name="lastPulledAt" type="datetime_immutable" column="last_pulled_at" nullable="true"/>
 
         <field name="createdAt" type="datetime_immutable" column="created_at"/>
         <field name="updatedAt" type="datetime_immutable" column="updated_at"/>

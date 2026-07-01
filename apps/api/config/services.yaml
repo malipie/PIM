@@ -367,6 +367,15 @@ services:
         arguments:
             $secret: '%env(APP_SECRET)%'
 
+    # XMLF-P3-06 [SEC] — the pull URL carries the feed credential in the path,
+    # and the framework logs request paths (RouterListener route_parameters,
+    # ErrorListener "No route found for …"). Decorating the single `logger`
+    # service redacts the token in every record before it reaches stderr.
+    App\Export\Feed\Infrastructure\Logging\FeedTokenRedactingLogger:
+        decorates: 'logger'
+        arguments:
+            $inner: '@.inner'
+
     # EXP-08 (#587) — sessions controller streams the file back from
     # MinIO through PHP (no presigned URL in MVP).
     App\Export\Presentation\Controller\ExportSessionController:
