@@ -12,6 +12,13 @@ interface FeedRunLogRepositoryInterface
     public function save(FeedRunLog $log): void;
 
     /**
+     * Persist many log lines in one flush (feed-health during generation).
+     *
+     * @param list<FeedRunLog> $logs
+     */
+    public function saveMany(array $logs): void;
+
+    /**
      * @return list<FeedRunLog>
      */
     public function findByRun(Uuid $feedRunId): array;
