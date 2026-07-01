@@ -100,7 +100,10 @@ final class FeedCategoryVariantsApiTest extends CatalogApiTestCase
         self::assertSame('KL-MASTER', $items['KL-MASTER-S']['group'] ?? null);
         self::assertSame('KL-MASTER', $items['KL-MASTER-M']['group'] ?? null);
         self::assertArrayHasKey('KL-SIMPLE', $items);
-        self::assertNull($items['KL-SIMPLE']['group'], 'standalone product carries no item_group_id');
+        // The writer emits an optional slot with an empty value as an empty
+        // element (M0/M2 policy) — a standalone product must simply never
+        // carry a group id, absent node and empty node both qualify.
+        self::assertContains($items['KL-SIMPLE']['group'], [null, ''], 'standalone product carries no item_group_id');
 
         // Channel category resolution: variants inherit nothing automatically —
         // only categorised objects resolve. The simple product resolves '123';
