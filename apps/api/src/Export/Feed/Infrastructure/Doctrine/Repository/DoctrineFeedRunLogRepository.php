@@ -27,6 +27,18 @@ class DoctrineFeedRunLogRepository extends ServiceEntityRepository implements Fe
         $em->flush();
     }
 
+    public function saveMany(array $logs): void
+    {
+        if ([] === $logs) {
+            return;
+        }
+        $em = $this->getEntityManager();
+        foreach ($logs as $log) {
+            $em->persist($log);
+        }
+        $em->flush();
+    }
+
     /**
      * @return list<FeedRunLog>
      */
