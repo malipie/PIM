@@ -39,6 +39,9 @@ final class FeedCategoryVariantsApiTest extends CatalogApiTestCase
         $channel = new Channel('ceneo', 'Ceneo');
         $em->persist($channel);
         $node = new ChannelCategoryNode($channel, 'elektronika', ['pl' => 'Elektronika'], null, '123');
+        // The ltree path is materialised by the CHC add handler, not the
+        // entity — a root node's path is its own ltree label.
+        $node->attachToPath($node->ltreeLabel());
         $em->persist($node);
 
         $types = self::getContainer()->get(ObjectTypeRepositoryInterface::class);
