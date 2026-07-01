@@ -155,6 +155,7 @@ parameters:
               - src/Import/Domain/Entity/ImportScheduleRun.php
               - src/Export/Domain/Entity/ExportSession.php
               - src/Export/Domain/Entity/ExportProfile.php
+              - src/Export/Feed/Domain/Entity/FeedProfile.php
               - src/Backup/Domain/Entity/Backup.php
               - src/Channel/Domain/Entity/TenantLocale.php
               - src/Channel/Domain/Entity/ChannelPublicationProfile.php
