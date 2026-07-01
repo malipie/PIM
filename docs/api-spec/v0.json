@@ -13199,6 +13199,45 @@
                 "x-cortex-permission": "integration.admin"
             }
         },
+        "/api/feeds/{id}/regenerate": {
+            "post": {
+                "operationId": "api_feeds_id_regenerate_post",
+                "tags": [
+                    "feeds"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api feeds id regenerate",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "integration.admin"
+            }
+        },
         "/api/feeds/{id}/resume": {
             "post": {
                 "operationId": "api_feeds_id_resume_post",
