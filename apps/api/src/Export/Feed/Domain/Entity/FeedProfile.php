@@ -45,13 +45,13 @@ class FeedProfile extends AggregateRoot implements TenantScoped
     /** Bare uuid → Catalog\ObjectType (cross-BC decoupling, ADR-0015); MVP always the Product type. */
     private Uuid $objectTypeId;
 
-    /** @var array<string, mixed> */
+    /** @var array<mixed, mixed> */
     private array $descriptor;
 
-    /** @var list<array<string, mixed>> */
+    /** @var list<array<mixed, mixed>> */
     private array $fieldMappings;
 
-    /** @var array<string, mixed>|null */
+    /** @var array<mixed, mixed>|null */
     private ?array $filter = null;
 
     /** Bare uuid → Channel; scopes values per channel (?channel=). */
@@ -65,7 +65,7 @@ class FeedProfile extends AggregateRoot implements TenantScoped
 
     private ?string $scheduleCron = null;
 
-    /** @var array<string, mixed> */
+    /** @var array<mixed, mixed> */
     private array $delivery;
 
     /** Hash of the URL token (Argon2id, ApiKey pattern); minted at delivery config (XMLF-P3-04). */
@@ -90,10 +90,10 @@ class FeedProfile extends AggregateRoot implements TenantScoped
     private DateTimeImmutable $updatedAt;
 
     /**
-     * @param array<string, mixed>       $descriptor
-     * @param list<array<string, mixed>> $fieldMappings
-     * @param array<string, mixed>|null  $filter
-     * @param array<string, mixed>       $delivery
+     * @param array<mixed, mixed>       $descriptor
+     * @param list<array<mixed, mixed>> $fieldMappings
+     * @param array<mixed, mixed>|null  $filter
+     * @param array<mixed, mixed>       $delivery
      */
     public function __construct(
         string $code,
@@ -178,39 +178,39 @@ class FeedProfile extends AggregateRoot implements TenantScoped
         return $this->objectTypeId;
     }
 
-    /** @return array<string, mixed> */
+    /** @return array<mixed, mixed> */
     public function getDescriptor(): array
     {
         return $this->descriptor;
     }
 
-    /** @param array<string, mixed> $descriptor */
+    /** @param array<mixed, mixed> $descriptor */
     public function updateDescriptor(array $descriptor): void
     {
         $this->descriptor = $descriptor;
         $this->touch();
     }
 
-    /** @return list<array<string, mixed>> */
+    /** @return list<array<mixed, mixed>> */
     public function getFieldMappings(): array
     {
         return $this->fieldMappings;
     }
 
-    /** @param list<array<string, mixed>> $fieldMappings */
+    /** @param list<array<mixed, mixed>> $fieldMappings */
     public function updateFieldMappings(array $fieldMappings): void
     {
         $this->fieldMappings = $fieldMappings;
         $this->touch();
     }
 
-    /** @return array<string, mixed>|null */
+    /** @return array<mixed, mixed>|null */
     public function getFilter(): ?array
     {
         return $this->filter;
     }
 
-    /** @param array<string, mixed>|null $filter */
+    /** @param array<mixed, mixed>|null $filter */
     public function updateFilter(?array $filter): void
     {
         $this->filter = $filter;
@@ -261,13 +261,13 @@ class FeedProfile extends AggregateRoot implements TenantScoped
         $this->touch();
     }
 
-    /** @return array<string, mixed> */
+    /** @return array<mixed, mixed> */
     public function getDelivery(): array
     {
         return $this->delivery;
     }
 
-    /** @param array<string, mixed> $delivery */
+    /** @param array<mixed, mixed> $delivery */
     public function updateDelivery(array $delivery): void
     {
         $this->delivery = $delivery;
