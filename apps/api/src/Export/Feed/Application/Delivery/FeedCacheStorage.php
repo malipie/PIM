@@ -21,4 +21,15 @@ interface FeedCacheStorage
      * overwriting any previous cache for that feed.
      */
     public function put(string $key, string $localPath): void;
+
+    public function exists(string $key): bool;
+
+    /**
+     * Open a read stream on the cached object so the public URL (XMLF-P3-05)
+     * streams it straight to the puller without buffering the whole feed. The
+     * caller owns closing the returned resource.
+     *
+     * @return resource
+     */
+    public function read(string $key);
 }

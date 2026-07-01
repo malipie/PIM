@@ -40,4 +40,22 @@ final class FlysystemFeedCacheStorage implements FeedCacheStorage
             }
         }
     }
+
+    public function exists(string $key): bool
+    {
+        try {
+            return $this->exportsStorage->fileExists($key);
+        } catch (FilesystemException) {
+            return false;
+        }
+    }
+
+    public function read(string $key)
+    {
+        try {
+            return $this->exportsStorage->readStream($key);
+        } catch (FilesystemException $error) {
+            throw new RuntimeException(sprintf('Feed cache read failed for "%s": %s', $key, $error->getMessage()), previous: $error);
+        }
+    }
 }
