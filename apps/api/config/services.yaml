@@ -353,6 +353,13 @@ services:
         arguments:
             $exportsStorage: '@exports.storage'
 
+    # XMLF-P4-01 — feed cache-and-serve storage. Same exports.storage MinIO
+    # bucket under a dedicated `feeds/` prefix (regeneration writes here, the
+    # XMLF-P3-05 public URL reads it back).
+    App\Export\Feed\Infrastructure\Delivery\FlysystemFeedCacheStorage:
+        arguments:
+            $exportsStorage: '@exports.storage'
+
     # EXP-08 (#587) — sessions controller streams the file back from
     # MinIO through PHP (no presigned URL in MVP).
     App\Export\Presentation\Controller\ExportSessionController:

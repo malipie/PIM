@@ -94,6 +94,10 @@ final class FeedGenerator
             $writer->finish();
         } catch (Throwable $error) {
             $this->logs->saveMany($buffer);
+            // The value source clears the EM between chunks (memory-flat 50k),
+            // which detaches $run — reload a managed instance before the
+            // terminal transition so save() issues an UPDATE, not a duplicate.
+            $run = $this->reload($run);
             $run->markError($error->getMessage());
             $this->runs->save($run);
 
@@ -104,10 +108,20 @@ final class FeedGenerator
 
         $size = is_file($targetPath) ? (int) filesize($targetPath) : 0;
         $durationMs = (int) ((hrtime(true) - $startedAt) / 1_000_000);
+        $run = $this->reload($run);
         $run->markDone($items, $skipped, $warnings, $targetPath, $size, $durationMs);
         $this->runs->save($run);
 
         return $run;
+    }
+
+    /**
+     * Reload a managed FeedRun after the value source's mid-run EM clears
+     * detached it (falls back to the detached instance if the row is gone).
+     */
+    private function reload(FeedRun $run): FeedRun
+    {
+        return $this->runs->findById($run->getId()) ?? $run;
     }
 
     /**
