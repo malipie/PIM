@@ -197,10 +197,40 @@ parameters:
           collectors:
               - type: directory
                 value: 'src/Import/.*'
+        # ─── Export core + Feed sub-area (ADR-0023, epik XMLF) ─────────
+        # Feed (src/Export/Feed) is a sub-area of the Export BC: it may reach
+        # the whole Export core (ExportBuilder reuse) and the Export_Contracts
+        # seam, but talks to other BCs (Channel/Catalog/Asset) only through
+        # their *_Contracts. Core Export must NOT reach Feed.
         - name: Export
           collectors:
+              - type: bool
+                must:
+                    - type: directory
+                      value: 'src/Export/.*'
+                must_not:
+                    - type: directory
+                      value: 'src/Export/Feed/.*'
+                    - type: directory
+                      value: 'src/Export/Contracts/.*'
+        - name: Export_Contracts
+          collectors:
               - type: directory
-                value: 'src/Export/.*'
+                value: 'src/Export/Contracts/.*'
+        - name: Export_Feed_Internals
+          collectors:
+              - type: directory
+                value: 'src/Export/Feed/Domain/.*'
+              - type: directory
+                value: 'src/Export/Feed/Application/.*'
+              - type: directory
+                value: 'src/Export/Feed/Infrastructure/.*'
+              - type: directory
+                value: 'src/Export/Feed/Presentation/.*'
+        - name: Export_Feed_Contracts
+          collectors:
+              - type: directory
+                value: 'src/Export/Feed/Contracts/.*'
 
         # ─── Tooling — fixtures, benchmarks, foundry stories, PHPStan rules ───
         - name: Tooling
@@ -268,10 +298,27 @@ parameters:
             - Shared
             - Vendor
         Export:
+            - Export_Contracts
             - Catalog_Contracts
             - Channel_Contracts
             - Asset_Contracts
             - Identity_Contracts
+            - Shared
+            - Vendor
+        Export_Contracts:
+            - Shared
+            - Vendor
+        Export_Feed_Internals:
+            - Export
+            - Export_Contracts
+            - Export_Feed_Contracts
+            - Catalog_Contracts
+            - Channel_Contracts
+            - Asset_Contracts
+            - Identity_Contracts
+            - Shared
+            - Vendor
+        Export_Feed_Contracts:
             - Shared
             - Vendor
 
