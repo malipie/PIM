@@ -54,4 +54,31 @@ class DoctrineFeedRunLogRepository extends ServiceEntityRepository implements Fe
 
         return $result;
     }
+
+    /**
+     * @return list<FeedRunLog>
+     */
+    public function findPageByRun(Uuid $feedRunId, ?string $level, ?Uuid $cursor, int $limit): array
+    {
+        // UUIDv7 ids are time-ordered — id ASC == emission order, and the
+        // keyset cursor (id > last seen) stays stable across pages even
+        // while a running regeneration keeps appending lines.
+        $qb = $this->createQueryBuilder('l')
+            ->where('l.feedRunId = :rid')
+            ->orderBy('l.id', 'ASC')
+            ->setMaxResults($limit)
+            ->setParameter('rid', $feedRunId->toRfc4122());
+
+        if (null !== $level) {
+            $qb->andWhere('l.level = :level')->setParameter('level', $level);
+        }
+        if (null !== $cursor) {
+            $qb->andWhere('l.id > :cursor')->setParameter('cursor', $cursor->toRfc4122());
+        }
+
+        /** @var list<FeedRunLog> $result */
+        $result = $qb->getQuery()->getResult();
+
+        return $result;
+    }
 }
