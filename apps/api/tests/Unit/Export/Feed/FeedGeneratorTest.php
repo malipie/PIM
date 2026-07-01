@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Export\Feed;
 
+use App\Export\Contracts\FeedProductScope;
+use App\Export\Contracts\FeedProductValues;
 use App\Export\Feed\Application\Generator\FeedGenerator;
 use App\Export\Feed\Domain\Entity\FeedProfile;
 use App\Export\Feed\Domain\Entity\FeedRun;
@@ -11,7 +13,6 @@ use App\Export\Feed\Domain\Entity\FeedRunLog;
 use App\Export\Feed\Domain\Enum\FeedRunStatus;
 use App\Export\Feed\Domain\Enum\FeedRunTrigger;
 use App\Export\Feed\Domain\Enum\FeedTemplateKind;
-use App\Export\Feed\Domain\Generator\FeedProductValues;
 use App\Export\Feed\Domain\Generator\FeedRequiredValidator;
 use App\Export\Feed\Domain\Mapping\FeedItemMapper;
 use App\Export\Feed\Domain\Mapping\FeedTransformApplier;
@@ -59,7 +60,7 @@ final class FeedGeneratorTest extends TestCase
         self::assertIsString($path);
 
         $source = new class implements FeedProductValues {
-            public function forProfile(FeedProfile $profile): iterable
+            public function forScope(FeedProductScope $scope): iterable
             {
                 yield ['sku' => 'KL-1', 'name' => 'Wkręt'];
                 yield ['sku' => 'KL-2', 'name' => 'Kątownik'];

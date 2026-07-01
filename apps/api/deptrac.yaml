@@ -530,6 +530,16 @@ parameters:
             - App\Catalog\Domain\ObjectKind
             - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
             - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
+        # XMLF-P3-02 — the feed value adapter lives in Export core (ADR-0023,
+        # operator decision) so it reuses the same catalog id-resolution +
+        # ExportBuilder streaming as SyncExportRunner; identical Export → Catalog
+        # \Domain reach (the implementation is catalog-data-bound).
+        App\Export\Application\Feed\ExportBuilderFeedValues:
+            - App\Catalog\Application\Filter\FilterDslResolver
+            - App\Catalog\Domain\Entity\CatalogObject
+            - App\Catalog\Domain\Entity\ObjectType
+            - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
+            - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
         # APIC-P3-06 — outbound-sync reader reuses the Export ValueSerializer +
         # iterates catalog objects; same Export → Catalog\Domain reach as the
         # serializer/runner above (the implementation is Catalog-data-bound).
