@@ -150,6 +150,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Export/Infrastructure/Doctrine/Orm/Mapping'
                 prefix: 'App\Export\Domain\Entity'
                 alias: Export
+            ExportFeed:
+                type: xml
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Export/Feed/Infrastructure/Doctrine/Orm/Mapping'
+                prefix: 'App\Export\Feed\Domain\Entity'
+                alias: ExportFeed
             Backup:
                 type: xml
                 is_bundle: false
