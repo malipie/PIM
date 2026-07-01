@@ -55,7 +55,11 @@ final class FeedRegenerateController
 
         $run = $this->regenerator->regenerate($feed, FeedRunTrigger::Manual);
 
-        return new JsonResponse($this->serialize($feed, $run), Response::HTTP_ACCEPTED);
+        // The generator's value source clears the EM mid-run, detaching $feed;
+        // reload so the response reflects the freshly recorded cache pointer.
+        $fresh = $this->feeds->findById($feed->getId()) ?? $feed;
+
+        return new JsonResponse($this->serialize($fresh, $run), Response::HTTP_ACCEPTED);
     }
 
     private function resolveTenant(): Tenant
