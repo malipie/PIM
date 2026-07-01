@@ -79,6 +79,20 @@ final class ExportBuilderFeedValues implements FeedProductValues
                 yield $this->toAttributeMap($row, $scope);
             }
             $this->em->clear();
+            // clear() detaches the Tenant the caller's TenantContext holds; the
+            // feed generator persists FeedRun/FeedRunLog rows (TenantScoped)
+            // after us and TenantAssignmentListener would otherwise assign a
+            // detached Tenant → "new entity found through relationship". Rebind
+            // a managed instance so downstream persists stay in the identity map.
+            $this->rebindTenantContext($tenantId);
+        }
+    }
+
+    private function rebindTenantContext(Uuid $tenantId): void
+    {
+        $tenant = $this->em->find(Tenant::class, $tenantId->toRfc4122());
+        if ($tenant instanceof Tenant) {
+            $this->tenantContext->set($tenant);
         }
     }
 
