@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Export\Feed;
 
+use App\Channel\Contracts\ChannelCategoryExternalCodeResolverInterface;
 use App\Export\Contracts\FeedProductScope;
 use App\Export\Contracts\FeedProductValues;
 use App\Export\Feed\Application\Async\FeedCancelledException;
@@ -121,7 +122,7 @@ final class FeedGeneratorTest extends TestCase
         };
 
         try {
-            $generator = new FeedGenerator($source, new FeedItemMapper(new FeedTransformApplier()), new FeedRequiredValidator(), $runRepo, $logRepo);
+            $generator = new FeedGenerator($source, new FeedItemMapper(new FeedTransformApplier()), new FeedRequiredValidator(), $runRepo, $logRepo, $this->stubResolver());
             $run = $generator->generate($this->profile(), $path, FeedRunTrigger::Manual);
 
             self::assertSame(FeedRunStatus::Done, $run->getStatus());
@@ -219,7 +220,7 @@ final class FeedGeneratorTest extends TestCase
         };
 
         try {
-            $generator = new FeedGenerator($source, new FeedItemMapper(new FeedTransformApplier()), new FeedRequiredValidator(), $runRepo, $logRepo);
+            $generator = new FeedGenerator($source, new FeedItemMapper(new FeedTransformApplier()), new FeedRequiredValidator(), $runRepo, $logRepo, $this->stubResolver());
 
             try {
                 $generator->generate($profile, $path, FeedRunTrigger::Manual, $run, $onChunk);
@@ -234,5 +235,177 @@ final class FeedGeneratorTest extends TestCase
         } finally {
             @unlink($path);
         }
+    }
+
+    /**
+     * XMLF-P3-03 — fmt=category slots resolve the RECEIVER's category id from
+     * the product's master categories through the Channel contract: first
+     * mapped category with an external_code wins; an explicit mapping value
+     * still takes precedence; a required slot left unresolved skips the item
+     * (with the validator's warning), an optional one is omitted with its own
+     * health-trail warning.
+     */
+    #[Test]
+    public function categorySlotsResolveThroughTheChannelContract(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'pim-feed-');
+        self::assertIsString($path);
+
+        $catMapped = Uuid::v7()->toRfc4122();
+        $catUnmapped = Uuid::v7()->toRfc4122();
+        $channelId = Uuid::v7();
+
+        $source = new class($catMapped, $catUnmapped) implements FeedProductValues {
+            public ?FeedProductScope $seenScope = null;
+
+            public function __construct(private readonly string $mapped, private readonly string $unmapped)
+            {
+            }
+
+            public function forScope(FeedProductScope $scope): iterable
+            {
+                $this->seenScope = $scope;
+                // Resolved through the channel port (second category carries the code).
+                yield ['sku' => 'KL-1', 'category_ids' => $this->unmapped.'|'.$this->mapped];
+                // No category resolvable → required 'cat' skips, optional 'gcat' omits.
+                yield ['sku' => 'KL-2', 'category_ids' => $this->unmapped];
+                // Explicit mapping value present → resolution must NOT overwrite it.
+                yield ['sku' => 'KL-3', 'category_ids' => $this->mapped, 'category_path' => 'Dom > Ogród'];
+            }
+        };
+
+        $resolver = new class($catMapped) implements ChannelCategoryExternalCodeResolverInterface {
+            /** @var list<array{0: string, 1: list<string>}> */
+            public array $calls = [];
+
+            public function __construct(private readonly string $mapped)
+            {
+            }
+
+            public function resolveExternalCodes(Uuid $channelId, array $masterCategoryIds): array
+            {
+                $this->calls[] = [$channelId->toRfc4122(), $masterCategoryIds];
+
+                return \in_array($this->mapped, $masterCategoryIds, true) ? [$this->mapped => '123'] : [];
+            }
+        };
+
+        $logRepo = new class implements FeedRunLogRepositoryInterface {
+            /** @var list<FeedRunLog> */
+            public array $lines = [];
+
+            public function save(FeedRunLog $log): void
+            {
+                $this->lines[] = $log;
+            }
+
+            public function saveMany(array $logs): void
+            {
+                foreach ($logs as $log) {
+                    $this->lines[] = $log;
+                }
+            }
+
+            public function findByRun(Uuid $feedRunId): array
+            {
+                return [];
+            }
+
+            public function findPageByRun(Uuid $feedRunId, ?string $level, ?Uuid $cursor, int $limit): array
+            {
+                return [];
+            }
+        };
+
+        $runRepo = new class implements FeedRunRepositoryInterface {
+            public function save(FeedRun $run): void
+            {
+            }
+
+            public function findById(Uuid $id): ?FeedRun
+            {
+                return null;
+            }
+
+            public function findByFeedProfile(Uuid $feedProfileId, int $limit = 50): array
+            {
+                return [];
+            }
+
+            public function findPage(?Uuid $feedProfileId, ?string $health, ?Uuid $cursor, int $limit): array
+            {
+                return [];
+            }
+
+            public function kpi24h(\App\Shared\Domain\Tenant $tenant, DateTimeImmutable $now): array
+            {
+                return ['regenerations_24h' => 0, 'skipped_24h' => 0, 'errors_24h' => 0, 'last_error' => null];
+            }
+        };
+
+        $profile = new FeedProfile(
+            code: 'ceneo_pl',
+            name: 'Ceneo PL',
+            templateKind: FeedTemplateKind::Custom,
+            objectTypeId: Uuid::v7(),
+            descriptor: [
+                'root' => ['element' => 'offers'],
+                'item' => [
+                    'element' => 'o',
+                    'slots' => [
+                        ['slot' => 'sku', 'node' => 'element', 'required' => true, 'fmt' => 'text'],
+                        ['slot' => 'cat', 'node' => 'element', 'required' => true, 'fmt' => 'category'],
+                        ['slot' => 'gcat', 'node' => 'element', 'fmt' => 'category'],
+                    ],
+                ],
+            ],
+            fieldMappings: [
+                ['slot' => 'sku', 'source' => ['kind' => 'attribute', 'ref' => 'sku']],
+                // Explicit mapping for 'cat' — its value (when present) wins.
+                ['slot' => 'cat', 'source' => ['kind' => 'attribute', 'ref' => 'category_path']],
+            ],
+            channelId: $channelId,
+        );
+
+        try {
+            $generator = new FeedGenerator($source, new FeedItemMapper(new FeedTransformApplier()), new FeedRequiredValidator(), $runRepo, $logRepo, $resolver);
+            $run = $generator->generate($profile, $path, FeedRunTrigger::Manual);
+
+            self::assertSame(2, $run->getItemCount(), 'KL-1 resolved + KL-3 explicit; KL-2 skipped');
+            self::assertSame(1, $run->getSkippedCount());
+
+            $scope = $source->seenScope;
+            self::assertNotNull($scope);
+            self::assertContains('category_ids', $scope->attributeCodes, 'generator requests the built-in only when category slots exist');
+
+            $dom = new DOMDocument();
+            self::assertNotFalse($dom->loadXML((string) file_get_contents($path)));
+            $cats = $dom->getElementsByTagName('cat');
+            self::assertSame(2, $cats->length);
+            self::assertSame('123', $cats->item(0)?->textContent, 'KL-1: resolved external_code');
+            self::assertSame('Dom > Ogród', $cats->item(1)?->textContent, 'KL-3: explicit mapping wins');
+            self::assertSame(2, $dom->getElementsByTagName('gcat')->length, 'optional gcat filled where resolvable');
+
+            // KL-2: required 'cat' violation (validator) + optional 'gcat' omission (generator).
+            $slots = array_map(static fn (FeedRunLog $line): ?string => $line->getSlot(), $logRepo->lines);
+            self::assertContains('cat', $slots);
+            self::assertContains('gcat', $slots);
+
+            // Memoisation: the port is hit once per distinct category id.
+            $queried = array_merge(...array_map(static fn (array $call): array => $call[1], $resolver->calls));
+            self::assertSame(\count(array_unique($queried)), \count($queried), 'no category id is resolved twice');
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    private function stubResolver(): ChannelCategoryExternalCodeResolverInterface
+    {
+        return new class implements ChannelCategoryExternalCodeResolverInterface {
+            public function resolveExternalCodes(Uuid $channelId, array $masterCategoryIds): array
+            {
+                return [];
+            }
+        };
     }
 }

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Export\Feed\Application\Generator;
 
+use App\Channel\Contracts\ChannelCategoryExternalCodeResolverInterface;
+use App\Export\Application\Builder\ValueSerializer;
 use App\Export\Contracts\FeedProductScope;
 use App\Export\Contracts\FeedProductValues;
 use App\Export\Feed\Application\Async\FeedCancelledException;
 use App\Export\Feed\Domain\Descriptor\FeedDescriptor;
+use App\Export\Feed\Domain\Descriptor\SlotFormat;
 use App\Export\Feed\Domain\Entity\FeedProfile;
 use App\Export\Feed\Domain\Entity\FeedRun;
 use App\Export\Feed\Domain\Entity\FeedRunLog;
@@ -22,6 +25,7 @@ use App\Export\Feed\Domain\Repository\FeedRunRepositoryInterface;
 use App\Export\Feed\Infrastructure\Writer\XmlFeedWriter;
 use App\Export\Infrastructure\Writer\XmlWriterCore;
 use Closure;
+use Symfony\Component\Uid\Uuid;
 use Throwable;
 
 /**
@@ -42,12 +46,16 @@ final class FeedGenerator
     /** Progress-callback cadence — aligned with the value source's EM-clear interval. */
     private const int PROGRESS_EVERY = 200;
 
+    /** Requested from the value source only when the descriptor has category slots. */
+    private const string CATEGORY_IDS_CODE = 'category_ids';
+
     public function __construct(
         private readonly FeedProductValues $values,
         private readonly FeedItemMapper $mapper,
         private readonly FeedRequiredValidator $validator,
         private readonly FeedRunRepositoryInterface $runs,
         private readonly FeedRunLogRepositoryInterface $logs,
+        private readonly ChannelCategoryExternalCodeResolverInterface $externalCodes,
     ) {
     }
 
@@ -67,7 +75,14 @@ final class FeedGenerator
         $descriptor = FeedDescriptor::fromArray($profile->getDescriptor());
         $mappings = FeedFieldMapping::listFromArray($profile->getFieldMappings());
         $context = $this->context($profile);
-        $scope = $this->scope($profile, $mappings);
+        // XMLF-P3-03 — slots with fmt=category carry the RECEIVER's category id
+        // (Ceneo <cat>, Google g:google_product_category), resolved from the
+        // product's master categories via the Channel contract.
+        $categorySlots = $this->categorySlots($descriptor);
+        $scope = $this->scope($profile, $mappings, [] !== $categorySlots);
+        $channelId = $profile->getChannelId();
+        /** @var array<string, string|null> $externalCodeMemo master category id → code (null = resolved-as-missing) */
+        $externalCodeMemo = [];
         $skip = FeedValidationPolicy::SkipInvalid === $profile->getValidationPolicy();
 
         $xml = XmlWriterCore::toUri($targetPath);
@@ -84,8 +99,30 @@ final class FeedGenerator
         try {
             foreach ($this->values->forScope($scope) as $attributes) {
                 $item = $this->mapper->map($mappings, $attributes, $context);
-                $violations = $this->validator->check($descriptor, $item);
                 $sku = $attributes['sku'] ?? null;
+
+                if ([] !== $categorySlots) {
+                    $resolved = $this->resolveExternalCode($attributes[self::CATEGORY_IDS_CODE] ?? '', $channelId, $externalCodeMemo);
+                    foreach ($categorySlots as $target => $required) {
+                        if ('' !== trim($item[$target] ?? '')) {
+                            continue; // an explicit mapping value wins; resolution is the default
+                        }
+                        if (null !== $resolved) {
+                            $item[$target] = $resolved;
+                            continue;
+                        }
+                        if ($required) {
+                            continue; // stays empty — the required validator skips + logs below
+                        }
+                        // Optional category slot with nothing resolved: omit the
+                        // node but leave a health-trail line (plan §6.7).
+                        unset($item[$target]);
+                        $buffer[] = new FeedRunLog($run->getId(), FeedRunLogLevel::Warning, 'no channel category external_code mapped — slot omitted', $sku, $target);
+                        ++$warnings;
+                    }
+                }
+
+                $violations = $this->validator->check($descriptor, $item);
 
                 if ([] !== $violations) {
                     foreach ($violations as $violation) {
@@ -175,13 +212,18 @@ final class FeedGenerator
     /**
      * @param list<FeedFieldMapping> $mappings
      */
-    private function scope(FeedProfile $profile, array $mappings): FeedProductScope
+    private function scope(FeedProfile $profile, array $mappings, bool $needsCategoryIds): FeedProductScope
     {
         $codes = ['sku' => true]; // always needed for the FeedRunLog object_sku
         foreach ($mappings as $mapping) {
             if ('attribute' === $mapping->sourceKind && null !== $mapping->sourceRef) {
                 $codes[$mapping->sourceRef] = true;
             }
+        }
+        if ($needsCategoryIds) {
+            // Master category ids (built-in column) feed the channel
+            // external-code resolution for fmt=category slots (XMLF-P3-03).
+            $codes[self::CATEGORY_IDS_CODE] = true;
         }
 
         return new FeedProductScope(
@@ -191,6 +233,62 @@ final class FeedGenerator
             channel: $profile->getPublicationChannel(),
             filter: $profile->getFilter(),
         );
+    }
+
+    /**
+     * Targets of slots with fmt=category → required flag.
+     *
+     * @return array<string, bool>
+     */
+    private function categorySlots(FeedDescriptor $descriptor): array
+    {
+        $slots = [];
+        foreach ($descriptor->slots as $slot) {
+            if (SlotFormat::Category === $slot->rule->format) {
+                $slots[$slot->target] = $slot->rule->required;
+            }
+        }
+
+        return $slots;
+    }
+
+    /**
+     * First marketplace external_code resolvable from the row's master
+     * categories (assignment order), memoised per run — the port is hit once
+     * per distinct category id, not once per product. A feed without a
+     * channel resolves nothing (the required/optional consequence is the
+     * caller's).
+     *
+     * @param array<string, string|null> $memo
+     */
+    private function resolveExternalCode(string $joinedCategoryIds, ?Uuid $channelId, array &$memo): ?string
+    {
+        if (null === $channelId || '' === $joinedCategoryIds) {
+            return null;
+        }
+        $categoryIds = array_values(array_filter(
+            explode(ValueSerializer::MULTI_VALUE_GLUE, $joinedCategoryIds),
+            static fn (string $id): bool => '' !== $id,
+        ));
+        if ([] === $categoryIds) {
+            return null;
+        }
+
+        $missing = array_values(array_filter($categoryIds, static fn (string $id): bool => !\array_key_exists($id, $memo)));
+        if ([] !== $missing) {
+            $resolved = $this->externalCodes->resolveExternalCodes($channelId, $missing);
+            foreach ($missing as $id) {
+                $memo[$id] = $resolved[$id] ?? null;
+            }
+        }
+
+        foreach ($categoryIds as $id) {
+            if (null !== $memo[$id]) {
+                return $memo[$id];
+            }
+        }
+
+        return null;
     }
 
     /**

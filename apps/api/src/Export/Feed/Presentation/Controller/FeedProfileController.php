@@ -84,6 +84,8 @@ final class FeedProfileController
             objectTypeId: $objectTypeId,
             descriptor: $descriptor,
             fieldMappings: $mappings,
+            channelId: $this->parseOptionalUuid($payload, 'channel_id'),
+            publicationChannel: $this->parseOptionalString($payload, 'publication_channel'),
             locale: $this->parseOptionalString($payload, 'locale'),
             currency: $this->parseOptionalString($payload, 'currency'),
             validationPolicy: $this->parsePolicy($payload),
@@ -129,6 +131,20 @@ final class FeedProfileController
         }
         if (\array_key_exists('validation_policy', $payload)) {
             $feed->setValidationPolicy($this->parsePolicy($payload));
+        }
+        // Scope block (XMLF-P3-03) — channel drives the fmt=category external
+        // code resolution; absent keys keep their current values.
+        if (\array_key_exists('channel_id', $payload)
+            || \array_key_exists('publication_channel', $payload)
+            || \array_key_exists('locale', $payload)
+            || \array_key_exists('currency', $payload)
+        ) {
+            $feed->setScope(
+                \array_key_exists('channel_id', $payload) ? $this->parseOptionalUuid($payload, 'channel_id') : $feed->getChannelId(),
+                \array_key_exists('publication_channel', $payload) ? $this->parseOptionalString($payload, 'publication_channel') : $feed->getPublicationChannel(),
+                \array_key_exists('locale', $payload) ? $this->parseOptionalString($payload, 'locale') : $feed->getLocale(),
+                \array_key_exists('currency', $payload) ? $this->parseOptionalString($payload, 'currency') : $feed->getCurrency(),
+            );
         }
 
         $this->feeds->save($feed);
@@ -293,6 +309,22 @@ final class FeedProfileController
     }
 
     /**
+     * @param array<string, mixed> $payload
+     */
+    private function parseOptionalUuid(array $payload, string $key): ?Uuid
+    {
+        $value = $payload[$key] ?? null;
+        if (null === $value || '' === $value) {
+            return null;
+        }
+        if (!\is_string($value) || !Uuid::isValid($value)) {
+            throw new BadRequestHttpException(sprintf('%s must be a UUID when provided.', $key));
+        }
+
+        return Uuid::fromString($value);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function decodeJson(Request $request): array
@@ -337,6 +369,7 @@ final class FeedProfileController
             'validation_policy' => $feed->getValidationPolicy()->value,
             'locale' => $feed->getLocale(),
             'currency' => $feed->getCurrency(),
+            'channel_id' => $feed->getChannelId()?->toRfc4122(),
             'publication_channel' => $feed->getPublicationChannel(),
             'schedule_cron' => $feed->getScheduleCron(),
             'descriptor' => $feed->getDescriptor(),

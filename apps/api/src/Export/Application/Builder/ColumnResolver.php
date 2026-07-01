@@ -43,6 +43,10 @@ final class ColumnResolver
         'sku' => 'sku',
         'parent_sku' => 'parent_sku',
         'category' => 'category',
+        // XMLF-P3-03 — master category IDS (rfc4122, pipe-joined); the feed
+        // generator resolves them to marketplace external codes via the
+        // Channel contract. `category` above stays the human-readable codes.
+        'category_ids' => 'category_ids',
         'created_at' => 'created_at',
         'updated_at' => 'updated_at',
         'status' => 'status',
