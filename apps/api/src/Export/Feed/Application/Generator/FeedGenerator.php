@@ -6,6 +6,7 @@ namespace App\Export\Feed\Application\Generator;
 
 use App\Export\Contracts\FeedProductScope;
 use App\Export\Contracts\FeedProductValues;
+use App\Export\Feed\Application\Async\FeedCancelledException;
 use App\Export\Feed\Domain\Descriptor\FeedDescriptor;
 use App\Export\Feed\Domain\Entity\FeedProfile;
 use App\Export\Feed\Domain\Entity\FeedRun;
@@ -20,6 +21,7 @@ use App\Export\Feed\Domain\Repository\FeedRunLogRepositoryInterface;
 use App\Export\Feed\Domain\Repository\FeedRunRepositoryInterface;
 use App\Export\Feed\Infrastructure\Writer\XmlFeedWriter;
 use App\Export\Infrastructure\Writer\XmlWriterCore;
+use Closure;
 use Throwable;
 
 /**
@@ -37,6 +39,9 @@ final class FeedGenerator
 {
     private const int LOG_FLUSH_EVERY = 500;
 
+    /** Progress-callback cadence — aligned with the value source's EM-clear interval. */
+    private const int PROGRESS_EVERY = 200;
+
     public function __construct(
         private readonly FeedProductValues $values,
         private readonly FeedItemMapper $mapper,
@@ -46,9 +51,16 @@ final class FeedGenerator
     ) {
     }
 
-    public function generate(FeedProfile $profile, string $targetPath, FeedRunTrigger $trigger): FeedRun
+    /**
+     * @param FeedRun|null            $run     pre-created run to drive (async worker, XMLF-P4-02);
+     *                                         null creates one inline (sync path)
+     * @param Closure(int): void|null $onChunk invoked with the processed-row count every
+     *                                         PROGRESS_EVERY rows; may throw
+     *                                         {@see FeedCancelledException} to stop gracefully
+     */
+    public function generate(FeedProfile $profile, string $targetPath, FeedRunTrigger $trigger, ?FeedRun $run = null, ?Closure $onChunk = null): FeedRun
     {
-        $run = new FeedRun($profile->getId(), $trigger);
+        $run ??= new FeedRun($profile->getId(), $trigger);
         $run->markRunning();
         $this->runs->save($run);
 
@@ -83,6 +95,7 @@ final class FeedGenerator
                     if ($skip) {
                         ++$skipped;
                         $buffer = $this->maybeFlush($buffer);
+                        $this->tickProgress($onChunk, $items + $skipped);
                         continue;
                     }
                 }
@@ -90,8 +103,17 @@ final class FeedGenerator
                 $writer->writeItem($item);
                 ++$items;
                 $buffer = $this->maybeFlush($buffer);
+                $this->tickProgress($onChunk, $items + $skipped);
             }
             $writer->finish();
+        } catch (FeedCancelledException $cancelled) {
+            // The cancel endpoint already persisted the terminal `cancelled`
+            // status — flush the health trail collected so far and let the
+            // async handler publish the final state. No markError: cancelling
+            // is a user decision, not a failure.
+            $this->logs->saveMany($buffer);
+
+            throw $cancelled;
         } catch (Throwable $error) {
             $this->logs->saveMany($buffer);
             // The value source clears the EM between chunks (memory-flat 50k),
@@ -122,6 +144,16 @@ final class FeedGenerator
     private function reload(FeedRun $run): FeedRun
     {
         return $this->runs->findById($run->getId()) ?? $run;
+    }
+
+    /**
+     * @param Closure(int): void|null $onChunk
+     */
+    private function tickProgress(?Closure $onChunk, int $processed): void
+    {
+        if (null !== $onChunk && $processed > 0 && 0 === $processed % self::PROGRESS_EVERY) {
+            $onChunk($processed);
+        }
     }
 
     /**

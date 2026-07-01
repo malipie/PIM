@@ -166,6 +166,13 @@ framework:
             # consume it, so no docker-compose change is needed.
             App\Export\Domain\Message\RunExportMessage: import
 
+            # XMLF-P4-02 (#1926) — async feed regeneration. Same import/export
+            # worker split as RunExportMessage: a 50k-SKU feed streams to MinIO
+            # out-of-band (FeedRunHandler) with progress over Mercure.
+            # TenantAwareMessage so the rebinding + RLS-GUC middleware restore
+            # tenant context on the worker before the handler loads the run.
+            App\Export\Feed\Domain\Message\RunFeedMessage: import
+
             # APIC-P4-05 — producer webhook delivery. Async so the originating
             # write never blocks on a slow integrator; the `async` retry strategy
             # (5×, exponential) backs off failures and dead-letters to `failed`.

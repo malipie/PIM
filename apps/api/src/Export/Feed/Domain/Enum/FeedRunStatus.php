@@ -14,4 +14,15 @@ enum FeedRunStatus: string
     case Done = 'done';
     case Error = 'error';
     case Cancelled = 'cancelled';
+
+    /**
+     * Terminal states cannot be cancelled or re-entered (XMLF-P4-02).
+     */
+    public function isTerminal(): bool
+    {
+        return match ($this) {
+            self::Done, self::Error, self::Cancelled => true,
+            self::Pending, self::Running => false,
+        };
+    }
 }
