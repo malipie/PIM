@@ -10,6 +10,7 @@ use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
+use App\Export\Application\Builder\ColumnResolver;
 use App\Export\Application\Builder\ExportBuilder;
 use App\Export\Application\Builder\PublicationColumnPlanner;
 use App\Export\Application\Builder\Structural\StructuralExportBuilderInterface;
@@ -20,8 +21,13 @@ use App\Export\Domain\Enum\ExportFormat;
 use App\Export\Domain\Enum\ExportTargetScope;
 use App\Export\Domain\Repository\ExportSessionRepositoryInterface;
 use App\Export\Infrastructure\Writer\CsvStreamWriter;
+use App\Export\Infrastructure\Writer\GenericXmlWriter;
+use App\Export\Infrastructure\Writer\PositionalRowSink;
+use App\Export\Infrastructure\Writer\RowSink;
 use App\Export\Infrastructure\Writer\RowWriter;
 use App\Export\Infrastructure\Writer\XlsxStreamWriter;
+use App\Export\Infrastructure\Writer\XmlRowSink;
+use App\Export\Infrastructure\Writer\XmlWriterCore;
 use App\Shared\Domain\Tenant;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -68,6 +74,7 @@ final class SyncExportRunner
         private readonly FilterDslResolver $filterDsl,
         private readonly Connection $connection,
         private readonly PublicationColumnPlanner $columnPlanner,
+        private readonly ColumnResolver $columnResolver,
         private readonly ObjectTypeRepositoryInterface $objectTypes,
         private readonly EntityManagerInterface $em,
         /** @var iterable<StructuralExportBuilderInterface> */
@@ -342,8 +349,8 @@ final class SyncExportRunner
             $columns = $planned;
         }
 
-        $writer = $this->openWriter($session->getFormat(), $session, $targetPath);
-        $writer->writeHeaders($columns);
+        $sink = $this->openSink($session->getFormat(), $session, $columns, $targetPath);
+        $sink->begin($columns);
 
         $rows = 0;
         try {
@@ -356,11 +363,7 @@ final class SyncExportRunner
                 // (findByIds returns DB order; the plan owns the contract).
                 $page = $this->hydratePageInOrder($idPage);
                 foreach ($this->builder->build($page, $session) as $row) {
-                    $values = [];
-                    foreach ($columns as $key) {
-                        $values[] = $row[$key] ?? '';
-                    }
-                    $writer->writeRow($values);
+                    $sink->accept($row);
                     ++$rows;
                     if (null !== $onChunk && 0 === $rows % self::PROGRESS_CHUNK) {
                         $onChunk($rows);
@@ -370,7 +373,7 @@ final class SyncExportRunner
                 $this->em->clear();
             }
         } finally {
-            $writer->close();
+            $sink->close();
         }
 
         $size = file_exists($targetPath) ? (int) filesize($targetPath) : 0;
@@ -448,24 +451,20 @@ final class SyncExportRunner
             $columns = $builder->columns($tenant);
         }
 
-        $writer = $this->openWriter($session->getFormat(), $session, $targetPath);
-        $writer->writeHeaders($columns);
+        $sink = $this->openSink($session->getFormat(), $session, $columns, $targetPath);
+        $sink->begin($columns);
 
         $rows = 0;
         try {
             foreach ($builder->rows($tenant) as $row) {
-                $values = [];
-                foreach ($columns as $key) {
-                    $values[] = $row[$key] ?? '';
-                }
-                $writer->writeRow($values);
+                $sink->accept($row);
                 ++$rows;
                 if (null !== $onChunk && 0 === $rows % self::PROGRESS_CHUNK) {
                     $onChunk($rows);
                 }
             }
         } finally {
-            $writer->close();
+            $sink->close();
         }
 
         $session->setTargetCount($rows);
@@ -495,6 +494,25 @@ final class SyncExportRunner
         }
 
         return $tenant;
+    }
+
+    /**
+     * Build the {@see RowSink} for the session format. XML (ADR-0023 §6.10)
+     * streams through {@see GenericXmlWriter}, which needs the resolved column
+     * plan (locale/channel scope → element attributes); CSV/XLSX wrap the
+     * positional {@see RowWriter}.
+     *
+     * @param list<string> $columns
+     */
+    private function openSink(ExportFormat $format, ExportSession $session, array $columns, string $path): RowSink
+    {
+        if (ExportFormat::Xml === $format) {
+            $definitions = array_values($this->columnResolver->resolve($columns, $session->getChannels() ?? []));
+
+            return new XmlRowSink(new GenericXmlWriter(XmlWriterCore::toUri($path), $definitions));
+        }
+
+        return new PositionalRowSink($this->openWriter($format, $session, $path));
     }
 
     private function openWriter(ExportFormat $format, ExportSession $session, string $path): RowWriter
