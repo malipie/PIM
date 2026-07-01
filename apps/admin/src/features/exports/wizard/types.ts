@@ -9,7 +9,7 @@ export type ExportEntityType =
   | 'attribute_groups'
   | 'categories';
 
-export type ExportFormat = 'xlsx' | 'csv';
+export type ExportFormat = 'xlsx' | 'csv' | 'xml';
 
 export type ExportTargetScope = 'all' | 'filter' | 'selected';
 

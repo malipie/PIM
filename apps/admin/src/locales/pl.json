@@ -3143,16 +3143,15 @@
       "format_group_aria": "Format pliku",
       "format_desc": {
         "xlsx": "Arkusz kalkulacyjny Excel",
-        "csv": "Wartości rozdzielane przecinkiem"
+        "csv": "Wartości rozdzielane przecinkiem",
+        "xml": "Hierarchiczny feed XML (generyczny wrapper)"
       },
       "format_soon": {
-        "xml": "XML",
         "json": "JSON",
         "gsheets": "Google Sheets",
         "pdf": "PDF"
       },
       "format_soon_desc": {
-        "xml": "Feed hierarchiczny",
         "json": "Dane strukturalne / API",
         "gsheets": "Arkusz w chmurze",
         "pdf": "Katalog / cennik"
