@@ -91,5 +91,27 @@ final class MercureSubscribeTopicsTest extends TestCase
         self::assertStringContainsString('/imports', $joined);
         self::assertStringContainsString('/exports', $joined);
         self::assertStringContainsString('/identity', $joined);
+        // XMLF-P4-02 — feed regeneration progress family.
+        self::assertStringContainsString('/feeds', $joined);
+    }
+
+    #[Test]
+    public function feedRunsTopicIsTenantScopedAndCoveredByTheClaim(): void
+    {
+        $tenantId = Uuid::fromString(self::TENANT_A);
+        $feedId = '019f1f42-b277-750c-919e-83f65bf9bf54';
+
+        $topic = MercureSubscribeTopics::feedRuns($tenantId, self::BASE, $feedId);
+
+        self::assertSame(
+            self::BASE.'/tenant/'.self::TENANT_A.'/feeds/'.$feedId.'/runs',
+            $topic,
+        );
+        // The URI-template claim (`/feeds/{id}/runs`) must authorise exactly
+        // this topic shape — one path segment for the feed id.
+        self::assertContains(
+            self::BASE.'/tenant/'.self::TENANT_A.'/feeds/{id}/runs',
+            MercureSubscribeTopics::forTenant($tenantId, self::BASE),
+        );
     }
 }

@@ -60,6 +60,11 @@ final class MessengerRoutingTest extends KernelTestCase
             'import',
         ];
 
+        yield 'export: run feed regeneration (XMLF-P4-02, reuses import transport)' => [
+            \App\Export\Feed\Domain\Message\RunFeedMessage::class,
+            'import',
+        ];
+
         yield 'integration: inbound sync (APIC-P3-04, reuses import transport)' => [
             \App\Integration\Generic\Domain\Message\InboundSyncMessage::class,
             'import',

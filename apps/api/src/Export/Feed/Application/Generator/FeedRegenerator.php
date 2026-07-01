@@ -11,6 +11,7 @@ use App\Export\Feed\Domain\Enum\FeedRunStatus;
 use App\Export\Feed\Domain\Enum\FeedRunTrigger;
 use App\Export\Feed\Domain\Repository\FeedProfileRepositoryInterface;
 use App\Shared\Application\TenantContext;
+use Closure;
 use DateTimeImmutable;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
@@ -41,7 +42,12 @@ final class FeedRegenerator
     ) {
     }
 
-    public function regenerate(FeedProfile $profile, FeedRunTrigger $trigger): FeedRun
+    /**
+     * @param FeedRun|null            $run     pre-created run to drive (async worker, XMLF-P4-02)
+     * @param Closure(int): void|null $onChunk progress callback forwarded to the generator;
+     *                                         may throw FeedCancelledException to stop gracefully
+     */
+    public function regenerate(FeedProfile $profile, FeedRunTrigger $trigger, ?FeedRun $run = null, ?Closure $onChunk = null): FeedRun
     {
         $tenant = $this->tenantContext->get();
         if (null === $tenant) {
@@ -54,7 +60,7 @@ final class FeedRegenerator
         }
 
         try {
-            $run = $this->generator->generate($profile, $tempPath, $trigger);
+            $run = $this->generator->generate($profile, $tempPath, $trigger, $run, $onChunk);
 
             if (FeedRunStatus::Done === $run->getStatus()) {
                 $key = $this->cacheKey($tenant->getId(), $profile->getId());

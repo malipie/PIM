@@ -71,6 +71,16 @@ final class MercureSubscribeTopics
         return self::tenantPrefix($tenantId, $base).'/exports/'.$userId;
     }
 
+    /**
+     * Live regeneration progress of one feed (XMLF-P4-02) — every run of the
+     * feed publishes progress + status here; the monitor screen subscribes
+     * per feed, so a new run appears on the already-open detail view.
+     */
+    public static function feedRuns(Uuid $tenantId, string $base, string $feedId): string
+    {
+        return self::tenantPrefix($tenantId, $base).'/feeds/'.$feedId.'/runs';
+    }
+
     public static function identityUser(Uuid $tenantId, string $base, string $userId): string
     {
         return self::tenantPrefix($tenantId, $base).'/identity/user/'.$userId;
@@ -102,6 +112,8 @@ final class MercureSubscribeTopics
             $prefix.'/imports/user/{id}',
             // Export progress (list + detail).
             $prefix.'/exports/{id}',
+            // Feed regeneration progress (XMLF-P4-02, per-feed run stream).
+            $prefix.'/feeds/{id}/runs',
             // Permission invalidation (per-user + tenant-wide).
             $prefix.'/identity/user/{id}',
             $prefix.'/identity/tenant/{id}',

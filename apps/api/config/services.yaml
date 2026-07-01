@@ -258,6 +258,14 @@ services:
     App\Export\Application\Async\ExportProgressPublisher:
         arguments:
             $topicBase: '%env(MERCURE_TOPIC_BASE)%'
+    # XMLF-P4-02 — feed regeneration progress topic (tenant/{tid}/feeds/{id}/runs);
+    # the regenerate endpoint returns the same topic as `mercure_topic`.
+    App\Export\Feed\Application\Async\FeedProgressPublisher:
+        arguments:
+            $topicBase: '%env(MERCURE_TOPIC_BASE)%'
+    App\Export\Feed\Presentation\Controller\FeedRegenerateController:
+        arguments:
+            $topicBase: '%env(MERCURE_TOPIC_BASE)%'
     # AUD-001 (#1573) — Catalog + permission publishers and the cookie
     # mint endpoint must build topics from the same public origin the SPA
     # subscribes on, so the tenant-scoped subscribe claim matches the
