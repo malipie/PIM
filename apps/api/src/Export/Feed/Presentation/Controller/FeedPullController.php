@@ -91,6 +91,7 @@ final class FeedPullController
         }
         // Establish the RLS scope from the URL before any TenantScoped query:
         // the Postgres GUC (row-level security) + the Doctrine TenantFilter.
+        // tenant-safe: infrastructure (establishes the tenant_id RLS policies read from the URL path; this IS the tenant boundary the token then gates, not a bypass — mirrors RlsContextListener)
         $this->connection->executeStatement(
             "SELECT set_config('app.current_tenant', :tenant, false)",
             ['tenant' => $tenantId->toRfc4122()],

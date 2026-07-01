@@ -114,6 +114,11 @@ final class FeedRegeneratorTest extends TestCase
                 return $this->known;
             }
 
+            public function findByTokenHash(string $tokenHash): ?FeedProfile
+            {
+                return null;
+            }
+
             public function findByTenantAndCode(Tenant $tenant, string $code): ?FeedProfile
             {
                 return null;
@@ -155,6 +160,21 @@ final class FeedRegeneratorTest extends TestCase
                 $this->keys[] = $key;
                 $this->content = (string) file_get_contents($localPath);
             }
+
+            public function exists(string $key): bool
+            {
+                return \in_array($key, $this->keys, true);
+            }
+
+            public function read(string $key)
+            {
+                $stream = fopen('php://memory', 'r+');
+                \assert(false !== $stream);
+                fwrite($stream, $this->content);
+                rewind($stream);
+
+                return $stream;
+            }
         };
 
         $profile = $this->profile();
@@ -191,6 +211,19 @@ final class FeedRegeneratorTest extends TestCase
         $cache = new class implements FeedCacheStorage {
             public function put(string $key, string $localPath): void
             {
+            }
+
+            public function exists(string $key): bool
+            {
+                return false;
+            }
+
+            public function read(string $key)
+            {
+                $stream = fopen('php://memory', 'r');
+                \assert(false !== $stream);
+
+                return $stream;
             }
         };
         $profile = $this->profile();
