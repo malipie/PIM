@@ -23,6 +23,7 @@ use App\Export\Feed\Domain\Repository\FeedRunLogRepositoryInterface;
 use App\Export\Feed\Domain\Repository\FeedRunRepositoryInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use DateTimeImmutable;
 use DOMDocument;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -75,6 +76,16 @@ final class FeedRegeneratorTest extends TestCase
             {
                 return [];
             }
+
+            public function findPage(?Uuid $feedProfileId, ?string $health, ?Uuid $cursor, int $limit): array
+            {
+                return [];
+            }
+
+            public function kpi24h(Tenant $tenant, DateTimeImmutable $now): array
+            {
+                return ['regenerations_24h' => 0, 'skipped_24h' => 0, 'errors_24h' => 0, 'last_error' => null];
+            }
         };
         $logRepo = new class implements FeedRunLogRepositoryInterface {
             public function save(FeedRunLog $log): void
@@ -86,6 +97,11 @@ final class FeedRegeneratorTest extends TestCase
             }
 
             public function findByRun(Uuid $feedRunId): array
+            {
+                return [];
+            }
+
+            public function findPageByRun(Uuid $feedRunId, ?string $level, ?Uuid $cursor, int $limit): array
             {
                 return [];
             }

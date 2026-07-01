@@ -22,4 +22,14 @@ interface FeedRunLogRepositoryInterface
      * @return list<FeedRunLog>
      */
     public function findByRun(Uuid $feedRunId): array;
+
+    /**
+     * Keyset page of one run's log lines for the drill-down (XMLF-P4-03),
+     * oldest first (the order they were emitted). Log ids are UUIDv7, so the
+     * cursor is the last-seen log id. `$level` filters info|warning|error;
+     * null = all lines.
+     *
+     * @return list<FeedRunLog>
+     */
+    public function findPageByRun(Uuid $feedRunId, ?string $level, ?Uuid $cursor, int $limit): array;
 }

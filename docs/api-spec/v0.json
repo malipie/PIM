@@ -12997,6 +12997,58 @@
                 "x-cortex-permission": "exports.view_all"
             }
         },
+        "/api/feed-runs": {
+            "get": {
+                "operationId": "api_feed_runs_get",
+                "tags": [
+                    "feed-runs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api feed runs",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
+            }
+        },
+        "/api/feed-runs/kpi": {
+            "get": {
+                "operationId": "api_feed_runs_kpi_get",
+                "tags": [
+                    "feed-runs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api feed runs kpi",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
+            }
+        },
         "/api/feeds": {
             "get": {
                 "operationId": "api_feeds_get",
@@ -13261,6 +13313,45 @@
                 ],
                 "x-pim-source": "custom-route",
                 "x-cortex-permission": "integration.admin"
+            }
+        },
+        "/api/feeds/{id}/health": {
+            "get": {
+                "operationId": "api_feeds_id_health_get",
+                "tags": [
+                    "feeds"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api feeds id health",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
             }
         },
         "/api/feeds/{id}/mapping": {
@@ -13534,6 +13625,96 @@
                 "x-cortex-permission": "integration.admin"
             }
         },
+        "/api/feeds/{id}/runs": {
+            "get": {
+                "operationId": "api_feeds_id_runs_get",
+                "tags": [
+                    "feeds"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api feeds id runs",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
+            }
+        },
+        "/api/feeds/{id}/runs/{runId}": {
+            "get": {
+                "operationId": "api_feeds_id_runs_runid_get",
+                "tags": [
+                    "feeds"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api feeds id runs runId",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    },
+                    {
+                        "name": "runId",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
+            }
+        },
         "/api/feeds/{id}/runs/{runId}/cancel": {
             "post": {
                 "operationId": "api_feeds_id_runs_runid_cancel_post",
@@ -13583,6 +13764,57 @@
                 ],
                 "x-pim-source": "custom-route",
                 "x-cortex-permission": "integration.admin"
+            }
+        },
+        "/api/feeds/{id}/runs/{runId}/logs": {
+            "get": {
+                "operationId": "api_feeds_id_runs_runid_logs_get",
+                "tags": [
+                    "feeds"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api feeds id runs runId logs",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    },
+                    {
+                        "name": "runId",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
             }
         },
         "/api/feeds/{id}/token": {
