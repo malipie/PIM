@@ -61,6 +61,6 @@
     }
   },
   "dependencies": {
-    "react-hook-form": "7.77.0"
+    "react-hook-form": "7.80.0"
   }
 }
