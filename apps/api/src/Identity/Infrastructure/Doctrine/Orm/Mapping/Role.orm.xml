@@ -32,6 +32,11 @@
                 <option name="default">false</option>
             </options>
         </field>
+        <field name="agentAutonomy" type="string" length="16" column="agent_autonomy">
+            <options>
+                <option name="default">propose</option>
+            </options>
+        </field>
         <field name="createdAt" type="datetime_immutable" column="created_at"/>
 
         <many-to-many field="permissions" target-entity="App\Identity\Domain\Entity\Permission">

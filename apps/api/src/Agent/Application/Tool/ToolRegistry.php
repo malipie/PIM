@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Agent\Application\Tool;
 
 use App\Agent\Domain\Exception\ToolAccessDeniedException;
+use App\Identity\Contracts\Policy\AgentAutonomyResolverInterface;
 use App\Identity\Contracts\Policy\PermissionCheckerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\Uid\Uuid;
@@ -29,6 +30,7 @@ final readonly class ToolRegistry
         #[AutowireIterator('agent.tool')]
         iterable $tools,
         private PermissionCheckerInterface $permissions,
+        private ?AgentAutonomyResolverInterface $autonomy = null,
     ) {
         $indexed = [];
         foreach ($tools as $tool) {
@@ -42,9 +44,19 @@ final readonly class ToolRegistry
      */
     public function availableFor(Uuid $userId): array
     {
+        // AGENT-P8-05 (#1987) — the role-level autonomy gate runs BEFORE
+        // per-tool permissions: 'off' = empty surface (a run refuses to
+        // plan), 'read_only' = grounding tools only, 'propose' = full
+        // surface with write/schema still behind the approval gate.
+        $level = $this->autonomy?->autonomyForUser($userId) ?? 'propose';
+        if ('off' === $level) {
+            return [];
+        }
+
         return array_values(array_filter(
             $this->tools,
-            fn (AgentToolInterface $tool): bool => $this->permissions->userHasPermission($userId, $tool->requiredPermission()),
+            fn (AgentToolInterface $tool): bool => ('read_only' !== $level || ToolKind::Read === $tool->kind())
+                && $this->permissions->userHasPermission($userId, $tool->requiredPermission()),
         ));
     }
 
