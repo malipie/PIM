@@ -29,8 +29,24 @@ export interface FeedDraft {
   authPassword: string;
 }
 
-export const WIZARD_STEP_IDS = ['template', 'scope', 'mapping', 'delivery', 'preview'] as const;
+export const WIZARD_STEP_IDS = [
+  'template',
+  'structure',
+  'scope',
+  'mapping',
+  'delivery',
+  'preview',
+] as const;
 export type WizardStepId = (typeof WIZARD_STEP_IDS)[number];
+
+/**
+ * XMLF-P5-06 — the step list is a function of the template kind: only a
+ * custom feed gets the structure editor (predefs have a fixed descriptor).
+ * Steps are addressed by id everywhere; indexes are derived per draft.
+ */
+export function stepsFor(kind: FeedTemplateKind | null): readonly WizardStepId[] {
+  return kind === 'custom' ? WIZARD_STEP_IDS : WIZARD_STEP_IDS.filter((s) => s !== 'structure');
+}
 
 export function emptyDraft(): FeedDraft {
   return {
@@ -117,18 +133,29 @@ export function slugifyCode(name: string): string {
     .replace(/^_+|_+$/g, '');
 }
 
-/** Step gating (design canNext): step 0 needs a template and a name. */
-export function canLeaveStep(step: number, draft: FeedDraft): boolean {
-  if (step === 0) {
+/** Step gating (design canNext), addressed by step id. The structure step
+ * gates on the inline descriptor validation (descriptor-edit.ts) — the page
+ * passes its verdict in, keeping this module free of the editor types. */
+export function canLeaveStep(
+  stepId: WizardStepId,
+  draft: FeedDraft,
+  structureValid = true,
+): boolean {
+  if (stepId === 'template') {
     return draft.kind !== null && draft.name.trim() !== '';
   }
-  if (step === 1) {
+  if (stepId === 'structure') {
+    return structureValid;
+  }
+  if (stepId === 'scope') {
     return draft.locale.trim() !== '';
   }
   return true;
 }
 
-/** POST /api/feeds payload for a fresh draft. */
+/** POST /api/feeds payload for a fresh draft. A custom feed sends its edited
+ * descriptor (+ pruned mappings) so create seeds the user's structure instead
+ * of the blank starter — the persist guard (P1-04) validates it server-side. */
 export function createPayload(draft: FeedDraft, objectTypeId: string): Record<string, unknown> {
   return {
     template_kind: draft.kind,
@@ -139,6 +166,9 @@ export function createPayload(draft: FeedDraft, objectTypeId: string): Record<st
     currency: draft.currency,
     channel_id: draft.channelId,
     filter: draft.filterDsl,
+    ...(draft.kind === 'custom'
+      ? { descriptor: draft.descriptor, field_mappings: draft.mappings.filter(isMapped) }
+      : {}),
   };
 }
 
@@ -152,6 +182,7 @@ export function patchPayload(draft: FeedDraft): Record<string, unknown> {
     filter: draft.filterDsl,
     validation_policy: draft.skipPolicy,
     schedule_cron: draft.cron,
+    ...(draft.kind === 'custom' ? { descriptor: draft.descriptor } : {}),
     delivery: {
       gzip: draft.gzip,
       auth:
@@ -164,4 +195,8 @@ export function patchPayload(draft: FeedDraft): Record<string, unknown> {
           : { type: 'none' },
     },
   };
+}
+
+function isMapped(mapping: SlotMapping): boolean {
+  return mapping.source !== null;
 }

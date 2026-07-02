@@ -1833,14 +1833,16 @@
           "scope": "Zakres",
           "mapping": "Mapowanie",
           "delivery": "Dostarczanie",
-          "preview": "Podgląd"
+          "preview": "Podgląd",
+          "structure": "Struktura"
         },
         "step_note": {
           "template": "kanał docelowy",
           "scope": "filtr · scope",
           "mapping": "sloty ↔ atrybuty",
           "delivery": "URL · harmonogram",
-          "preview": "XML · publikacja"
+          "preview": "XML · publikacja",
+          "structure": "root + pola"
         },
         "cancel": "Anuluj",
         "back": "← Wstecz",
@@ -1892,7 +1894,49 @@
           "preview_hint": "Podgląd XML na żywo z raportem zdrowia wchodzi z XMLF-P5-04."
         },
         "back_to_hub": "Wróć do feedów",
-        "saved_generating": "Feed zapisany — pierwsza regeneracja zakolejkowana."
+        "saved_generating": "Feed zapisany — pierwsza regeneracja zakolejkowana.",
+        "structure": {
+          "title": "Struktura dokumentu",
+          "subtitle": "custom XML — root, przestrzenie nazw i pola pozycji",
+          "root_label": "Element główny (root)",
+          "item_label": "Element pozycji (item)",
+          "namespaces": "Przestrzenie nazw",
+          "ns_prefix": "Prefiks przestrzeni nazw",
+          "ns_uri": "URI przestrzeni nazw",
+          "ns_add": "Dodaj przestrzeń nazw",
+          "ns_remove": "Usuń przestrzeń nazw",
+          "slots_title": "Pola elementu <{{item}}>",
+          "slot_name": "Nazwa pola",
+          "node": "Rodzaj węzła",
+          "format": "Format",
+          "required": "wymagane",
+          "max_length": "Maks. długość",
+          "parent": "Element nadrzędny (atrybut trafia na niego)",
+          "wrap_in": "Opakuj powtórzenia w",
+          "slot_add": "Dodaj pole",
+          "slot_remove": "Usuń pole",
+          "preview_title": "Podgląd struktury",
+          "node_kind": {
+            "element": "Element",
+            "attribute": "Atrybut",
+            "repeatable": "Powtarzalny",
+            "keyvalue": "Klucz-wartość"
+          },
+          "format_kind": {
+            "text": "Tekst",
+            "html": "HTML",
+            "url": "URL",
+            "price": "Cena",
+            "number": "Liczba",
+            "date": "Data"
+          },
+          "issue": {
+            "invalid_name": "„{{value}}” nie jest poprawną nazwą XML",
+            "duplicate_slot": "Zduplikowane pole „{{value}}”",
+            "parent_required": "Atrybut wymaga elementu nadrzędnego",
+            "invalid_max_length": "Maks. długość musi być liczbą dodatnią"
+          }
+        }
       },
       "detail": {
         "placeholder_title": "Detal feedu — w kolejnym tickecie",

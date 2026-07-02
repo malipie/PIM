@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
 import type { FeedRow } from '../api/feeds';
-import { canLeaveStep, draftFromFeed, emptyDraft, slugifyCode } from '../wizard/wizard-state';
+import {
+  canLeaveStep,
+  createPayload,
+  draftFromFeed,
+  emptyDraft,
+  patchPayload,
+  slugifyCode,
+  stepsFor,
+} from '../wizard/wizard-state';
 
 /**
- * XMLF-P5-02 — pure wizard logic: the code auto-slug, step gating and the
- * edit-mode prefill mapping.
+ * XMLF-P5-02 (+P5-06 id-based steps) — pure wizard logic: the code auto-slug,
+ * the kind-dependent step list, step gating and the edit-mode prefill mapping.
  */
 
 describe('slugifyCode', () => {
@@ -16,22 +24,75 @@ describe('slugifyCode', () => {
   });
 });
 
+describe('stepsFor', () => {
+  it('inserts the structure step for custom feeds only', () => {
+    expect(stepsFor('custom')).toEqual([
+      'template',
+      'structure',
+      'scope',
+      'mapping',
+      'delivery',
+      'preview',
+    ]);
+    expect(stepsFor('google_shopping')).toEqual([
+      'template',
+      'scope',
+      'mapping',
+      'delivery',
+      'preview',
+    ]);
+    expect(stepsFor(null)).not.toContain('structure');
+  });
+});
+
 describe('canLeaveStep', () => {
-  it('gates step 0 on template and name', () => {
+  it('gates the template step on template and name', () => {
     const draft = emptyDraft();
-    expect(canLeaveStep(0, draft)).toBe(false);
+    expect(canLeaveStep('template', draft)).toBe(false);
     draft.kind = 'ceneo';
-    expect(canLeaveStep(0, draft)).toBe(false);
+    expect(canLeaveStep('template', draft)).toBe(false);
     draft.name = 'Ceneo PL';
-    expect(canLeaveStep(0, draft)).toBe(true);
+    expect(canLeaveStep('template', draft)).toBe(true);
   });
 
-  it('gates step 1 on a locale and lets later steps pass', () => {
+  it('gates scope on a locale and lets later steps pass', () => {
     const draft = { ...emptyDraft(), kind: 'ceneo' as const, name: 'x', locale: '' };
-    expect(canLeaveStep(1, draft)).toBe(false);
+    expect(canLeaveStep('scope', draft)).toBe(false);
     draft.locale = 'pl';
-    expect(canLeaveStep(1, draft)).toBe(true);
-    expect(canLeaveStep(2, draft)).toBe(true);
+    expect(canLeaveStep('scope', draft)).toBe(true);
+    expect(canLeaveStep('mapping', draft)).toBe(true);
+  });
+
+  it('gates structure on the inline validation verdict', () => {
+    const draft = { ...emptyDraft(), kind: 'custom' as const, name: 'x' };
+    expect(canLeaveStep('structure', draft, false)).toBe(false);
+    expect(canLeaveStep('structure', draft, true)).toBe(true);
+  });
+});
+
+describe('custom descriptor in payloads', () => {
+  it('sends descriptor + mapped-only field_mappings on create for custom', () => {
+    const draft = {
+      ...emptyDraft(),
+      kind: 'custom' as const,
+      name: 'B2B',
+      code: 'b2b',
+      descriptor: { root: { element: 'products' }, item: { element: 'product', slots: [] } },
+      mappings: [
+        { slot: 'sku', source: { kind: 'attribute', ref: 'sku' } },
+        { slot: 'name', source: null },
+      ] as never[],
+    };
+    const payload = createPayload(draft, 'type-1');
+    expect(payload.descriptor).toEqual(draft.descriptor);
+    expect(payload.field_mappings).toHaveLength(1);
+    expect(patchPayload(draft).descriptor).toEqual(draft.descriptor);
+  });
+
+  it('omits descriptor for predefined templates', () => {
+    const draft = { ...emptyDraft(), kind: 'ceneo' as const, name: 'x', code: 'x' };
+    expect(createPayload(draft, 'type-1')).not.toHaveProperty('descriptor');
+    expect(patchPayload(draft)).not.toHaveProperty('descriptor');
   });
 });
 
