@@ -3600,5 +3600,30 @@
     "kbd_navigate": "nawiguj",
     "kbd_open": "otwórz",
     "kbd_close": "zamknij"
+  },
+  "agent": {
+    "chat": {
+      "open": "Otwórz czat agenta",
+      "title": "Agent PIM",
+      "empty": "Opisz, co mam zrobić — np. „ustaw cenę 100 wszystkim produktom bez ceny”. Nic nie zapiszę bez Twojej akceptacji.",
+      "placeholder": "Napisz, co zrobić…",
+      "busy_placeholder": "Agent pracuje…",
+      "input": "Wiadomość do agenta",
+      "send": "Wyślij",
+      "cancel": "Anuluj run",
+      "awaiting_approval": "Plan gotowy: {{count}} zmian czeka na Twoją akceptację.",
+      "go_to_inbox": "Przejdź do skrzynki akceptacji"
+    },
+    "status": {
+      "planning": "Planuję…",
+      "awaiting_input": "Czekam na odpowiedź",
+      "awaiting_approval": "Czeka na akceptację",
+      "committing": "Zapisuję…",
+      "done": "Zakończony",
+      "rejected": "Odrzucony",
+      "cancelled": "Anulowany",
+      "error": "Błąd",
+      "rolled_back": "Cofnięty"
+    }
   }
 }

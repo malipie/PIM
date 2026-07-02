@@ -3544,5 +3544,30 @@
     "kbd_navigate": "navigate",
     "kbd_open": "open",
     "kbd_close": "close"
+  },
+  "agent": {
+    "chat": {
+      "open": "Open agent chat",
+      "title": "PIM Agent",
+      "empty": "Tell me what to do — e.g. \"set price 100 on every product without one\". Nothing is written without your approval.",
+      "placeholder": "Type what to do…",
+      "busy_placeholder": "Agent is working…",
+      "input": "Message to the agent",
+      "send": "Send",
+      "cancel": "Cancel run",
+      "awaiting_approval": "Plan ready: {{count}} change(s) await your approval.",
+      "go_to_inbox": "Go to the approval inbox"
+    },
+    "status": {
+      "planning": "Planning…",
+      "awaiting_input": "Awaiting your reply",
+      "awaiting_approval": "Awaiting approval",
+      "committing": "Committing…",
+      "done": "Done",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled",
+      "error": "Error",
+      "rolled_back": "Rolled back"
+    }
   }
 }
