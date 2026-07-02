@@ -89,6 +89,13 @@ services:
         arguments:
             $topicBase: '%env(MERCURE_TOPIC_BASE)%'
 
+    # AGENT-P9-02 (#1989) — cost aggregator uses the same §8.5 caps the
+    # limit guard enforces (P1-04 knobs).
+    App\Agent\Application\Cost\AgentCostAggregator:
+        arguments:
+            $dayCapUsd: '%pim.agent.limits.cost_per_day_per_tenant_usd%'
+            $monthCapUsd: '%pim.agent.limits.cost_per_month_per_tenant_usd%'
+
     # AGENT-P1-03 (#1955) — loop limits + cost accounting knobs.
     App\Agent\Application\Run\AgentLoopRunner:
         arguments:

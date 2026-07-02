@@ -3627,7 +3627,13 @@
       "transparency_intent": "Your intent and the follow-up conversation messages.",
       "transparency_context": "View context: object type code, the active filter, selection counts (no full product data).",
       "transparency_results": "Tool results: counts, codes and minimal projections (id, code, name, completeness) — only what a tool returns.",
-      "transparency_never": "Never: your key, passwords, API tokens or other tenants’ data. Catalog writes happen only after your approval."
+      "transparency_never": "Never: your key, passwords, API tokens or other tenants’ data. Catalog writes happen only after your approval.",
+      "cost_heading": "Cost & limits",
+      "cost_today": "Today",
+      "cost_month": "This month",
+      "runs": "runs",
+      "cap_day": "Daily cap",
+      "cap_month": "Monthly cap"
     },
     "phase": {
       "planning": "Planning…",
