@@ -180,6 +180,11 @@ services:
     App\Catalog\Contracts\Query\CompletenessReportPort:
         alias: App\Catalog\Application\Query\SqlCompletenessReport
 
+    # AGENT-P3-01 (#1961) — write-through-approval seam: materializes
+    # value-edit diffs into pending_changes (commit is post-accept).
+    App\Catalog\Contracts\Command\BulkEditValuesPort:
+        alias: App\Catalog\Application\PendingChanges\BulkEditValuesMaterializer
+
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
     # "is this {value: ...} payload valid against this Attribute?" without
@@ -650,4 +655,9 @@ when@test:
         # AGENT-P2-03 (#1960) — same story for the completeness report port.
         App\Catalog\Contracts\Query\CompletenessReportPort:
             alias: App\Catalog\Application\Query\SqlCompletenessReport
+            public: true
+
+        # AGENT-P3-01 (#1961) — and the value-edit materializer port.
+        App\Catalog\Contracts\Command\BulkEditValuesPort:
+            alias: App\Catalog\Application\PendingChanges\BulkEditValuesMaterializer
             public: true
