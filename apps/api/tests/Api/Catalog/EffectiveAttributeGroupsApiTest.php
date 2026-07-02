@@ -177,7 +177,6 @@ final class EffectiveAttributeGroupsApiTest extends CatalogApiTestCase
         self::assertContains('pl', $codes);
         self::assertContains('en', $codes);
         $first = $locales[0];
-        \assert(\is_array($first));
         self::assertTrue($first['is_default'], 'Default locale is listed first.');
         self::assertSame('pl', $first['code']);
     }
