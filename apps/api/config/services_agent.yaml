@@ -22,6 +22,17 @@ parameters:
     # availability additionally requires an active BYOK key.
     pim.agent.enabled: '%env(bool:AGENT_ENABLED)%'
 
+    # AGENT-P1-03 (#1955) — in-run hard limits (PRD 10.4 / architecture
+    # 8.5 subset enforced inside the loop; hourly/daily/monthly budgets
+    # + kill-switch land in P1-04) and per-MTok USD pricing per model
+    # tier (cost accounting on agent_runs).
+    pim.agent.limits.tool_calls_per_run: 10
+    pim.agent.limits.tokens_per_run: 100000
+    pim.agent.pricing.default_input_per_mtok: 3.0
+    pim.agent.pricing.default_output_per_mtok: 15.0
+    pim.agent.pricing.schema_input_per_mtok: 5.0
+    pim.agent.pricing.schema_output_per_mtok: 25.0
+
 services:
     _defaults:
         autowire: true
@@ -65,3 +76,16 @@ services:
     App\Agent\Application\Run\AgentProgressPublisher:
         arguments:
             $topicBase: '%env(MERCURE_TOPIC_BASE)%'
+
+    # AGENT-P1-03 (#1955) — loop limits + cost accounting knobs.
+    App\Agent\Application\Run\AgentLoopRunner:
+        arguments:
+            $maxToolCallsPerRun: '%pim.agent.limits.tool_calls_per_run%'
+            $maxTokensPerRun: '%pim.agent.limits.tokens_per_run%'
+
+    App\Agent\Application\Run\UsageCostCalculator:
+        arguments:
+            $defaultInputPerMtok: '%pim.agent.pricing.default_input_per_mtok%'
+            $defaultOutputPerMtok: '%pim.agent.pricing.default_output_per_mtok%'
+            $schemaInputPerMtok: '%pim.agent.pricing.schema_input_per_mtok%'
+            $schemaOutputPerMtok: '%pim.agent.pricing.schema_output_per_mtok%'

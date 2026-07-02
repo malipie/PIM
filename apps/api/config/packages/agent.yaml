@@ -22,3 +22,11 @@ doctrine_migrations:
         # ships inside src/Agent so it disappears with the module. Core
         # hooks (pending_changes etc.) stay in /migrations.
         'AgentMigrations': '%kernel.project_dir%/src/Agent/Infrastructure/Migrations'
+
+framework:
+    messenger:
+        routing:
+            # AGENT-P1-03 (#1955) — the loop runs async on the queue the
+            # dev/prod worker already consumes; TenantAwareMessage rebinds
+            # tenant + RLS GUC in the worker middlewares.
+            App\Agent\Application\Run\AgentRunMessage: import
