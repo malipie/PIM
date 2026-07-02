@@ -1,5 +1,6 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
@@ -17,6 +18,8 @@ interface AgentKeyStatus {
 
 const JSON_OPTS = { contentType: 'application/json', accept: 'application/json' } as const;
 
+const AGENT_KEY_QUERY_KEY = ['settings', 'agent-key'] as const;
+
 /**
  * AGENT-P6-06 (#1979) — BYOK settings (Piotr, PRD §4.2): set/rotate the
  * tenant's Anthropic key (plaintext never comes back - only the display
@@ -26,21 +29,21 @@ const JSON_OPTS = { contentType: 'application/json', accept: 'application/json' 
  */
 export function AiSettingsPage() {
   const { t } = useTranslation();
-  const [status, setStatus] = useState<AgentKeyStatus | null>(null);
+  const queryClient = useQueryClient();
   const [draftKey, setDraftKey] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const reload = useCallback(async () => {
-    try {
-      setStatus(await jsonFetch<AgentKeyStatus>('/api/settings/agent-key', JSON_OPTS));
-    } catch (error) {
-      toast.error(httpErrorDetail(error) ?? String(error));
-    }
-  }, []);
+  // ADR-0021 — the status read lives in the query cache so the PUT /
+  // DELETE mutations refresh it through invalidation, not manual state.
+  const statusQuery = useQuery({
+    queryKey: AGENT_KEY_QUERY_KEY,
+    queryFn: () => jsonFetch<AgentKeyStatus>('/api/settings/agent-key', JSON_OPTS),
+  });
+  const status = statusQuery.data ?? null;
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  const reload = async () => {
+    await queryClient.invalidateQueries({ queryKey: AGENT_KEY_QUERY_KEY });
+  };
 
   const saveKey = async () => {
     const key = draftKey.trim();
@@ -95,10 +98,16 @@ export function AiSettingsPage() {
       </div>
 
       {status === null ? (
-        <p className="flex items-center gap-2 text-sm text-zinc-500" role="status">
-          <Loader2 className="size-4 animate-spin" aria-hidden />
-          {t('agent.settings.loading', { defaultValue: 'Wczytywanie…' })}
-        </p>
+        statusQuery.isError ? (
+          <p className="text-sm text-red-600" role="alert">
+            {httpErrorDetail(statusQuery.error) ?? String(statusQuery.error)}
+          </p>
+        ) : (
+          <p className="flex items-center gap-2 text-sm text-zinc-500" role="status">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            {t('agent.settings.loading', { defaultValue: 'Wczytywanie…' })}
+          </p>
+        )
       ) : (
         <>
           {!status.agent_feature_enabled && (
