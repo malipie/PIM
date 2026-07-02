@@ -653,6 +653,13 @@ parameters:
         # configuration entities through the Catalog CQRS commands + the shared
         # idempotent assignment service — the same Import→Catalog seam as the
         # CatalogObject importer, baselined here pending the #1466 burndown.
+        # AGENT-P5-04 (#1973) — agent schema rollback deletes through the
+        # same guarded CQRS commands the modeling UI uses (identical
+        # baseline pattern as the structural creators below).
+        App\Import\Application\Service\AgentSchemaImportApplier:
+            - App\Catalog\Application\Command\DeleteAttribute\DeleteAttributeCommand
+            - App\Catalog\Application\Command\DeleteAttributeGroup\DeleteAttributeGroupCommand
+
         App\Import\Application\Service\Structural\AttributeImportCreator:
             - App\Catalog\Application\Command\CreateAttribute\CreateAttributeCommand
             - App\Catalog\Application\Command\UpdateAttribute\UpdateAttributeCommand

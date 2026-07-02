@@ -24,4 +24,14 @@ use Symfony\Component\Uid\Uuid;
 interface SchemaImportPort
 {
     public function commitSchemaBatch(Uuid $batchId, Uuid $approvedBy): SchemaCommitResult;
+
+    /**
+     * AGENT-P5-04 (#1973) — "Cofnij tę operację" for schema: delete
+     * ONLY what the batch CREATED (the commit annotates each row's
+     * outcome) and ONLY when dataless — an attribute with values or a
+     * group with foreign attachments blocks the WHOLE rollback
+     * (all-or-nothing, nothing partially deleted) with an
+     * operator-facing reason.
+     */
+    public function rollbackSchemaBatch(Uuid $batchId): SchemaRollbackResult;
 }
