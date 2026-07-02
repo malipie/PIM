@@ -216,6 +216,11 @@ services:
     App\Import\Contracts\SchemaImportPort:
         alias: App\Import\Application\Service\AgentSchemaImportApplier
 
+    # AGENT-P7-01 (#1981) — feed configurator seam (suggest structure on
+    # a sample + regenerate-as-action).
+    App\Export\Contracts\FeedAssistPort:
+        alias: App\Export\Feed\Application\AgentFeedAssist
+
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
     # "is this {value: ...} payload valid against this Attribute?" without
@@ -721,4 +726,9 @@ when@test:
         # AGENT-P5-01 (#1970) — and the schema commit port.
         App\Import\Contracts\SchemaImportPort:
             alias: App\Import\Application\Service\AgentSchemaImportApplier
+            public: true
+
+        # AGENT-P7-01 (#1981) — and the feed assist port.
+        App\Export\Contracts\FeedAssistPort:
+            alias: App\Export\Feed\Application\AgentFeedAssist
             public: true
