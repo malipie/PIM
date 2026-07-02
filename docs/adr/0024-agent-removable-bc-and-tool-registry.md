@@ -1,10 +1,10 @@
 # 0024. Agent layer — removable bounded context, tool registry, single approval gate
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-07-01
 - **Deciders:** Marcin (operator), architekt rozwiązań (agent)
 
-> **Uwaga:** to szkic do finalizacji w tickecie AGENT-P0-01 (epik 0.7 Agent layer). Po akceptacji status → `accepted` i streszczenie trafia do `Project Plan/01-architektura-pim.md` §13. Master feature-PRD: `Project Plan/PRD/PRD-PIM-agent.md`.
+> Zaakceptowany w tickecie AGENT-P0-01 (epik 0.7 Agent layer, #1944). Streszczenie w `Project Plan/01-architektura-pim.md` §13. Master feature-PRD: `Project Plan/PRD/PRD-PIM-agent.md`.
 
 ## Context and Problem Statement
 
@@ -75,4 +75,4 @@ Chosen option: **Option 2** — agent to w pełni wydzielalny BC, którego każd
 - Plan: `Project Plan/02-plan-projektu-pim.md` (epik 0.7 Agent layer); Architektura §8.5 (limity agenta), §3.10 (memory FrankenPHP)
 - Backlog: `Project Plan/feature-agent-tickets.md` (epik 0.7, ~45 ticketów, M0–M9)
 - Related ADRs: ADR-0012 (CQRS Application), ADR-0013 (Deptrac rollout Internals/Contracts), ADR-0015 (bare UUID cross-BC), ADR-0017 (BYOK AES-256-GCM — klucz Anthropic tenanta), ADR-0019 (import engine contracts), ADR-0020 (OpenAPI custom route), ADR-0022 (consumer/producer boundary)
-- Tickets: AGENT-P0-01 (finalizacja tego ADR)
+- Tickets: AGENT-P0-01 #1944 (finalizacja tego ADR); huki core: AGENT-P0-03 #1946 (`pending_changes`), AGENT-P0-04 #1947 (`Provenance::Agent`), AGENT-P0-05 #1948 (`EntityChanged`)
