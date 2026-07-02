@@ -220,6 +220,12 @@ final class AgentLoopRunnerTest extends KernelTestCase
             prompts: new AgentSystemPromptBuilder(),
             costs: new UsageCostCalculator($selector, 3.0, 15.0, 5.0, 25.0),
             entityManager: $em,
+            eventBus: new class implements \Symfony\Component\Messenger\MessageBusInterface {
+                public function dispatch(object $message, array $stamps = []): \Symfony\Component\Messenger\Envelope
+                {
+                    return new \Symfony\Component\Messenger\Envelope($message);
+                }
+            },
             maxToolCallsPerRun: 10,
             maxTokensPerRun: 100_000,
         );
