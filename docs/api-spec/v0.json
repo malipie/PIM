@@ -21973,19 +21973,31 @@
                                         "type": "string"
                                     },
                                     "first": {
-                                        "type": "string",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
                                         "format": "iri-reference"
                                     },
                                     "last": {
-                                        "type": "string",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
                                         "format": "iri-reference"
                                     },
                                     "previous": {
-                                        "type": "string",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
                                         "format": "iri-reference"
                                     },
                                     "next": {
-                                        "type": "string",
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
                                         "format": "iri-reference"
                                     }
                                 },
