@@ -185,6 +185,11 @@ services:
     App\Catalog\Contracts\Command\BulkEditValuesPort:
         alias: App\Catalog\Application\PendingChanges\BulkEditValuesMaterializer
 
+    # AGENT-P3-02 (#1962) — post-approval commit seam: accepted pending
+    # batches reach the catalog through the real bulk-path.
+    App\Catalog\Contracts\Command\PendingBatchCommitPort:
+        alias: App\Catalog\Application\PendingChanges\PendingBatchCommitter
+
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
     # "is this {value: ...} payload valid against this Attribute?" without
@@ -660,4 +665,9 @@ when@test:
         # AGENT-P3-01 (#1961) — and the value-edit materializer port.
         App\Catalog\Contracts\Command\BulkEditValuesPort:
             alias: App\Catalog\Application\PendingChanges\BulkEditValuesMaterializer
+            public: true
+
+        # AGENT-P3-02 (#1962) — and the post-approval committer port.
+        App\Catalog\Contracts\Command\PendingBatchCommitPort:
+            alias: App\Catalog\Application\PendingChanges\PendingBatchCommitter
             public: true
