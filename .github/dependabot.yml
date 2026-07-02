@@ -93,6 +93,16 @@ updates:
       time: "06:00"
       timezone: Europe/Warsaw
     open-pull-requests-limit: 10
+    # KNOWN ISSUE (2026-07-02): dependabot bumps apps/admin/package.json but
+    # fails to regenerate the workspace-root pnpm-lock.yaml, so every PR from
+    # this entry fails CI with ERR_PNPM_OUTDATED_LOCKFILE and must be redone
+    # manually (pnpm --dir apps/admin add ...). Grouping below bundles all
+    # admin bumps into a single weekly PR so there is only one PR to redo.
+    # If this persists, consider migrating to Renovate (proper pnpm support).
+    groups:
+      admin-npm:
+        patterns:
+          - "*"
     labels:
       - dependencies
       - frontend
