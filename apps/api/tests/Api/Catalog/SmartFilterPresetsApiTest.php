@@ -73,7 +73,7 @@ final class SmartFilterPresetsApiTest extends CatalogApiTestCase
         self::assertContains('no-category', $slugs);
 
         foreach ($data as $row) {
-            \assert(\is_array($row));
+            self::assertIsArray($row);
             if ('red-low-completeness' === ($row['slug'] ?? null)) {
                 self::assertTrue($row['is_built_in']);
                 self::assertTrue($row['is_system']);
