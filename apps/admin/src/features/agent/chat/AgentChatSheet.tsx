@@ -62,12 +62,6 @@ export function AgentChatSheet() {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const onOpenEvent = () => setOpen(true);
-    window.addEventListener(OPEN_AGENT_CHAT_EVENT, onOpenEvent);
-    return () => window.removeEventListener(OPEN_AGENT_CHAT_EVENT, onOpenEvent);
-  }, []);
-
   const refresh = useCallback(async (id: string) => {
     try {
       const detail = await getAgentRun(id);
@@ -78,6 +72,21 @@ export function AgentChatSheet() {
       return null;
     }
   }, []);
+
+  useEffect(() => {
+    // AGENT-P6-02 (#1975) — other surfaces (Cmd+K) start a run and hand
+    // the conversation over via the event detail.
+    const onOpenEvent = (event: Event) => {
+      setOpen(true);
+      const adoptedRunId = (event as CustomEvent<{ runId?: string }>).detail?.runId;
+      if (typeof adoptedRunId === 'string') {
+        setRunId(adoptedRunId);
+        void refresh(adoptedRunId);
+      }
+    };
+    window.addEventListener(OPEN_AGENT_CHAT_EVENT, onOpenEvent);
+    return () => window.removeEventListener(OPEN_AGENT_CHAT_EVENT, onOpenEvent);
+  }, [refresh]);
 
   // Poll while the loop is busy server-side (planning/committing).
   useEffect(() => {
