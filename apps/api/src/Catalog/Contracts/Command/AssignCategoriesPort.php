@@ -19,9 +19,11 @@ use Symfony\Component\Uid\Uuid;
 interface AssignCategoriesPort
 {
     /**
-     * @param array<string, mixed>  $filterDsl   selector ([] = every object of the type)
-     * @param list<string>          $categoryIds category object UUIDs (RFC 4122)
-     * @param 'add'|'remove'|'move' $operation
+     * @param array<string, mixed> $filterDsl   selector ([] = every object of the type)
+     * @param list<string>         $categoryIds category object UUIDs (RFC 4122)
+     * @param string               $operation   add|remove|move - runtime-validated (a literal
+     *                                          union here makes the adapter's defensive guard
+     *                                          "always true" for PHPStan)
      *
      * @throws InvalidArgumentException on unknown object type / invalid DSL / unknown operation
      */
