@@ -5,19 +5,20 @@ import { PillTabs } from '@/components/ui-v2/pill-tabs';
 
 const BASE = '/integrations/api-configurator';
 
-type ShellTab = 'connections' | 'producer' | 'feeds' | 'monitor';
+type ShellTab = 'connections' | 'producer' | 'monitor';
 
 /**
  * APIC-P0-04 / P4-08 — shared shell unifying the faces of the Konfigurator API
  * area (ADR-0022, api-app.jsx prototype): a pill-tab split over an Outlet
  * between the **consumer** side (Połączenia — hub/wizard/detail/mapping/sync,
  * P1-07/P2/P3-11/P3-12), the **producer** side (Moje API — the hub with
- * Profile/Keys/Webhooks tabs + the profile builder, P4-06/P4-07), the product
- * XML **Feeds** hub (XMLF-P5-01 — the third citizen of the area, ADR-0023) and
- * the sync **Monitor** (P4-02). The active tab is derived from the path prefix
- * so every sub-route (connection detail, profile builder, feed detail, monitor
- * drill-down) keeps its face highlighted; switching tabs deep-links to each
- * face's landing.
+ * Profile/Keys/Webhooks tabs + the profile builder, P4-06/P4-07) and the sync
+ * **Monitor** (P4-02). The XML feeds area (XMLF, ADR-0023) shipped here as a
+ * fourth tab and was then promoted to its own sidebar entry (XMLF-FUP-01
+ * #2028) — its routes render outside this shell, same URLs. The active tab is
+ * derived from the path prefix so every sub-route (connection detail, profile
+ * builder, monitor drill-down) keeps its face highlighted; switching tabs
+ * deep-links to each face's landing.
  */
 export function KonfiguratorApiLayout() {
   const { t } = useTranslation();
@@ -26,11 +27,9 @@ export function KonfiguratorApiLayout() {
 
   const activeId: ShellTab = pathname.startsWith(`${BASE}/connections`)
     ? 'connections'
-    : pathname.startsWith(`${BASE}/feeds`)
-      ? 'feeds'
-      : pathname.startsWith(`${BASE}/monitor`)
-        ? 'monitor'
-        : 'producer';
+    : pathname.startsWith(`${BASE}/monitor`)
+      ? 'monitor'
+      : 'producer';
 
   return (
     <div className="space-y-5">
@@ -43,7 +42,6 @@ export function KonfiguratorApiLayout() {
         items={[
           { id: 'connections', label: t('api_configurator.shell.tabs.connections') },
           { id: 'producer', label: t('api_configurator.shell.tabs.producer') },
-          { id: 'feeds', label: t('api_configurator.shell.tabs.feeds') },
           { id: 'monitor', label: t('api_configurator.shell.tabs.monitor') },
         ]}
       />

@@ -78,14 +78,15 @@ test('XMLF-P5-01 — feeds hub: tab, KPI, cards, filtering, a11y', async ({ page
 
   await page.goto('/integrations/api-configurator/feeds');
 
-  // Shell: the fourth tab exists and is active for the /feeds prefix
-  // (scoped to the layout tablist — the P5-07 feeds sub-nav has its own
-  // same-named "Feeds" tab).
-  const feedsTab = page
-    .getByLabel(/API Configurator|Konfigurator API/)
-    .getByRole('tab', { name: /Feedy|Feeds/ });
-  await expect(feedsTab).toBeVisible();
-  await expect(feedsTab).toHaveAttribute('aria-selected', 'true');
+  // XMLF-FUP-01 (#2028): feeds live under their own sidebar entry
+  // ("Konfigurator XML"), highlighted for the /feeds prefix — and the
+  // Konfigurator API shell no longer renders its pill tabs here.
+  const sidebarEntry = page.getByRole('link', { name: /Konfigurator XML|XML Configurator/ });
+  await expect(sidebarEntry).toBeVisible();
+  await expect(sidebarEntry).toHaveClass(/bg-zinc-100/);
+  await expect(
+    page.getByLabel(/API Configurator|Konfigurator API/).getByRole('tab', { name: /Feedy|Feeds/ }),
+  ).toHaveCount(0);
 
   // KPI strip renders the merged aggregates. pl-PL grouping starts at five
   // digits (CLDR minimumGroupingDigits=2), so 1284 renders bare and 12408 gets
