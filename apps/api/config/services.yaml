@@ -199,6 +199,10 @@ services:
     App\Catalog\Contracts\Command\AssignCategoriesPort:
         alias: App\Catalog\Application\PendingChanges\AssignCategoriesMaterializer
 
+    # AGENT-P3-06 (#1966) — export-as-action seam (no approval diff).
+    App\Export\Contracts\ExportTriggerPort:
+        alias: App\Export\Application\AgentExportTrigger
+
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
     # "is this {value: ...} payload valid against this Attribute?" without
@@ -689,4 +693,9 @@ when@test:
         # AGENT-P3-05 (#1965) — and the category-assignment port.
         App\Catalog\Contracts\Command\AssignCategoriesPort:
             alias: App\Catalog\Application\PendingChanges\AssignCategoriesMaterializer
+            public: true
+
+        # AGENT-P3-06 (#1966) — and the export trigger port.
+        App\Export\Contracts\ExportTriggerPort:
+            alias: App\Export\Application\AgentExportTrigger
             public: true
