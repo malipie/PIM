@@ -2771,3 +2771,34 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 5. **Partial `composer update pkgA pkgB` bez `--with-all-dependencies` potrafi ZREGRESOWAĆ wcześniejsze downgrade'y** (re-resolve wciągnął z powrotem symfony/string v8 i cofnął api-platform 4.3.15→4.3.7). Po KAŻDYM composer update w ramach naprawy: `grep '"version": "v8\.' composer.lock` przed commitem.
 6. **PHPStan w kontenerze api pada na OOM (limit 1 GiB, exit 137)** — pełną analizę robi tylko CI; lokalnie weryfikować `bin/console cache:clear` (boot) + poprawki punktowe.
 7. **Współdzielony checkout z równoległą sesją operatora**: przed `git add` po dłuższej pracy w tle OBOWIĄZKOWO `git status` i staging TYLKO własnych plików (working tree miał w międzyczasie delecje src/Agent z eksperymentu removability AGENT-P0-09). Nigdy `git add -A` / `git commit -a`.
+
+## Lessons z epiku 0.7 AGENT — M0/M1 (2026-07-02, maraton)
+
+### Patterns to Follow
+1. **Usuwalny moduł = jeden zestaw plików do `rm -rf`.** Cała powierzchnia DI/ORM/routing agenta żyje w `config/services_agent.yaml` (import z `ignore_errors: not_found`) + `config/packages/agent.yaml` (mapping ORM + `migrations_paths` + routing Messenger), a główny `App\` discovery excluduje `src/Agent/`. Job CI `agent-removability` usuwa zestaw i przechodzi core gates — bramka DoD każdego ticketu epiku.
+2. **Drugi namespace migracji wymaga komparatora timestampowego.** Default Doctrine sortuje po FQCN → `AgentMigrations\*` wykonywało się PRZED `DoctrineMigrations\*` na świeżej bazie (FK do `tenants` nie istniał; złapał to dopiero Playwright CI, bo lokalna baza była już zmigrowna). `App\Shared\Infrastructure\DoctrineMigrations\TimestampVersionComparator` przywraca globalną chronologię.
+3. **PHPStan ignore-paths dla plików usuwalnego modułu MUSZĄ być fnmatch-patternami** (`src/Agent/Domain/Entity/Agent*.php`) — jawna ścieżka nieistniejącego pliku to hard-error configu na drzewie bez modułu.
+4. **Porty testowane bez konsumentów** = alias `public: true` w `when@test` (kontener inline'uje/usuwa serwisy bez konsumenta) ALBO konstrukcja ręczna w teście (repozytoria). Wzorzec użyty dla `PendingChangesPort`, `CatalogQueryPort`, `CompletenessReportPort`.
+5. **Pętla LLM deterministyczna przez seam:** `AgentLlmClientInterface` + skryptowane odpowiedzi w testach; SDK adapter to JEDYNY kod sieciowy. Logika limitów/materializacji/statusów w 100% testowalna bez klucza.
+6. **Bulk DQL UPDATE omija TenantFilter** (SQLFilter tylko SELECT) — tranzycje `pending_changes` niosą jawny `pc.tenant = :tenant`; RLS = backstop. Analogicznie raw SQL w `SqlCompletenessReport` z jawnym `tenant_id` + markerami `// tenant-safe:`.
+
+### Patterns to Avoid
+1. **TruffleHog skanuje CAŁĄ historię brancha** — fake-sekret w commicie (np. pełny DSN Postgresa z parą user:hasło w teście leak-guarda — celowo nie cytowany tu dosłownie) failuje push nawet po poprawce następnym commitem. Fake'i pisać jako inert markery (`xyzzy-internal-detail`); poprawka = squash historii brancha, nie append.
+2. **`git checkout -b` na innym branchu niż myślisz** — commit P0-07 wylądował na branchu P0-02 (checkout w kaskadzie merge zmienił HEAD między napisaniem plików a commitem). Przed `git add` w maratonie: `git branch --show-current`. Cherry-pick + reset naprawia, ale kosztuje.
+3. **Backticki w `git commit -m "..."`** (double-quoted) wykonują command substitution i wycinają słowo z messagu. Commit message z backtickami → heredoc `git commit -F /dev/stdin <<'MSG'`.
+4. **`getArgument()`+`(string)` na PHPStan max** = cast.useless (PHPDoc mówi string) — ale runtime może dać null; `// @phpstan-ignore cast.useless` per linia zamiast zdejmowania castów.
+5. **Anonimowa klasa nie widzi `private const` klasy testowej** — `AgentLoopRunnerTest::BATCH_ID` musiał być `public const`; objaw był mylący (tool_failed zamiast Error o stałej).
+6. **Prywatny helper `run()` w TestCase koliduje z finalnym `TestCase::run()`** — fatal na etapie parsowania.
+
+### Toolchain quirks
+- **Vendor kontenera może zdryfować od composer.lock** (cudze bumpy manifestów w working tree + `composer require` = częściowy update; phpstan 2.2.3 vs lock 2.2.2 dawał INNE errory niż CI). Sanity: `vendor/bin/phpstan --version` vs lock; naprawa `composer install`.
+- **PHPStan result-cache flake**: „Ignored error pattern ... was not matched" na nietkniętym pliku → `vendor/bin/phpstan clear-result-cache` przed debugowaniem configu.
+- **PHPStan narrowing po `assertSame([], $expr)`** zapamiętuje typ POWTÓRZONEGO wyrażenia metody jako `array{}` — używać `assertCount(0, ...)` albo zmiennych.
+- **`/** @var */` przed `$arr[] = ...` cs-fixer degraduje do zwykłego komentarza** (phpdoc_to_comment) i narrowing znika — annotować przypisanie zmiennej, nie append.
+
+### Decyzje świadome (epik 0.7, M0–M2)
+- **EntityChanged przez in-process EventDispatcher, nie Messenger** — zero konsumentów w MVP = no-op; Messenger bez handlera wybucha. P8-01 re-dispatchnie async sam.
+- **„1 aktywny run/user" własnym partial unique indexem** zamiast reuse `BulkOperationLock` (Catalog internals — Deptrac zabrania; semantyka per-user ≠ per-tenant); DB-constraint = race-proof, friendly pre-check daje ładne 409.
+- **search_catalog zwraca minimalną projekcję** (id/code/kind/status/name/completeness_pct) zamiast mapy atrybutów — field-level safety by-construction + minimalizacja danych do modelu (§10.3); value-read z pełnym field-level filtrem = przyszłe narzędzie na seamie P1-02.
+- **aggregate_count bez median/min/max** — Meili nie liczy ich tanio; narzędzie mówi to modelowi wprost (zakaz estymacji), statystyki = przyszły port analityczny.
+- **Koszt runu w mikro-dolarach int** (brak bcmath na obrazie); pricing per MTok w konfigu per tier.

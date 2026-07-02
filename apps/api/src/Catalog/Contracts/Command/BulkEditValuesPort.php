@@ -22,9 +22,11 @@ use Symfony\Component\Uid\Uuid;
 interface BulkEditValuesPort
 {
     /**
-     * @param array<string, mixed>     $filterDsl selector ([] = every object of the type)
-     * @param array<string, mixed>     $changes   attribute code => raw value
-     * @param 'overwrite'|'only_empty' $mode
+     * @param array<string, mixed> $filterDsl selector ([] = every object of the type)
+     * @param array<string, mixed> $changes   attribute code => raw value
+     * @param string               $mode      overwrite|only_empty - runtime-validated (a literal
+     *                                        union here makes the adapter's defensive guard
+     *                                        "always true" for PHPStan)
      *
      * @throws InvalidArgumentException on unknown object type / attribute / invalid DSL
      */

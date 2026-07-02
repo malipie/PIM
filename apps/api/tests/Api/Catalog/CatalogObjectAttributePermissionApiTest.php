@@ -64,7 +64,7 @@ final class CatalogObjectAttributePermissionApiTest extends CatalogApiTestCase
             'restricted attribute must be removed from the GET response (PRD §3.5)',
         );
         // The visible attribute is untouched.
-        self::assertSame(['value' => 'red'], $cache['color'] ?? null);
+        self::assertSame(['value' => 'red', 'provenance' => 'manual'], $cache['color'] ?? null);
     }
 
     #[Test]
@@ -82,7 +82,7 @@ final class CatalogObjectAttributePermissionApiTest extends CatalogApiTestCase
         $cache = $body['attributesIndexed'] ?? [];
         \assert(\is_array($cache));
 
-        self::assertSame(['value' => 42.5], $cache['purchase_price'] ?? null);
+        self::assertSame(['value' => 42.5, 'provenance' => 'manual'], $cache['purchase_price'] ?? null);
     }
 
     #[Test]
@@ -118,7 +118,7 @@ final class CatalogObjectAttributePermissionApiTest extends CatalogApiTestCase
         $body = $this->authenticatedClient()->request('GET', '/api/products/'.$id)->toArray();
         $cache = $body['attributesIndexed'] ?? [];
         \assert(\is_array($cache));
-        self::assertSame(['value' => 10.5], $cache['purchase_price'] ?? null);
+        self::assertSame(['value' => 10.5, 'provenance' => 'manual'], $cache['purchase_price'] ?? null);
     }
 
     #[Test]
