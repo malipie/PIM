@@ -2739,3 +2739,13 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 6. **Konsola admina zawsze ma 2×401 na twardym wejściu** (in-memory JWT + refresh-cookie bootstrap) — asercja `consoleErrors === []` w e2e jest zbyt ostra; filtrować 401-e z /api/auth.
 
 **Errata numeracji (2026-07-02):** P3-03 = **#1921**, nie #1922 (to P3-04) — instrukcja operatora miała zły numer; commit P3-03 w PR #2017 nosi błędny `Refs #1922`. Reguła bez wyjątku: `gh issue list --search "XMLF-PX-NN in:title"` przed KAŻDYM `Refs`/`Closes`/`gh issue close`, także gdy numer podał operator.
+
+## Lessons z XMLF P5-02/P5-03 (2026-07-02 — kreator + mapper FE)
+
+1. **Guard `lint-jsonfetch-useeffect` liczy STRING co-occurrence** (`grep jsonFetch` × `grep 'useEffect('`) w pliku — nawet komentarz ze słowem jsonFetch flaguje plik. Ekrany z efektami trzymać BEZ transportu: read przez useQuery, komendy (POST/PATCH) jako funkcje w `api/*.ts`.
+2. **Playwright glob `*` nie matchuje `/`** — `**/api/feeds/*` NIE łapie `/api/feeds/{id}/mapping`; catch-all = `**`; route'y matchowane LIFO (szczegółowe rejestrować PO catch-allu).
+3. **`attribute.label` to JSONB `{pl,en}`** — render obiektu = React crash w ErrorBoundary („Objects are not valid as a React child"); zawsze helper `attributeLabel()`.
+4. **Default mappings szablonu to SUGESTIA**: BE waliduje istnienie atrybutów w katalogu tenanta (400 „nie istnieje w katalogu") — na load katalogu sanitize (unknown ref → source null), a PUT wysyła TYLKO zmapowane sloty (source null ≠ wpis mapowania → 400 „nieznany typ źródła").
+5. **API Platform format-dependent shape**: z `accept: application/json` kolekcja to goły ARRAY (bez `member`); default (LD+JSON) ma `member` — hooki odporne na oba.
+6. **Feed create wymaga `object_type_id`** mimo locked-Produkt w UI — rozwiązywać raz z `/api/object_types` i trzymać przycisk „Dalej" do czasu resolve (wyścig na szybkim kliku). `filter` przyjmuje tylko PATCH — flow: POST create → follow-up PATCH.
+7. **Kolumna „Wynik·próbka" mappera bez nowego BE**: POST /api/feeds/preview (limit=1) + DOMParser na XML writera (getElementsByTagNameNS('*', local) dla namespace'ów) — BE zostaje jedynym źródłem semantyki renderowania.

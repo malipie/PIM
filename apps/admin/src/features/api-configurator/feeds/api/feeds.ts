@@ -26,6 +26,7 @@ export interface FeedRow {
   descriptor: Record<string, unknown>;
   field_mappings: Array<Record<string, unknown>>;
   filter?: unknown;
+  validation_policy?: 'skip_invalid' | 'include_with_warning';
   cached_item_count: number | null;
   cached_at: string | null;
   last_pulled_at: string | null;

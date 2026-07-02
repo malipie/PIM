@@ -12,8 +12,15 @@ import { httpErrorDetail } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 import { createFeed, fetchFeed, patchFeed } from '../api/feeds';
+import {
+  type SlotMapping,
+  sanitizeMappings,
+  useFeedMapping,
+  useSaveFeedMapping,
+} from '../api/mapping';
 import { type FeedTemplateInfo, useFeedTemplates, useProductObjectTypeId } from '../api/templates';
 import { TemplateBadge } from '../components/primitives';
+import { StepMapper } from './steps/StepMapper';
 import { StepScope } from './steps/StepScope';
 import { StepTemplate } from './steps/StepTemplate';
 import {
@@ -72,6 +79,23 @@ export function FeedWizardPage() {
     setLoadedForEdit(true);
   }, [editRow, loadedForEdit, setFilterConditions]);
 
+  const mappingView = useFeedMapping(step >= 2 ? draft.id : null);
+  const saveMapping = useSaveFeedMapping(draft.id);
+  const attributesKey = mappingView.data?.attributes.map((a) => a.code).join(',') ?? null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: catalog tracked via its code key
+  useEffect(() => {
+    if (attributesKey === null || mappingView.data === undefined) {
+      return;
+    }
+    const catalog = mappingView.data.attributes;
+    setDraft((prev) => {
+      const cleaned = sanitizeMappings(prev.mappings, catalog);
+      return JSON.stringify(cleaned) === JSON.stringify(prev.mappings)
+        ? prev
+        : { ...prev, mappings: cleaned };
+    });
+  }, [attributesKey]);
+
   const preflight = useExportPreflight({
     entityType: 'product',
     objectTypeId: null,
@@ -97,7 +121,10 @@ export function FeedWizardPage() {
       return {
         ...prev,
         kind: template.kind,
-        mappings: template.default_mappings.map((mapping) => ({ ...mapping })),
+        descriptor: template.descriptor,
+        mappings: template.default_mappings.map((mapping) => ({
+          ...mapping,
+        })) as unknown as SlotMapping[],
         name: nextName,
         code: prev.codeTouched ? prev.code : slugifyCode(nextName),
       };
@@ -138,6 +165,21 @@ export function FeedWizardPage() {
     // The mapper (P5-03) needs a persisted FeedProfile — save when leaving scope.
     if (step === 1 && !(await persistDraft())) {
       return;
+    }
+    // Leaving the mapper persists the slot mappings (PUT — the backend
+    // validates and returns the fresh view) + the skip policy via PATCH.
+    if (step === 2) {
+      try {
+        // Only mapped slots go to the backend — a null source means "unmapped"
+        // in the UI, not a mapping entry.
+        await saveMapping.mutateAsync(draft.mappings.filter((m) => m.source !== null));
+      } catch (error) {
+        toast.error(httpErrorDetail(error) ?? t('api_configurator.feeds.wizard.save_error'));
+        return;
+      }
+      if (!(await persistDraft())) {
+        return;
+      }
     }
     setStep((value) => Math.min(value + 1, WIZARD_STEP_IDS.length - 1));
   }
@@ -265,7 +307,20 @@ export function FeedWizardPage() {
             countLoading={preflight.isLoading}
           />
         )}
-        {step >= 2 && (
+        {step === 2 && mappingView.data !== undefined && productTypeId.data != null && (
+          <StepMapper
+            view={mappingView.data}
+            mappings={draft.mappings}
+            onMappings={(next) => setDraft((prev) => ({ ...prev, mappings: next }))}
+            skipPolicy={draft.skipPolicy}
+            onSkipPolicy={(policy) => setDraft((prev) => ({ ...prev, skipPolicy: policy }))}
+            descriptor={draft.descriptor}
+            objectTypeId={productTypeId.data}
+            locale={draft.locale}
+            filter={filterState.dsl}
+          />
+        )}
+        {step >= 3 && (
           <div className="rounded-3xl bg-white p-10 text-center soft-shadow">
             <h2 className="font-display text-[16px] font-semibold tracking-tight">
               {t(`api_configurator.feeds.wizard.placeholder.${WIZARD_STEP_IDS[step]}_title`)}

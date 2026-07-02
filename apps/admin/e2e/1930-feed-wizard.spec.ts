@@ -37,12 +37,34 @@ test('XMLF-P5-02 — wizard: template choice, gating, scope + draft save', async
 
   // Registered before the more specific routes — Playwright matches LIFO,
   // so `/api/feeds/templates` (below) wins over this id-wildcard.
-  await page.route('**/api/feeds/*', (route) => {
+  await page.route('**/api/feeds/**', (route) => {
+    if (route.request().url().endsWith('/mapping')) {
+      return route.fulfill({
+        json: {
+          feed_id: '019f0000-0000-7000-8000-00000000aaaa',
+          object_type_id: '019f0000-0000-7000-8000-000000000001',
+          slots: [],
+          attributes: [],
+          coverage: {
+            slots_total: 0,
+            slots_mapped: 0,
+            required_total: 0,
+            required_mapped: 0,
+            missing_required: [],
+            one_of_groups: [],
+          },
+          transforms: ['none'],
+        },
+      });
+    }
     if (route.request().method() === 'PATCH') {
       return route.fulfill({ json: route.request().postDataJSON() as Record<string, unknown> });
     }
     return route.fulfill({ json: {} });
   });
+  await page.route('**/api/feeds/preview', (route) =>
+    route.fulfill({ json: { sample_count: 0, xml: '', health: [] } }),
+  );
   await page.route('**/api/feeds/templates', (route) => route.fulfill({ json: TEMPLATES }));
   await page.route('**/api/object_types*', (route) =>
     route.fulfill({
@@ -102,7 +124,8 @@ test('XMLF-P5-02 — wizard: template choice, gating, scope + draft save', async
 
   // Leaving scope persists the draft.
   await nextButton.click();
-  await expect(page.getByText(/XMLF-P5-03/)).toBeVisible();
+  // Step 3 is the live mapper since P5-03 — its header proves the transition.
+  await expect(page.getByText(/Mapowanie slot|Slot ↔ attribute/)).toBeVisible();
   expect(createdPayload).not.toBeNull();
   expect(createdPayload?.template_kind).toBe('google_shopping');
   expect(createdPayload?.locale).toBe('pl');

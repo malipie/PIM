@@ -1896,6 +1896,35 @@
       "detail": {
         "placeholder_title": "Detal feedu — w kolejnym tickecie",
         "placeholder_hint": "Widok pipeline, historia runów i drill-down logu per produkt wchodzą z XMLF-P5-05."
+      },
+      "mapper": {
+        "title": "Mapowanie slot ↔ atrybut",
+        "subtitle": "Zwiąż sloty szablonu z atrybutami PIM; kolumna próbki pokazuje wynik writera na żywo.",
+        "required_coverage": "Wymagane",
+        "type_warnings": "Ostrzeżenia typu",
+        "skip_policy_aria": "Polityka niepoprawnych produktów",
+        "skip_invalid": "pomiń niepoprawne",
+        "include_with_warning": "dołącz z ostrzeżeniem",
+        "col": {
+          "slot": "Slot szablonu",
+          "source": "Źródło · atrybut PIM",
+          "transform": "Transformacja",
+          "sample": "Wynik · próbka"
+        },
+        "required": "wym.",
+        "one_of": "1 z {{count}}",
+        "source_aria": "Źródło dla slotu {{slot}}",
+        "value_aria": "Wartość dla slotu {{slot}}",
+        "transform_aria": "Transformacja dla slotu {{slot}}",
+        "source_none": "— niezmapowany —",
+        "source_attribute": "Atrybut PIM",
+        "source_other": "Inne",
+        "source_static": "Wartość statyczna…",
+        "source_template": "Szablon / interpolacja…",
+        "static_placeholder": "stała wartość",
+        "missing_value": "brak wartości — wymagane",
+        "too_long": "ponad limit {{max}} znaków — dodaj transformację truncate",
+        "category_note": "Sloty z fmt=category (Ceneo cat, Google g:google_product_category) są rozwiązywane przy generacji z external_code drzewa kategorii kanału; jawna wartość z mapowania wygrywa. Warianty wchodzą płasko z item_group_id = SKU mastera."
       }
     },
     "shell": {
