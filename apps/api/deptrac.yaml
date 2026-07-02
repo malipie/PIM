@@ -163,6 +163,15 @@ parameters:
                 must_not:
                     - type: directory
                       value: 'src/Integration/Generic/.*'
+                    - type: directory
+                      value: 'src/Integration/Contracts/.*'
+        # AGENT-P7-02 (#1982) — the cross-BC seam future connectors
+        # (BaseLinker 0.8, Shopify 0.9) implement; the Agent BC may only
+        # reach Integration through it.
+        - name: Integration_Contracts
+          collectors:
+              - type: directory
+                value: 'src/Integration/Contracts/.*'
         - name: Integration_Generic_Internals
           collectors:
               - type: directory
@@ -423,11 +432,16 @@ parameters:
             - Vendor
 
         Integration:
+            - Integration_Contracts
             - Shared
             - Catalog_Contracts
             - Channel_Contracts
             - Asset_Contracts
             - Identity_Contracts
+            - Vendor
+
+        Integration_Contracts:
+            - Shared
             - Vendor
 
         Integration_Generic_Internals:
@@ -455,6 +469,7 @@ parameters:
             - Export_Contracts
             - Search_Contracts
             - Import_Contracts
+            - Integration_Contracts
             - Vendor
         Agent_Contracts:
             - Shared
