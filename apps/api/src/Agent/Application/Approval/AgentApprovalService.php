@@ -11,6 +11,7 @@ use App\Agent\Domain\Exception\ApprovalConflictException;
 use App\Catalog\Contracts\Command\BulkRollbackPort;
 use App\Catalog\Contracts\Command\PendingBatchCommitPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
+use App\Identity\Contracts\Audit\AgentActionAuditor;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
@@ -39,6 +40,7 @@ final readonly class AgentApprovalService
         private BulkRollbackPort $rollbacks,
         private PendingChangesPort $pendingChanges,
         private AgentProgressPublisher $publisher,
+        private AgentActionAuditor $auditor,
     ) {
     }
 
@@ -103,6 +105,20 @@ final readonly class AgentApprovalService
         $this->entityManager->flush();
         $this->publisher->status($run);
 
+        // AGENT-P3-07 (#1967) — accountability: who approved, what the
+        // agent committed, with which model, at what cost (PRD §10.5).
+        $this->auditor->recordAgentAction('agent_batch_committed', $run->getId()->toRfc4122(), $run->getUserId()->toRfc4122(), [
+            'approved_by' => $approvedBy->toRfc4122(),
+            'pending_change_batch_id' => $batchId->toRfc4122(),
+            'bulk_operation_id' => $result->bulkSessionId->toRfc4122(),
+            'committed_values' => $result->committedValues,
+            'objects_touched' => $result->objectsTouched,
+            'model' => $run->getModel(),
+            'tokens_input' => $run->getTokensInput(),
+            'tokens_output' => $run->getTokensOutput(),
+            'cost_usd' => $run->getCostUsd(),
+        ]);
+
         return $run;
     }
 
@@ -132,6 +148,10 @@ final readonly class AgentApprovalService
         $run->markRejected();
         $this->entityManager->flush();
         $this->publisher->status($run);
+
+        $this->auditor->recordAgentAction('agent_run_rejected', $run->getId()->toRfc4122(), $run->getUserId()->toRfc4122(), [
+            'pending_change_batch_id' => $batchId?->toRfc4122(),
+        ]);
 
         return $run;
     }
@@ -164,6 +184,10 @@ final readonly class AgentApprovalService
         $this->entityManager->flush();
         $this->publisher->status($run);
 
+        $this->auditor->recordAgentAction('agent_run_cancelled', $run->getId()->toRfc4122(), $run->getUserId()->toRfc4122(), [
+            'pending_change_batch_id' => $batchId?->toRfc4122(),
+        ]);
+
         return $run;
     }
 
@@ -193,6 +217,11 @@ final readonly class AgentApprovalService
         $run->markRolledBack();
         $this->entityManager->flush();
         $this->publisher->status($run);
+
+        $this->auditor->recordAgentAction('agent_batch_rolled_back', $run->getId()->toRfc4122(), $run->getUserId()->toRfc4122(), [
+            'bulk_operation_id' => $bulkOperationId->toRfc4122(),
+            'model' => $run->getModel(),
+        ]);
 
         return $run;
     }
