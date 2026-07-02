@@ -120,7 +120,10 @@ final readonly class CreateUpdateAttributeTool implements AgentToolInterface
             }
         }
 
-        $batchId = Uuid::v7();
+        [$batchId, $batchError] = $this->resolveBatch($arguments['pending_change_batch_id'] ?? null, PendingChangeType::Schema);
+        if (null === $batchId) {
+            return ['error' => $batchError];
+        }
         $this->pendingChanges->materialize($batchId, 'agent', [
             new PendingChangeDraft(
                 changeType: PendingChangeType::Schema,
@@ -137,5 +140,31 @@ final readonly class CreateUpdateAttributeTool implements AgentToolInterface
             'code' => $code,
             'note' => 'Schema proposal awaits human approval in the inbox. Nothing is changed yet.',
         ];
+    }
+
+    /**
+     * AGENT-P8-03 (#1985) — resolve the target batch for a multi-step
+     * plan: 'new' forces a fresh proposal, a valid UUID appends ONLY if
+     * the existing batch holds the same change family (mixing families
+     * in one batch would poison the commit path).
+     *
+     * @return array{0: ?Uuid, 1: ?string} [batchId, error]
+     */
+    private function resolveBatch(mixed $requested, PendingChangeType $family): array
+    {
+        if (!\is_string($requested) || 'new' === $requested || !Uuid::isValid($requested)) {
+            return [Uuid::v7(), null];
+        }
+        $batchId = Uuid::fromString($requested);
+        $rows = $this->pendingChanges->listBatch($batchId, 1);
+        if ([] !== $rows && $rows[0]->changeType !== $family) {
+            return [null, \sprintf(
+                'The current plan batch holds %s changes - this tool materializes %s. Finish the current plan for approval first, or pass pending_change_batch_id: "new" to open a separate proposal.',
+                $rows[0]->changeType->value,
+                $family->value,
+            )];
+        }
+
+        return [$batchId, null];
     }
 }

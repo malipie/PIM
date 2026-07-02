@@ -77,6 +77,9 @@ final readonly class AgentLoopRunner
         }
 
         $toolCallCount = 0;
+        // AGENT-P8-03 (#1985) — the collective plan of a multi-step intent.
+        $planBatchId = null;
+        $planAffected = 0;
 
         try {
             while (true) {
@@ -107,8 +110,19 @@ final readonly class AgentLoopRunner
 
                 $toolUses = $response->toolUses();
                 if ([] === $toolUses || AgentLlmResponse::STOP_TOOL_USE !== $response->stopReason) {
-                    // Plain-text turn: a clarifying question or the final
-                    // summary — hand control back to the user.
+                    // AGENT-P8-03 (#1985) — end of the model's plan: with an
+                    // accumulated batch this is the COLLECTIVE diff going to
+                    // approval; without one it is a clarifying question /
+                    // summary handing control back to the user.
+                    if (null !== $planBatchId) {
+                        $run->markAwaitingApproval(
+                            \Symfony\Component\Uid\Uuid::fromString($planBatchId),
+                            $planAffected,
+                        );
+                        $this->announcePlanReady($run, $planAffected);
+
+                        return;
+                    }
                     $run->markAwaitingInput();
 
                     return;
@@ -121,9 +135,17 @@ final readonly class AgentLoopRunner
                 }
 
                 $toolResults = [];
-                $materialized = null;
                 foreach ($toolUses as $toolUse) {
-                    $outcome = $this->executor->execute($run, $toolUse['name'], $toolUse['input'], $context);
+                    // AGENT-P8-03 (#1985) — multi-step plans accumulate into
+                    // ONE batch: once a write tool materialized, every later
+                    // write-tool call inherits the batch id (unless the model
+                    // explicitly passes one).
+                    $input = $toolUse['input'];
+                    if (null !== $planBatchId && !\array_key_exists('pending_change_batch_id', $input)) {
+                        $input['pending_change_batch_id'] = $planBatchId;
+                    }
+
+                    $outcome = $this->executor->execute($run, $toolUse['name'], $input, $context);
                     ++$toolCallCount;
 
                     $toolResults[] = [
@@ -136,38 +158,15 @@ final readonly class AgentLoopRunner
                     $batchId = $outcome['content']['pending_change_batch_id'] ?? null;
                     if (!$outcome['is_error'] && \is_string($batchId)) {
                         $affected = $outcome['content']['affected_count'] ?? 0;
-                        $materialized = [
-                            'batch_id' => $batchId,
-                            'affected_count' => \is_int($affected) ? $affected : 0,
-                        ];
+                        $planBatchId ??= $batchId;
+                        if ($batchId === $planBatchId) {
+                            $planAffected += \is_int($affected) ? $affected : 0;
+                        }
                     }
                 }
 
                 $this->persistMessage($run, AgentMessage::ROLE_TOOL, $toolResults);
                 $messages[] = ['role' => 'user', 'content' => $toolResults];
-
-                if (null !== $materialized) {
-                    // Plan == diff (ADR-0024 c): the materialized batch IS
-                    // the plan; stop before approval.
-                    $run->markAwaitingApproval(
-                        \Symfony\Component\Uid\Uuid::fromString($materialized['batch_id']),
-                        $materialized['affected_count'],
-                    );
-
-                    // AGENT-P8-04 (#1986) — "the batch is ready" webhook
-                    // (best-effort fan-out via the core delivery infra).
-                    try {
-                        $this->eventBus->dispatch(new \App\Shared\Contracts\Event\AgentRunAwaitingApproval(
-                            $run->getId(),
-                            $run->getIntent(),
-                            $materialized['affected_count'],
-                        ));
-                    } catch (Throwable) {
-                        // Never let a webhook failure kill the run.
-                    }
-
-                    return;
-                }
             }
         } catch (Throwable $failure) {
             // Backoff exhaustion (SDK), missing key, or an unexpected bug:
@@ -187,6 +186,23 @@ final readonly class AgentLoopRunner
         $encoded = json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         return false === $encoded ? '{}' : $encoded;
+    }
+
+    /**
+     * AGENT-P8-03/P8-04 — "the collective plan is ready" webhook,
+     * best-effort.
+     */
+    private function announcePlanReady(AgentRun $run, int $affected): void
+    {
+        try {
+            $this->eventBus->dispatch(new \App\Shared\Contracts\Event\AgentRunAwaitingApproval(
+                $run->getId(),
+                $run->getIntent(),
+                $affected,
+            ));
+        } catch (Throwable) {
+            // Never let a webhook failure kill the run.
+        }
     }
 
     /**
