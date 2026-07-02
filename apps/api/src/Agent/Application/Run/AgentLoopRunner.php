@@ -65,9 +65,15 @@ final readonly class AgentLoopRunner
         $run->setModel($model);
 
         $system = $this->prompts->build($run);
-        $userTurn = [['type' => 'text', 'text' => $run->getIntent()]];
-        $messages = [['role' => 'user', 'content' => $userTurn]];
-        $this->persistMessage($run, AgentMessage::ROLE_USER, $userTurn);
+        // AGENT-P4-01 (#1968) — a re-dispatched run (next user turn after
+        // awaiting_input) resumes from the persisted transcript instead of
+        // restarting at the intent.
+        $messages = $this->loadTranscript($run);
+        if ([] === $messages) {
+            $userTurn = [['type' => 'text', 'text' => $run->getIntent()]];
+            $messages = [['role' => 'user', 'content' => $userTurn]];
+            $this->persistMessage($run, AgentMessage::ROLE_USER, $userTurn);
+        }
 
         $toolCallCount = 0;
 
@@ -168,6 +174,38 @@ final readonly class AgentLoopRunner
         $encoded = json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         return false === $encoded ? '{}' : $encoded;
+    }
+
+    /**
+     * Rebuild the Anthropic-shaped transcript from agent_messages: user
+     * and assistant turns map 1:1, tool-result turns are user turns (the
+     * Messages API shape for tool results).
+     *
+     * @return list<array{role: string, content: list<array<string, mixed>>}>
+     */
+    private function loadTranscript(AgentRun $run): array
+    {
+        $rows = $this->entityManager->createQueryBuilder()
+            ->select('m')
+            ->from(AgentMessage::class, 'm')
+            ->where('m.run = :run')
+            ->setParameter('run', $run)
+            ->orderBy('m.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        $messages = [];
+        /** @var list<AgentMessage> $rows */
+        foreach ($rows as $row) {
+            /** @var list<array<string, mixed>> $content */
+            $content = array_values($row->getContent());
+            $messages[] = [
+                'role' => AgentMessage::ROLE_ASSISTANT === $row->getRole() ? 'assistant' : 'user',
+                'content' => $content,
+            ];
+        }
+
+        return $messages;
     }
 
     /**

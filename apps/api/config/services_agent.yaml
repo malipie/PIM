@@ -62,6 +62,10 @@ services:
             # AGENT-P1-01 (#1953) — module-namespace migrations
             # (AgentMigrations\*) are not App\Agent\* classes.
             - '../src/Agent/Infrastructure/Migrations/'
+            # AGENT-P4-01 (#1968) — test-only LLM stand-in; excluded so the
+            # SDK client stays the single AgentLlmClientInterface
+            # implementation outside when@test.
+            - '../src/Agent/Infrastructure/Testing/'
 
     # AGENT-P0-06 (#1949) — Anthropic client on the tenant's BYOK key;
     # scalar knobs are not autowired.
@@ -108,9 +112,14 @@ services:
 
 when@test:
     services:
-        # AGENT-P3-02 (#1962) — approval gate under integration test; the
-        # container would otherwise inline the service (no consumer yet
-        # until the P4-01 endpoints land).
+        # AGENT-P3-02 (#1962) — approval gate under integration test.
         test.agent.approval:
             alias: App\Agent\Application\Approval\AgentApprovalService
             public: true
+
+        # AGENT-P4-01 (#1968) — the API suite runs the loop inline
+        # (sync transports); a canned LLM keeps it deterministic and
+        # offline.
+        App\Agent\Infrastructure\Testing\CannedAgentLlmClient: ~
+        App\Agent\Application\Llm\AgentLlmClientInterface:
+            alias: App\Agent\Infrastructure\Testing\CannedAgentLlmClient
