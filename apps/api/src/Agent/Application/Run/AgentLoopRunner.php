@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Agent\Application\Run;
 
+use App\Agent\Application\Limits\AgentLimitGuard;
 use App\Agent\Application\Llm\AgentLlmClientInterface;
 use App\Agent\Application\Llm\AgentLlmResponse;
 use App\Agent\Application\Tool\AgentToolContext;
@@ -40,6 +41,7 @@ final readonly class AgentLoopRunner
 {
     public function __construct(
         private AgentLlmClientInterface $llm,
+        private AgentLimitGuard $limits,
         private ToolRegistry $registry,
         private GuardedToolExecutor $executor,
         private AgentModelSelector $models,
@@ -71,6 +73,16 @@ final readonly class AgentLoopRunner
 
         try {
             while (true) {
+                try {
+                    // 8.5 budgets (hour/day/month) re-checked before every
+                    // model call - a run cannot spend past a cap mid-flight.
+                    $this->limits->assertWithinLimits($tenant, $userId);
+                } catch (\App\Agent\Domain\Exception\AgentLimitExceededException $limit) {
+                    $run->markError($limit->getMessage());
+
+                    return;
+                }
+
                 $response = $this->llm->create($tenant, $model, $system, $messages, $tools);
                 $run->addUsage(
                     $response->inputTokens,

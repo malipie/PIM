@@ -33,6 +33,14 @@ parameters:
     pim.agent.pricing.schema_input_per_mtok: 5.0
     pim.agent.pricing.schema_output_per_mtok: 25.0
 
+    # AGENT-P1-04 (#1956) — 8.5 budgets; windows are UTC (day/month) and
+    # sliding (hour). Exceeding a window IS the kill-switch: refusals
+    # last until the window rolls over (midnight UTC / month end).
+    pim.agent.limits.tool_calls_per_hour_per_user: 50
+    pim.agent.limits.tokens_per_day_per_user: 500000
+    pim.agent.limits.cost_per_day_per_tenant_usd: 20.0
+    pim.agent.limits.cost_per_month_per_tenant_usd: 300.0
+
 services:
     _defaults:
         autowire: true
@@ -82,6 +90,14 @@ services:
         arguments:
             $maxToolCallsPerRun: '%pim.agent.limits.tool_calls_per_run%'
             $maxTokensPerRun: '%pim.agent.limits.tokens_per_run%'
+
+    # AGENT-P1-04 (#1956) — 8.5 budget guard knobs.
+    App\Agent\Application\Limits\AgentLimitGuard:
+        arguments:
+            $toolCallsPerHourPerUser: '%pim.agent.limits.tool_calls_per_hour_per_user%'
+            $tokensPerDayPerUser: '%pim.agent.limits.tokens_per_day_per_user%'
+            $costPerDayPerTenantUsd: '%pim.agent.limits.cost_per_day_per_tenant_usd%'
+            $costPerMonthPerTenantUsd: '%pim.agent.limits.cost_per_month_per_tenant_usd%'
 
     App\Agent\Application\Run\UsageCostCalculator:
         arguments:

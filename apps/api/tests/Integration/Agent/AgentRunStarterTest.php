@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Agent;
 
 use App\Agent\Application\AgentFeatureGuard;
+use App\Agent\Application\Limits\AgentLimitGuard;
 use App\Agent\Application\Run\AgentRunStarter;
 use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\AgentRunSurface;
@@ -40,7 +41,7 @@ final class AgentRunStarterTest extends KernelTestCase
     public function secondActiveRunForTheSameUserConflicts(): void
     {
         [$tenant, $em] = $this->tenantFixture();
-        $starter = new AgentRunStarter($this->guard(true), $em, $this->noopBus());
+        $starter = new AgentRunStarter($this->guard(true), $this->permissiveLimits($em), $em, $this->noopBus());
         $userId = Uuid::v7();
 
         $first = $starter->start($tenant, $userId, AgentRunSurface::Chat, 'first intent');
@@ -54,7 +55,7 @@ final class AgentRunStarterTest extends KernelTestCase
     public function guardRefusalPersistsNothing(): void
     {
         [$tenant, $em] = $this->tenantFixture();
-        $starter = new AgentRunStarter($this->guard(false), $em, $this->noopBus());
+        $starter = new AgentRunStarter($this->guard(false), $this->permissiveLimits($em), $em, $this->noopBus());
 
         try {
             $starter->start($tenant, Uuid::v7(), AgentRunSurface::Chat, 'intent');
@@ -79,7 +80,7 @@ final class AgentRunStarterTest extends KernelTestCase
         // the real container service - the tenant has no BYOK key, so the
         // handler must mark the run error instead of crashing the queue.
         $bus = self::getContainer()->get(MessageBusInterface::class);
-        $starter = new AgentRunStarter($this->guard(true), $em, $bus);
+        $starter = new AgentRunStarter($this->guard(true), $this->permissiveLimits($em), $em, $bus);
 
         $run = $starter->start($tenant, Uuid::v7(), AgentRunSurface::Chat, 'live wire-through');
 
@@ -131,6 +132,11 @@ final class AgentRunStarterTest extends KernelTestCase
         };
 
         return new AgentFeatureGuard($resolver, agentEnabled: true);
+    }
+
+    private function permissiveLimits(EntityManagerInterface $em): AgentLimitGuard
+    {
+        return new AgentLimitGuard($em, 1000, 10_000_000, 10_000.0, 100_000.0);
     }
 
     private function noopBus(): MessageBusInterface

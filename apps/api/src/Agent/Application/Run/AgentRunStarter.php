@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Agent\Application\Run;
 
 use App\Agent\Application\AgentFeatureGuard;
+use App\Agent\Application\Limits\AgentLimitGuard;
 use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentRun;
@@ -25,6 +26,7 @@ final readonly class AgentRunStarter
 {
     public function __construct(
         private AgentFeatureGuard $guard,
+        private AgentLimitGuard $limits,
         private EntityManagerInterface $entityManager,
         private MessageBusInterface $messageBus,
     ) {
@@ -36,6 +38,7 @@ final readonly class AgentRunStarter
     public function start(Tenant $tenant, Uuid $userId, AgentRunSurface $surface, string $intent, array $context = []): AgentRun
     {
         $this->guard->assertEnabled($tenant);
+        $this->limits->assertWithinLimits($tenant, $userId);
 
         if ($this->hasActiveRun($userId)) {
             throw ActiveRunConflictException::forUser();

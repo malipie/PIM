@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Agent;
 
+use App\Agent\Application\Limits\AgentLimitGuard;
 use App\Agent\Application\Llm\AgentLlmClientInterface;
 use App\Agent\Application\Llm\AgentLlmResponse;
 use App\Agent\Application\Run\AgentLoopRunner;
@@ -212,6 +213,7 @@ final class AgentLoopRunnerTest extends KernelTestCase
 
         return new AgentLoopRunner(
             llm: $llm,
+            limits: new AgentLimitGuard($em, 1000, 10_000_000, 10_000.0, 100_000.0),
             registry: $registry,
             executor: new GuardedToolExecutor($registry, $em),
             models: $selector,
