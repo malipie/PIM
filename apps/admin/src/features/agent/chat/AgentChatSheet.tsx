@@ -15,6 +15,7 @@ import {
   sendAgentMessage,
   startAgentRun,
 } from '@/features/agent/api';
+import { useAgentRunStream } from '@/features/agent/hooks/useAgentRunStream';
 import { httpErrorDetail } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -60,7 +61,11 @@ export function AgentChatSheet() {
   const [draft, setDraft] = useState('');
   const [pendingError, setPendingError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [livePhase, setLivePhase] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // AGENT-P6-07 (#1980) — live phases over SSE; polling stays as the
+  // fallback whenever the stream is not connected.
+  const { connected: sseConnected, lastEvent } = useAgentRunStream(open ? runId : null);
 
   const refresh = useCallback(async (id: string) => {
     try {
@@ -88,12 +93,25 @@ export function AgentChatSheet() {
     return () => window.removeEventListener(OPEN_AGENT_CHAT_EVENT, onOpenEvent);
   }, [refresh]);
 
-  // Poll while the loop is busy server-side (planning/committing).
+  // Poll while the loop is busy server-side (planning/committing) -
+  // ONLY as the fallback when the SSE stream is down (P6-07).
   useEffect(() => {
-    if (!open || runId === null || run === null || !isRunBusy(run.status)) return;
+    if (!open || runId === null || run === null || !isRunBusy(run.status) || sseConnected) return;
     const timer = window.setInterval(() => void refresh(runId), 2500);
     return () => window.clearInterval(timer);
-  }, [open, runId, run, refresh]);
+  }, [open, runId, run, refresh, sseConnected]);
+
+  // SSE events: a status transition re-reads the run (fresh transcript);
+  // a progress tick just updates the live phase label.
+  useEffect(() => {
+    if (lastEvent === null || runId === null) return;
+    if (lastEvent.event === 'status') {
+      setLivePhase(null);
+      void refresh(runId);
+    } else if (typeof lastEvent.phase === 'string') {
+      setLivePhase(lastEvent.phase);
+    }
+  }, [lastEvent, runId, refresh]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new messages only
   useEffect(() => {
@@ -203,9 +221,15 @@ export function AgentChatSheet() {
             );
           })}
           {run !== null && isRunBusy(run.status) && (
-            <p className="flex items-center gap-2 text-sm text-zinc-500" role="status">
+            <p
+              className="flex items-center gap-2 text-sm text-zinc-500"
+              role="status"
+              data-testid="agent-live-phase"
+            >
               <Loader2 className="size-3 animate-spin" aria-hidden />
-              {t(`agent.status.${run.status}`, { defaultValue: run.status })}
+              {livePhase !== null
+                ? t(`agent.phase.${livePhase}`, { defaultValue: livePhase })
+                : t(`agent.status.${run.status}`, { defaultValue: run.status })}
             </p>
           )}
           {run?.status === 'awaiting_approval' && (

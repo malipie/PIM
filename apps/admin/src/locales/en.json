@@ -3628,6 +3628,12 @@
       "transparency_context": "View context: object type code, the active filter, selection counts (no full product data).",
       "transparency_results": "Tool results: counts, codes and minimal projections (id, code, name, completeness) — only what a tool returns.",
       "transparency_never": "Never: your key, passwords, API tokens or other tenants’ data. Catalog writes happen only after your approval."
+    },
+    "phase": {
+      "planning": "Planning…",
+      "tool-call": "Calling a tool…",
+      "materializing": "Materializing the plan…",
+      "committing": "Committing…"
     }
   }
 }
