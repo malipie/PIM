@@ -43,7 +43,7 @@
     "@commitlint/cli": "^20.5.2",
     "@commitlint/config-conventional": "^21.0.2",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
+    "lint-staged": "^17.0.8",
     "turbo": "^2.10.2"
   },
   "pnpm": {
