@@ -180,6 +180,11 @@ services:
         arguments:
             $agentEnabled: '%pim.agent.enabled%'
 
+    # AGENT-P1-05 (#1957) — agent run SSE topics (tenant-scoped, private).
+    App\Agent\Application\Run\AgentProgressPublisher:
+        arguments:
+            $topicBase: '%env(MERCURE_TOPIC_BASE)%'
+
     # DAM MVP upload entry point (#438). The size caps are wired through
     # parameters so deployment-specific overrides land in env vars
     # (e.g. enterprise tier raises the PDF cap).

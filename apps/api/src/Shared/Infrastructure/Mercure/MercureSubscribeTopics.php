@@ -81,6 +81,25 @@ final class MercureSubscribeTopics
         return self::tenantPrefix($tenantId, $base).'/feeds/'.$feedId.'/runs';
     }
 
+    /**
+     * Live phases of one agent run (AGENT-P1-05 #1957): planning /
+     * tool-call / materializing / awaiting_approval / committing / done
+     * / error / rolled_back — the chat panel + inbox subscribe per run.
+     */
+    public static function agentRun(Uuid $tenantId, string $base, string $runId): string
+    {
+        return self::tenantPrefix($tenantId, $base).'/agent-runs/'.$runId;
+    }
+
+    /**
+     * Per-user broadcast (AGENT-P1-05): any of the user's runs changing
+     * state refreshes their history/inbox list.
+     */
+    public static function agentUser(Uuid $tenantId, string $base, string $userId): string
+    {
+        return self::tenantPrefix($tenantId, $base).'/agent-runs/user/'.$userId;
+    }
+
     public static function identityUser(Uuid $tenantId, string $base, string $userId): string
     {
         return self::tenantPrefix($tenantId, $base).'/identity/user/'.$userId;
@@ -114,6 +133,9 @@ final class MercureSubscribeTopics
             $prefix.'/exports/{id}',
             // Feed regeneration progress (XMLF-P4-02, per-feed run stream).
             $prefix.'/feeds/{id}/runs',
+            // Agent run phases + per-user history refresh (AGENT-P1-05).
+            $prefix.'/agent-runs/{id}',
+            $prefix.'/agent-runs/user/{id}',
             // Permission invalidation (per-user + tenant-wide).
             $prefix.'/identity/user/{id}',
             $prefix.'/identity/tenant/{id}',
