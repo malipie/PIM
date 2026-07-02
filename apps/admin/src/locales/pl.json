@@ -3659,6 +3659,31 @@
       "operation": "operacja",
       "no_tools": "Run bez wywołań narzędzi.",
       "audit_hint": "Pełna odpowiedzialność: Ustawienia → Audyt (agent_run)"
+    },
+    "settings": {
+      "title": "AI / Agent",
+      "subtitle": "Agent działa na Twoim kluczu Anthropic (BYOK). Bez aktywnego klucza agent jest wyłączony.",
+      "loading": "Wczytywanie…",
+      "feature_off": "Warstwa agenta jest globalnie wyłączona (AGENT_ENABLED) — klucz można skonfigurować, ale runy nie wystartują.",
+      "key_heading": "Klucz Anthropic",
+      "state": "Stan",
+      "state_on": "Aktywny — agent włączony",
+      "state_disabled": "Wyłączony (soft-off)",
+      "state_missing": "Brak klucza — agent wymaga klucza",
+      "prefix": "Prefiks",
+      "last_used": "Ostatnio użyty",
+      "rotate_label": "Nowy klucz (rotacja zastępuje obecny)",
+      "set_label": "Klucz API (sk-ant-…)",
+      "save": "Zapisz",
+      "disable": "Wyłącz agenta",
+      "saved": "Klucz zapisany — agent włączony.",
+      "disabled": "Agent wyłączony dla tego tenanta.",
+      "never_plaintext": "Klucz jest szyfrowany (AES-256-GCM) i nigdy nie wraca w odpowiedziach — widzisz tylko prefiks.",
+      "transparency_heading": "Co trafia do modelu",
+      "transparency_intent": "Twoja intencja i kolejne wiadomości rozmowy.",
+      "transparency_context": "Kontekst widoku: kod typu obiektu, aktywny filtr, liczność selekcji (bez pełnych danych produktów).",
+      "transparency_results": "Wyniki narzędzi: liczniki, kody i minimalne projekcje (id, kod, nazwa, kompletność) — tylko to, co narzędzie zwróci.",
+      "transparency_never": "Nigdy: Twój klucz, hasła, tokeny API ani dane innych tenantów. Zapis do katalogu wyłącznie po Twojej akceptacji."
     }
   }
 }
