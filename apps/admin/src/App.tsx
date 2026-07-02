@@ -692,26 +692,6 @@ function App() {
                       path="/integrations/api-configurator/monitor"
                       element={<SyncMonitorScreen />}
                     />
-                    {/* XMLF-P5-01 — product XML feeds (hub / wizard / detail)
-                        under the same shell; wizard + detail are placeholder
-                        targets until P5-02..P5-05 replace them. */}
-                    <Route path="/integrations/api-configurator/feeds" element={<FeedsHubPage />} />
-                    <Route
-                      path="/integrations/api-configurator/feeds/monitor"
-                      element={<FeedsMonitorPage />}
-                    />
-                    <Route
-                      path="/integrations/api-configurator/feeds/new"
-                      element={<FeedWizardPage />}
-                    />
-                    <Route
-                      path="/integrations/api-configurator/feeds/:id/edit"
-                      element={<FeedWizardPage />}
-                    />
-                    <Route
-                      path="/integrations/api-configurator/feeds/:id"
-                      element={<FeedDetailPage />}
-                    />
                     <Route
                       path="/integrations/api-configurator/:id/edit"
                       element={<ApiProfileEditPage />}
@@ -721,6 +701,28 @@ function App() {
                       element={<ApiProfileShowPage />}
                     />
                   </Route>
+                  {/* XMLF — product XML feeds (hub / monitor / wizard / detail).
+                      Shipped as a tab of the Konfigurator API shell, promoted
+                      to its own sidebar entry in XMLF-FUP-01 (#2028): same
+                      URLs, rendered outside the shell (FeedsSubnav is the
+                      area's own hub|monitor navigation). */}
+                  <Route path="/integrations/api-configurator/feeds" element={<FeedsHubPage />} />
+                  <Route
+                    path="/integrations/api-configurator/feeds/monitor"
+                    element={<FeedsMonitorPage />}
+                  />
+                  <Route
+                    path="/integrations/api-configurator/feeds/new"
+                    element={<FeedWizardPage />}
+                  />
+                  <Route
+                    path="/integrations/api-configurator/feeds/:id/edit"
+                    element={<FeedWizardPage />}
+                  />
+                  <Route
+                    path="/integrations/api-configurator/feeds/:id"
+                    element={<FeedDetailPage />}
+                  />
                   <Route
                     path="/integrations"
                     element={<Navigate to="/integrations/imports/sessions" replace />}

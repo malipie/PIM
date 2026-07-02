@@ -156,6 +156,8 @@ interface IntegrationChild {
   countKey?: string;
   /** NUI-01 — pulsing dot next to the count while the counter is > 0 (live sessions). */
   live?: boolean;
+  /** A sibling owns this deeper prefix — do not highlight this item there. */
+  excludePrefix?: string;
 }
 
 const INTEGRATION_CHILDREN: IntegrationChild[] = [
@@ -171,6 +173,14 @@ const INTEGRATION_CHILDREN: IntegrationChild[] = [
     key: 'api_configurator',
     labelKey: 'nav.api_configurator',
     route: '/integrations/api-configurator',
+    // XMLF-FUP-01 — the feeds area is its own menu entry below; without this
+    // exclusion both items would light up on /api-configurator/feeds/*.
+    excludePrefix: '/integrations/api-configurator/feeds',
+  },
+  {
+    key: 'xml_configurator',
+    labelKey: 'nav.xml_configurator',
+    route: '/integrations/api-configurator/feeds',
   },
 ];
 
@@ -277,7 +287,11 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
                 className={({ isActive }) =>
                   cn(
                     'flex items-center gap-3 rounded-xl py-1.5 pr-3 pl-10 text-[13px] font-medium transition',
-                    isActive ? 'bg-zinc-100 text-ink' : 'text-zinc-500 hover:bg-zinc-50',
+                    isActive &&
+                      (child.excludePrefix === undefined ||
+                        !pathname.startsWith(child.excludePrefix))
+                      ? 'bg-zinc-100 text-ink'
+                      : 'text-zinc-500 hover:bg-zinc-50',
                   )
                 }
                 end={false}

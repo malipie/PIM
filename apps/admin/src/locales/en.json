@@ -97,7 +97,8 @@
     "add_custom_module": "Add custom module",
     "imports": "Imports",
     "exports": "Exports",
-    "api_configurator": "API Configurator"
+    "api_configurator": "API Configurator",
+    "xml_configurator": "XML Configurator"
   },
   "admin": {
     "tenants": {
@@ -2053,7 +2054,6 @@
       "tabs": {
         "connections": "Connections",
         "producer": "My API",
-        "feeds": "Feeds",
         "monitor": "Monitor"
       },
       "connections_soon_title": "Connections — coming soon",
