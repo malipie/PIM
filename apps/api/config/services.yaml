@@ -226,6 +226,11 @@ services:
     App\Integration\Contracts\ChannelPublishPort:
         alias: App\Integration\Application\UnavailableChannelPublisher
 
+    # AGENT-P8-02 (#1984) — deterministic mapping baseline for the
+    # AI-assisted column suggestions.
+    App\Import\Contracts\ColumnMappingPort:
+        alias: App\Import\Application\Service\AgentColumnMappingAssist
+
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
     # "is this {value: ...} payload valid against this Attribute?" without
@@ -736,4 +741,9 @@ when@test:
         # AGENT-P7-01 (#1981) — and the feed assist port.
         App\Export\Contracts\FeedAssistPort:
             alias: App\Export\Feed\Application\AgentFeedAssist
+            public: true
+
+        # AGENT-P8-02 (#1984) — and the column-mapping port.
+        App\Import\Contracts\ColumnMappingPort:
+            alias: App\Import\Application\Service\AgentColumnMappingAssist
             public: true
