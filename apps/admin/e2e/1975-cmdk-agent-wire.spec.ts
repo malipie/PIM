@@ -73,9 +73,15 @@ test('cmd+k sends a free-form command to the agent with view context', async ({ 
     }),
   );
 
-  // The list route owns mod+k (VIEW-19 palette).
-  await page.keyboard.press('ControlOrMeta+k');
-  const commandInput = page.getByRole('dialog').getByRole('textbox');
+  // The list route owns mod+k (VIEW-19 palette). The handler binds when
+  // the lazy list page mounts, which lags `main` becoming visible — so
+  // retry the shortcut until the palette answers instead of pressing once.
+  const dialog = page.getByRole('dialog');
+  await expect(async () => {
+    await page.keyboard.press('ControlOrMeta+k');
+    await expect(dialog).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
+  const commandInput = dialog.getByRole('textbox');
   await expect(commandInput).toBeVisible();
 
   // Free-form command → the local planner falls back → "send to agent".
