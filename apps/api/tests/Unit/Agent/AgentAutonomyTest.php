@@ -68,8 +68,7 @@ final class AgentAutonomyTest extends TestCase
 
             public function autonomyForUser(Uuid $userId): string
             {
-                /* @var 'off'|'read_only'|'propose' */
-                return $this->level;
+                return \in_array($this->level, ['off', 'read_only', 'propose'], true) ? $this->level : 'off';
             }
         };
 
