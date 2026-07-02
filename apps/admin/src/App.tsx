@@ -19,6 +19,7 @@ import { AppLayout } from '@/layout/AppLayout';
 import { SettingsLayout } from '@/layout/SettingsLayout';
 import { authProvider } from '@/lib/auth-provider';
 import { dataProvider } from '@/lib/data-provider';
+import { AGENT_ENABLED } from '@/lib/features';
 
 /**
  * Lazy-loads a page module that exports the component as a named
@@ -35,6 +36,10 @@ function lazyPage<K extends string, T extends Record<K, ComponentType<never>>>(
   return lazy(() => loader().then((m) => ({ default: m[exportName] as ComponentType<unknown> })));
 }
 
+const AgentInboxPage = lazyPage(
+  () => import('@/features/agent/inbox/AgentInboxPage'),
+  'AgentInboxPage',
+);
 const ApiProfileCreatePage = lazyPage(
   () => import('@/features/api-configurator/api-profiles/create'),
   'ApiProfileCreatePage',
@@ -464,6 +469,7 @@ function App() {
                 >
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
+                  {AGENT_ENABLED && <Route path="/agent/inbox" element={<AgentInboxPage />} />}
                   {/* UP-10 (#1026) — `/products` default is the
                     UniversalListPage parametrized for the built-in
                     product ObjectType (ADR-009 pixel-perfect parity

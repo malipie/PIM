@@ -12,6 +12,8 @@ use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentMessage;
 use App\Agent\Domain\Entity\AgentRun;
 use App\Agent\Domain\Entity\AgentToolCall;
+use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
+use App\Catalog\Contracts\PendingChanges\PendingChangeView;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Shared\Application\TenantContext;
 use App\Shared\Application\UserIdentityAware;
@@ -55,6 +57,7 @@ final readonly class AgentRunController
         private EntityManagerInterface $entityManager,
         private TenantContext $tenantContext,
         private Security $security,
+        private PendingChangesPort $pendingChanges,
     ) {
     }
 
@@ -179,6 +182,49 @@ final readonly class AgentRunController
         $this->turns->appendUserMessage($run, $tenant, trim($message));
 
         return new JsonResponse($this->serializeSummary($run), Response::HTTP_ACCEPTED);
+    }
+
+    /**
+     * AGENT-P6-03 (#1976) — the operator-facing PLAN: the materialized
+     * batch rows (before -> after diffs) behind the run awaiting
+     * approval. Permission-scoped like the decisions (a manager reviews
+     * runs they do not own).
+     */
+    #[Route('/api/agent/runs/{id}/plan', name: 'pim_agent_run_plan', methods: ['GET'], requirements: ['id' => '[0-9a-f-]{36}'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[RequiresPermission(module: 'agent', action: 'approve_pending')]
+    public function plan(string $id, Request $request): JsonResponse
+    {
+        $this->featureGuard->assertEnabled($this->tenant());
+        $run = $this->anyRun($id);
+
+        $batchId = $run->getPendingChangeBatchId();
+        if (null === $batchId) {
+            return new JsonResponse(['items' => [], 'total' => 0, 'page' => 1, 'per_page' => 50]);
+        }
+
+        $page = max(1, $request->query->getInt('page', 1));
+        $perPage = min(200, max(1, $request->query->getInt('per_page', 50)));
+
+        $rows = $this->pendingChanges->listBatch($batchId, $perPage, ($page - 1) * $perPage);
+
+        return new JsonResponse([
+            'items' => array_map(static fn (PendingChangeView $row): array => [
+                'id' => $row->id->toRfc4122(),
+                'change_type' => $row->changeType->value,
+                'status' => $row->status->value,
+                'target_object_id' => $row->targetObjectId?->toRfc4122(),
+                'attribute_code' => $row->attributeCode,
+                'scope_locale' => $row->scopeLocale,
+                'scope_channel' => $row->scopeChannel,
+                'before' => $row->before,
+                'after' => $row->after,
+                'provenance' => $row->provenance,
+            ], $rows),
+            'total' => $this->pendingChanges->countBatch($batchId),
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
     }
 
     #[Route('/api/agent/runs/{id}/approve', name: 'pim_agent_run_approve', methods: ['POST'], requirements: ['id' => '[0-9a-f-]{36}'])]

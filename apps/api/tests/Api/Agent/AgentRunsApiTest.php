@@ -207,6 +207,19 @@ final class AgentRunsApiTest extends ApiTestCase
 
         $client = $this->authenticatedClient();
 
+        // AGENT-P6-03 (#1976) — the inbox reads the materialized plan.
+        $plan = $client->request('GET', \sprintf('/api/agent/runs/%s/plan', $runId));
+        self::assertSame(200, $plan->getStatusCode());
+        $planPayload = $plan->toArray(false);
+        self::assertSame(1, $planPayload['total']);
+        $items = $planPayload['items'];
+        self::assertIsArray($items);
+        self::assertIsArray($items[0]);
+        self::assertSame('price', $items[0]['attribute_code']);
+        self::assertNull($items[0]['before']);
+        self::assertSame(['value' => 100], $items[0]['after']);
+        self::assertSame('agent', $items[0]['provenance']);
+
         $approve = $client->request('POST', \sprintf('/api/agent/runs/%s/approve', $runId));
         self::assertSame(200, $approve->getStatusCode());
         $approvedPayload = $approve->toArray(false);

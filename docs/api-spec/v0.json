@@ -10099,6 +10099,45 @@
                 "x-cortex-permission": "agent.bulk_actions"
             }
         },
+        "/api/agent/runs/{id}/plan": {
+            "get": {
+                "operationId": "api_agent_runs_id_plan_get",
+                "tags": [
+                    "agent"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api agent runs id plan",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "agent.approve_pending"
+            }
+        },
         "/api/agent/runs/{id}/reject": {
             "post": {
                 "operationId": "api_agent_runs_id_reject_post",
