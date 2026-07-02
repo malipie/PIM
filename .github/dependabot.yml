@@ -62,7 +62,16 @@ updates:
           - version-update:semver-major
 
   # ────────────────────────────────────────────────────────────────
-  # npm — workspace root (monorepo deps: husky, biome, lint-staged, commitlint)
+  # npm — whole pnpm workspace (root + apps/admin + packages/*)
+  #
+  # NOTE (2026-07-02): there used to be a second npm entry with
+  # directory: /apps/admin. It was removed on purpose — dependabot
+  # bumped apps/admin/package.json WITHOUT regenerating the
+  # workspace-root pnpm-lock.yaml, so every PR from that entry
+  # (grouped or not) failed CI with ERR_PNPM_OUTDATED_LOCKFILE and
+  # had to be redone manually. This root entry covers the entire
+  # pnpm workspace correctly (manifest + lockfile together).
+  # Do not re-add a per-directory npm entry.
   # ────────────────────────────────────────────────────────────────
   - package-ecosystem: npm
     directory: /
@@ -71,41 +80,10 @@ updates:
       day: monday
       time: "06:00"
       timezone: Europe/Warsaw
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
     labels:
       - dependencies
       - tooling
-    commit-message:
-      prefix: "chore(deps)"
-      include: scope
-
-  # ────────────────────────────────────────────────────────────────
-  # npm — admin frontend (apps/admin/)
-  # ────────────────────────────────────────────────────────────────
-  - package-ecosystem: npm
-    directory: /apps/admin
-    schedule:
-      # Weekly to avoid first-run backlog flood. Patch updates are
-      # frequent enough that weekly catches them within the
-      # CLAUDE.md "Maintenance ticket co 2 epiki" cadence.
-      interval: weekly
-      day: monday
-      time: "06:00"
-      timezone: Europe/Warsaw
-    open-pull-requests-limit: 10
-    # KNOWN ISSUE (2026-07-02): dependabot bumps apps/admin/package.json but
-    # fails to regenerate the workspace-root pnpm-lock.yaml, so every PR from
-    # this entry fails CI with ERR_PNPM_OUTDATED_LOCKFILE and must be redone
-    # manually (pnpm --dir apps/admin add ...). Grouping below bundles all
-    # admin bumps into a single weekly PR so there is only one PR to redo.
-    # If this persists, consider migrating to Renovate (proper pnpm support).
-    groups:
-      admin-npm:
-        patterns:
-          - "*"
-    labels:
-      - dependencies
-      - frontend
     commit-message:
       prefix: "chore(deps)"
       include: scope
