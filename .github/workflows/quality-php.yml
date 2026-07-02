@@ -416,6 +416,110 @@ jobs:
       - name: Run memory benchmarks (import-benchmark group)
         run: php bin/phpunit --group import-benchmark
 
+  agent-removability:
+    # AGENT-P0-09 (#1952, ADR-0024 a) — the open-core gate: the agent BC
+    # must be physically deletable. This job removes src/Agent, its DI
+    # root (config/services_agent.yaml) and its tests, then proves the
+    # core still compiles, passes static analysis and the core unit +
+    # architecture suites, and the admin builds with the agent flag off.
+    # A failure here means a core->Agent dependency leaked — fix the
+    # dependency, never this job. DoD gate for every epic-0.7 ticket.
+    name: Agent removability (open-core gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: ctype, iconv, intl, opcache, pcntl, pdo_pgsql, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer
+        uses: actions/cache@v6
+        with:
+          path: |
+            apps/api/vendor
+            ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('apps/api/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Generate JWT keypair (cache warmup boots Lexik)
+        run: |
+          mkdir -p config/jwt
+          openssl genpkey -algorithm RSA -out config/jwt/private.pem -aes256 -pass pass:ci -pkeyopt rsa_keygen_bits:4096
+          openssl pkey -in config/jwt/private.pem -passin pass:ci -pubout -out config/jwt/public.pem
+
+      - name: Remove the agent module (ADR-0024 removability)
+        run: |
+          rm -rf src/Agent config/services_agent.yaml config/packages/agent.yaml \
+                 tests/Unit/Agent tests/Integration/Agent tests/Api/Agent
+          if grep -RFn 'App\Agent' src tests config; then
+            echo "::error::core still references App\Agent after module removal"
+            exit 1
+          fi
+
+      - name: Core container compiles without the agent
+        run: php bin/console cache:clear --env=dev
+        env:
+          APP_ENV: dev
+          APP_DEBUG: "1"
+          AGENT_ENABLED: "0"
+          DATABASE_URL: postgresql://app:app@localhost:5432/app?serverVersion=16
+          MESSENGER_TRANSPORT_DSN: in-memory://
+          MERCURE_URL: http://localhost/.well-known/mercure
+          MERCURE_PUBLIC_URL: http://localhost/.well-known/mercure
+          MERCURE_JWT_SECRET: ci-mercure-key-at-least-256-bits-long
+          JWT_PASSPHRASE: ci
+
+      - name: PHPStan on the agent-less tree
+        run: composer phpstan
+        env:
+          APP_ENV: dev
+          AGENT_ENABLED: "0"
+          JWT_PASSPHRASE: ci
+
+      - name: Deptrac on the agent-less tree
+        run: vendor/bin/deptrac analyse --no-progress --no-cache
+
+      - name: Core PHPUnit (unit + architecture) without the agent
+        run: php bin/phpunit --testsuite unit,architecture
+        env:
+          APP_ENV: test
+          APP_DEBUG: "0"
+          AGENT_ENABLED: "0"
+          DATABASE_URL: postgresql://pim:ChangeMeInDev@127.0.0.1:5432/pim?serverVersion=16&charset=utf8
+          MESSENGER_TRANSPORT_DSN: in-memory://
+          MERCURE_URL: http://localhost/.well-known/mercure
+          MERCURE_PUBLIC_URL: http://localhost/.well-known/mercure
+          MERCURE_JWT_SECRET: ci-mercure-key-at-least-256-bits-long
+          JWT_PASSPHRASE: ci
+          APP_DEFAULT_TENANT_CODE: demo
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install admin dependencies
+        working-directory: ${{ github.workspace }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Admin builds with the agent flag off
+        working-directory: ${{ github.workspace }}
+        run: pnpm --filter @pim/admin build
+        env:
+          VITE_AGENT_ENABLED: "false"
+
   openapi-spec:
     name: OpenAPI spec drift
     runs-on: ubuntu-latest

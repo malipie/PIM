@@ -122,9 +122,11 @@ parameters:
               - src/Catalog/Domain/Entity/BulkEditJob.php
               - src/Catalog/Domain/Entity/SavedView.php
               - src/Catalog/Domain/Entity/BulkSession.php
-              - src/Agent/Domain/Entity/AgentRun.php
-              - src/Agent/Domain/Entity/AgentMessage.php
-              - src/Agent/Domain/Entity/AgentToolCall.php
+              # Agent entities as an fnmatch PATTERN, not file paths — the
+              # removability CI job (AGENT-P0-09) deletes src/Agent and
+              # PHPStan hard-errors on non-existent ignore paths; a pattern
+              # matching nothing is legal.
+              - src/Agent/Domain/Entity/Agent*.php
               - src/Catalog/Domain/Entity/PendingChange.php
               - src/Channel/Domain/Entity/Channel.php
               - src/Channel/Domain/Entity/ChannelCategoryNode.php
