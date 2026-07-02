@@ -8,6 +8,7 @@ import {
   GROUP_ICONS,
   isSpecialTab,
   resolveProvenance,
+  resolveProvenanceRunId,
   type TabKey,
 } from './product-detail-helpers';
 import { OtherTabs } from './product-detail-other-tabs';
@@ -99,6 +100,7 @@ export function ProductDetailContent({
           attribute={attr}
           value={fieldValue(attr.code)}
           provenance={resolveProvenance(attr, product)}
+          provenanceSource={resolveProvenanceRunId(attr, product)}
           locale={locale}
           channel={channel}
           isEditing={isEditing}

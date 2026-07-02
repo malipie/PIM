@@ -58,7 +58,12 @@ function buildTooltip(
   locale: string,
 ): string {
   const parts = [t(`provenance.${provenance}`, { defaultValue: provenance })];
-  if (source) {
+  if (provenance === 'agent') {
+    parts[0] = t('provenance.agent_tooltip', { defaultValue: 'Ustawione przez agenta' });
+    if (source) {
+      parts.push(`${t('provenance.agent_run', { defaultValue: 'run' })}: ${source}`);
+    }
+  } else if (source) {
     parts.push(`${t('provenance.source', { defaultValue: 'Source' })}: ${source}`);
   }
   if (occurredAt) {

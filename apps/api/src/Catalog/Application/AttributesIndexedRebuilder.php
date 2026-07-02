@@ -74,7 +74,16 @@ final readonly class AttributesIndexedRebuilder
             if (null !== $value->getLocale() || null !== $value->getChannelId()) {
                 continue;
             }
-            $indexed[$value->getAttribute()->getCode()] = $value->getValue();
+            // AGENT-P6-05 (#1978) — the projection carries the provenance
+            // signal (and the agent run id) so the admin's badges answer
+            // "who set this?" without touching object_values on read.
+            $slot = $value->getValue();
+            $slot['provenance'] = $value->getProvenance()->value;
+            $meta = $value->getProvenanceMeta();
+            if (isset($meta['agent_run_id']) && \is_string($meta['agent_run_id'])) {
+                $slot['provenance_meta'] = ['agent_run_id' => $meta['agent_run_id']];
+            }
+            $indexed[$value->getAttribute()->getCode()] = $slot;
         }
 
         $object->updateAttributeIndex($indexed);

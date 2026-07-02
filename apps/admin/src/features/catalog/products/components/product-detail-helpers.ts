@@ -185,3 +185,19 @@ export function resolveProvenance(
   }
   return 'manual';
 }
+
+/**
+ * AGENT-P6-05 (#1978) — the agent run id from the indexed projection's
+ * provenance_meta (jsonb-schemas §5), for the badge tooltip
+ * "ustawione przez agenta, run …".
+ */
+export function resolveProvenanceRunId(
+  attr: AttributeMeta,
+  product: CatalogObjectDto | null | undefined,
+): string | null {
+  const indexed = product?.attributesIndexed as
+    | Record<string, { provenance_meta?: { agent_run_id?: string } }>
+    | undefined;
+  const runId = indexed?.[attr.code]?.provenance_meta?.agent_run_id;
+  return typeof runId === 'string' ? runId : null;
+}
