@@ -240,12 +240,24 @@ Schema unionowa — pole `validation_rules` jest interpretowane przez validator 
     "source": { "type": "string", "description": "Identyfikator źródła (import session uuid, integration name, agent run id)" },
     "imported_at": { "type": "string", "format": "date-time" },
     "user_id": { "type": "string", "format": "uuid" },
-    "agent_run_id": { "type": "string", "format": "uuid", "description": "Faza 2 — id Anthropic conversation" },
+    "agent_run_id": { "type": "string", "format": "uuid", "description": "provenance=agent — id AgentRun (epik 0.7, tabela agent_runs)" },
+    "model": { "type": "string", "description": "provenance=agent — id modelu Anthropic użytego w runie (np. claude-sonnet-*)" },
+    "intent": { "type": "string", "description": "provenance=agent — intencja usera, z której powstała zmiana (skrót)" },
     "channel": { "type": "string", "description": "Integration channel id jeśli provenance=integration" }
   },
   "additionalProperties": true
 }
 ```
+
+### Shape per provenance=agent (AGENT-P0-04 #1947, ADR-0024)
+
+Wartości zapisane przez agenta (po akcepcie batcha `pending_changes`) niosą:
+
+```json
+{ "agent_run_id": "<uuid AgentRun>", "model": "claude-sonnet-…", "intent": "ustaw cenę 100 wszystkim bez ceny" }
+```
+
+`agent_run_id` linkuje wartość do runu (audyt + tooltip badge'a „agent" w UI, P6-05).
 
 ### Reguły
 

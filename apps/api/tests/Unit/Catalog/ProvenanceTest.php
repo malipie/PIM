@@ -11,12 +11,12 @@ use PHPUnit\Framework\TestCase;
 final class ProvenanceTest extends TestCase
 {
     #[Test]
-    public function threeMvpCasesAreDefinedExactly(): void
+    public function fourCasesAreDefinedExactly(): void
     {
-        // Phase 2 adds the `agent` case (epic 0.7). Until then we ship
-        // exactly three so a stale fixture cannot accidentally claim
-        // agent provenance — guard against drift.
-        self::assertCount(3, Provenance::cases());
+        // AGENT-P0-04 (#1947) — epic 0.7 adds the `agent` case alongside
+        // the pending_changes approval gate (ADR-0024). Guard against
+        // further drift: a fifth source needs a conscious decision.
+        self::assertCount(4, Provenance::cases());
     }
 
     #[Test]
@@ -29,12 +29,13 @@ final class ProvenanceTest extends TestCase
     }
 
     #[Test]
-    public function agentCaseIsExplicitlyAbsent(): void
+    public function agentCaseIsPresent(): void
     {
-        // Negative guard: phase 2 will add this case alongside the agent
-        // approval inbox in epic 0.7. If someone adds it here without
-        // shipping the inbox, this test fails and forces a conscious
-        // change.
-        self::assertNull(Provenance::tryFrom('agent'));
+        // The agent commits values only after a human accepts the
+        // pending_changes batch — the enum case is the substrate for
+        // provenance=agent badges (P6-05) and agent bulk-path writes
+        // (P3-01/P3-02).
+        self::assertSame(Provenance::Agent, Provenance::from('agent'));
+        self::assertSame('agent', Provenance::Agent->value);
     }
 }
