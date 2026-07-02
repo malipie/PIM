@@ -1776,8 +1776,73 @@
         "last_regen": "Last regen."
       },
       "wizard": {
-        "placeholder_title": "Feed wizard — coming in the next ticket",
-        "placeholder_hint": "The 5-step creator (template, scope, mapping, delivery, review) lands with XMLF-P5-02..04.",
+        "title_new": "New feed",
+        "title_edit": "Edit feed",
+        "subtitle": "An XML feed for a marketplace or partner — template, mapping, filter, preview and a stable URL. No developer needed.",
+        "steps_aria": "Wizard steps",
+        "step": {
+          "template": "Template",
+          "scope": "Scope",
+          "mapping": "Mapping",
+          "delivery": "Delivery",
+          "preview": "Preview"
+        },
+        "step_note": {
+          "template": "target channel",
+          "scope": "filter · scope",
+          "mapping": "slots ↔ attributes",
+          "delivery": "URL · schedule",
+          "preview": "XML · publish"
+        },
+        "cancel": "Cancel",
+        "back": "← Back",
+        "next": "Next",
+        "progress": "Step {{current}} of {{total}}",
+        "save_and_generate": "Save and generate",
+        "saved": "Feed saved.",
+        "save_error": "Saving the feed failed. Check the fields and try again.",
+        "template": {
+          "title": "Choose a feed template",
+          "subtitle": "A predefined channel ships ready slots and validation rules. Custom builds its own structure (or clones a predef).",
+          "predef": "predef",
+          "custom": "custom",
+          "chosen": "chosen",
+          "name_label": "Feed name",
+          "name_placeholder": "e.g. Google Shopping — Poland",
+          "code_label": "Code",
+          "code_hint": "auto from name",
+          "desc": {
+            "google_shopping": "Google Merchant Center product feed (RSS 2.0, g: namespace) — GTIN/MPN validation, variants via item_group_id.",
+            "ceneo": "Ceneo.pl offer feed — <o> items with attribute nodes, category as a CDATA path.",
+            "meta": "Meta (Facebook/Instagram) catalog feed — RSS with fb product fields.",
+            "custom": "Your own XML structure: root, item and slots defined slot-by-slot. Clone a predef or start empty."
+          }
+        },
+        "scope": {
+          "title": "Value scope",
+          "one_locale": "· one feed = one locale",
+          "object_type": "Object type",
+          "product": "Product",
+          "locked": "locked",
+          "locale": "Language (locale)",
+          "currency": "Currency",
+          "none": "—",
+          "channel": "Channel",
+          "channel_hint": "value overlay",
+          "variants_note": "Product variants enter the feed FLAT — every variant is its own <item> with its own id and a shared item_group_id = the master's SKU. Multiple languages = multiple feeds.",
+          "assortment": "Assortment in the feed",
+          "filter_hint": "The same filter (DSL) as the product list and the export — no second implementation.",
+          "in_feed": "In feed: {{count}} products",
+          "counting": "Counting…"
+        },
+        "placeholder": {
+          "mapping_title": "Mapping — next ticket",
+          "mapping_hint": "The slot ↔ attribute mapper lands with XMLF-P5-03.",
+          "delivery_title": "Delivery — next ticket",
+          "delivery_hint": "Schedule, gzip, URL auth and the token card land with XMLF-P5-04.",
+          "preview_title": "Preview — next ticket",
+          "preview_hint": "The live XML preview with the health report lands with XMLF-P5-04."
+        },
         "back_to_hub": "Back to feeds"
       },
       "detail": {

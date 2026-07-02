@@ -1824,8 +1824,73 @@
         "last_regen": "Ost. regen."
       },
       "wizard": {
-        "placeholder_title": "Kreator feedu — w kolejnym tickecie",
-        "placeholder_hint": "5-krokowy kreator (szablon, zakres, mapowanie, delivery, przegląd) wchodzi z XMLF-P5-02..04.",
+        "title_new": "Nowy feed",
+        "title_edit": "Edytuj feed",
+        "subtitle": "Feed XML dla marketplace lub partnera — szablon, mapowanie, filtr, podgląd i stabilny URL. Bez developera.",
+        "steps_aria": "Kroki kreatora",
+        "step": {
+          "template": "Szablon",
+          "scope": "Zakres",
+          "mapping": "Mapowanie",
+          "delivery": "Dostarczanie",
+          "preview": "Podgląd"
+        },
+        "step_note": {
+          "template": "kanał docelowy",
+          "scope": "filtr · scope",
+          "mapping": "sloty ↔ atrybuty",
+          "delivery": "URL · harmonogram",
+          "preview": "XML · publikacja"
+        },
+        "cancel": "Anuluj",
+        "back": "← Wstecz",
+        "next": "Dalej",
+        "progress": "Krok {{current}} z {{total}}",
+        "save_and_generate": "Zapisz i wygeneruj",
+        "saved": "Feed zapisany.",
+        "save_error": "Zapis feedu nie powiódł się. Sprawdź pola i spróbuj ponownie.",
+        "template": {
+          "title": "Wybierz szablon feedu",
+          "subtitle": "Predefiniowany kanał ma gotowe sloty i reguły walidacji. Custom buduje własną strukturę od zera (lub klonuje predef).",
+          "predef": "predef",
+          "custom": "custom",
+          "chosen": "wybrany",
+          "name_label": "Nazwa feedu",
+          "name_placeholder": "np. Google Shopping — Polska",
+          "code_label": "Code",
+          "code_hint": "auto z nazwy",
+          "desc": {
+            "google_shopping": "Feed produktowy Google Merchant Center (RSS 2.0, namespace g:) — walidacja GTIN/MPN, warianty przez item_group_id.",
+            "ceneo": "Feed ofertowy Ceneo.pl — itemy <o> z atrybutami, kategoria jako ścieżka w CDATA.",
+            "meta": "Feed katalogu Meta (Facebook/Instagram) — RSS z polami produktowymi fb.",
+            "custom": "Własna struktura XML: root, item i sloty definiowane slot po slocie. Sklonuj predef albo zacznij od zera."
+          }
+        },
+        "scope": {
+          "title": "Scope wartości",
+          "one_locale": "· feed = jeden locale",
+          "object_type": "Typ obiektu",
+          "product": "Produkt",
+          "locked": "zablokowane",
+          "locale": "Język (locale)",
+          "currency": "Waluta",
+          "none": "—",
+          "channel": "Kanał",
+          "channel_hint": "overlay wartości",
+          "variants_note": "Warianty produktów trafiają do feedu PŁASKO — każdy wariant to osobny <item> z własnym id i wspólnym item_group_id = SKU mastera. Wiele języków = wiele feedów.",
+          "assortment": "Asortyment w feedzie",
+          "filter_hint": "Ten sam filtr (DSL) co lista produktów i eksport — bez drugiej implementacji.",
+          "in_feed": "W feedzie: {{count}} produktów",
+          "counting": "Liczenie…"
+        },
+        "placeholder": {
+          "mapping_title": "Mapowanie — kolejny ticket",
+          "mapping_hint": "Mapper slotów ↔ atrybutów wchodzi z XMLF-P5-03.",
+          "delivery_title": "Dostarczanie — kolejny ticket",
+          "delivery_hint": "Harmonogram, gzip, autoryzacja URL i karta tokenu wchodzą z XMLF-P5-04.",
+          "preview_title": "Podgląd — kolejny ticket",
+          "preview_hint": "Podgląd XML na żywo z raportem zdrowia wchodzi z XMLF-P5-04."
+        },
         "back_to_hub": "Wróć do feedów"
       },
       "detail": {

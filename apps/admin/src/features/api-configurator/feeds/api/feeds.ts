@@ -25,6 +25,7 @@ export interface FeedRow {
   schedule_cron: string | null;
   descriptor: Record<string, unknown>;
   field_mappings: Array<Record<string, unknown>>;
+  filter?: unknown;
   cached_item_count: number | null;
   cached_at: string | null;
   last_pulled_at: string | null;
@@ -55,6 +56,19 @@ interface PullStatsResponse {
 }
 
 export const FEEDS_QUERY_KEY = ['xmlf', 'feeds'] as const;
+
+export async function fetchFeed(id: string): Promise<FeedRow> {
+  return jsonFetch<FeedRow>(`/api/feeds/${id}`);
+}
+
+/** Command helpers for the wizard (POST create / PATCH update). */
+export async function createFeed(payload: Record<string, unknown>): Promise<FeedRow> {
+  return jsonFetch<FeedRow>('/api/feeds', { method: 'POST', body: payload });
+}
+
+export async function patchFeed(id: string, payload: Record<string, unknown>): Promise<FeedRow> {
+  return jsonFetch<FeedRow>(`/api/feeds/${id}`, { method: 'PATCH', body: payload });
+}
 
 export function useFeeds() {
   return useQuery({

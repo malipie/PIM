@@ -697,6 +697,10 @@ function App() {
                       element={<FeedWizardPage />}
                     />
                     <Route
+                      path="/integrations/api-configurator/feeds/:id/edit"
+                      element={<FeedWizardPage />}
+                    />
+                    <Route
                       path="/integrations/api-configurator/feeds/:id"
                       element={<FeedDetailPage />}
                     />
