@@ -11,7 +11,7 @@ import { useFilterDslState } from '@/lib/filters/use-filter-dsl-state';
 import { httpErrorDetail } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
-import { createFeed, fetchFeed, patchFeed } from '../api/feeds';
+import { createFeed, fetchFeed, patchFeed, regenerateFeed } from '../api/feeds';
 import {
   type SlotMapping,
   sanitizeMappings,
@@ -20,7 +20,9 @@ import {
 } from '../api/mapping';
 import { type FeedTemplateInfo, useFeedTemplates, useProductObjectTypeId } from '../api/templates';
 import { TemplateBadge } from '../components/primitives';
+import { StepDelivery } from './steps/StepDelivery';
 import { StepMapper } from './steps/StepMapper';
+import { StepPreview } from './steps/StepPreview';
 import { StepScope } from './steps/StepScope';
 import { StepTemplate } from './steps/StepTemplate';
 import {
@@ -166,6 +168,10 @@ export function FeedWizardPage() {
     if (step === 1 && !(await persistDraft())) {
       return;
     }
+    // Leaving delivery persists schedule + gzip/auth via PATCH.
+    if (step === 3 && !(await persistDraft())) {
+      return;
+    }
     // Leaving the mapper persists the slot mappings (PUT — the backend
     // validates and returns the fresh view) + the skip policy via PATCH.
     if (step === 2) {
@@ -183,6 +189,17 @@ export function FeedWizardPage() {
     }
     setStep((value) => Math.min(value + 1, WIZARD_STEP_IDS.length - 1));
   }
+
+  const rootPath = useMemo(() => {
+    const root = draft.descriptor.root;
+    const rootEl =
+      typeof root === 'object' && root !== null && 'element' in root
+        ? String((root as { element?: unknown }).element ?? '')
+        : '';
+    const hasChannel =
+      typeof draft.descriptor.channel === 'object' && draft.descriptor.channel !== null;
+    return hasChannel ? `${rootEl}/channel/item` : `${rootEl}/item`;
+  }, [draft.descriptor]);
 
   const last = WIZARD_STEP_IDS.length - 1;
   // Leaving scope needs the resolved product ObjectType id for the create
@@ -320,16 +337,23 @@ export function FeedWizardPage() {
             filter={filterState.dsl}
           />
         )}
-        {step >= 3 && (
-          <div className="rounded-3xl bg-white p-10 text-center soft-shadow">
-            <h2 className="font-display text-[16px] font-semibold tracking-tight">
-              {t(`api_configurator.feeds.wizard.placeholder.${WIZARD_STEP_IDS[step]}_title`)}
-            </h2>
-            <p className="mt-2 text-[13px] text-zinc-500">
-              {t(`api_configurator.feeds.wizard.placeholder.${WIZARD_STEP_IDS[step]}_hint`)}
-            </p>
-          </div>
+        {step === 3 && (
+          <StepDelivery
+            feedId={draft.id}
+            hasToken={editRow?.has_token ?? false}
+            cron={draft.cron}
+            onCron={(value) => setDraft((prev) => ({ ...prev, cron: value }))}
+            gzip={draft.gzip}
+            onGzip={(value) => setDraft((prev) => ({ ...prev, gzip: value }))}
+            authType={draft.authType}
+            onAuthType={(value) => setDraft((prev) => ({ ...prev, authType: value }))}
+            authUsername={draft.authUsername}
+            onAuthUsername={(value) => setDraft((prev) => ({ ...prev, authUsername: value }))}
+            authPassword={draft.authPassword}
+            onAuthPassword={(value) => setDraft((prev) => ({ ...prev, authPassword: value }))}
+          />
         )}
+        {step === 4 && <StepPreview feedId={draft.id} rootPath={rootPath} />}
       </div>
 
       <div className="flex items-center gap-3 pt-1">
@@ -370,11 +394,22 @@ export function FeedWizardPage() {
           <button
             type="button"
             onClick={() => {
-              void persistDraft().then((ok) => {
-                if (ok) {
-                  toast.success(t('api_configurator.feeds.wizard.saved'));
-                  void navigate(HUB_PATH);
+              void persistDraft().then(async (ok) => {
+                if (!ok) {
+                  return;
                 }
+                if (draft.id !== null) {
+                  // First publish: queue a regeneration so the public URL has
+                  // a file right away (manual trigger — the dedicated
+                  // first_publish enqueue is the P4-01 scheduler follow-up).
+                  try {
+                    await regenerateFeed(draft.id);
+                  } catch {
+                    // The feed is saved; regeneration can be retried from the hub.
+                  }
+                }
+                toast.success(t('api_configurator.feeds.wizard.saved_generating'));
+                void navigate(HUB_PATH);
               });
             }}
             disabled={saving}

@@ -1843,7 +1843,8 @@
           "preview_title": "Preview — next ticket",
           "preview_hint": "The live XML preview with the health report lands with XMLF-P5-04."
         },
-        "back_to_hub": "Back to feeds"
+        "back_to_hub": "Back to feeds",
+        "saved_generating": "Feed saved — first regeneration queued."
       },
       "detail": {
         "placeholder_title": "Feed detail — coming in the next ticket",
@@ -1877,6 +1878,57 @@
         "missing_value": "no value — required",
         "too_long": "over the {{max}}-char limit — add a truncate transform",
         "category_note": "Slots with fmt=category (Ceneo cat, Google g:google_product_category) are resolved from the channel category tree's external codes at generation time; an explicit mapping value wins. Variants enter flat with item_group_id = the master's SKU."
+      },
+      "delivery": {
+        "schedule_title": "Regeneration schedule",
+        "presets_aria": "Schedule presets",
+        "preset": {
+          "hourly": "hourly",
+          "daily": "daily 03:00",
+          "twice": "twice a day",
+          "manual": "manual only"
+        },
+        "cron_label": "Cron expression",
+        "cron_hint": "human next-run preview ships with the scheduler service",
+        "cron_placeholder": "manual only — no schedule",
+        "gzip_title": "Gzip compression",
+        "gzip_hint": "Serve the .xml.gz variant when the crawler accepts it",
+        "auth_title": "URL authorisation",
+        "auth_method": "Method",
+        "auth_hint": "marketplace crawlers do not send auth headers",
+        "auth_none": "Token in URL",
+        "auth_basic": "Token + HTTP Basic",
+        "auth_user": "Username",
+        "auth_password": "Password",
+        "auth_password_hint": "AES-GCM encrypted, write-only",
+        "url_title": "Feed URL",
+        "url_once": "The URL below is shown ONCE — copy it now. Only its HMAC is stored.",
+        "url_hidden": "A token exists, but its URL cannot be re-displayed (only an HMAC is stored). Rotate to mint a fresh one.",
+        "url_none": "No token yet — mint one to get the public URL for the crawler.",
+        "mint": "Mint token",
+        "rotate": "Rotate token",
+        "revoke": "Revoke",
+        "rotate_success": "New token minted — copy the URL now, it is shown once.",
+        "revoke_success": "Token revoked — the public URL now returns 404.",
+        "pull_note": "Pull model — cache & serve. Regeneration (cron/manual) writes the file to storage; the public endpoint only serves the cache (no session, tenant from the token → RLS). A crawler can never trigger generation — no DoS. Per-token rate limit, 304 on conditional GET."
+      },
+      "preview": {
+        "title": "XML preview · {{count}} samples",
+        "well_formed": "well-formed",
+        "mode_aria": "Preview mode",
+        "formatted": "Formatted",
+        "raw": "Raw",
+        "health_title": "Health report",
+        "health_clean": "No issues in the sample — every required slot resolved.",
+        "health_more": "…and {{count}} more lines",
+        "projection_title": "Full-catalog projection (last run)",
+        "projection_items": "in feed",
+        "projection_skipped": "skipped",
+        "projection_warnings": "warnings",
+        "projection_none": "No run yet — the projection appears after the first regeneration.",
+        "ai_cta": "AI mapping suggestions",
+        "ai_soon": "Faza 2",
+        "well_formed_note": "The writer escapes every value (or wraps it in CDATA) — the feed stays well-formed XML regardless of catalog content. Preview and production share the same engine."
       }
     },
     "shell": {

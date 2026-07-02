@@ -27,6 +27,7 @@ export interface FeedRow {
   field_mappings: Array<Record<string, unknown>>;
   filter?: unknown;
   validation_policy?: 'skip_invalid' | 'include_with_warning';
+  delivery?: unknown;
   cached_item_count: number | null;
   cached_at: string | null;
   last_pulled_at: string | null;
@@ -130,6 +131,22 @@ export function useResumeFeed() {
 export interface MintedToken {
   token: string;
   url: string;
+}
+
+/** Fire-and-collect regeneration trigger (202 + pending run). */
+export async function regenerateFeed(id: string): Promise<unknown> {
+  return jsonFetch(`/api/feeds/${id}/regenerate`, { method: 'POST' });
+}
+
+/** Revoke the URL token — the public URL 404s immediately (P3-04/P3-05). */
+export function useRevokeToken() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => jsonFetch(`/api/feeds/${id}/token`, { method: 'DELETE' }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: FEEDS_QUERY_KEY });
+    },
+  });
 }
 
 /** Mint/rotate the URL token — the plaintext URL is shown once (P3-04/P3-05). */

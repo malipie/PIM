@@ -163,7 +163,9 @@ test('XMLF-P5-03 — mapper: table, badges, source pick, sample, PUT on leave', 
     .first()
     .selectOption('name');
   await page.getByRole('button', { name: /Dalej|^Next$/ }).click();
-  await expect(page.getByText(/XMLF-P5-04/)).toBeVisible();
+  // Step 4 is the live delivery step since P5-04 — its schedule card proves
+  // the transition.
+  await expect(page.getByText(/Harmonogram regeneracji|Regeneration schedule/)).toBeVisible();
   expect(putBody?.mappings?.every((m) => m.source !== null)).toBe(true);
   expect(putBody?.mappings?.some((m) => m.slot === 'g:title')).toBe(true);
 

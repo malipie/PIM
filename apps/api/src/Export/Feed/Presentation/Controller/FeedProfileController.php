@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Export\Feed\Presentation\Controller;
 
+use App\Export\Feed\Application\Delivery\FeedDeliveryConfig;
 use App\Export\Feed\Application\Descriptor\FeedDescriptorGuard;
 use App\Export\Feed\Domain\Descriptor\InvalidDescriptorException;
 use App\Export\Feed\Domain\Entity\FeedProfile;
@@ -16,6 +17,7 @@ use App\Shared\Application\TenantContext;
 use App\Shared\Application\UserIdentityAware;
 use App\Shared\Domain\Tenant;
 use DateTimeInterface;
+use InvalidArgumentException;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -42,6 +44,7 @@ final class FeedProfileController
         private readonly Security $security,
         private readonly FeedDescriptorGuard $guard,
         private readonly FeedTemplateCatalog $catalog,
+        private readonly FeedDeliveryConfig $deliveryConfig,
     ) {
     }
 
@@ -128,6 +131,38 @@ final class FeedProfileController
         }
         if (\array_key_exists('schedule_cron', $payload)) {
             $feed->setScheduleCron($this->parseOptionalString($payload, 'schedule_cron'));
+        }
+        // Delivery block (XMLF-P5-04): gzip + URL auth. The password is
+        // write-only — it is encrypted here (AES-GCM) and never serialized
+        // back; omitting `password` while staying on basic keeps the stored
+        // secret untouched.
+        if (\array_key_exists('delivery', $payload) && \is_array($payload['delivery'])) {
+            $delivery = $payload['delivery'];
+            $gzip = (bool) ($delivery['gzip'] ?? false);
+            $auth = \is_array($delivery['auth'] ?? null) ? $delivery['auth'] : [];
+            $authType = \is_string($auth['type'] ?? null) ? $auth['type'] : 'none';
+            $username = \is_string($auth['username'] ?? null) && '' !== $auth['username'] ? $auth['username'] : null;
+            $password = \is_string($auth['password'] ?? null) && '' !== $auth['password'] ? $auth['password'] : null;
+            try {
+                if ('basic' === $authType && null === $password) {
+                    $current = $feed->getDelivery();
+                    $currentAuth = \is_array($current['auth'] ?? null) ? $current['auth'] : [];
+                    if ('basic' !== ($currentAuth['type'] ?? null)) {
+                        throw new BadRequestHttpException('HTTP Basic auth requires a password on first enable.');
+                    }
+                    // Keep the stored secret; allow a username change only.
+                    $currentAuth['username'] = $username ?? ($currentAuth['username'] ?? null);
+                    $feed->updateDelivery([
+                        'gzip' => $gzip,
+                        'auth' => $currentAuth,
+                    ] + array_diff_key($current, ['gzip' => true, 'auth' => true]));
+                } else {
+                    $preserved = array_diff_key($feed->getDelivery(), ['gzip' => true, 'auth' => true]);
+                    $feed->updateDelivery($this->deliveryConfig->build($gzip, $authType, $username, $password) + $preserved);
+                }
+            } catch (InvalidArgumentException $error) {
+                throw new BadRequestHttpException($error->getMessage(), $error);
+            }
         }
         if (\array_key_exists('validation_policy', $payload)) {
             $feed->setValidationPolicy($this->parsePolicy($payload));
