@@ -1848,6 +1848,35 @@
       "detail": {
         "placeholder_title": "Feed detail — coming in the next ticket",
         "placeholder_hint": "The pipeline view, run history and per-product log drill-down land with XMLF-P5-05."
+      },
+      "mapper": {
+        "title": "Slot ↔ attribute mapping",
+        "subtitle": "Bind the template slots to PIM attributes; the sample column shows the writer's live output.",
+        "required_coverage": "Required",
+        "type_warnings": "Type warnings",
+        "skip_policy_aria": "Invalid product policy",
+        "skip_invalid": "skip invalid",
+        "include_with_warning": "include with warning",
+        "col": {
+          "slot": "Template slot",
+          "source": "Source · PIM attribute",
+          "transform": "Transform",
+          "sample": "Result · sample"
+        },
+        "required": "req.",
+        "one_of": "1 of {{count}}",
+        "source_aria": "Source for slot {{slot}}",
+        "value_aria": "Value for slot {{slot}}",
+        "transform_aria": "Transform for slot {{slot}}",
+        "source_none": "— not mapped —",
+        "source_attribute": "PIM attribute",
+        "source_other": "Other",
+        "source_static": "Static value…",
+        "source_template": "Template / interpolation…",
+        "static_placeholder": "constant value",
+        "missing_value": "no value — required",
+        "too_long": "over the {{max}}-char limit — add a truncate transform",
+        "category_note": "Slots with fmt=category (Ceneo cat, Google g:google_product_category) are resolved from the channel category tree's external codes at generation time; an explicit mapping value wins. Variants enter flat with item_group_id = the master's SKU."
       }
     },
     "shell": {

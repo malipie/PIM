@@ -1,6 +1,7 @@
 import type { FilterDsl } from '@/lib/filters/filter-dsl';
 
 import type { FeedRow, FeedTemplateKind } from '../api/feeds';
+import type { SlotMapping } from '../api/mapping';
 
 /**
  * XMLF-P5-02 — the wizard's draft state (design feed-wizard.jsx FeedWizard):
@@ -13,11 +14,13 @@ export interface FeedDraft {
   name: string;
   code: string;
   codeTouched: boolean;
+  descriptor: Record<string, unknown>;
   locale: string;
   currency: string | null;
   channelId: string | null;
-  mappings: Array<Record<string, unknown>>;
+  mappings: SlotMapping[];
   filterDsl: FilterDsl | null;
+  skipPolicy: 'skip_invalid' | 'include_with_warning';
 }
 
 export const WIZARD_STEP_IDS = ['template', 'scope', 'mapping', 'delivery', 'preview'] as const;
@@ -30,11 +33,13 @@ export function emptyDraft(): FeedDraft {
     name: '',
     code: '',
     codeTouched: false,
+    descriptor: {},
     locale: 'pl',
     currency: null,
     channelId: null,
     mappings: [],
     filterDsl: null,
+    skipPolicy: 'skip_invalid',
   };
 }
 
@@ -46,11 +51,13 @@ export function draftFromFeed(feed: FeedRow): FeedDraft {
     name: feed.name,
     code: feed.code,
     codeTouched: true,
+    descriptor: feed.descriptor,
     locale: feed.locale ?? 'pl',
     currency: feed.currency,
     channelId: feed.channel_id,
-    mappings: feed.field_mappings,
+    mappings: feed.field_mappings as unknown as SlotMapping[],
     filterDsl: (feed.filter as FilterDsl | null) ?? null,
+    skipPolicy: feed.validation_policy ?? 'skip_invalid',
   };
 }
 
@@ -98,5 +105,6 @@ export function patchPayload(draft: FeedDraft): Record<string, unknown> {
     currency: draft.currency,
     channel_id: draft.channelId,
     filter: draft.filterDsl,
+    validation_policy: draft.skipPolicy,
   };
 }

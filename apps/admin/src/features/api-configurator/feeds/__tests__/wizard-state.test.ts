@@ -66,3 +66,77 @@ describe('draftFromFeed', () => {
     expect(draft.filterDsl).not.toBeNull();
   });
 });
+
+describe('sampleValuesFromXml', () => {
+  it('resolves element and namespaced values from the first item', async () => {
+    const { sampleValuesFromXml } = await import('../api/mapping');
+    const xml = `<?xml version="1.0"?><rss xmlns:g="http://base.google.com/ns/1.0"><channel><item><g:id>KL-1</g:id><g:title>Wkręt</g:title></item></channel></rss>`;
+    const slots = [
+      {
+        target: 'g:id',
+        element: 'g:id',
+        node: 'element',
+        required: true,
+        required_one_of: [],
+        format: 'text',
+        max_length: null,
+        enums: [],
+        mapping: null,
+        mapped: true,
+        type_warning: null,
+      },
+      {
+        target: 'g:title',
+        element: 'g:title',
+        node: 'element',
+        required: true,
+        required_one_of: [],
+        format: 'text',
+        max_length: 150,
+        enums: [],
+        mapping: null,
+        mapped: true,
+        type_warning: null,
+      },
+      {
+        target: 'g:brand',
+        element: 'g:brand',
+        node: 'element',
+        required: false,
+        required_one_of: [],
+        format: 'text',
+        max_length: null,
+        enums: [],
+        mapping: null,
+        mapped: false,
+        type_warning: null,
+      },
+    ] as never[];
+    const values = sampleValuesFromXml(xml, slots);
+    expect(values.get('g:id')).toBe('KL-1');
+    expect(values.get('g:title')).toBe('Wkręt');
+    expect(values.has('g:brand')).toBe(false);
+  });
+
+  it('returns empty on malformed xml', async () => {
+    const { sampleValuesFromXml } = await import('../api/mapping');
+    expect(sampleValuesFromXml('<broken', []).size).toBe(0);
+  });
+});
+
+describe('sanitizeMappings', () => {
+  it('drops attribute refs the tenant does not have, keeps the rest', async () => {
+    const { sanitizeMappings } = await import('../api/mapping');
+    const cleaned = sanitizeMappings(
+      [
+        { slot: 'g:id', source: { kind: 'attribute', ref: 'sku' } },
+        { slot: 'g:availability', source: { kind: 'attribute', ref: 'stock_qty' } },
+        { slot: 'g:condition', source: { kind: 'static', value: 'new' } },
+      ],
+      [{ code: 'sku', label: 'SKU', type: 'text' }],
+    );
+    expect(cleaned[0]?.source).not.toBeNull();
+    expect(cleaned[1]?.source).toBeNull();
+    expect(cleaned[2]?.source?.kind).toBe('static');
+  });
+});
