@@ -13,3 +13,10 @@ doctrine_migrations:
     # (doctrine_migration_versions) therefore also lives on the owner
     # connection. See config/packages/doctrine.yaml dbal.connections.
     connection: owner
+
+    # AGENT-P1-01 (#1953) — with a second migrations namespace
+    # (AgentMigrations, ADR-0024) the default FQCN sort would run agent
+    # migrations before core ones on a fresh DB (alphabetical namespace
+    # order); compare by the Version timestamp instead.
+    services:
+        'Doctrine\Migrations\Version\Comparator': 'App\Shared\Infrastructure\DoctrineMigrations\TimestampVersionComparator'

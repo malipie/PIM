@@ -1,0 +1,16 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Agent\Domain;
+
+/**
+ * AGENT-P1-01 (#1953) — where the run was initiated (PRD 5.1): the
+ * docked chat panel or the Cmd+K palette. Both are equal-rights entry
+ * points into the same loop/approval flow.
+ */
+enum AgentRunSurface: string
+{
+    case Chat = 'chat';
+    case CmdK = 'cmdk';
+}
