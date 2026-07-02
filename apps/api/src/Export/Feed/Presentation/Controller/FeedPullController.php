@@ -14,6 +14,7 @@ use App\Identity\Contracts\Attribute\NoPermissionRequired;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
@@ -50,6 +51,7 @@ final class FeedPullController
         private readonly FeedCacheStorage $cache,
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantContext $tenantContext,
+        private readonly TenantFilterConfigurator $tenantFilter,
         private readonly Connection $connection,
         private readonly FeedPullStatsRepositoryInterface $pullStats,
         private readonly RateLimiterFactoryInterface $feedPullLimiter,
@@ -149,6 +151,12 @@ final class FeedPullController
             ['tenant' => $tenantId->toRfc4122()],
         );
         $this->tenantContext->set($tenant);
+        // Re-apply the Doctrine tenant filter to the context we just set.
+        // Without this the filter keeps whatever the previous request on this
+        // worker configured — an enabled filter for tenant X would AND
+        // `tenant_id = X` into the token lookup below and turn a perfectly
+        // valid pull for tenant Y into a 404 (found by the P6-02 suite).
+        $this->tenantFilter->apply();
     }
 
     private function stream(FeedProfile $feed, string $key, string $etag): StreamedResponse
