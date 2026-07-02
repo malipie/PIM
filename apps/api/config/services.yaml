@@ -654,3 +654,11 @@ when@test:
         App\Backup\Application\Service\BackupRunnerInterface:
             alias: App\Tests\Support\InMemoryBackupRunner
             public: true
+
+        # AGENT-P0-03 (#1946) — the pending-changes port has no runtime
+        # consumer until the agent tools land (epic 0.7 M3), so the compiled
+        # container would remove/inline it; integration tests fetch it
+        # directly from the container.
+        App\Catalog\Contracts\PendingChanges\PendingChangesPort:
+            alias: App\Catalog\Application\PendingChanges\PendingChangesService
+            public: true

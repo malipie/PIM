@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                                      https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="App\Catalog\Domain\Entity\PendingChange" table="pending_changes">
+        <indexes>
+            <index name="pending_changes_tenant_status_idx" columns="tenant_id,status"/>
+            <index name="pending_changes_batch_idx" columns="batch_id"/>
+        </indexes>
+
+        <id name="id" type="uuid" column="id">
+            <generator strategy="NONE"/>
+        </id>
+
+        <many-to-one field="tenant" target-entity="App\Shared\Domain\Tenant">
+            <join-column name="tenant_id" referenced-column-name="id" nullable="false" on-delete="RESTRICT"/>
+        </many-to-one>
+
+        <field name="batchId" type="uuid" column="batch_id"/>
+        <field name="provenance" type="string" length="32"/>
+        <field name="changeType" type="string" length="16" column="change_type" enum-type="App\Catalog\Contracts\PendingChanges\PendingChangeType"/>
+        <field name="status" type="string" length="16" enum-type="App\Catalog\Contracts\PendingChanges\PendingChangeStatus">
+            <options>
+                <option name="default">pending</option>
+            </options>
+        </field>
+
+        <field name="targetObjectId" type="uuid" column="target_object_id" nullable="true"/>
+        <field name="attributeCode" type="string" length="255" column="attribute_code" nullable="true"/>
+        <field name="scopeLocale" type="string" length="16" column="scope_locale" nullable="true"/>
+        <field name="scopeChannel" type="string" length="64" column="scope_channel" nullable="true"/>
+
+        <field name="before" type="json" column="before_state" nullable="true">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+        <field name="after" type="json" column="after_state" nullable="true">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+        <field name="meta" type="json" column="meta" nullable="true">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
+        <field name="costUsd" type="decimal" precision="12" scale="6" column="cost_usd" nullable="true"/>
+        <field name="tokens" type="integer" column="tokens" nullable="true"/>
+
+        <field name="createdAt" type="datetime_immutable" column="created_at"/>
+        <field name="decidedAt" type="datetime_immutable" column="decided_at" nullable="true"/>
+    </entity>
+
+</doctrine-mapping>

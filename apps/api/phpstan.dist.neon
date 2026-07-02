@@ -125,6 +125,7 @@ parameters:
               - src/Agent/Domain/Entity/AgentRun.php
               - src/Agent/Domain/Entity/AgentMessage.php
               - src/Agent/Domain/Entity/AgentToolCall.php
+              - src/Catalog/Domain/Entity/PendingChange.php
               - src/Channel/Domain/Entity/Channel.php
               - src/Channel/Domain/Entity/ChannelCategoryNode.php
               - src/Channel/Domain/Entity/ObjectChannelPlacement.php
