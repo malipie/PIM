@@ -25,6 +25,7 @@ export interface FeedRow {
   schedule_cron: string | null;
   descriptor: Record<string, unknown>;
   field_mappings: Array<Record<string, unknown>>;
+  filter?: unknown;
   cached_item_count: number | null;
   cached_at: string | null;
   last_pulled_at: string | null;

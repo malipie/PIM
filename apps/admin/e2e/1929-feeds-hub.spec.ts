@@ -109,7 +109,9 @@ test('XMLF-P5-01 — feeds hub: tab, KPI, cards, filtering, a11y', async ({ page
   // NewFeedCard CTA routes to the wizard placeholder.
   await page.getByRole('button', { name: /Nowy feed|New feed/ }).click();
   await expect(page).toHaveURL(/\/integrations\/api-configurator\/feeds\/new$/);
-  await page.getByRole('link', { name: /Wróć do feedów|Back to feeds/ }).click();
+  // The target is the full wizard since P5-02 — return via its back control.
+  await expect(page.getByRole('heading', { name: /Nowy feed|New feed/ })).toBeVisible();
+  await page.getByRole('button', { name: /Wróć do feedów|Back to feeds/ }).click();
   await expect(page).toHaveURL(/\/integrations\/api-configurator\/feeds$/);
 
   // a11y — no serious/critical violations on the hub.
