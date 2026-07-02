@@ -1988,6 +1988,20 @@
       "log": {
         "title": "Product log",
         "empty": "No log lines — a clean run."
+      },
+      "subnav": {
+        "aria": "Feeds sections",
+        "hub": "Feeds",
+        "monitor": "Monitor"
+      },
+      "monitor": {
+        "history_title": "Regeneration history — all feeds",
+        "kpi": {
+          "regenerations": "Regenerations · 24h",
+          "syndicated": "Products syndicated",
+          "skipped": "Skipped · 24h",
+          "errors": "Errors · 24h"
+        }
       }
     },
     "shell": {

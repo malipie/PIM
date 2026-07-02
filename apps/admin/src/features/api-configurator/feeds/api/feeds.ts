@@ -41,6 +41,9 @@ export interface FeedKpi {
   itemsSyndicated: number;
   pulls24h: number;
   spark: Array<{ bucket: string; count: number }>;
+  regenerations24h: number;
+  skipped24h: number;
+  errors24h: number;
 }
 
 interface FeedsResponse {
@@ -50,6 +53,9 @@ interface FeedsResponse {
 interface RunsKpiResponse {
   items_syndicated: number;
   feeds: { active: number; paused: number; error: number };
+  regenerations_24h: number;
+  skipped_24h: number;
+  errors_24h: number;
 }
 
 interface PullStatsResponse {
@@ -100,6 +106,9 @@ export function useFeedKpi() {
         itemsSyndicated: kpi.items_syndicated,
         pulls24h: pulls.pulls_24h,
         spark: pulls.spark,
+        regenerations24h: kpi.regenerations_24h,
+        skipped24h: kpi.skipped_24h,
+        errors24h: kpi.errors_24h,
       };
     },
   });

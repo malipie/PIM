@@ -2036,6 +2036,20 @@
       "log": {
         "title": "Log produktów",
         "empty": "Brak linii logu — czysty run."
+      },
+      "subnav": {
+        "aria": "Sekcje feedów",
+        "hub": "Feedy",
+        "monitor": "Monitor"
+      },
+      "monitor": {
+        "history_title": "Historia regeneracji — wszystkie feedy",
+        "kpi": {
+          "regenerations": "Regeneracje · 24h",
+          "syndicated": "Produkty syndykowane",
+          "skipped": "Pominięte · 24h",
+          "errors": "Błędy · 24h"
+        }
       }
     },
     "shell": {
