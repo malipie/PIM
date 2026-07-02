@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Rss } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,10 +8,10 @@ import { useToast } from '@/components/ui/toast';
 import { useExportPreflight } from '@/features/exports/wizard/use-export-preflight';
 import { dslToFlatConditions, type FilterDsl } from '@/lib/filters/filter-dsl';
 import { useFilterDslState } from '@/lib/filters/use-filter-dsl-state';
-import { httpErrorDetail, jsonFetch } from '@/lib/http';
+import { httpErrorDetail } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
-import type { FeedRow } from '../api/feeds';
+import { createFeed, fetchFeed, patchFeed } from '../api/feeds';
 import { type FeedTemplateInfo, useFeedTemplates, useProductObjectTypeId } from '../api/templates';
 import { TemplateBadge } from '../components/primitives';
 import { StepScope } from './steps/StepScope';
@@ -51,24 +52,25 @@ export function FeedWizardPage() {
   const filterState = useFilterDslState(draft.filterDsl);
   const setFilterConditions = filterState.setConditions;
 
+  // Edit mode loads through useQuery (ADR-0021 — an effect-driven raw read
+  // would be invisible to the query cache); the effect below only copies
+  // the arrived row into the draft once.
+  const editFeed = useQuery({
+    queryKey: ['xmlf', 'feed', editId ?? 'none'],
+    enabled: editId !== undefined,
+    queryFn: async () => fetchFeed(editId ?? ''),
+  });
+  const editRow = editFeed.data;
   useEffect(() => {
-    if (editId === undefined || loadedForEdit) {
+    if (editRow === undefined || loadedForEdit) {
       return;
     }
-    let cancelled = false;
-    void jsonFetch<FeedRow>(`/api/feeds/${editId}`).then((feed) => {
-      if (!cancelled) {
-        setDraft(draftFromFeed(feed));
-        // The filter state hook only reads its initial value on mount —
-        // push the loaded DSL into it explicitly for the edit flow.
-        setFilterConditions(dslToFlatConditions((feed.filter as FilterDsl | null) ?? null) ?? []);
-        setLoadedForEdit(true);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [editId, loadedForEdit, setFilterConditions]);
+    setDraft(draftFromFeed(editRow));
+    // The filter state hook only reads its initial value on mount —
+    // push the loaded DSL into it explicitly for the edit flow.
+    setFilterConditions(dslToFlatConditions((editRow.filter as FilterDsl | null) ?? null) ?? []);
+    setLoadedForEdit(true);
+  }, [editRow, loadedForEdit, setFilterConditions]);
 
   const preflight = useExportPreflight({
     entityType: 'product',
@@ -112,20 +114,14 @@ export function FeedWizardPage() {
           toast.error(t('api_configurator.feeds.wizard.save_error'));
           return false;
         }
-        const created = await jsonFetch<FeedRow>('/api/feeds', {
-          method: 'POST',
-          body: createPayload(currentDraft, typeId),
-        });
+        const created = await createFeed(createPayload(currentDraft, typeId));
         feedId = created.id;
         setDraft((prev) => ({ ...prev, id: created.id }));
       }
       // The create endpoint owns identity + template seed; the assortment
       // filter (and later renames) go through PATCH — one follow-up call
       // covers both the fresh-draft and the edit flow.
-      await jsonFetch<FeedRow>(`/api/feeds/${feedId}`, {
-        method: 'PATCH',
-        body: patchPayload(currentDraft),
-      });
+      await patchFeed(feedId, patchPayload(currentDraft));
       return true;
     } catch (error) {
       toast.error(httpErrorDetail(error) ?? t('api_configurator.feeds.wizard.save_error'));
