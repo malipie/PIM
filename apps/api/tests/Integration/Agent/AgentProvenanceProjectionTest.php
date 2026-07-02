@@ -21,6 +21,9 @@ use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\ReceivedStamp;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Symfony\Component\Uid\Uuid;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
@@ -77,6 +80,8 @@ final class AgentProvenanceProjectionTest extends KernelTestCase
         \assert($approval instanceof AgentApprovalService);
         $approval->approve($run->getId(), Uuid::v7());
 
+        $this->drainAsyncTransport();
+
         $indexed = $em->getConnection()->fetchOne(
             'SELECT attributes_indexed::text FROM objects WHERE code = :c',
             ['c' => 'NOPRICE-1'],
@@ -92,5 +97,25 @@ final class AgentProvenanceProjectionTest extends KernelTestCase
         \assert($em instanceof EntityManagerInterface);
 
         return $em;
+    }
+
+    /**
+     * The commit dispatches ObjectValuesChangedMessage to the `async`
+     * transport. Locally .env.test aliases it to sync:// (handlers run
+     * in-band), but the CI phpunit job pins MESSENGER_TRANSPORT_DSN to
+     * in-memory:// — queued envelopes are never consumed and the
+     * projection would stay empty. Re-dispatch them with ReceivedStamp
+     * so the bus runs the handlers instead of re-routing to transport.
+     */
+    private function drainAsyncTransport(): void
+    {
+        $transport = self::getContainer()->get('messenger.transport.async');
+        if (!$transport instanceof InMemoryTransport) {
+            return;
+        }
+        $bus = self::getContainer()->get(MessageBusInterface::class);
+        foreach ($transport->getSent() as $envelope) {
+            $bus->dispatch($envelope->getMessage(), [new ReceivedStamp('async')]);
+        }
     }
 }
