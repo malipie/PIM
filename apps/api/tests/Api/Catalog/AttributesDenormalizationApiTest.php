@@ -55,7 +55,7 @@ final class AttributesDenormalizationApiTest extends CatalogApiTestCase
         // Cache stores the canonical JSONB shape `{value: 'red'}` per-attribute;
         // a future #45-followup may unwrap scalar wrappers in the normalizer
         // so the API surface is `{color: 'red'}` directly.
-        self::assertSame(['value' => 'red'], $cache['color'] ?? null);
+        self::assertSame(['value' => 'red', 'provenance' => 'manual'], $cache['color'] ?? null);
 
         // Canonical store: one ObjectValue with provenance Manual.
         $object = $this->reloadObject('ATTR-001');
@@ -100,8 +100,8 @@ final class AttributesDenormalizationApiTest extends CatalogApiTestCase
 
         // `color` updated, `weight` left alone (Patch semantics). Cache
         // mirrors the canonical JSONB wrapper shape from ObjectValue.
-        self::assertSame(['value' => 'blue'], $cache['color'] ?? null);
-        self::assertSame(['value' => 12.5], $cache['weight'] ?? null);
+        self::assertSame(['value' => 'blue', 'provenance' => 'manual'], $cache['color'] ?? null);
+        self::assertSame(['value' => 12.5, 'provenance' => 'manual'], $cache['weight'] ?? null);
     }
 
     #[Test]

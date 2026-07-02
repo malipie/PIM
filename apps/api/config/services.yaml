@@ -698,12 +698,11 @@ when@test:
             alias: App\Catalog\Application\Query\SqlCompletenessReport
             public: true
 
-        # AGENT-P3-01 (#1961) — and the value-edit materializer port.
+        # AGENT-P3-01/02 (#1961/#1962) — and the value-edit + commit ports.
         App\Catalog\Contracts\Command\BulkEditValuesPort:
             alias: App\Catalog\Application\PendingChanges\BulkEditValuesMaterializer
             public: true
 
-        # AGENT-P3-02 (#1962) — and the post-approval committer port.
         App\Catalog\Contracts\Command\PendingBatchCommitPort:
             alias: App\Catalog\Application\PendingChanges\PendingBatchCommitter
             public: true

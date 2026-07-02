@@ -4,11 +4,13 @@ import { loginAsAdmin } from './helpers/auth';
 
 /**
  * NUI-03 (#1422) — global ⌘K palette: real navigation (static routes +
- * settings sub-pages), agent section mocked. The sidebar pill opens the
- * palette; on the universal list routes the list-scoped palette keeps
- * the shortcut (no double binding).
+ * settings sub-pages). Since AGENT-P6-02 (#1975) the agent section is
+ * REAL (no MOCK badge): suggestions prefill the input and the query can
+ * be sent to the agent. The sidebar pill opens the palette; on the
+ * universal list routes the list-scoped palette keeps the shortcut (no
+ * double binding).
  */
-test('NUI-03 — global palette navigates and mocks the agent section', async ({ page }) => {
+test('NUI-03 — global palette navigates, agent section is live', async ({ page }) => {
   await loginAsAdmin(page);
   await page.goto('/dashboard');
   // Wait for the app shell to hydrate before firing the shortcut.
@@ -21,9 +23,10 @@ test('NUI-03 — global palette navigates and mocks the agent section', async ({
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
 
-  // Agent section renders (mock suggestions + MOCK badge).
+  // Agent section renders live suggestions — the MOCK badge is gone
+  // since the palette talks to the real agent API (AGENT-P6-02).
   await expect(dialog.getByText('Generuj opisy SEO')).toBeVisible();
-  await expect(dialog.getByText('MOCK', { exact: true }).first()).toBeVisible();
+  await expect(dialog.getByText('MOCK', { exact: true })).toHaveCount(0);
 
   // Type to filter and navigate to settings users.
   await page.keyboard.type('Użytkow');
