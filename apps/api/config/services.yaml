@@ -70,6 +70,12 @@ services:
         App\Integration\Generic\Infrastructure\Http\Pagination\PaginationStrategy:
             tags: ['integration.pagination_strategy']
 
+        # AGENT-P0-07 (#1950) — every AgentToolInterface implementation is
+        # auto-registered in the ToolRegistry (ADR-0024 b: adding a tool =
+        # adding a service, zero loop changes).
+        App\Agent\Application\Tool\AgentToolInterface:
+            tags: ['agent.tool']
+
     App\:
         resource: '../src/'
 
