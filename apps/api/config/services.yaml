@@ -84,6 +84,11 @@ services:
 
     App\:
         resource: '../src/'
+        exclude:
+            # AGENT-P1-01 (#1953) — module-namespace migrations
+            # (AgentMigrations\*, ADR-0024 a) are not App\* classes;
+            # excluding them keeps the PSR-4 discovery honest.
+            - '../src/Agent/Infrastructure/Migrations/'
 
     # W2-7 / AUD-042 — single RFC 7807 contract for custom controllers.
     # `$debug` is bound to the kernel flag so the listener can keep the

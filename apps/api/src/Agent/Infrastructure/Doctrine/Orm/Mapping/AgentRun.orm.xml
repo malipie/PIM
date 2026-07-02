@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                                      https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="App\Agent\Domain\Entity\AgentRun" table="agent_runs">
+        <indexes>
+            <index name="idx_agent_runs_tenant" columns="tenant_id,started_at"/>
+            <index name="idx_agent_runs_user" columns="tenant_id,user_id"/>
+            <index name="idx_agent_runs_status" columns="tenant_id,status"/>
+        </indexes>
+
+        <id name="id" type="uuid" column="id">
+            <generator strategy="NONE"/>
+        </id>
+
+        <many-to-one field="tenant" target-entity="App\Shared\Domain\Tenant">
+            <join-column name="tenant_id" referenced-column-name="id" nullable="false" on-delete="RESTRICT"/>
+        </many-to-one>
+
+        <field name="userId" type="uuid" column="user_id"/>
+        <field name="surface" type="string" length="16" enum-type="App\Agent\Domain\AgentRunSurface"/>
+        <field name="intent" type="text"/>
+
+        <field name="context" type="json">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
+        <field name="status" type="string" length="32" enum-type="App\Agent\Domain\AgentRunStatus">
+            <options>
+                <option name="default">planning</option>
+            </options>
+        </field>
+
+        <field name="model" type="string" length="64" nullable="true"/>
+        <field name="pendingChangeBatchId" type="uuid" column="pending_change_batch_id" nullable="true"/>
+        <field name="bulkOperationId" type="uuid" column="bulk_operation_id" nullable="true"/>
+        <field name="affectedCount" type="integer" column="affected_count" nullable="true"/>
+        <field name="tokensInput" type="integer" column="tokens_input">
+            <options>
+                <option name="default">0</option>
+            </options>
+        </field>
+        <field name="tokensOutput" type="integer" column="tokens_output">
+            <options>
+                <option name="default">0</option>
+            </options>
+        </field>
+        <field name="costUsd" type="decimal" precision="12" scale="6" column="cost_usd">
+            <options>
+                <option name="default">0</option>
+            </options>
+        </field>
+        <field name="errorMessage" type="text" column="error_message" nullable="true"/>
+
+        <field name="startedAt" type="datetime_immutable" column="started_at"/>
+        <field name="approvedAt" type="datetime_immutable" column="approved_at" nullable="true"/>
+        <field name="approvedBy" type="uuid" column="approved_by" nullable="true"/>
+        <field name="completedAt" type="datetime_immutable" column="completed_at" nullable="true"/>
+    </entity>
+
+</doctrine-mapping>

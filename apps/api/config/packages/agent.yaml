@@ -1,0 +1,24 @@
+# AGENT-P1-01 (#1953) — Doctrine surface of the removable Agent BC
+# (ADR-0024 a). Lives in its own package file so the whole module is
+# deletable: the removability CI job removes src/Agent,
+# config/services_agent.yaml AND this file; without it the core ORM has
+# no agent mappings and no agent migrations namespace. Agent tables
+# left behind in an existing database are inert (nothing references
+# them).
+
+doctrine:
+    orm:
+        mappings:
+            Agent:
+                type: xml
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Agent/Infrastructure/Doctrine/Orm/Mapping'
+                prefix: 'App\Agent\Domain\Entity'
+                alias: Agent
+
+doctrine_migrations:
+    migrations_paths:
+        # Module-namespace migrations (ADR-0024 a): agent entity DDL
+        # ships inside src/Agent so it disappears with the module. Core
+        # hooks (pending_changes etc.) stay in /migrations.
+        'AgentMigrations': '%kernel.project_dir%/src/Agent/Infrastructure/Migrations'
