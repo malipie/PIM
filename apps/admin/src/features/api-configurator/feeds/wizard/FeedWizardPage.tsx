@@ -20,10 +20,17 @@ import {
 } from '../api/mapping';
 import { type FeedTemplateInfo, useFeedTemplates, useProductObjectTypeId } from '../api/templates';
 import { TemplateBadge } from '../components/primitives';
+import {
+  descriptorToEdit,
+  type EditableStructure,
+  editToDescriptor,
+  structureIssues,
+} from './descriptor-edit';
 import { StepDelivery } from './steps/StepDelivery';
 import { StepMapper } from './steps/StepMapper';
 import { StepPreview } from './steps/StepPreview';
 import { StepScope } from './steps/StepScope';
+import { StepStructure } from './steps/StepStructure';
 import { StepTemplate } from './steps/StepTemplate';
 import {
   canLeaveStep,
@@ -33,7 +40,7 @@ import {
   type FeedDraft,
   patchPayload,
   slugifyCode,
-  WIZARD_STEP_IDS,
+  stepsFor,
 } from './wizard-state';
 
 const HUB_PATH = '/integrations/api-configurator/feeds';
@@ -58,8 +65,14 @@ export function FeedWizardPage() {
   const [draft, setDraft] = useState<FeedDraft>(emptyDraft);
   const [saving, setSaving] = useState(false);
   const [loadedForEdit, setLoadedForEdit] = useState(false);
+  const [structureEdit, setStructureEdit] = useState<EditableStructure | null>(null);
   const filterState = useFilterDslState(draft.filterDsl);
   const setFilterConditions = filterState.setConditions;
+
+  // Steps are a function of the template kind (P5-06): custom feeds get the
+  // structure editor between template and scope; predefs skip it.
+  const steps = stepsFor(draft.kind);
+  const stepId = steps[Math.min(step, steps.length - 1)] ?? 'template';
 
   // Edit mode loads through useQuery (ADR-0021 — an effect-driven raw read
   // would be invisible to the query cache); the effect below only copies
@@ -81,7 +94,29 @@ export function FeedWizardPage() {
     setLoadedForEdit(true);
   }, [editRow, loadedForEdit, setFilterConditions]);
 
-  const mappingView = useFeedMapping(step >= 2 ? draft.id : null);
+  // Entering the structure step projects the draft's descriptor into the
+  // editable shape once; choosing a template resets the projection.
+  useEffect(() => {
+    if (stepId === 'structure') {
+      setStructureEdit((prev) => prev ?? descriptorToEdit(draft.descriptor));
+    }
+  }, [stepId, draft.descriptor]);
+
+  function applyStructure(next: EditableStructure): void {
+    setStructureEdit(next);
+    setDraft((prev) => {
+      const descriptor = editToDescriptor(next, prev.descriptor);
+      const names = new Set(next.slots.map((slot) => slot.name.trim()));
+      // A removed/renamed slot drops its mapping — the mapper re-offers it.
+      const mappings = prev.mappings.filter((m) => names.has(m.slot));
+      return { ...prev, descriptor, mappings };
+    });
+  }
+
+  const structureValid = structureEdit === null || structureIssues(structureEdit).length === 0;
+
+  const mappingIndex = steps.indexOf('mapping');
+  const mappingView = useFeedMapping(step >= mappingIndex ? draft.id : null);
   const saveMapping = useSaveFeedMapping(draft.id);
   const attributesKey = mappingView.data?.attributes.map((a) => a.code).join(',') ?? null;
   // biome-ignore lint/correctness/useExhaustiveDependencies: catalog tracked via its code key
@@ -104,7 +139,7 @@ export function FeedWizardPage() {
     targetScope: filterState.dsl === null ? 'all' : 'filter',
     filterDsl: filterState.dsl,
     selectedIds: null,
-    enabled: step === 1,
+    enabled: stepId === 'scope',
   });
   const resultCount = preflight.result?.count ?? null;
 
@@ -115,6 +150,8 @@ export function FeedWizardPage() {
   );
 
   function chooseTemplate(template: FeedTemplateInfo): void {
+    // A template switch replaces the descriptor — drop the stale projection.
+    setStructureEdit(null);
     setDraft((prev) => {
       const nextName =
         prev.name.trim() === ''
@@ -161,20 +198,20 @@ export function FeedWizardPage() {
   }
 
   async function next(): Promise<void> {
-    if (!canLeaveStep(step, currentDraft)) {
+    if (!canLeaveStep(stepId, currentDraft, structureValid)) {
       return;
     }
     // The mapper (P5-03) needs a persisted FeedProfile — save when leaving scope.
-    if (step === 1 && !(await persistDraft())) {
+    if (stepId === 'scope' && !(await persistDraft())) {
       return;
     }
     // Leaving delivery persists schedule + gzip/auth via PATCH.
-    if (step === 3 && !(await persistDraft())) {
+    if (stepId === 'delivery' && !(await persistDraft())) {
       return;
     }
     // Leaving the mapper persists the slot mappings (PUT — the backend
     // validates and returns the fresh view) + the skip policy via PATCH.
-    if (step === 2) {
+    if (stepId === 'mapping') {
       try {
         // Only mapped slots go to the backend — a null source means "unmapped"
         // in the UI, not a mapping entry.
@@ -187,7 +224,7 @@ export function FeedWizardPage() {
         return;
       }
     }
-    setStep((value) => Math.min(value + 1, WIZARD_STEP_IDS.length - 1));
+    setStep((value) => Math.min(value + 1, steps.length - 1));
   }
 
   const rootPath = useMemo(() => {
@@ -201,12 +238,12 @@ export function FeedWizardPage() {
     return hasChannel ? `${rootEl}/channel/item` : `${rootEl}/item`;
   }, [draft.descriptor]);
 
-  const last = WIZARD_STEP_IDS.length - 1;
+  const last = steps.length - 1;
   // Leaving scope needs the resolved product ObjectType id for the create
   // payload — hold the button until the lookup lands (fresh drafts only).
   const waitingForTypeId =
-    step === 1 && currentDraft.id === null && productTypeId.data === undefined;
-  const stepAllowed = canLeaveStep(step, currentDraft) && !waitingForTypeId;
+    stepId === 'scope' && currentDraft.id === null && productTypeId.data === undefined;
+  const stepAllowed = canLeaveStep(stepId, currentDraft, structureValid) && !waitingForTypeId;
 
   return (
     <div className="max-w-[1180px] space-y-5">
@@ -236,11 +273,11 @@ export function FeedWizardPage() {
 
       <nav aria-label={t('api_configurator.feeds.wizard.steps_aria')}>
         <ol className="flex items-stretch gap-2 rounded-3xl bg-white p-3 soft-shadow">
-          {WIZARD_STEP_IDS.map((stepId, index) => {
+          {steps.map((id, index) => {
             const state = index < step ? 'done' : index === step ? 'active' : 'pending';
             const clickable = index <= step;
             return (
-              <li key={stepId} className="flex min-w-0 flex-1 items-center gap-2">
+              <li key={id} className="flex min-w-0 flex-1 items-center gap-2">
                 <button
                   type="button"
                   onClick={() => clickable && setStep(index)}
@@ -272,7 +309,7 @@ export function FeedWizardPage() {
                         state === 'pending' && 'text-zinc-500',
                       )}
                     >
-                      {t(`api_configurator.feeds.wizard.step.${stepId}`)}
+                      {t(`api_configurator.feeds.wizard.step.${id}`)}
                     </span>
                   </div>
                   <div
@@ -281,7 +318,7 @@ export function FeedWizardPage() {
                       state === 'pending' ? 'text-zinc-400' : 'text-zinc-500',
                     )}
                   >
-                    {t(`api_configurator.feeds.wizard.step_note.${stepId}`)}
+                    {t(`api_configurator.feeds.wizard.step_note.${id}`)}
                   </div>
                 </button>
                 {index < last && (
@@ -294,7 +331,7 @@ export function FeedWizardPage() {
       </nav>
 
       <div key={step}>
-        {step === 0 && (
+        {stepId === 'template' && (
           <StepTemplate
             templates={templates.data ?? []}
             kind={draft.kind}
@@ -311,7 +348,10 @@ export function FeedWizardPage() {
             onCode={(value) => setDraft((prev) => ({ ...prev, code: value, codeTouched: true }))}
           />
         )}
-        {step === 1 && (
+        {stepId === 'structure' && structureEdit !== null && (
+          <StepStructure edit={structureEdit} onEdit={applyStructure} />
+        )}
+        {stepId === 'scope' && (
           <StepScope
             locale={draft.locale}
             onLocale={(value) => setDraft((prev) => ({ ...prev, locale: value }))}
@@ -324,7 +364,7 @@ export function FeedWizardPage() {
             countLoading={preflight.isLoading}
           />
         )}
-        {step === 2 && mappingView.data !== undefined && productTypeId.data != null && (
+        {stepId === 'mapping' && mappingView.data !== undefined && productTypeId.data != null && (
           <StepMapper
             view={mappingView.data}
             mappings={draft.mappings}
@@ -337,7 +377,7 @@ export function FeedWizardPage() {
             filter={filterState.dsl}
           />
         )}
-        {step === 3 && (
+        {stepId === 'delivery' && (
           <StepDelivery
             feedId={draft.id}
             hasToken={editRow?.has_token ?? false}
@@ -353,7 +393,7 @@ export function FeedWizardPage() {
             onAuthPassword={(value) => setDraft((prev) => ({ ...prev, authPassword: value }))}
           />
         )}
-        {step === 4 && <StepPreview feedId={draft.id} rootPath={rootPath} />}
+        {stepId === 'preview' && <StepPreview feedId={draft.id} rootPath={rootPath} />}
       </div>
 
       <div className="flex items-center gap-3 pt-1">
@@ -372,7 +412,7 @@ export function FeedWizardPage() {
         <div className="hidden text-[12px] text-zinc-500 sm:block">
           {t('api_configurator.feeds.wizard.progress', {
             current: step + 1,
-            total: WIZARD_STEP_IDS.length,
+            total: steps.length,
           })}
         </div>
         {step < last ? (

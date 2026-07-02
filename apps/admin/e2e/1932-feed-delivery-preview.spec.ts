@@ -122,6 +122,9 @@ test('XMLF-P5-04 — delivery + preview: schedule, auth, mint-once, preview, sav
 
   await page.goto('/integrations/api-configurator/feeds/new');
   await page.getByRole('button', { name: /Custom|Własny/ }).click();
+  // Custom feeds pass through the structure editor (P5-06) on the way:
+  // template → structure → scope → mapping → delivery.
+  await page.getByRole('button', { name: /Dalej|^Next$/ }).click();
   await page.getByRole('button', { name: /Dalej|^Next$/ }).click();
   await page.getByRole('button', { name: /Dalej|^Next$/ }).click();
   await page.getByRole('button', { name: /Dalej|^Next$/ }).click();

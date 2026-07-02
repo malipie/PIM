@@ -1785,14 +1785,16 @@
           "scope": "Scope",
           "mapping": "Mapping",
           "delivery": "Delivery",
-          "preview": "Preview"
+          "preview": "Preview",
+          "structure": "Structure"
         },
         "step_note": {
           "template": "target channel",
           "scope": "filter · scope",
           "mapping": "slots ↔ attributes",
           "delivery": "URL · schedule",
-          "preview": "XML · publish"
+          "preview": "XML · publish",
+          "structure": "root + fields"
         },
         "cancel": "Cancel",
         "back": "← Back",
@@ -1844,7 +1846,49 @@
           "preview_hint": "The live XML preview with the health report lands with XMLF-P5-04."
         },
         "back_to_hub": "Back to feeds",
-        "saved_generating": "Feed saved — first regeneration queued."
+        "saved_generating": "Feed saved — first regeneration queued.",
+        "structure": {
+          "title": "Document structure",
+          "subtitle": "custom XML — root, namespaces and item fields",
+          "root_label": "Root element",
+          "item_label": "Item element",
+          "namespaces": "Namespaces",
+          "ns_prefix": "Namespace prefix",
+          "ns_uri": "Namespace URI",
+          "ns_add": "Add namespace",
+          "ns_remove": "Remove namespace",
+          "slots_title": "Fields of <{{item}}>",
+          "slot_name": "Field name",
+          "node": "Node kind",
+          "format": "Format",
+          "required": "required",
+          "max_length": "Max length",
+          "parent": "Parent element (attribute goes on it)",
+          "wrap_in": "Wrap repeated values in",
+          "slot_add": "Add field",
+          "slot_remove": "Remove field",
+          "preview_title": "Structure preview",
+          "node_kind": {
+            "element": "Element",
+            "attribute": "Attribute",
+            "repeatable": "Repeatable",
+            "keyvalue": "Key-value"
+          },
+          "format_kind": {
+            "text": "Text",
+            "html": "HTML",
+            "url": "URL",
+            "price": "Price",
+            "number": "Number",
+            "date": "Date"
+          },
+          "issue": {
+            "invalid_name": "“{{value}}” is not a valid XML name",
+            "duplicate_slot": "Duplicate field “{{value}}”",
+            "parent_required": "An attribute needs a parent element",
+            "invalid_max_length": "Max length must be a positive number"
+          }
+        }
       },
       "detail": {
         "placeholder_title": "Feed detail — coming in the next ticket",
