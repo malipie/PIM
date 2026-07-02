@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Application;
 
+use App\Identity\Contracts\Byok\ByokKeyResolverInterface;
 use App\Identity\Domain\Entity\TenantAgentConfig;
 use App\Identity\Domain\Repository\TenantAgentConfigRepositoryInterface;
 use App\Shared\Application\Crypto\EncryptedSecret;
@@ -27,7 +28,7 @@ use DateTimeImmutable;
  * through `resolveKey()` — and even there it's a transient string the
  * caller is expected to hand straight to the Anthropic SDK.
  */
-final readonly class ByokKeyManager
+final readonly class ByokKeyManager implements ByokKeyResolverInterface
 {
     private const int PREFIX_LENGTH = 8;
 

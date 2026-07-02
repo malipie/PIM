@@ -54,6 +54,18 @@ parameters:
     # column header.
     pim.imports.dictionary_path: '%kernel.project_dir%/config/imports/mapping_dictionary.yaml'
 
+    # AGENT-P0-06 (#1949) — agent LLM models per tool kind (ADR-0024 b):
+    # schema-ops (bigger blast radius) run on the Opus-tier model, all
+    # other kinds on the Sonnet-tier default. A model bump is a config
+    # change, not a code change. Retries are bounded (SDK honours
+    # retry-after, exponential fallback); exhaustion -> run error.
+    pim.agent.model.default: '%env(default:pim.agent.model.default.fallback:AGENT_MODEL_DEFAULT)%'
+    pim.agent.model.default.fallback: 'claude-sonnet-4-6'
+    pim.agent.model.schema: '%env(default:pim.agent.model.schema.fallback:AGENT_MODEL_SCHEMA)%'
+    pim.agent.model.schema.fallback: 'claude-opus-4-8'
+    pim.agent.llm.max_retries: 4
+    pim.agent.llm.timeout_seconds: 120.0
+
 services:
     _defaults:
         autowire: true
@@ -135,6 +147,18 @@ services:
     App\Catalog\Application\ObjectTypeService:
         arguments:
             $enableCustomObjectTypes: '%pim.catalog.enable_custom_object_types%'
+
+    # AGENT-P0-06 (#1949) — Anthropic client on the tenant's BYOK key;
+    # scalar knobs are not autowired.
+    App\Agent\Infrastructure\Anthropic\AnthropicClientFactory:
+        arguments:
+            $maxRetries: '%pim.agent.llm.max_retries%'
+            $timeoutSeconds: '%pim.agent.llm.timeout_seconds%'
+
+    App\Agent\Infrastructure\Anthropic\AgentModelSelector:
+        arguments:
+            $defaultModel: '%pim.agent.model.default%'
+            $schemaModel: '%pim.agent.model.schema%'
 
     # DAM MVP upload entry point (#438). The size caps are wired through
     # parameters so deployment-specific overrides land in env vars
