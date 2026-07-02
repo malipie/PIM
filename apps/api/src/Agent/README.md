@@ -1,10 +1,20 @@
 # Agent — Bounded Context
 
-> **Status:** scaffolded in epic 0.1 (#19). Implementation deferred to **Faza 2** — Beta-Min (epic 0.7, [#63-#71](https://github.com/malipie/PIM/issues?q=label%3Aepik-0.7)) + Beta-Full ([#108-#112](https://github.com/malipie/PIM/issues?q=label%3Aepik-0.7)). Reason: scope revision 2026-04-27 prioritised "working catalog" over "talk to the catalog" for the first pilot.
+> **Status:** under active implementation — epic 0.7 (issues #1944–#1992,
+> milestones M0–M9). Backlog: `Project Plan/feature-agent-tickets.md`.
+> Governing decision: **ADR-0024** (removable BC, tool registry, single
+> approval gate). Feature PRD: `Project Plan/PRD/PRD-PIM-agent.md`.
 
-Houses the LLM-driven schema-modification surface: chat-as-first-class
+Houses the LLM-driven catalog/schema-operation surface: chat-as-first-class
 interaction, tool calls, pending changes (human approval flow), audit log.
 Anthropic SDK PHP — Claude Sonnet by default, Claude Opus for schema-ops.
+
+**Removability (open-core, ADR-0024):** this whole directory is deletable.
+No core BC may import `App\Agent\*` (fail-closed via deptrac: the Agent
+layer appears in no other ruleset). Every tool is a thin adapter over a
+`*\Contracts\*` port of the host engine — the agent has no domain logic of
+its own. CI runs a removability job (`rm -rf src/Agent` → build + core
+suite must stay green).
 
 ## Layer responsibilities (DDD)
 
@@ -26,13 +36,15 @@ Anthropic SDK PHP — Claude Sonnet by default, Claude Opus for schema-ops.
 After 100% — agent disabled until midnight UTC. BYOK for enterprise (key
 encrypted AES-256-GCM).
 
-## MVP hooks reserved here
+## Core hooks (live outside this directory)
 
-The Sprint-0 / MVP work intentionally leaves three hooks for Faza 2 (4–6h
-scope, candidate for ticket 0.3.11 / 0.11):
+Three shared hooks live in **core** (Catalog), exist independently of the
+agent, and survive its removal. Contrary to what earlier revisions of this
+README claimed, none of them pre-existed — they are built by epic 0.7 M0
+tickets:
 
-- `pending_changes` table — empty migration, schema reserved.
-- `provenance` enum already includes `agent` (UI variant deferred).
-- Doctrine lifecycle subscriber emitting `EntityChanged` for the future audit.
+- `pending_changes` table + `Catalog\Contracts\PendingChanges` port — AGENT-P0-03 (#1946).
+- `Provenance::Agent` enum case + `provenance_meta` shape — AGENT-P0-04 (#1947).
+- Doctrine lifecycle subscriber emitting `EntityChanged` — AGENT-P0-05 (#1948).
 
 Those land outside this directory but exist *for* this context.

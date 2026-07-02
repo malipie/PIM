@@ -30,3 +30,4 @@ ADRs 0001-0009 codify the existing decisions narrated in `Project Plan/01-archit
 - [0021-frontend-data-fetching.md](0021-frontend-data-fetching.md) — frontend data-fetching strategy
 - [0022-api-configurator-consumer-producer-boundary.md](0022-api-configurator-consumer-producer-boundary.md) — consumer/producer boundary; generic connector in `Integration/Generic`
 - [0023-konfigurator-xml-placement.md](0023-konfigurator-xml-placement.md) — Konfigurator XML: engine in `Export`, feeds in `Export/Feed`, associative `ItemWriter`, pull cache-and-serve, token-in-URL auth
+- [0024-agent-removable-bc-and-tool-registry.md](0024-agent-removable-bc-and-tool-registry.md) — Agent layer: removable `src/Agent/` BC (open-core, CI removability gate), tool = engine `Contracts` port + thin adapter, RBAC-filtered tool registry, single approval gate via `pending_changes`
