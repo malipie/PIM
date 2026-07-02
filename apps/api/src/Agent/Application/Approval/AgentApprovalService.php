@@ -8,6 +8,7 @@ use App\Agent\Application\Run\AgentProgressPublisher;
 use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\Entity\AgentRun;
 use App\Agent\Domain\Exception\ApprovalConflictException;
+use App\Catalog\Contracts\Command\BulkRollbackPort;
 use App\Catalog\Contracts\Command\PendingBatchCommitPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use Doctrine\ORM\EntityManagerInterface;
@@ -35,6 +36,7 @@ final readonly class AgentApprovalService
         private EntityManagerInterface $entityManager,
         private ManagerRegistry $managerRegistry,
         private PendingBatchCommitPort $commits,
+        private BulkRollbackPort $rollbacks,
         private PendingChangesPort $pendingChanges,
         private AgentProgressPublisher $publisher,
     ) {
@@ -159,6 +161,36 @@ final readonly class AgentApprovalService
         }
 
         $run->markCancelled();
+        $this->entityManager->flush();
+        $this->publisher->status($run);
+
+        return $run;
+    }
+
+    /**
+     * AGENT-P3-04 (#1964) — "Cofnij tę operację": replay the undo-log of
+     * the run's BulkSession on the canonical object_values (superseded
+     * rows are skipped so later manual edits survive) and mark the run
+     * rolled_back. Idempotent: a second rollback returns as-is.
+     */
+    public function rollback(Uuid $runId): AgentRun
+    {
+        $run = $this->load($runId);
+
+        if (AgentRunStatus::RolledBack === $run->getStatus()) {
+            return $run;
+        }
+
+        $bulkOperationId = $run->getBulkOperationId();
+        if (AgentRunStatus::Done !== $run->getStatus() || !$bulkOperationId instanceof Uuid) {
+            throw ApprovalConflictException::cannotRollback($run->getStatus()->value);
+        }
+
+        $this->rollbacks->rollbackSession($bulkOperationId);
+
+        // The rollback handler's per-chunk clear() detached the run.
+        $run = $this->reload($runId);
+        $run->markRolledBack();
         $this->entityManager->flush();
         $this->publisher->status($run);
 
