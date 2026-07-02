@@ -51,6 +51,7 @@ final readonly class AgentKeyController
             'enabled_at' => $config?->getEnabledAt()->format(DateTimeInterface::ATOM),
             'disabled_at' => $config?->getDisabledAt()?->format(DateTimeInterface::ATOM),
             'last_used_at' => $config?->getLastUsedAt()?->format(DateTimeInterface::ATOM),
+            'proactive_scan_enabled' => $config?->isProactiveScanEnabled() ?? false,
         ]);
     }
 
@@ -78,6 +79,28 @@ final readonly class AgentKeyController
             'enabled' => $config->isEnabled(),
             'key_prefix' => $config->getKeyPrefix(),
         ]);
+    }
+
+    /**
+     * AGENT-P8-01 (#1983) — the proactive-scan opt-in (per tenant).
+     */
+    #[Route('/api/settings/agent-key', name: 'pim_agent_key_patch', methods: ['PATCH'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[RequiresPermission(module: 'settings', action: 'tenant.manage')]
+    public function patch(Request $request): JsonResponse
+    {
+        $tenant = $this->tenant();
+
+        /** @var array<string, mixed> $body */
+        $body = json_decode($request->getContent(), true) ?? [];
+        $proactive = $body['proactive_scan_enabled'] ?? null;
+        if (!\is_bool($proactive)) {
+            throw new BadRequestHttpException('proactive_scan_enabled must be a boolean.');
+        }
+
+        $this->keys->setProactiveScan($tenant, $proactive);
+
+        return new JsonResponse(['proactive_scan_enabled' => $proactive]);
     }
 
     #[Route('/api/settings/agent-key', name: 'pim_agent_key_disable', methods: ['DELETE'])]

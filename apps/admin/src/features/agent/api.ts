@@ -19,7 +19,7 @@ export type AgentRunStatus =
 export interface AgentRunSummary {
   id: string;
   status: AgentRunStatus;
-  surface: 'chat' | 'cmdk';
+  surface: 'chat' | 'cmdk' | 'proactive';
   intent: string;
   model: string | null;
   pending_change_batch_id: string | null;
