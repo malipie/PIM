@@ -112,10 +112,21 @@ parameters:
                 value: 'src/Shared/.*'
 
         # ─── Search (Meilisearch adapter — epic 0.5) ───────────────────
+        # Search splits off a Contracts seam (ADR-0024, AGENT-P0-02): agent
+        # read-tools query the catalog only through src/Search/Contracts.
         - name: Search
           collectors:
+              - type: bool
+                must:
+                    - type: directory
+                      value: 'src/Search/.*'
+                must_not:
+                    - type: directory
+                      value: 'src/Search/Contracts/.*'
+        - name: Search_Contracts
+          collectors:
               - type: directory
-                value: 'src/Search/.*'
+                value: 'src/Search/Contracts/.*'
 
         # ─── Backup (pgBackRest snapshots — IMP-06) ────────────────────
         # AUD-079 (W3-1): the Backup BC shipped without any deptrac rules,
@@ -166,10 +177,24 @@ parameters:
           collectors:
               - type: directory
                 value: 'src/Integration/Generic/Contracts/.*'
-        - name: Agent
+        # ─── Agent (removable BC — ADR-0024, epic 0.7) ─────────────────
+        # The agent is a fully removable bounded context (open-core): no
+        # other ruleset may list Agent_Internals/Agent_Contracts, so any
+        # core->Agent import fails closed. Agent_Internals reaches host
+        # engines exclusively through their *_Contracts seams.
+        - name: Agent_Internals
+          collectors:
+              - type: bool
+                must:
+                    - type: directory
+                      value: 'src/Agent/.*'
+                must_not:
+                    - type: directory
+                      value: 'src/Agent/Contracts/.*'
+        - name: Agent_Contracts
           collectors:
               - type: directory
-                value: 'src/Agent/.*'
+                value: 'src/Agent/Contracts/.*'
         - name: ApiConfigurator
           collectors:
               - type: directory
@@ -193,10 +218,22 @@ parameters:
         # ─── Import / Export (ADR-0019, IMP2-1.1 #1463) ────────────────
         # Target ruleset: only *_Contracts + Shared. Existing reaches into
         # Catalog_Internals are baselined below and burned down by #1466.
+        # Import splits off a Contracts seam (ADR-0024, AGENT-P0-02): agent
+        # tools reach the import engine (StructuralImport, AutoMapper) only
+        # through src/Import/Contracts.
         - name: Import
           collectors:
+              - type: bool
+                must:
+                    - type: directory
+                      value: 'src/Import/.*'
+                must_not:
+                    - type: directory
+                      value: 'src/Import/Contracts/.*'
+        - name: Import_Contracts
+          collectors:
               - type: directory
-                value: 'src/Import/.*'
+                value: 'src/Import/Contracts/.*'
         # ─── Export core + Feed sub-area (ADR-0023, epik XMLF) ─────────
         # Feed (src/Export/Feed) is a sub-area of the Export BC: it may reach
         # the whole Export core (ExportBuilder reuse) and the Export_Contracts
@@ -284,6 +321,7 @@ parameters:
             - Vendor
 
         Import:
+            - Import_Contracts
             - Catalog_Contracts
             - Channel_Contracts
             - Asset_Contracts
@@ -295,6 +333,9 @@ parameters:
             # cannot be hidden behind a Contracts interface; allow it
             # explicitly rather than baseline it as a violation.
             - Backup_Internals
+            - Shared
+            - Vendor
+        Import_Contracts:
             - Shared
             - Vendor
         Export:
@@ -353,6 +394,7 @@ parameters:
             - Vendor
 
         Search:
+            - Search_Contracts
             - Shared
             - Catalog_Contracts
             - Catalog_Internals
@@ -363,6 +405,9 @@ parameters:
             # actually uses (debug: it touches nothing else in Identity
             # Internals).
             - Identity_TenantProvider
+            - Vendor
+        Search_Contracts:
+            - Shared
             - Vendor
 
         Backup_Internals:
@@ -397,10 +442,22 @@ parameters:
             - Shared
             - Vendor
 
-        Agent:
+        # ADR-0024: Agent_Internals sees engine Contracts seams only — never
+        # any *_Internals. Nothing else lists Agent_* (removability is
+        # fail-closed: an import of App\Agent\* from core is a violation).
+        Agent_Internals:
+            - Agent_Contracts
             - Shared
             - Catalog_Contracts
+            - Channel_Contracts
+            - Asset_Contracts
             - Identity_Contracts
+            - Export_Contracts
+            - Search_Contracts
+            - Import_Contracts
+            - Vendor
+        Agent_Contracts:
+            - Shared
             - Vendor
 
         ApiConfigurator:
