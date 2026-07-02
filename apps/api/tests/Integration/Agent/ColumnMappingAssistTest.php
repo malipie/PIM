@@ -54,6 +54,7 @@ final class ColumnMappingAssistTest extends KernelTestCase
         $byHeader = [];
         foreach ($result['suggestions'] as $suggestion) {
             self::assertIsArray($suggestion);
+            self::assertIsString($suggestion['header']);
             $byHeader[$suggestion['header']] = $suggestion;
         }
 
@@ -62,6 +63,7 @@ final class ColumnMappingAssistTest extends KernelTestCase
         self::assertNull($byHeader['Tajemnicza Kolumna X17']['suggested_code']);
         self::assertSame('manual', $byHeader['Tajemnicza Kolumna X17']['confidence'], 'ambiguous columns are the model\'s territory');
 
+        self::assertIsArray($result['attribute_catalogue']);
         $codes = array_column($result['attribute_catalogue'], 'code');
         self::assertContains('price', $codes);
         self::assertContains('material', $codes, 'the catalogue grounds the model\'s proposal');

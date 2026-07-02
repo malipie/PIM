@@ -62,8 +62,19 @@ final readonly class AgentColumnMappingAssist implements ColumnMappingPort
             $catalogue[] = ['code' => $row['code'], 'labels' => $labels];
         }
 
+        // AutoMapper wants positional samples (list per row, aligned with
+        // the header order) - the agent supplies header=>value objects.
+        $positionalRows = [];
+        foreach ($sampleRows as $row) {
+            $positional = [];
+            foreach ($headers as $header) {
+                $positional[] = $row[$header] ?? null;
+            }
+            $positionalRows[] = $positional;
+        }
+
         $suggestions = [];
-        foreach ($this->autoMapper->map($codes, $headers, $sampleRows, $labelsByCode) as $suggestion) {
+        foreach ($this->autoMapper->map($codes, $headers, $positionalRows, $labelsByCode) as $suggestion) {
             $suggestions[] = [
                 'header' => $suggestion->columnHeader,
                 'suggested_code' => $suggestion->suggestedAttributeCode,
