@@ -1768,11 +1768,77 @@
     }
   },
   "api_configurator": {
+    "feeds": {
+      "template": {
+        "google_shopping": "Google Shopping",
+        "ceneo": "Ceneo",
+        "meta": "Meta",
+        "custom": "Własny"
+      },
+      "status": {
+        "active": "Aktywny",
+        "paused": "Wstrzymany",
+        "error": "Błąd"
+      },
+      "kpi": {
+        "feeds": "Feedy",
+        "items": "Produkty w feedach",
+        "items_hint": "syndykowane do kanałów",
+        "pulls": "Pobrania feedów · 24h"
+      },
+      "hub": {
+        "title": "Feedy produktowe",
+        "subtitle": "Statyczne projekcje XML pod crawler kanału · {{count}} skonfigurowanych",
+        "search_placeholder": "nazwa lub code…",
+        "search_aria": "Szukaj feedów",
+        "filter_aria": "Filtruj feedy po statusie",
+        "filter": {
+          "all": "wszystkie",
+          "active": "aktywne",
+          "paused": "wstrzymane",
+          "error": "błąd"
+        },
+        "new_feed": "Nowy feed",
+        "new_feed_hint": "Wybierz szablon (Google Shopping, Ceneo, Meta) albo zbuduj własny. Mapowanie, filtr, podgląd i stabilny URL — bez developera.",
+        "adhoc_title": "Potrzebujesz jednorazowego zrzutu XML?",
+        "adhoc_hint": "Format XML jest też dostępny w kreatorze eksportu — obok XLSX/CSV. Generyczny wrapper, wolny wybór kolumn, jednorazowy download. Bez szablonu, mapowania i harmonogramu."
+      },
+      "card": {
+        "copy_url": "Kopiuj URL feedu",
+        "rotate": "Rotuj token",
+        "rotate_success": "Nowy token wygenerowany — URL poniżej widoczny raz, skopiuj go teraz.",
+        "regenerate": "Regeneruj",
+        "regenerate_started": "Regeneracja zakolejkowana.",
+        "pause": "Wstrzymaj",
+        "resume": "Wznów",
+        "open": "Otwórz",
+        "action_error": "Akcja nie powiodła się. Spróbuj ponownie.",
+        "url_masked": "https://…/api/feeds/pull/… (token ukryty — rotuj, by wygenerować nowy URL)",
+        "url_none": "brak tokenu — rotuj, by wygenerować URL feedu",
+        "items": "Produkty w feedzie",
+        "schedule": "Harmonogram",
+        "schedule_manual": "tylko ręcznie",
+        "coverage": "Pokrycie mapowania",
+        "coverage_aria": "Pokrycie mapowania: {{mapped}} z {{total}} slotów",
+        "last_pull": "Ostatnie pobranie",
+        "last_regen": "Ost. regen."
+      },
+      "wizard": {
+        "placeholder_title": "Kreator feedu — w kolejnym tickecie",
+        "placeholder_hint": "5-krokowy kreator (szablon, zakres, mapowanie, delivery, przegląd) wchodzi z XMLF-P5-02..04.",
+        "back_to_hub": "Wróć do feedów"
+      },
+      "detail": {
+        "placeholder_title": "Detal feedu — w kolejnym tickecie",
+        "placeholder_hint": "Widok pipeline, historia runów i drill-down logu per produkt wchodzą z XMLF-P5-05."
+      }
+    },
     "shell": {
       "tabs_aria": "Sekcje Konfiguratora API",
       "tabs": {
         "connections": "Połączenia",
         "producer": "Moje API",
+        "feeds": "Feedy",
         "monitor": "Monitor"
       },
       "connections_soon_title": "Połączenia — wkrótce",

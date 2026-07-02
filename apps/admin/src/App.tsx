@@ -83,6 +83,18 @@ const SyncMonitorScreen = lazyPage(
   () => import('@/features/api-configurator/monitor/SyncMonitorScreen'),
   'SyncMonitorScreen',
 );
+const FeedsHubPage = lazyPage(
+  () => import('@/features/api-configurator/feeds/hub/FeedsHubPage'),
+  'FeedsHubPage',
+);
+const FeedWizardPage = lazyPage(
+  () => import('@/features/api-configurator/feeds/wizard/FeedWizardPage'),
+  'FeedWizardPage',
+);
+const FeedDetailPage = lazyPage(
+  () => import('@/features/api-configurator/feeds/detail/FeedDetailPage'),
+  'FeedDetailPage',
+);
 const AssetsListPage = lazyPage(() => import('@/features/asset/assets/list'), 'AssetsListPage');
 const AssetShowPage = lazyPage(() => import('@/features/asset/assets/show'), 'AssetShowPage');
 const AttributeGroupCreatePage = lazyPage(
@@ -675,6 +687,18 @@ function App() {
                     <Route
                       path="/integrations/api-configurator/monitor"
                       element={<SyncMonitorScreen />}
+                    />
+                    {/* XMLF-P5-01 — product XML feeds (hub / wizard / detail)
+                        under the same shell; wizard + detail are placeholder
+                        targets until P5-02..P5-05 replace them. */}
+                    <Route path="/integrations/api-configurator/feeds" element={<FeedsHubPage />} />
+                    <Route
+                      path="/integrations/api-configurator/feeds/new"
+                      element={<FeedWizardPage />}
+                    />
+                    <Route
+                      path="/integrations/api-configurator/feeds/:id"
+                      element={<FeedDetailPage />}
                     />
                     <Route
                       path="/integrations/api-configurator/:id/edit"

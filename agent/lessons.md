@@ -2728,3 +2728,14 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 4. **fmt=category = trigger resolucji, mapping = override**: wartość z explicit mappingu (np. `category_path`) wygrywa nad external_code; required-empty idzie przez FeedRequiredValidator (skip+warning), optional-empty → unset slot + własna linia FeedRunLog.
 5. **`setScope()` był martwy w API** — create/PATCH nie przyjmowały `channel_id`/`publication_channel`; bez tego cała resolucja kategorii jest nieosiągalna dla klienta. Domknięte w P3-03 (create + PATCH scope-block + serializacja `channel_id`).
 6. **Built-in kolumny w feedach za darmo**: mapping `{kind:attribute, ref:'parent_sku'}` przepływa przez ColumnResolver.BUILT_INS bez zmian w mapperze — g:item_group_id to czysty default-mapping w szablonie. Uwaga: atrybut `sku` (lokalizowany) wygrywa nad built-in `sku` w toAttributeMap (preferencja locale) — SKU w feedzie to wartość atrybutu, nie code obiektu, jeśli tenant ma taki atrybut.
+
+## Lessons z XMLF P5-01 (2026-07-02 — hub feedów, FE)
+
+1. **pl-PL grouping zaczyna się od 5 cyfr** (CLDR `minimumGroupingDigits=2`): `(1284).toLocaleString('pl-PL')` = `"1284"` (bez separatora!), `12408` → `"12 408"` z NBSP. Asercje e2e na liczby: `/1\s?284/` (opcjonalny `\s` — łapie oba przypadki; `\s` w JS matchuje U+00A0).
+2. **Playwright renderuje admin po ANGIELSKU** (language detector bierze locale przeglądarki en-US, mimo `fallbackLng: 'pl'`) — lokatory tekstowe w e2e MUSZĄ być dwujęzyczne: `/Feedy|Feeds/`, `/wstrzymane|^paused$/i` (konwencja repo, np. `/silnik|engine/i` w 1096).
+3. **axe w Playwright LICZY kontrast** (jsdom nie — stary gotcha): `text-zinc-400` na białym = fail AA (serious) przy KAŻDYM tekście, nie tylko labelkach. Nowe featury od razu `text-zinc-500`; `text-zinc-400` zostaje tylko na ikonach `aria-hidden`.
+4. **`/api/feeds` (custom route, kształt `{items:[]}`)** nie przejdzie przez Refine dataProvider (getList czyta hydra `member`) — wzorzec: `useQuery` + `jsonFetch` (jak catalog channel-placements). KPI huba = merge dwóch read-modeli: `/api/feed-runs/kpi` (statusy+syndykacja) + `/api/feeds/pull-stats` (pulls24h+spark) — spec-owe `/api/feeds/stats` nigdy nie istniało.
+5. **URL feedu na karcie:** plaintext tokenu nie da się odtworzyć (HMAC w DB) — karta pokazuje maskowany hint + pełny URL tylko w sesji po rotate (response mint). `has_token` dodane do serializacji listy (rozróżnia copy „rotuj by wygenerować" vs „token ukryty").
+6. **Konsola admina zawsze ma 2×401 na twardym wejściu** (in-memory JWT + refresh-cookie bootstrap) — asercja `consoleErrors === []` w e2e jest zbyt ostra; filtrować 401-e z /api/auth.
+
+**Errata numeracji (2026-07-02):** P3-03 = **#1921**, nie #1922 (to P3-04) — instrukcja operatora miała zły numer; commit P3-03 w PR #2017 nosi błędny `Refs #1922`. Reguła bez wyjątku: `gh issue list --search "XMLF-PX-NN in:title"` przed KAŻDYM `Refs`/`Closes`/`gh issue close`, także gdy numer podał operator.
