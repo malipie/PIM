@@ -95,6 +95,10 @@ const FeedDetailPage = lazyPage(
   () => import('@/features/api-configurator/feeds/detail/FeedDetailPage'),
   'FeedDetailPage',
 );
+const FeedsMonitorPage = lazyPage(
+  () => import('@/features/api-configurator/feeds/monitor/FeedsMonitorPage'),
+  'FeedsMonitorPage',
+);
 const AssetsListPage = lazyPage(() => import('@/features/asset/assets/list'), 'AssetsListPage');
 const AssetShowPage = lazyPage(() => import('@/features/asset/assets/show'), 'AssetShowPage');
 const AttributeGroupCreatePage = lazyPage(
@@ -692,6 +696,10 @@ function App() {
                         under the same shell; wizard + detail are placeholder
                         targets until P5-02..P5-05 replace them. */}
                     <Route path="/integrations/api-configurator/feeds" element={<FeedsHubPage />} />
+                    <Route
+                      path="/integrations/api-configurator/feeds/monitor"
+                      element={<FeedsMonitorPage />}
+                    />
                     <Route
                       path="/integrations/api-configurator/feeds/new"
                       element={<FeedWizardPage />}

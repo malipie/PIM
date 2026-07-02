@@ -78,8 +78,12 @@ test('XMLF-P5-01 — feeds hub: tab, KPI, cards, filtering, a11y', async ({ page
 
   await page.goto('/integrations/api-configurator/feeds');
 
-  // Shell: the fourth tab exists and is active for the /feeds prefix.
-  const feedsTab = page.getByRole('tab', { name: /Feedy|Feeds/ });
+  // Shell: the fourth tab exists and is active for the /feeds prefix
+  // (scoped to the layout tablist — the P5-07 feeds sub-nav has its own
+  // same-named "Feeds" tab).
+  const feedsTab = page
+    .getByLabel(/API Configurator|Konfigurator API/)
+    .getByRole('tab', { name: /Feedy|Feeds/ });
   await expect(feedsTab).toBeVisible();
   await expect(feedsTab).toHaveAttribute('aria-selected', 'true');
 

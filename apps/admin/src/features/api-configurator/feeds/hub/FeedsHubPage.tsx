@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router';
 import { Segmented } from '@/features/api-configurator/components/primitives';
 
 import { type FeedStatus, filterFeeds, useFeedKpi, useFeeds } from '../api/feeds';
+import { FeedsSubnav } from '../components/FeedsSubnav';
 import { FeedCard } from './FeedCard';
 import { FeedKpiStrip } from './FeedKpiStrip';
 
@@ -29,6 +30,7 @@ export function FeedsHubPage() {
 
   return (
     <div className="space-y-6">
+      <FeedsSubnav active="hub" />
       <FeedKpiStrip kpi={kpiQuery.data} />
 
       <div className="flex flex-wrap items-center gap-3">
