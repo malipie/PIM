@@ -1848,7 +1848,22 @@
       },
       "detail": {
         "placeholder_title": "Feed detail — coming in the next ticket",
-        "placeholder_hint": "The pipeline view, run history and per-product log drill-down land with XMLF-P5-05."
+        "placeholder_hint": "The pipeline view, run history and per-product log drill-down land with XMLF-P5-05.",
+        "edit": "Edit",
+        "regenerate_now": "Regenerate now",
+        "live": "LIVE · {{topic}}",
+        "pipeline_title": "Regeneration pipeline",
+        "stage": {
+          "query": "query",
+          "serialize": "serialize",
+          "validate": "validate",
+          "store": "store",
+          "done": "done"
+        },
+        "size": "File size",
+        "last_pull": "Last pull",
+        "health_note": "The last regeneration failed — check the run history below and the drill-down log.",
+        "history_title": "Regeneration history"
       },
       "mapper": {
         "title": "Slot ↔ attribute mapping",
@@ -1929,6 +1944,50 @@
         "ai_cta": "AI mapping suggestions",
         "ai_soon": "Faza 2",
         "well_formed_note": "The writer escapes every value (or wraps it in CDATA) — the feed stays well-formed XML regardless of catalog content. Preview and production share the same engine."
+      },
+      "run": {
+        "empty": "No regenerations yet.",
+        "drill_title": "Regeneration run",
+        "regenerate_again": "Regenerate again",
+        "col": {
+          "feed_start": "Feed · start",
+          "start": "Start",
+          "trigger": "Trigger",
+          "duration": "Duration",
+          "items": "Products",
+          "size": "Size",
+          "status": "Status"
+        },
+        "trigger": {
+          "manual": "manual",
+          "schedule": "schedule",
+          "first_publish": "first publish"
+        },
+        "health": {
+          "success": "success",
+          "warning": "warning",
+          "error": "error",
+          "pending": "pending",
+          "running": "running",
+          "cancelled": "cancelled"
+        },
+        "filter": {
+          "all": "all",
+          "success": "success",
+          "warning": "warnings",
+          "error": "errors"
+        },
+        "metric": {
+          "in_feed": "in feed",
+          "skipped": "skipped",
+          "warnings": "warnings",
+          "size": "size"
+        },
+        "close": "Close"
+      },
+      "log": {
+        "title": "Product log",
+        "empty": "No log lines — a clean run."
       }
     },
     "shell": {

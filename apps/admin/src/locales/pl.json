@@ -1896,7 +1896,22 @@
       },
       "detail": {
         "placeholder_title": "Detal feedu — w kolejnym tickecie",
-        "placeholder_hint": "Widok pipeline, historia runów i drill-down logu per produkt wchodzą z XMLF-P5-05."
+        "placeholder_hint": "Widok pipeline, historia runów i drill-down logu per produkt wchodzą z XMLF-P5-05.",
+        "edit": "Edytuj",
+        "regenerate_now": "Regeneruj teraz",
+        "live": "LIVE · {{topic}}",
+        "pipeline_title": "Pipeline regeneracji",
+        "stage": {
+          "query": "zapytanie",
+          "serialize": "serializacja",
+          "validate": "walidacja",
+          "store": "zapis",
+          "done": "gotowe"
+        },
+        "size": "Rozmiar pliku",
+        "last_pull": "Ostatnie pobranie",
+        "health_note": "Ostatnia regeneracja nie powiodła się — sprawdź historię poniżej i log w drill-downie.",
+        "history_title": "Historia regeneracji"
       },
       "mapper": {
         "title": "Mapowanie slot ↔ atrybut",
@@ -1977,6 +1992,50 @@
         "ai_cta": "AI-sugestie mapowania",
         "ai_soon": "Faza 2",
         "well_formed_note": "Writer escapuje każdą wartość (lub pakuje w CDATA) — feed pozostaje well-formed XML niezależnie od treści katalogu. Podgląd i produkcja używają tego samego silnika."
+      },
+      "run": {
+        "empty": "Brak regeneracji.",
+        "drill_title": "Run regeneracji",
+        "regenerate_again": "Regeneruj ponownie",
+        "col": {
+          "feed_start": "Feed · start",
+          "start": "Start",
+          "trigger": "Trigger",
+          "duration": "Czas",
+          "items": "Produkty",
+          "size": "Rozmiar",
+          "status": "Status"
+        },
+        "trigger": {
+          "manual": "ręcznie",
+          "schedule": "harmonogram",
+          "first_publish": "pierwsza publikacja"
+        },
+        "health": {
+          "success": "sukces",
+          "warning": "ostrzeżenie",
+          "error": "błąd",
+          "pending": "oczekuje",
+          "running": "w toku",
+          "cancelled": "anulowany"
+        },
+        "filter": {
+          "all": "wszystkie",
+          "success": "sukces",
+          "warning": "ostrzeżenia",
+          "error": "błędy"
+        },
+        "metric": {
+          "in_feed": "w feedzie",
+          "skipped": "pominięte",
+          "warnings": "ostrzeżenia",
+          "size": "rozmiar"
+        },
+        "close": "Zamknij"
+      },
+      "log": {
+        "title": "Log produktów",
+        "empty": "Brak linii logu — czysty run."
       }
     },
     "shell": {
