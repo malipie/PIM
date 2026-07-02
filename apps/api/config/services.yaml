@@ -1,5 +1,11 @@
 # yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
 
+# AGENT-P0-09 (#1952) — the agent's whole DI surface lives in
+# services_agent.yaml; `not_found` is tolerated so `rm -rf src/Agent`
+# + removing that file leaves a compiling core (ADR-0024 removability).
+imports:
+    - { resource: services_agent.yaml, ignore_errors: not_found }
+
 parameters:
     # Sprint 0 fallback: until full auth lands in #4 / #24, the listener resolves
     # the active tenant by code from this env var. Smoke test #12 (0.0.12) flips
@@ -54,22 +60,6 @@ parameters:
     # column header.
     pim.imports.dictionary_path: '%kernel.project_dir%/config/imports/mapping_dictionary.yaml'
 
-    # AGENT-P0-06 (#1949) — agent LLM models per tool kind (ADR-0024 b):
-    # schema-ops (bigger blast radius) run on the Opus-tier model, all
-    # other kinds on the Sonnet-tier default. A model bump is a config
-    # change, not a code change. Retries are bounded (SDK honours
-    # retry-after, exponential fallback); exhaustion -> run error.
-    pim.agent.model.default: '%env(default:pim.agent.model.default.fallback:AGENT_MODEL_DEFAULT)%'
-    pim.agent.model.default.fallback: 'claude-sonnet-4-6'
-    pim.agent.model.schema: '%env(default:pim.agent.model.schema.fallback:AGENT_MODEL_SCHEMA)%'
-    pim.agent.model.schema.fallback: 'claude-opus-4-8'
-    pim.agent.llm.max_retries: 4
-    pim.agent.llm.timeout_seconds: 120.0
-
-    # AGENT-P0-08 (#1951) — global agent feature flag; per-tenant
-    # availability additionally requires an active BYOK key.
-    pim.agent.enabled: '%env(bool:AGENT_ENABLED)%'
-
 services:
     _defaults:
         autowire: true
@@ -86,19 +76,13 @@ services:
         App\Integration\Generic\Infrastructure\Http\Pagination\PaginationStrategy:
             tags: ['integration.pagination_strategy']
 
-        # AGENT-P0-07 (#1950) — every AgentToolInterface implementation is
-        # auto-registered in the ToolRegistry (ADR-0024 b: adding a tool =
-        # adding a service, zero loop changes).
-        App\Agent\Application\Tool\AgentToolInterface:
-            tags: ['agent.tool']
-
     App\:
         resource: '../src/'
         exclude:
-            # AGENT-P1-01 (#1953) — module-namespace migrations
-            # (AgentMigrations\*, ADR-0024 a) are not App\* classes;
-            # excluding them keeps the PSR-4 discovery honest.
-            - '../src/Agent/Infrastructure/Migrations/'
+            # AGENT-P0-09 (#1952) — the agent module's discovery root lives
+            # in services_agent.yaml so the module is deletable wholesale
+            # (supersedes the narrower P1-01 migrations-only exclude).
+            - '../src/Agent/'
 
     # W2-7 / AUD-042 — single RFC 7807 contract for custom controllers.
     # `$debug` is bound to the kernel flag so the listener can keep the
@@ -162,28 +146,6 @@ services:
     App\Catalog\Application\ObjectTypeService:
         arguments:
             $enableCustomObjectTypes: '%pim.catalog.enable_custom_object_types%'
-
-    # AGENT-P0-06 (#1949) — Anthropic client on the tenant's BYOK key;
-    # scalar knobs are not autowired.
-    App\Agent\Infrastructure\Anthropic\AnthropicClientFactory:
-        arguments:
-            $maxRetries: '%pim.agent.llm.max_retries%'
-            $timeoutSeconds: '%pim.agent.llm.timeout_seconds%'
-
-    App\Agent\Infrastructure\Anthropic\AgentModelSelector:
-        arguments:
-            $defaultModel: '%pim.agent.model.default%'
-            $schemaModel: '%pim.agent.model.schema%'
-
-    # AGENT-P0-08 (#1951) — global flag + per-tenant BYOK availability.
-    App\Agent\Application\AgentFeatureGuard:
-        arguments:
-            $agentEnabled: '%pim.agent.enabled%'
-
-    # AGENT-P1-05 (#1957) — agent run SSE topics (tenant-scoped, private).
-    App\Agent\Application\Run\AgentProgressPublisher:
-        arguments:
-            $topicBase: '%env(MERCURE_TOPIC_BASE)%'
 
     # DAM MVP upload entry point (#438). The size caps are wired through
     # parameters so deployment-specific overrides land in env vars
