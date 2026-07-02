@@ -3587,6 +3587,20 @@
       "schema_group": "group",
       "schema_attribute": "attribute",
       "categories": "categories"
+    },
+    "history": {
+      "title": "Agent run history",
+      "subtitle": "Your runs: status, scope, cost and \"Undo this operation\" for completed ones.",
+      "go_inbox": "Approval inbox",
+      "loading": "Loading…",
+      "empty": "No runs yet — open the agent chat or Cmd+K.",
+      "expand": "Run details",
+      "scope": "{{count}} change(s) · ",
+      "rollback": "Undo this operation",
+      "tokens": "tokens",
+      "operation": "operation",
+      "no_tools": "No tool calls in this run.",
+      "audit_hint": "Full accountability: Settings → Audit (agent_run)"
     }
   }
 }

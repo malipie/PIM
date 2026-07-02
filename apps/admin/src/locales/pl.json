@@ -3643,6 +3643,20 @@
       "schema_group": "grupa",
       "schema_attribute": "atrybut",
       "categories": "kategorie"
+    },
+    "history": {
+      "title": "Historia runów agenta",
+      "subtitle": "Twoje runy: status, zakres, koszt i „Cofnij tę operację” dla zakończonych.",
+      "go_inbox": "Skrzynka akceptacji",
+      "loading": "Wczytywanie…",
+      "empty": "Jeszcze żadnych runów — otwórz czat agenta albo Cmd+K.",
+      "expand": "Szczegóły runu",
+      "scope": "{{count}} zmian · ",
+      "rollback": "Cofnij tę operację",
+      "tokens": "tokenów",
+      "operation": "operacja",
+      "no_tools": "Run bez wywołań narzędzi.",
+      "audit_hint": "Pełna odpowiedzialność: Ustawienia → Audyt (agent_run)"
     }
   }
 }
