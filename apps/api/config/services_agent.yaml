@@ -65,3 +65,12 @@ services:
     App\Agent\Application\Run\AgentProgressPublisher:
         arguments:
             $topicBase: '%env(MERCURE_TOPIC_BASE)%'
+
+when@test:
+    services:
+        # AGENT-P3-02 (#1962) — approval gate under integration test; the
+        # container would otherwise inline the service (no consumer yet
+        # until the P4-01 endpoints land).
+        test.agent.approval:
+            alias: App\Agent\Application\Approval\AgentApprovalService
+            public: true
