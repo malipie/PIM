@@ -21,6 +21,12 @@ export interface FeedDraft {
   mappings: SlotMapping[];
   filterDsl: FilterDsl | null;
   skipPolicy: 'skip_invalid' | 'include_with_warning';
+  cron: string | null;
+  gzip: boolean;
+  authType: 'none' | 'basic';
+  authUsername: string;
+  /** Write-only — sent on PATCH when non-empty, never read back. */
+  authPassword: string;
 }
 
 export const WIZARD_STEP_IDS = ['template', 'scope', 'mapping', 'delivery', 'preview'] as const;
@@ -40,6 +46,11 @@ export function emptyDraft(): FeedDraft {
     mappings: [],
     filterDsl: null,
     skipPolicy: 'skip_invalid',
+    cron: null,
+    gzip: true,
+    authType: 'none',
+    authUsername: '',
+    authPassword: '',
   };
 }
 
@@ -58,7 +69,41 @@ export function draftFromFeed(feed: FeedRow): FeedDraft {
     mappings: feed.field_mappings as unknown as SlotMapping[],
     filterDsl: (feed.filter as FilterDsl | null) ?? null,
     skipPolicy: feed.validation_policy ?? 'skip_invalid',
+    cron: feed.schedule_cron,
+    gzip: feedDeliveryGzip(feed),
+    authType: feedDeliveryAuthType(feed),
+    authUsername: feedDeliveryUsername(feed),
+    authPassword: '',
   };
+}
+
+function feedDeliveryGzip(feed: FeedRow): boolean {
+  const delivery = feed.delivery;
+  return (
+    typeof delivery === 'object' &&
+    delivery !== null &&
+    (delivery as { gzip?: unknown }).gzip === true
+  );
+}
+
+function feedDeliveryAuthType(feed: FeedRow): 'none' | 'basic' {
+  const auth = deliveryAuth(feed);
+  return auth?.type === 'basic' ? 'basic' : 'none';
+}
+
+function feedDeliveryUsername(feed: FeedRow): string {
+  return deliveryAuth(feed)?.username ?? '';
+}
+
+function deliveryAuth(feed: FeedRow): { type?: string; username?: string } | null {
+  const delivery = feed.delivery;
+  if (typeof delivery !== 'object' || delivery === null) {
+    return null;
+  }
+  const auth = (delivery as { auth?: unknown }).auth;
+  return typeof auth === 'object' && auth !== null
+    ? (auth as { type?: string; username?: string })
+    : null;
 }
 
 /** Auto-slug for the code field: `Google Shopping — PL` → `google_shopping_pl`. */
@@ -106,5 +151,17 @@ export function patchPayload(draft: FeedDraft): Record<string, unknown> {
     channel_id: draft.channelId,
     filter: draft.filterDsl,
     validation_policy: draft.skipPolicy,
+    schedule_cron: draft.cron,
+    delivery: {
+      gzip: draft.gzip,
+      auth:
+        draft.authType === 'basic'
+          ? {
+              type: 'basic',
+              username: draft.authUsername,
+              ...(draft.authPassword !== '' ? { password: draft.authPassword } : {}),
+            }
+          : { type: 'none' },
+    },
   };
 }

@@ -1891,7 +1891,8 @@
           "preview_title": "Podgląd — kolejny ticket",
           "preview_hint": "Podgląd XML na żywo z raportem zdrowia wchodzi z XMLF-P5-04."
         },
-        "back_to_hub": "Wróć do feedów"
+        "back_to_hub": "Wróć do feedów",
+        "saved_generating": "Feed zapisany — pierwsza regeneracja zakolejkowana."
       },
       "detail": {
         "placeholder_title": "Detal feedu — w kolejnym tickecie",
@@ -1925,6 +1926,57 @@
         "missing_value": "brak wartości — wymagane",
         "too_long": "ponad limit {{max}} znaków — dodaj transformację truncate",
         "category_note": "Sloty z fmt=category (Ceneo cat, Google g:google_product_category) są rozwiązywane przy generacji z external_code drzewa kategorii kanału; jawna wartość z mapowania wygrywa. Warianty wchodzą płasko z item_group_id = SKU mastera."
+      },
+      "delivery": {
+        "schedule_title": "Harmonogram regeneracji",
+        "presets_aria": "Presety harmonogramu",
+        "preset": {
+          "hourly": "co godzinę",
+          "daily": "codziennie 03:00",
+          "twice": "2× dziennie",
+          "manual": "tylko ręcznie"
+        },
+        "cron_label": "Wyrażenie cron",
+        "cron_hint": "czytelny podgląd next-run wchodzi z serwisem harmonogramu",
+        "cron_placeholder": "tylko ręcznie — bez harmonogramu",
+        "gzip_title": "Kompresja gzip",
+        "gzip_hint": "Serwuj wariant .xml.gz gdy crawler akceptuje",
+        "auth_title": "Autoryzacja URL",
+        "auth_method": "Metoda",
+        "auth_hint": "crawlery marketplace nie wysyłają nagłówków auth",
+        "auth_none": "Token w URL",
+        "auth_basic": "Token + HTTP Basic",
+        "auth_user": "Użytkownik",
+        "auth_password": "Hasło",
+        "auth_password_hint": "szyfrowane AES-GCM, write-only",
+        "url_title": "URL feedu",
+        "url_once": "Poniższy URL jest widoczny RAZ — skopiuj go teraz. Przechowujemy wyłącznie HMAC.",
+        "url_hidden": "Token istnieje, ale URL nie może być ponownie wyświetlony (przechowujemy tylko HMAC). Rotuj, by wygenerować nowy.",
+        "url_none": "Brak tokenu — wygeneruj go, by dostać publiczny URL dla crawlera.",
+        "mint": "Wygeneruj token",
+        "rotate": "Rotuj token",
+        "revoke": "Unieważnij",
+        "rotate_success": "Nowy token wygenerowany — skopiuj URL teraz, jest widoczny raz.",
+        "revoke_success": "Token unieważniony — publiczny URL zwraca 404.",
+        "pull_note": "Model pull — cache & serve. Regeneracja (cron/ręczna) zapisuje plik do storage; publiczny endpoint tylko serwuje cache (bez sesji, tenant z tokenu → RLS). Crawler nie uruchomi generacji — brak DoS. Rate-limit per token, 304 na conditional GET."
+      },
+      "preview": {
+        "title": "Podgląd XML · {{count}} sample",
+        "well_formed": "well-formed",
+        "mode_aria": "Tryb podglądu",
+        "formatted": "Sformatowany",
+        "raw": "Raw",
+        "health_title": "Raport zdrowia",
+        "health_clean": "Brak uwag w próbce — wszystkie wymagane sloty rozwiązane.",
+        "health_more": "…i {{count}} kolejnych linii",
+        "projection_title": "Projekcja na pełny katalog (ostatni run)",
+        "projection_items": "w feedzie",
+        "projection_skipped": "pominięte",
+        "projection_warnings": "ostrzeżenia",
+        "projection_none": "Brak runu — projekcja pojawi się po pierwszej regeneracji.",
+        "ai_cta": "AI-sugestie mapowania",
+        "ai_soon": "Faza 2",
+        "well_formed_note": "Writer escapuje każdą wartość (lub pakuje w CDATA) — feed pozostaje well-formed XML niezależnie od treści katalogu. Podgląd i produkcja używają tego samego silnika."
       }
     },
     "shell": {
