@@ -214,6 +214,10 @@ services:
     App\Search\Contracts\CatalogQueryPort:
         alias: App\Search\Application\AgentCatalogQueryAdapter
 
+    # AGENT-P2-03 (#1960) — completeness aggregate seam (read-only).
+    App\Catalog\Contracts\Query\CompletenessReportPort:
+        alias: App\Catalog\Application\Query\SqlCompletenessReport
+
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
     # "is this {value: ...} payload valid against this Attribute?" without
@@ -679,4 +683,9 @@ when@test:
         # the compiled container would remove it; tests fetch it directly.
         App\Search\Contracts\CatalogQueryPort:
             alias: App\Search\Application\AgentCatalogQueryAdapter
+            public: true
+
+        # AGENT-P2-03 (#1960) — same story for the completeness report port.
+        App\Catalog\Contracts\Query\CompletenessReportPort:
+            alias: App\Catalog\Application\Query\SqlCompletenessReport
             public: true
