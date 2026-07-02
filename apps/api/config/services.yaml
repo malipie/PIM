@@ -66,6 +66,10 @@ parameters:
     pim.agent.llm.max_retries: 4
     pim.agent.llm.timeout_seconds: 120.0
 
+    # AGENT-P0-08 (#1951) — global agent feature flag; per-tenant
+    # availability additionally requires an active BYOK key.
+    pim.agent.enabled: '%env(bool:AGENT_ENABLED)%'
+
 services:
     _defaults:
         autowire: true
@@ -165,6 +169,11 @@ services:
         arguments:
             $defaultModel: '%pim.agent.model.default%'
             $schemaModel: '%pim.agent.model.schema%'
+
+    # AGENT-P0-08 (#1951) — global flag + per-tenant BYOK availability.
+    App\Agent\Application\AgentFeatureGuard:
+        arguments:
+            $agentEnabled: '%pim.agent.enabled%'
 
     # DAM MVP upload entry point (#438). The size caps are wired through
     # parameters so deployment-specific overrides land in env vars

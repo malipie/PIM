@@ -91,6 +91,11 @@ final class AnthropicClientFactoryTest extends TestCase
             {
                 return $this->key;
             }
+
+            public function hasActiveKey(Tenant $tenant): bool
+            {
+                return null !== $this->key && '' !== $this->key;
+            }
         };
     }
 }

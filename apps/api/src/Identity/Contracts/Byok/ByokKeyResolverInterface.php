@@ -21,4 +21,11 @@ interface ByokKeyResolverInterface
      * straight to the LLM client — never store, log, or echo it.
      */
     public function resolveKey(Tenant $tenant): ?string;
+
+    /**
+     * Cheap availability probe for guards (AGENT-P0-08): true when the
+     * tenant has an enabled BYOK key. Unlike {@see resolveKey()} it
+     * neither decrypts the key nor bumps `last_used_at`.
+     */
+    public function hasActiveKey(Tenant $tenant): bool;
 }

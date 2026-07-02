@@ -100,4 +100,11 @@ final readonly class ByokKeyManager implements ByokKeyResolverInterface
 
         return $plaintext;
     }
+
+    public function hasActiveKey(Tenant $tenant): bool
+    {
+        $config = $this->configs->findForTenant($tenant);
+
+        return null !== $config && $config->isEnabled();
+    }
 }
