@@ -99,8 +99,8 @@ final readonly class WebhookDeliverySubscriber
     /**
      * AGENT-P8-04 (#1986) — agent lifecycle webhooks. The events live in
      * Shared\Contracts (not the Agent module), so this CORE subscriber
-     * never references App\Agent (removability, ADR-0024); with the
-     * module removed nothing dispatches them.
+     * never references the Agent module (removability, ADR-0024);
+     * with the module removed nothing dispatches them.
      */
     #[AsMessageHandler]
     public function onAgentRunAwaitingApproval(AgentRunAwaitingApproval $event): void
