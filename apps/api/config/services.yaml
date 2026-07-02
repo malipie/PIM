@@ -170,6 +170,12 @@ services:
     App\Asset\Contracts\Service\AssetPreviewSigner:
         alias: App\Asset\Application\AssetPreviewUrlSigner
 
+    # AGENT-P2-01 (#1958) — grounding seam for cross-BC consumers (the
+    # agent's search_catalog tool): explicit alias so the Contracts
+    # interface resolves without importing Search internals.
+    App\Search\Contracts\CatalogQueryPort:
+        alias: App\Search\Application\AgentCatalogQueryAdapter
+
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
     # "is this {value: ...} payload valid against this Attribute?" without
@@ -628,4 +634,11 @@ when@test:
         # directly from the container.
         App\Catalog\Contracts\PendingChanges\PendingChangesPort:
             alias: App\Catalog\Application\PendingChanges\PendingChangesService
+            public: true
+
+        # AGENT-P2-01 (#1958) — same story: the grounding port's consumer
+        # chain (tool -> registry -> loop) is not merged in full yet, so
+        # the compiled container would remove it; tests fetch it directly.
+        App\Search\Contracts\CatalogQueryPort:
+            alias: App\Search\Application\AgentCatalogQueryAdapter
             public: true
