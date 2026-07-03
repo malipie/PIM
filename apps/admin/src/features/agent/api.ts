@@ -130,6 +130,30 @@ export function cancelAgentRun(id: string): Promise<AgentRunSummary> {
   });
 }
 
+export interface AgentPlanRow {
+  id: string;
+  change_type: 'value' | 'schema' | 'category';
+  status: string;
+  target_object_id: string | null;
+  attribute_code: string | null;
+  scope_locale: string | null;
+  scope_channel: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  provenance: string;
+}
+
+export function getAgentPlan(
+  id: string,
+  page = 1,
+  perPage = 50,
+): Promise<{ items: AgentPlanRow[]; total: number; page: number; per_page: number }> {
+  return jsonFetch(`/api/agent/runs/${id}/plan`, {
+    ...JSON_OPTS,
+    query: { page, per_page: perPage },
+  });
+}
+
 /** Statuses in which the loop is still working server-side (poll). */
 export function isRunBusy(status: AgentRunStatus): boolean {
   return status === 'planning' || status === 'committing';

@@ -3568,6 +3568,25 @@
       "cancelled": "Cancelled",
       "error": "Error",
       "rolled_back": "Rolled back"
+    },
+    "inbox": {
+      "title": "Agent approval inbox",
+      "subtitle": "Nothing reaches the catalog without your decision — review the diff and approve or reject.",
+      "loading": "Loading…",
+      "empty": "No proposals awaiting approval.",
+      "scope": "{{count}} change(s)",
+      "show_diff": "Show diff",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approved": "Approved — {{count}} change(s) committed.",
+      "rejected": "Rejected — catalog untouched.",
+      "diff_title": "Change plan",
+      "diff_scope": "{{shown}} of {{total}} plan rows · all-or-nothing",
+      "partial": "Partial (soon)",
+      "partial_tooltip": "Partial approval is a hook — MVP approves the whole plan.",
+      "schema_group": "group",
+      "schema_attribute": "attribute",
+      "categories": "categories"
     }
   }
 }

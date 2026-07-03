@@ -217,7 +217,7 @@ export function AgentChatSheet() {
                 })}
               </p>
               <Link
-                to="/agent/history"
+                to="/agent/inbox"
                 className="mt-1 inline-block underline"
                 onClick={() => setOpen(false)}
               >

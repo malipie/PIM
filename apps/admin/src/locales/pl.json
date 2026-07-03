@@ -3624,6 +3624,25 @@
       "cancelled": "Anulowany",
       "error": "Błąd",
       "rolled_back": "Cofnięty"
+    },
+    "inbox": {
+      "title": "Skrzynka akceptacji agenta",
+      "subtitle": "Nic nie trafia do katalogu bez Twojej decyzji — przejrzyj diff i zatwierdź albo odrzuć.",
+      "loading": "Wczytywanie…",
+      "empty": "Brak propozycji czekających na akceptację.",
+      "scope": "{{count}} zmian",
+      "show_diff": "Pokaż diff",
+      "approve": "Akceptuj",
+      "reject": "Odrzuć",
+      "approved": "Zatwierdzono — {{count}} zmian zapisano.",
+      "rejected": "Odrzucono — katalog bez zmian.",
+      "diff_title": "Plan zmian",
+      "diff_scope": "{{shown}} z {{total}} pozycji planu · all-or-nothing",
+      "partial": "Częściowo (wkrótce)",
+      "partial_tooltip": "Częściowa akceptacja w przygotowaniu — MVP zatwierdza cały plan.",
+      "schema_group": "grupa",
+      "schema_attribute": "atrybut",
+      "categories": "kategorie"
     }
   }
 }
