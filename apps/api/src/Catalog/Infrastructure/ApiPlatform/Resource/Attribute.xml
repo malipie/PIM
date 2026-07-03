@@ -17,6 +17,16 @@
             </values>
         </normalizationContext>
 
+        <!--
+            DP-04 (#2034): `?attributeGroup={uuid}` narrows /api/attributes to
+            attributes assigned to one group — junction (ADR-012) OR legacy
+            group_id FK (ADR-009). Tag'd `api_platform.filter` via _instanceof
+            in services.yaml; AP4 picks it up by FQCN here.
+        -->
+        <filters>
+            <filter>App\Catalog\Infrastructure\ApiPlatform\Filter\AttributeGroupFilter</filter>
+        </filters>
+
         <operations>
             <operation class="ApiPlatform\Metadata\GetCollection"
                        uriTemplate="/attributes{._format}"

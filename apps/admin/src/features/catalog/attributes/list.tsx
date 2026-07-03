@@ -3,10 +3,11 @@ import { useQueries } from '@tanstack/react-query';
 import { ChevronRight, Layers, Plus, Search, Shield, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -68,10 +69,17 @@ export function AttributesListPage() {
   const { t, i18n } = useTranslation();
   const [filter, setFilter] = useState<TypeFilter>('all');
   const [query, setQuery] = useState('');
+  // DP-04 (#2034) — group filter lives in the URL (`?group=<uuid>`) so a
+  // refresh / back-navigation keeps the narrowed view. Filtering happens
+  // server-side via `?attributeGroup=` (AttributeGroupFilter, BE).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const groupFilter = searchParams.get('group') ?? '';
 
   const { result, query: listQuery } = useList<AttributeRow>({
     resource: 'attributes',
     pagination: { mode: 'off' },
+    filters:
+      groupFilter !== '' ? [{ field: 'attributeGroup', operator: 'eq', value: groupFilter }] : [],
     // Always refetch on mount + window focus so the list never serves a
     // stale snapshot after the operator creates / edits an attribute on
     // a sibling page (new.tsx, show.tsx, values.tsx) and clicks back.
@@ -79,6 +87,21 @@ export function AttributesListPage() {
     // CRUD flows where one tab can change data the other tab caches.
     queryOptions: { refetchOnMount: 'always', refetchOnWindowFocus: true, staleTime: 0 },
   });
+
+  const { result: groupsResult } = useList<{
+    id: string;
+    code: string;
+    label: Record<string, string> | string | null;
+  }>({
+    resource: 'attribute_groups',
+    pagination: { mode: 'off' },
+    queryOptions: { staleTime: 60_000 },
+  });
+  const groupOptions = groupsResult.data.map((group) => ({
+    value: group.id,
+    label: resolveLabel(group.label, i18n.language),
+    description: group.code,
+  }));
 
   const attributes = result.data;
   const isLoading = listQuery.isLoading;
@@ -152,6 +175,31 @@ export function AttributesListPage() {
             })}
             className="flex-1 min-w-[180px] bg-transparent text-[13.5px] outline-none placeholder:text-muted-foreground"
           />
+          <div className="w-56">
+            <Combobox
+              options={groupOptions}
+              value={groupFilter === '' ? null : groupFilter}
+              onChange={(value) => {
+                setSearchParams(
+                  (prev) => {
+                    const next = new URLSearchParams(prev);
+                    if (value === null) {
+                      next.delete('group');
+                    } else {
+                      next.set('group', value);
+                    }
+                    return next;
+                  },
+                  { replace: true },
+                );
+              }}
+              placeholder={t('attributes.filter.group', { defaultValue: 'Grupa atrybutów' })}
+              searchPlaceholder={t('attributes.filter.group_search', {
+                defaultValue: 'Szukaj grupy…',
+              })}
+              emptyText={t('attributes.filter.group_empty', { defaultValue: 'Brak grup' })}
+            />
+          </div>
           <div className="flex flex-wrap items-center gap-1">
             {TYPE_FILTERS.map((opt) => (
               <button

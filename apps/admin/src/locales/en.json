@@ -1024,6 +1024,13 @@
     "back": "Back to attributes",
     "filter_type": "Type",
     "filter_all": "All",
+    "filter": {
+      "all": "all",
+      "system": "system",
+      "group": "Attribute group",
+      "group_search": "Search groups…",
+      "group_empty": "No groups"
+    },
     "empty": "No attributes for the current tenant.",
     "write_deferred_note": "Manual create / edit / drag-and-drop is deferred to the schema-add agent flow (Faza 2). The seeder ships the MVP attribute set.",
     "fields": {
