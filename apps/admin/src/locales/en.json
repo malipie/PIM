@@ -936,8 +936,6 @@
     "breadcrumb_aria": "Breadcrumb",
     "search_agent_placeholder": "Ask the agent or search...",
     "agent_mock_tooltip": "MOCK · Agent layer requires implementation (epic 0.7, Phase 2)",
-    "audit_log": "Audit log",
-    "audit_log_tooltip": "MOCK · Audit log requires BE endpoint",
     "history": "History",
     "agent_pill_tooltip": "⌘K navigation works; the agent section is a MOCK (epic 0.7, Phase 2)"
   },
@@ -946,79 +944,79 @@
     "requires_implementation": "MOCK · Requires implementation"
   },
   "dashboard": {
-    "hero": {
-      "badge": "Agent · Claude Sonnet 4.5",
-      "title": "Ask the agent or search the catalog",
-      "subtitle": "The dashboard shows PIM traffic, integration status and agent suggestions. Every block is a mock; backend wiring lands in later tickets.",
-      "cta": "Ask the agent",
-      "cta_disabled_hint": "Mock — wired in Phase 2 (agent layer)"
+    "greeting": {
+      "hello": "Good morning, {{name}} 👋",
+      "title_main": "Catalog command center.",
+      "title_accent": "What do you want to change today?"
+    },
+    "agent": {
+      "label": "Agent · Claude Sonnet 4.5",
+      "prompt_example": "create a Google Shopping XML feed from the Pneumatics category",
+      "prompt_aria": "Agent command",
+      "press": "press",
+      "ask": "Ask the agent",
+      "accepted_this_week": "{{count}} accepted changes this week",
+      "actions": {
+        "add_attribute": "Add attribute",
+        "seo_descriptions": "Generate SEO descriptions",
+        "bulk_categories": "Bulk category update",
+        "translations": "PL→DE translations",
+        "feed_export": "Export XML feed"
+      }
     },
     "kpi": {
-      "products": "Products",
-      "attributes": "Attributes",
-      "families": "Attribute groups",
-      "categories": "Categories",
-      "enabled_share": "Enabled products",
-      "completeness_avg": "Average completeness",
-      "last_sync_minutes": "Last sync",
-      "open_alerts": "Open alerts",
-      "settings_trigger": "Pick KPIs",
-      "settings_title": "Pick KPIs",
-      "settings_description": "Pick up to {{max}} tiles for the dashboard. Selection persists in the browser.",
-      "settings_count": "{{count}} of {{max}} selected",
-      "settings_mock_tooltip": "Selection persists in localStorage, MOCK"
+      "products": {
+        "label": "Products",
+        "hint": "total in catalog"
+      },
+      "publish_ready": {
+        "label": "Ready to publish",
+        "hint": "≥ 80% completeness"
+      },
+      "avg_completeness": {
+        "label": "Average completeness",
+        "hint": "all channels"
+      },
+      "open_alerts": {
+        "label": "Open alerts",
+        "hint": "needs intervention"
+      },
+      "period_30d": "30 days",
+      "no_trend": "24h · no trend"
+    },
+    "health": {
+      "eyebrow": "Data health",
+      "title": "Catalog completeness",
+      "weekly_trend": "+ {{count}} pts / wk",
+      "ring_caption": "ready to publish",
+      "ring_aria": "{{percent}}% of products ready to publish",
+      "channels_header": "Completeness by channel",
+      "channels_sort": "sort: worst first"
     },
     "activity": {
-      "title": "Activity",
-      "legend_added": "added",
-      "legend_modified": "modified",
-      "range_aria": "Activity range",
+      "eyebrow": "Catalog activity",
+      "title": "Team work pace",
       "range_7d": "7 days",
       "range_30d": "30 days",
-      "range_90d": "90 days"
+      "range_90d": "90 days",
+      "legend_added": "Added",
+      "legend_modified": "Modified",
+      "avg_per_day": "avg {{count}} changes / day",
+      "chart_aria": "Daily catalog changes chart — added and modified products",
+      "most_edited": "Most edited",
+      "full_list": "Full list",
+      "edits_suffix": "edits"
     },
-    "top_edited": {
-      "title": "Most edited",
-      "subtitle": "last 30 days"
-    },
-    "syncs": {
-      "title": "Sync status",
-      "force": "Force",
-      "force_disabled": "Mock — needs POST /api/integrations/{id}/sync"
-    },
-    "mock_banner": {
-      "title": "Some widgets show demonstration data",
-      "body": "KPI counts and the “Completeness” (overall) tile are live from the API. The other blocks — activity, sync status, alerts, agent activity, backup, channel distribution and the edited ranking — are mock (features in progress)."
-    },
-    "completeness": {
-      "title": "Completeness",
-      "subtitle": "overall and per channel — publish readiness",
-      "overall": "Overall",
-      "publish_ready": "{{count}} of {{total}} ≥ {{threshold}}%",
-      "channel_mock_tooltip": "MOCK — per-channel completeness needs channel↔type mapping (epic 0.6)"
-    },
-    "agent_activity": {
-      "title": "Recent agent activity",
-      "subtitle": "last 6 audit entries",
-      "filter": "Filter"
-    },
-    "alerts": {
-      "title": "Alerts",
-      "subtitle": "last 5",
-      "configure": "Configure alerts"
-    },
-    "channel_dist": {
-      "title": "Channel distribution",
-      "unit": "products",
-      "export": "Export report"
-    },
-    "backup": {
-      "title": "Database backup",
-      "healthy": "Healthy",
-      "rpo": "RPO 15 min",
-      "last_label": "Last",
-      "size_label": "Size",
-      "heatmap_label": "Last 14 days"
+    "action_center": {
+      "eyebrow": "Needs attention",
+      "title": "Action center",
+      "cases_count": "{{count}} issues",
+      "critical_count": "{{count}} critical",
+      "warning_count": "{{count}} warnings",
+      "show_all": "Show all ( {{count}} )",
+      "mark_read": "mark as read",
+      "severity_critical": "Critical",
+      "severity_warning": "Warning"
     }
   },
   "attributes": {
