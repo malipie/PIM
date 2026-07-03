@@ -14,6 +14,8 @@ interface RefreshTokenRepositoryInterface
 
     public function revokeFamily(\Symfony\Component\Uid\Uuid $familyId, DateTimeImmutable $when): void;
 
+    public function revokeAllForUser(\Symfony\Component\Uid\Uuid $userId, DateTimeImmutable $when): void;
+
     public function purgeExpired(DateTimeImmutable $cutoff): int;
 
     public function save(\App\Identity\Domain\Entity\RefreshToken $entity): void;

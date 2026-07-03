@@ -1,5 +1,5 @@
 import { useGetIdentity, useList } from '@refinedev/core';
-import { ArrowLeft, ArrowRightLeft, Check, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRightLeft, Check, KeyRound, ShieldAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import type { RoleListItem } from '../roles/types';
 import { EffectivePermissionsPanel } from './EffectivePermissionsPanel';
 import { SecurityBadgeStack } from './SecurityBadgeStack';
+import { SetPasswordModal } from './SetPasswordModal';
 import { StatusBadge } from './StatusBadge';
 import type { UserListItem } from './types';
 import { UserAvatar } from './UserAvatar';
@@ -82,6 +83,8 @@ export function UserDetailPage() {
     channel: string[];
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // DP-02 (#2032) — admin set-password modal.
+  const [setPasswordOpen, setSetPasswordOpen] = useState(false);
 
   const { result: rolesResult } = useList<RoleListItem>({
     resource: 'roles',
@@ -517,6 +520,45 @@ export function UserDetailPage() {
             tone="danger"
           >
             <div className="space-y-2">
+              {/* DP-02 (#2032) — admin sets a new password from the panel.
+                Self-target is blocked (backend answers 409) — the operator
+                changes their own password in Settings → Security. */}
+              <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 p-3">
+                <div className="flex-1">
+                  <div className="text-[12.5px] font-medium text-zinc-900">
+                    {t('settings.users.set_password.row_title', {
+                      defaultValue: 'Ustaw nowe hasło',
+                    })}
+                  </div>
+                  <div className="text-[11px] text-zinc-500">
+                    {t('settings.users.set_password.row_description', {
+                      defaultValue:
+                        'Dla kont bez działającej skrzynki (email pełni rolę loginu) — reset mailowy ich nie dosięgnie. Sesje użytkownika zostaną unieważnione.',
+                    })}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={identity?.id === user.id}
+                  title={
+                    identity?.id === user.id
+                      ? t('settings.users.set_password.self_hint', {
+                          defaultValue: 'Własne hasło zmienisz w Ustawienia → Bezpieczeństwo.',
+                        })
+                      : undefined
+                  }
+                  onClick={() => setSetPasswordOpen(true)}
+                  className={cn(
+                    'inline-flex h-9 items-center gap-1.5 rounded-xl border border-zinc-200 px-3 text-[12.5px] font-medium transition',
+                    identity?.id === user.id
+                      ? 'cursor-not-allowed opacity-50'
+                      : 'text-zinc-700 hover:bg-zinc-50',
+                  )}
+                >
+                  <KeyRound className="size-3.5" aria-hidden />
+                  {t('settings.users.set_password.cta', { defaultValue: 'Ustaw hasło' })}
+                </button>
+              </div>
               <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 p-3">
                 <div className="flex-1">
                   <div className="text-[12.5px] font-medium text-zinc-900">
@@ -654,6 +696,8 @@ export function UserDetailPage() {
           </div>
         </div>
       </div>
+
+      <SetPasswordModal user={user} open={setPasswordOpen} onOpenChange={setSetPasswordOpen} />
     </div>
   );
 }
