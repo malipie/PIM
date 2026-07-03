@@ -778,6 +778,12 @@ parameters:
         # status/enabled write — per-chunk category resolve + replace/append.
         App\Import\Application\Handler\ImportRunHandler:
             - App\Catalog\Application\BatchValueWriter
+            # DP-07 (#2037, ADR-0025) — cross-field rules: the prime pass loads
+            # rule-referenced attributes so compare-against-existing works when
+            # the counterpart column is absent from the mapping. Same burndown
+            # bucket as BatchValueWriter (#1466).
+            - App\Catalog\Application\CrossFieldRulesValidator
+            - App\Catalog\Domain\Repository\AttributeRepositoryInterface
             # IMP2-2.6 (#1482) bulk path — suppress the per-flush sync rebuild
             # via BulkContext and dispatch the async attributes_indexed rebuild;
             # part of the #1466 Import → Catalog_Internals burndown.

@@ -55,6 +55,12 @@
                 <option name="default">{}</option>
             </options>
         </field>
+        <field name="validationRules" type="json" column="validation_rules">
+            <options>
+                <option name="jsonb">true</option>
+                <option name="default">[]</option>
+            </options>
+        </field>
         <field name="hierarchical" type="boolean">
             <options>
                 <option name="default">false</option>

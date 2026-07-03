@@ -39,6 +39,7 @@ final readonly class ObjectAttributesUpserter
         private ObjectValueRepositoryInterface $values,
         private ValueWriteCore $core,
         private AttributePermissionReader $attributePermissions,
+        private CrossFieldRulesValidator $crossFieldRules,
     ) {
     }
 
@@ -64,6 +65,13 @@ final readonly class ObjectAttributesUpserter
             // listener has already run by the time this service is called.
             return;
         }
+
+        // DP-07 (#2037, ADR-0025) — three phases: (1) the existing per-attribute
+        // validation collects prepared writes instead of saving, (2) the
+        // cross-field gate throws 422 BEFORE anything is saved, (3) persistence.
+        // Guarantees a cross-field violation never leaves a half-written object.
+        /** @var list<array{attribute: Attribute, envelope: array<string, mixed>, locale: ?string, channelId: ?Uuid}> $prepared */
+        $prepared = [];
 
         foreach ($payload as $code => $rawValue) {
             if ('' === $code) {
@@ -118,9 +126,30 @@ final readonly class ObjectAttributesUpserter
                 ));
             }
 
-            $existing = $this->values->findOneByScope($object, $attribute, $targetChannel, $targetLocale);
+            $prepared[] = [
+                'attribute' => $attribute,
+                'envelope' => $jsonbValue,
+                'locale' => $targetLocale,
+                'channelId' => $targetChannel,
+            ];
+        }
+
+        // Phase 2 — cross-field gate (ADR-0025): existing global rows
+        // overlaid with the prepared writes; a violation aborts the whole
+        // payload with 422 before the first save.
+        $violations = $this->crossFieldRules->validateForUpsert($object, $prepared);
+        if ([] !== $violations) {
+            throw new UnprocessableEntityHttpException(implode(
+                '; ',
+                array_map(static fn ($violation): string => $violation->message, $violations),
+            ));
+        }
+
+        // Phase 3 — persistence (unchanged semantics of the pre-DP-07 loop).
+        foreach ($prepared as $write) {
+            $existing = $this->values->findOneByScope($object, $write['attribute'], $write['channelId'], $write['locale']);
             if ($existing instanceof ObjectValue) {
-                $existing->updateValue($jsonbValue);
+                $existing->updateValue($write['envelope']);
                 $existing->changeProvenance($provenance);
                 $this->values->save($existing);
 
@@ -129,11 +158,11 @@ final readonly class ObjectAttributesUpserter
 
             $value = new ObjectValue(
                 object: $object,
-                attribute: $attribute,
-                value: $jsonbValue,
+                attribute: $write['attribute'],
+                value: $write['envelope'],
                 provenance: $provenance,
-                channelId: $targetChannel,
-                locale: $targetLocale,
+                channelId: $write['channelId'],
+                locale: $write['locale'],
             );
             $this->values->save($value);
         }

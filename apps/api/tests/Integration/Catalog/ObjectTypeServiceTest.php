@@ -258,6 +258,7 @@ final class ObjectTypeServiceTest extends KernelTestCase
         return new ObjectTypeService(
             $this->em(),
             self::getContainer()->get(ObjectTypeAttributeRepositoryInterface::class),
+            self::getContainer()->get(\App\Catalog\Domain\Repository\AttributeRepositoryInterface::class),
             self::getContainer()->get(\Doctrine\DBAL\Connection::class),
             $flag,
         );

@@ -152,6 +152,8 @@ final class ImportRunHandler extends AbstractBatchHandler
         private readonly ImportUndoLogger $undoLogger,
         private readonly ImportColumnGrammar $columnGrammar,
         private readonly \App\Catalog\Application\BatchValueWriter $valueWriter,
+        private readonly \App\Catalog\Application\CrossFieldRulesValidator $crossFieldRules,
+        private readonly \App\Catalog\Domain\Repository\AttributeRepositoryInterface $attributeRepository,
         private readonly \App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface $catalogObjects,
         private readonly \App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface $objectCategories,
         private readonly \App\Asset\Domain\Repository\AssetRepositoryInterface $assets,
@@ -282,7 +284,11 @@ final class ImportRunHandler extends AbstractBatchHandler
         $sourcePath = null;
         try {
             $columnMapping = $this->resolveColumnMapping($session);
-            $attributesByCode = $this->validator->loadAttributesByCode($tenant, $columnMapping);
+            $attributesByCode = $this->withCrossFieldRuleAttributes(
+                $this->validator->loadAttributesByCode($tenant, $columnMapping),
+                $session,
+                $tenant,
+            );
             $sourcePath = $this->stageSourceFile($session, $tenant);
 
             $skuSeenInFile = [];
@@ -347,7 +353,11 @@ final class ImportRunHandler extends AbstractBatchHandler
                     return;
                 }
 
-                $attributesByCode = $this->validator->loadAttributesByCode($tenant, $columnMapping);
+                $attributesByCode = $this->withCrossFieldRuleAttributes(
+                    $this->validator->loadAttributesByCode($tenant, $columnMapping),
+                    $session,
+                    $tenant,
+                );
                 // Throttled: at most one snapshot per ~1% of the file (force=false).
                 $this->publishProgress($session, $processed);
 
@@ -1265,6 +1275,43 @@ final class ImportRunHandler extends AbstractBatchHandler
      * Structural imports (attributes / attribute groups) carry no target and
      * never reach this handler, so a null here is a programming error.
      */
+    /**
+     * DP-07 (#2037, ADR-0025) — extend the primed attribute set with codes
+     * referenced by the target ObjectType's cross-field rules, so
+     * BatchValueWriter::primeChunk() loads existing counterpart values even
+     * when the rule's other side is absent from the import mapping. A code
+     * that stays unmapped only UNDER-enforces (compare skips, condition
+     * false) — never a false positive.
+     *
+     * @param array<string, Attribute> $attributesByCode
+     *
+     * @return array<string, Attribute>
+     */
+    private function withCrossFieldRuleAttributes(
+        array $attributesByCode,
+        ImportSession $session,
+        Tenant $tenant,
+    ): array {
+        $target = $session->getTargetObjectType();
+        if (!$target instanceof \App\Catalog\Domain\Entity\ObjectType) {
+            return $attributesByCode;
+        }
+
+        foreach ($this->crossFieldRules->rulesFor($target) as $rule) {
+            foreach ($rule->referencedCodes() as $code) {
+                if (isset($attributesByCode[$code])) {
+                    continue;
+                }
+                $attribute = $this->attributeRepository->findByCode($code, $tenant);
+                if ($attribute instanceof Attribute) {
+                    $attributesByCode[$code] = $attribute;
+                }
+            }
+        }
+
+        return $attributesByCode;
+    }
+
     private function requireTargetObjectType(ImportSession $session): \App\Catalog\Domain\Entity\ObjectType
     {
         $target = $session->getTargetObjectType();

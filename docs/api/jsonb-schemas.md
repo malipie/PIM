@@ -133,6 +133,33 @@ Schema unionowa — pole `validation_rules` jest interpretowane przez validator 
 
 ---
 
+## 2a. `object_types.validation_rules` — reguły cross-field (DP-07 #2037, ADR-0025)
+
+**Tabela**: `object_types.validation_rules JSONB DEFAULT '[]' NOT NULL`
+**Writer**: `ObjectTypeService::update()` (strict parse przez [`CrossFieldRules`](apps/api/src/Catalog/Domain/Rule/CrossFieldRules.php) — JSONB nigdy nie niesie śmieci)
+**Reader**: [`CrossFieldRulesValidator`](apps/api/src/Catalog/Application/CrossFieldRulesValidator.php) — egzekwowanie w OBU ścieżkach zapisu wartości (`ObjectAttributesUpserter` → 422 przed zapisem; `BatchValueWriter` → issue `kind: 'cross_field'`).
+
+### Shape
+
+Lista reguł dwóch rodzajów:
+
+```json
+[
+  { "type": "compare", "left": "weight_net", "op": "lte", "right": "weight_gross" },
+  { "type": "require_when",
+    "if": { "field": "expandable_storage", "operator": "equals", "value": true },
+    "then": { "required": "max_sd_card_gb" } }
+]
+```
+
+- `compare.op` ∈ `lt | lte | gt | gte | eq | neq`; `left`/`right` to kody atrybutów numerycznych
+  (`number`/`metric`/`price`) **tego samego typu** (guard przy PATCH; bez konwersji jednostek/walut).
+- `require_when.if` = kształt `VisibleWhenRule` (ten sam co `attribute_group_attributes.visible_when`).
+- Ewaluacja wyłącznie na global scope (locale=null, channel=null); brakująca/pusta strona `compare`
+  → SKIP; `require_when` strzela gdy warunek prawdziwy i target pusty. Pełna tabela semantyki: ADR-0025.
+
+---
+
 ## 3. `completeness` — denormalizowana kompletność
 
 **Tabela**: `objects.completeness JSONB DEFAULT '{}'` + redundant `objects.completeness_pct SMALLINT DEFAULT 0`

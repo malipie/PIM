@@ -42,6 +42,10 @@ import { LocaleTabsField } from '@/components/modeling/locale-tabs-field';
 import { ObjectTypeIcon } from '@/components/modeling/object-type-icon';
 import { SettingToggleRow } from '@/components/modeling/setting-toggle-row';
 import { StatBox } from '@/components/modeling/stat-box';
+import {
+  type CrossFieldRuleShape,
+  ValidationRulesCard,
+} from '@/components/modeling/validation-rules-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { resolveLabel } from '@/features/catalog/attributes/list';
@@ -66,6 +70,7 @@ interface ObjectTypeDetail {
   abstract?: boolean;
   allowedParentTypeIds?: string[];
   completenessRules?: Record<string, unknown> | null;
+  validationRules?: CrossFieldRuleShape[] | null;
   exposeToMainMenu?: boolean;
   isCategorizable?: boolean;
   hasMultimedia?: boolean;
@@ -881,6 +886,15 @@ export function ObjectTypeShowPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* DP-07 (#2037, ADR-0025) — cross-field rules. Deliberately editable
+        on built-in ObjectTypes too: the rules constrain VALUES, not the
+        entity model (backend guard mirrors this). */}
+      <ValidationRulesCard
+        key={`validation-rules-${objectType.schemaVersion ?? 0}`}
+        rules={objectType.validationRules ?? []}
+        onSave={(rules) => handlePatch({ validationRules: rules })}
+      />
 
       <Card>
         <CardContent className="space-y-3 p-6">

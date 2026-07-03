@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application;
 
+use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectTypeAttribute;
@@ -12,7 +13,10 @@ use App\Catalog\Domain\Exception\DisabledFeatureException;
 use App\Catalog\Domain\Exception\ObjectTypeCodeConflictException;
 use App\Catalog\Domain\Exception\ObjectTypeHasInstancesException;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeAttributeRepositoryInterface;
+use App\Catalog\Domain\Rule\CompareRule;
+use App\Catalog\Domain\Rule\CrossFieldRules;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -48,6 +52,7 @@ final readonly class ObjectTypeService
     public function __construct(
         private EntityManagerInterface $em,
         private ObjectTypeAttributeRepositoryInterface $junctions,
+        private AttributeRepositoryInterface $attributes,
         private Connection $connection,
         private bool $enableCustomObjectTypes,
     ) {
@@ -112,9 +117,10 @@ final readonly class ObjectTypeService
      * (including empty list / map) to overwrite. The signature uses named
      * arguments so callers don't need to position-track the optionals.
      *
-     * @param array<string, string>|null $label
-     * @param list<string>|null          $allowedParentTypeIds
-     * @param array<string, mixed>|null  $completenessRules
+     * @param array<string, string>|null      $label
+     * @param list<string>|null               $allowedParentTypeIds
+     * @param array<string, mixed>|null       $completenessRules
+     * @param list<array<string, mixed>>|null $validationRules      DP-07 (#2037, ADR-0025) cross-field rules
      */
     public function update(
         ObjectType $objectType,
@@ -126,6 +132,7 @@ final readonly class ObjectTypeService
         ?bool $abstract = null,
         ?array $allowedParentTypeIds = null,
         ?array $completenessRules = null,
+        ?array $validationRules = null,
         ?bool $exposeToMainMenu = null,
         ?bool $isCategorizable = null,
         ?bool $hasMultimedia = null,
@@ -175,6 +182,17 @@ final readonly class ObjectTypeService
             }
             $objectType->updateCompletenessRules($completenessRules);
         }
+        if (null !== $validationRules) {
+            // DP-07 (#2037, ADR-0025) — deliberately editable on built-in
+            // ObjectTypes too: cross-field rules constrain VALUES, not the
+            // entity model, and the primary use case (weight_net <=
+            // weight_gross) lives on the built-in Product. Shape parsed
+            // strictly; referenced codes must exist tenant-wide; compare
+            // sides must be numeric attributes of the same type.
+            $parsed = CrossFieldRules::fromArray($validationRules);
+            $this->assertRuleReferences($objectType, $parsed);
+            $objectType->updateValidationRules(CrossFieldRules::toStoredArray($parsed));
+        }
         if (null !== $exposeToMainMenu) {
             // VIEW-08 (#427): Asset has its own /assets DAM page. Exposing it
             // as a generic menu candidate would route to /objects/asset which
@@ -223,6 +241,47 @@ final readonly class ObjectTypeService
         $this->em->flush();
 
         return $objectType;
+    }
+
+    /**
+     * DP-07 (#2037) — every code a rule references must exist tenant-wide
+     * (deliberately NOT the effective schema: group membership drifts
+     * independently of rules and a detach must not silently break them),
+     * and compare sides must be numeric attributes of the SAME type
+     * (no price-vs-metric comparisons; unit conversion is out of scope).
+     *
+     * @param list<\App\Catalog\Domain\Rule\CrossFieldRule> $rules
+     */
+    private function assertRuleReferences(ObjectType $objectType, array $rules): void
+    {
+        $tenant = $objectType->getTenant();
+        if (null === $tenant) {
+            throw new LogicException('ObjectType has no tenant — cannot validate rule references.');
+        }
+
+        $numericTypes = [AttributeType::Number, AttributeType::Metric, AttributeType::Price];
+
+        foreach ($rules as $rule) {
+            $resolved = [];
+            foreach ($rule->referencedCodes() as $code) {
+                $attribute = $this->attributes->findByCode($code, $tenant);
+                if (!$attribute instanceof Attribute) {
+                    throw new LogicException(\sprintf('validation_rules references unknown attribute "%s".', $code));
+                }
+                $resolved[$code] = $attribute;
+            }
+
+            if ($rule instanceof CompareRule) {
+                $left = $resolved[$rule->left];
+                $right = $resolved[$rule->right];
+                if (!\in_array($left->getType(), $numericTypes, true)) {
+                    throw new LogicException(\sprintf('compare.left "%s" must be a numeric attribute (number/metric/price), got "%s".', $rule->left, $left->getType()->value));
+                }
+                if ($left->getType() !== $right->getType()) {
+                    throw new LogicException(\sprintf('compare sides must share one attribute type — "%s" is %s, "%s" is %s.', $rule->left, $left->getType()->value, $rule->right, $right->getType()->value));
+                }
+            }
+        }
     }
 
     public function delete(ObjectType $objectType): void
