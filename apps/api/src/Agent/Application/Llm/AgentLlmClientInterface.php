@@ -14,8 +14,10 @@ use App\Shared\Domain\Tenant;
 interface AgentLlmClientInterface
 {
     /**
-     * @param list<array<string, mixed>> $messages Anthropic message shapes (camelCase SDK keys)
-     * @param list<array<string, mixed>> $tools    tool definitions from the registry
+     * @param list<array<string, mixed>> $messages      Anthropic message shapes (camelCase SDK keys)
+     * @param list<array<string, mixed>> $tools         tool definitions from the registry
+     * @param bool                       $promptCaching when true, mark the stable system+tools prefix
+     *                                                  with an ephemeral cache breakpoint
      */
-    public function create(Tenant $tenant, string $model, string $system, array $messages, array $tools): AgentLlmResponse;
+    public function create(Tenant $tenant, string $model, string $system, array $messages, array $tools, bool $promptCaching = true): AgentLlmResponse;
 }

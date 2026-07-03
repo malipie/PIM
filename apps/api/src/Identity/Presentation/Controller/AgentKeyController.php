@@ -27,6 +27,17 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  */
 final readonly class AgentKeyController
 {
+    /**
+     * Selectable model overrides exposed in Settings → AI. Absent /
+     * null means the platform default (Sonnet for read/write, Opus for
+     * schema-ops). Haiku is the cheapest — the testing pick.
+     */
+    private const array SELECTABLE_MODELS = [
+        'claude-haiku-4-5',
+        'claude-sonnet-4-6',
+        'claude-opus-4-8',
+    ];
+
     public function __construct(
         private ByokKeyManager $keys,
         private TenantAgentConfigRepositoryInterface $configs,
@@ -52,6 +63,9 @@ final readonly class AgentKeyController
             'disabled_at' => $config?->getDisabledAt()?->format(DateTimeInterface::ATOM),
             'last_used_at' => $config?->getLastUsedAt()?->format(DateTimeInterface::ATOM),
             'proactive_scan_enabled' => $config?->isProactiveScanEnabled() ?? false,
+            'model' => $config?->getModel(),
+            'prompt_caching_enabled' => $config?->isPromptCachingEnabled() ?? true,
+            'selectable_models' => self::SELECTABLE_MODELS,
         ]);
     }
 
@@ -82,7 +96,10 @@ final readonly class AgentKeyController
     }
 
     /**
-     * AGENT-P8-01 (#1983) — the proactive-scan opt-in (per tenant).
+     * Partial update of the per-tenant agent settings — any subset of
+     * `proactive_scan_enabled` (P8-01), `model`, and
+     * `prompt_caching_enabled`. Each provided field is validated; the
+     * rest are left untouched. All require a configured key.
      */
     #[Route('/api/settings/agent-key', name: 'pim_agent_key_patch', methods: ['PATCH'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
@@ -93,14 +110,40 @@ final readonly class AgentKeyController
 
         /** @var array<string, mixed> $body */
         $body = json_decode($request->getContent(), true) ?? [];
-        $proactive = $body['proactive_scan_enabled'] ?? null;
-        if (!\is_bool($proactive)) {
-            throw new BadRequestHttpException('proactive_scan_enabled must be a boolean.');
+        $response = [];
+
+        if (\array_key_exists('proactive_scan_enabled', $body)) {
+            $proactive = $body['proactive_scan_enabled'];
+            if (!\is_bool($proactive)) {
+                throw new BadRequestHttpException('proactive_scan_enabled must be a boolean.');
+            }
+            $this->keys->setProactiveScan($tenant, $proactive);
+            $response['proactive_scan_enabled'] = $proactive;
         }
 
-        $this->keys->setProactiveScan($tenant, $proactive);
+        if (\array_key_exists('model', $body)) {
+            $model = $body['model'];
+            if (null !== $model && !\in_array($model, self::SELECTABLE_MODELS, true)) {
+                throw new BadRequestHttpException(\sprintf('model must be null (auto) or one of: %s.', implode(', ', self::SELECTABLE_MODELS)));
+            }
+            $this->keys->setModel($tenant, $model);
+            $response['model'] = $model;
+        }
 
-        return new JsonResponse(['proactive_scan_enabled' => $proactive]);
+        if (\array_key_exists('prompt_caching_enabled', $body)) {
+            $caching = $body['prompt_caching_enabled'];
+            if (!\is_bool($caching)) {
+                throw new BadRequestHttpException('prompt_caching_enabled must be a boolean.');
+            }
+            $this->keys->setPromptCaching($tenant, $caching);
+            $response['prompt_caching_enabled'] = $caching;
+        }
+
+        if ([] === $response) {
+            throw new BadRequestHttpException('No recognized settings in the request body.');
+        }
+
+        return new JsonResponse($response);
     }
 
     #[Route('/api/settings/agent-key', name: 'pim_agent_key_disable', methods: ['DELETE'])]

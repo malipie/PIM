@@ -32,6 +32,12 @@
                 <option name="default">false</option>
             </options>
         </field>
+        <field name="model" type="string" length="64" column="model" nullable="true"/>
+        <field name="promptCachingEnabled" type="boolean" column="prompt_caching_enabled">
+            <options>
+                <option name="default">true</option>
+            </options>
+        </field>
 
         <field name="createdAt" type="datetime_immutable" column="created_at"/>
         <field name="updatedAt" type="datetime_immutable" column="updated_at"/>

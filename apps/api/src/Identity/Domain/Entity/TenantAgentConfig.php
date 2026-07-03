@@ -62,6 +62,23 @@ class TenantAgentConfig implements TenantScoped
      */
     private bool $proactiveScanEnabled = false;
 
+    /**
+     * Per-tenant model override. `null` = the platform default (Sonnet
+     * for read/write/action, Opus for schema-ops — resolved by
+     * AgentModelSelector). A concrete id (`claude-haiku-4-5`,
+     * `claude-sonnet-4-6`, `claude-opus-4-8`) pins every tool kind to
+     * that model — e.g. Haiku for cheap testing.
+     */
+    private ?string $model = null;
+
+    /**
+     * Prompt caching (Anthropic ephemeral cache) toggle. On by default:
+     * the agent's stable prefix (system prompt + tool definitions) is a
+     * textbook caching win, and on BYOK the saving accrues to the
+     * tenant. Off only makes sense for very sparse, single-shot usage.
+     */
+    private bool $promptCachingEnabled = true;
+
     private DateTimeImmutable $createdAt;
 
     private DateTimeImmutable $updatedAt;
@@ -176,6 +193,28 @@ class TenantAgentConfig implements TenantScoped
     {
         $this->proactiveScanEnabled = $enabled;
         $this->updatedAt = new DateTimeImmutable();
+    }
+
+    public function getModel(): ?string
+    {
+        return $this->model;
+    }
+
+    public function setModel(?string $model): void
+    {
+        $this->model = ('' === $model) ? null : $model;
+        $this->touch();
+    }
+
+    public function isPromptCachingEnabled(): bool
+    {
+        return $this->promptCachingEnabled;
+    }
+
+    public function setPromptCachingEnabled(bool $enabled): void
+    {
+        $this->promptCachingEnabled = $enabled;
+        $this->touch();
     }
 
     public function getLastUsedAt(): ?DateTimeImmutable

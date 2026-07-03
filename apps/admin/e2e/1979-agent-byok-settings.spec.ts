@@ -22,12 +22,32 @@ test('BYOK settings set, rotate-visible-prefix and disable on the live API', asy
     [],
   );
 
+  // Right-column shortcuts into inbox / run history are always present
+  // (the routes have no sidebar entry — this is the only way in).
+  await expect(page.getByTestId('agent-shortcut-inbox')).toHaveAttribute('href', '/agent/inbox');
+  await expect(page.getByTestId('agent-shortcut-history')).toHaveAttribute(
+    'href',
+    '/agent/history',
+  );
+
   // Set a syntactically valid test key on the live endpoint.
   await page.getByTestId('agent-key-input').fill('sk-ant-api03-playwright-e2e-test-key');
   await page.getByTestId('agent-key-save').click();
   await expect(page.getByTestId('agent-key-state')).toContainText(/Aktywny|Active/);
   await expect(page.getByTestId('agent-key-prefix')).toBeVisible();
   await expect(page.getByTestId('agent-key-prefix')).not.toContainText('playwright-e2e-test-key');
+
+  // With a key configured, the model + caching card appears. Pin Haiku
+  // (the cheap testing pick) and toggle caching off — both hit the live
+  // PATCH endpoint.
+  await expect(page.getByTestId('agent-model')).toBeVisible();
+  await page.getByTestId('agent-model-select').selectOption('claude-haiku-4-5');
+  await expect(page.getByTestId('agent-model-select')).toHaveValue('claude-haiku-4-5');
+
+  const caching = page.getByTestId('agent-caching-toggle');
+  await expect(caching).toBeChecked();
+  await caching.uncheck();
+  await expect(caching).not.toBeChecked();
 
   // Disable: soft-off for the tenant.
   await page.getByTestId('agent-key-disable').click();

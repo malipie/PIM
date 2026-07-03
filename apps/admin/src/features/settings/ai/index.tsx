@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
+import { Cpu, KeyRound, Loader2, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import { getAgentCost } from '@/features/agent/api';
 import { httpErrorDetail, jsonFetch } from '@/lib/http';
+import { AgentShortcuts } from './agent-shortcuts';
 
 interface AgentKeyStatus {
   agent_feature_enabled: boolean;
@@ -15,6 +16,9 @@ interface AgentKeyStatus {
   enabled_at: string | null;
   disabled_at: string | null;
   last_used_at: string | null;
+  model: string | null;
+  prompt_caching_enabled: boolean;
+  selectable_models: string[];
 }
 
 const JSON_OPTS = { contentType: 'application/json', accept: 'application/json' } as const;
@@ -23,11 +27,26 @@ const AGENT_KEY_QUERY_KEY = ['settings', 'agent-key'] as const;
 const AGENT_COST_QUERY_KEY = ['settings', 'agent-cost'] as const;
 
 /**
+ * Friendly labels for the selectable model overrides. Kept in sync with
+ * AgentKeyController::SELECTABLE_MODELS; the API is the source of truth
+ * for which ids are offered, this map only prettifies known ones.
+ */
+const MODEL_LABELS: Record<string, string> = {
+  'claude-haiku-4-5': 'Haiku 4.5 — najtańszy',
+  'claude-sonnet-4-6': 'Sonnet 4.6 — zbalansowany',
+  'claude-opus-4-8': 'Opus 4.8 — najsilniejszy',
+};
+
+/**
  * AGENT-P6-06 (#1979) — BYOK settings (Piotr, PRD §4.2): set/rotate the
  * tenant's Anthropic key (plaintext never comes back - only the display
  * prefix + timestamps), soft-disable as the per-tenant agent-off
  * toggle, and the §10.3 transparency copy explaining what leaves the
  * system towards the model.
+ *
+ * Extended with a per-tenant model override + prompt-caching toggle,
+ * and right-column shortcuts into the agent inbox / run history (the
+ * routes exist but have no sidebar entry).
  */
 function CapBar({ label, pct }: { label: string; pct: number }) {
   const clamped = Math.max(0, Math.min(100, pct));
@@ -110,8 +129,20 @@ export function AiSettingsPage() {
     }
   };
 
+  const patchSetting = async (body: Record<string, unknown>) => {
+    setBusy(true);
+    try {
+      await jsonFetch('/api/settings/agent-key', { ...JSON_OPTS, method: 'PATCH', body });
+      await reload();
+    } catch (error) {
+      toast.error(httpErrorDetail(error) ?? String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="max-w-2xl space-y-6" data-testid="agent-settings">
+    <div className="space-y-6" data-testid="agent-settings">
       <div>
         <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <Sparkles className="size-5 text-purple-600" aria-hidden />
@@ -125,204 +156,297 @@ export function AiSettingsPage() {
         </p>
       </div>
 
-      {status === null ? (
-        statusQuery.isError ? (
-          <p className="text-sm text-red-600" role="alert">
-            {httpErrorDetail(statusQuery.error) ?? String(statusQuery.error)}
-          </p>
-        ) : (
-          <p className="flex items-center gap-2 text-sm text-zinc-500" role="status">
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-            {t('agent.settings.loading', { defaultValue: 'Wczytywanie…' })}
-          </p>
-        )
-      ) : (
-        <>
-          {!status.agent_feature_enabled && (
-            <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-              {t('agent.settings.feature_off', {
-                defaultValue:
-                  'Warstwa agenta jest globalnie wyłączona (AGENT_ENABLED) — klucz można skonfigurować, ale runy nie wystartują.',
-              })}
-            </p>
-          )}
-
-          <section
-            className="rounded-xl border border-zinc-200 bg-white p-4"
-            aria-labelledby="agent-key-heading"
-          >
-            <h2 id="agent-key-heading" className="flex items-center gap-2 text-sm font-semibold">
-              <KeyRound className="size-4 text-zinc-500" aria-hidden />
-              {t('agent.settings.key_heading', { defaultValue: 'Klucz Anthropic' })}
-            </h2>
-
-            <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-              <dt className="text-zinc-500">
-                {t('agent.settings.state', { defaultValue: 'Stan' })}
-              </dt>
-              <dd data-testid="agent-key-state">
-                {status.enabled
-                  ? t('agent.settings.state_on', { defaultValue: 'Aktywny — agent włączony' })
-                  : status.configured
-                    ? t('agent.settings.state_disabled', { defaultValue: 'Wyłączony (soft-off)' })
-                    : t('agent.settings.state_missing', {
-                        defaultValue: 'Brak klucza — agent wymaga klucza',
-                      })}
-              </dd>
-              {status.key_prefix !== null && (
-                <>
-                  <dt className="text-zinc-500">
-                    {t('agent.settings.prefix', { defaultValue: 'Prefiks' })}
-                  </dt>
-                  <dd className="font-mono" data-testid="agent-key-prefix">
-                    {status.key_prefix}…
-                  </dd>
-                </>
+      <div className="gap-6 lg:grid lg:grid-cols-[minmax(0,42rem)_18rem] lg:items-start">
+        <div className="space-y-6">
+          {status === null ? (
+            statusQuery.isError ? (
+              <p className="text-sm text-red-600" role="alert">
+                {httpErrorDetail(statusQuery.error) ?? String(statusQuery.error)}
+              </p>
+            ) : (
+              <p className="flex items-center gap-2 text-sm text-zinc-500" role="status">
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                {t('agent.settings.loading', { defaultValue: 'Wczytywanie…' })}
+              </p>
+            )
+          ) : (
+            <>
+              {!status.agent_feature_enabled && (
+                <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  {t('agent.settings.feature_off', {
+                    defaultValue:
+                      'Warstwa agenta jest globalnie wyłączona (AGENT_ENABLED) — klucz można skonfigurować, ale runy nie wystartują.',
+                  })}
+                </p>
               )}
-              {status.last_used_at !== null && (
-                <>
-                  <dt className="text-zinc-500">
-                    {t('agent.settings.last_used', { defaultValue: 'Ostatnio użyty' })}
-                  </dt>
-                  <dd>{new Date(status.last_used_at).toLocaleString()}</dd>
-                </>
-              )}
-            </dl>
 
-            <form
-              className="mt-4 flex items-end gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void saveKey();
-              }}
-            >
-              <label className="flex-1 text-sm">
-                <span className="mb-1 block text-zinc-500">
-                  {status.configured
-                    ? t('agent.settings.rotate_label', {
-                        defaultValue: 'Nowy klucz (rotacja zastępuje obecny)',
-                      })
-                    : t('agent.settings.set_label', { defaultValue: 'Klucz API (sk-ant-…)' })}
-                </span>
-                <input
-                  type="password"
-                  value={draftKey}
-                  onChange={(event) => setDraftKey(event.target.value)}
-                  autoComplete="off"
-                  placeholder="sk-ant-api03-…"
-                  className="w-full rounded-md border border-zinc-200 px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
-                  data-testid="agent-key-input"
-                />
-              </label>
-              <Button
-                type="submit"
-                disabled={busy || draftKey.trim() === ''}
-                data-testid="agent-key-save"
+              <section
+                className="rounded-xl border border-zinc-200 bg-white p-4"
+                aria-labelledby="agent-key-heading"
               >
-                {busy ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  t('agent.settings.save', { defaultValue: 'Zapisz' })
-                )}
-              </Button>
-              {status.enabled && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void disable()}
-                  data-testid="agent-key-disable"
+                <h2
+                  id="agent-key-heading"
+                  className="flex items-center gap-2 text-sm font-semibold"
                 >
-                  {t('agent.settings.disable', { defaultValue: 'Wyłącz agenta' })}
-                </Button>
+                  <KeyRound className="size-4 text-zinc-500" aria-hidden />
+                  {t('agent.settings.key_heading', { defaultValue: 'Klucz Anthropic' })}
+                </h2>
+
+                <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                  <dt className="text-zinc-500">
+                    {t('agent.settings.state', { defaultValue: 'Stan' })}
+                  </dt>
+                  <dd data-testid="agent-key-state">
+                    {status.enabled
+                      ? t('agent.settings.state_on', { defaultValue: 'Aktywny — agent włączony' })
+                      : status.configured
+                        ? t('agent.settings.state_disabled', {
+                            defaultValue: 'Wyłączony (soft-off)',
+                          })
+                        : t('agent.settings.state_missing', {
+                            defaultValue: 'Brak klucza — agent wymaga klucza',
+                          })}
+                  </dd>
+                  {status.key_prefix !== null && (
+                    <>
+                      <dt className="text-zinc-500">
+                        {t('agent.settings.prefix', { defaultValue: 'Prefiks' })}
+                      </dt>
+                      <dd className="font-mono" data-testid="agent-key-prefix">
+                        {status.key_prefix}…
+                      </dd>
+                    </>
+                  )}
+                  {status.last_used_at !== null && (
+                    <>
+                      <dt className="text-zinc-500">
+                        {t('agent.settings.last_used', { defaultValue: 'Ostatnio użyty' })}
+                      </dt>
+                      <dd>{new Date(status.last_used_at).toLocaleString()}</dd>
+                    </>
+                  )}
+                </dl>
+
+                <form
+                  className="mt-4 flex items-end gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveKey();
+                  }}
+                >
+                  <label className="flex-1 text-sm">
+                    <span className="mb-1 block text-zinc-500">
+                      {status.configured
+                        ? t('agent.settings.rotate_label', {
+                            defaultValue: 'Nowy klucz (rotacja zastępuje obecny)',
+                          })
+                        : t('agent.settings.set_label', { defaultValue: 'Klucz API (sk-ant-…)' })}
+                    </span>
+                    <input
+                      type="password"
+                      value={draftKey}
+                      onChange={(event) => setDraftKey(event.target.value)}
+                      autoComplete="off"
+                      placeholder="sk-ant-api03-…"
+                      className="w-full rounded-md border border-zinc-200 px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                      data-testid="agent-key-input"
+                    />
+                  </label>
+                  <Button
+                    type="submit"
+                    disabled={busy || draftKey.trim() === ''}
+                    data-testid="agent-key-save"
+                  >
+                    {busy ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      t('agent.settings.save', { defaultValue: 'Zapisz' })
+                    )}
+                  </Button>
+                  {status.enabled && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void disable()}
+                      data-testid="agent-key-disable"
+                    >
+                      {t('agent.settings.disable', { defaultValue: 'Wyłącz agenta' })}
+                    </Button>
+                  )}
+                </form>
+                <p className="mt-2 text-xs text-zinc-500">
+                  {t('agent.settings.never_plaintext', {
+                    defaultValue:
+                      'Klucz jest szyfrowany (AES-256-GCM) i nigdy nie wraca w odpowiedziach — widzisz tylko prefiks.',
+                  })}
+                </p>
+              </section>
+
+              {status.configured && (
+                <section
+                  className="rounded-xl border border-zinc-200 bg-white p-4"
+                  aria-labelledby="agent-model-heading"
+                  data-testid="agent-model"
+                >
+                  <h2
+                    id="agent-model-heading"
+                    className="flex items-center gap-2 text-sm font-semibold"
+                  >
+                    <Cpu className="size-4 text-zinc-500" aria-hidden />
+                    {t('agent.settings.model_heading', { defaultValue: 'Model i buforowanie' })}
+                  </h2>
+
+                  <label className="mt-3 block text-sm">
+                    <span className="mb-1 block text-zinc-500">
+                      {t('agent.settings.model_label', { defaultValue: 'Model agenta' })}
+                    </span>
+                    <select
+                      value={status.model ?? ''}
+                      disabled={busy}
+                      onChange={(event) =>
+                        void patchSetting({
+                          model: event.target.value === '' ? null : event.target.value,
+                        })
+                      }
+                      data-testid="agent-model-select"
+                      className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                    >
+                      <option value="">
+                        {t('agent.settings.model_auto', {
+                          defaultValue: 'Automatycznie (Sonnet; schema-ops na Opus)',
+                        })}
+                      </option>
+                      {status.selectable_models.map((id) => (
+                        <option key={id} value={id}>
+                          {MODEL_LABELS[id] ?? id}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="mt-1 block text-xs text-zinc-500">
+                      {t('agent.settings.model_hint', {
+                        defaultValue:
+                          'Puste = dobór automatyczny. Wybór modelu przypina wszystkie operacje do niego (np. Haiku do tanich testów). Zmiana modelu resetuje bufor promptu.',
+                      })}
+                    </span>
+                  </label>
+
+                  <label className="mt-4 flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={status.prompt_caching_enabled}
+                      disabled={busy}
+                      onChange={(event) =>
+                        void patchSetting({ prompt_caching_enabled: event.target.checked })
+                      }
+                      data-testid="agent-caching-toggle"
+                      className="mt-0.5 size-4 rounded border-zinc-300"
+                    />
+                    <span>
+                      <span className="flex items-center gap-1 font-medium text-zinc-900">
+                        <Zap className="size-3.5 text-amber-500" aria-hidden />
+                        {t('agent.settings.caching_label', {
+                          defaultValue: 'Buforowanie promptu',
+                        })}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-zinc-500">
+                        {t('agent.settings.caching_hint', {
+                          defaultValue:
+                            'Agent wysyła stały fragment (instrukcje + definicje narzędzi) raz i przez 5 minut płaci za jego ponowne użycie ~10% ceny. Pierwsze wywołanie kosztuje ~25% więcej (zapis), kolejne w oknie są tańsze. Zalecane: włączone.',
+                        })}
+                      </span>
+                    </span>
+                  </label>
+                </section>
               )}
-            </form>
-            <p className="mt-2 text-xs text-zinc-500">
-              {t('agent.settings.never_plaintext', {
-                defaultValue:
-                  'Klucz jest szyfrowany (AES-256-GCM) i nigdy nie wraca w odpowiedziach — widzisz tylko prefiks.',
-              })}
-            </p>
-          </section>
 
-          {cost !== null && (
-            <section
-              className="rounded-xl border border-zinc-200 bg-white p-4"
-              aria-labelledby="agent-cost-heading"
-              data-testid="agent-cost"
-            >
-              <h2 id="agent-cost-heading" className="flex items-center gap-2 text-sm font-semibold">
-                <Sparkles className="size-4 text-zinc-500" aria-hidden />
-                {t('agent.settings.cost_heading', { defaultValue: 'Koszt i limity' })}
-              </h2>
-              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <dt className="text-zinc-500">
-                  {t('agent.settings.cost_today', { defaultValue: 'Dziś' })}
-                </dt>
-                <dd data-testid="agent-cost-today">
-                  ${cost.cost_today_usd} · {cost.tokens_today} tok · {cost.runs_today}{' '}
-                  {t('agent.settings.runs', { defaultValue: 'runów' })}
-                </dd>
-                <dt className="text-zinc-500">
-                  {t('agent.settings.cost_month', { defaultValue: 'Ten miesiąc' })}
-                </dt>
-                <dd>
-                  ${cost.cost_month_usd} · {cost.tokens_month} tok · {cost.runs_month}{' '}
-                  {t('agent.settings.runs', { defaultValue: 'runów' })}
-                </dd>
-              </dl>
-              <div className="mt-3 space-y-2">
-                <CapBar
-                  label={`${t('agent.settings.cap_day', { defaultValue: 'Limit dzienny' })} ($${cost.day_cap_usd})`}
-                  pct={cost.day_cap_pct}
-                />
-                <CapBar
-                  label={`${t('agent.settings.cap_month', { defaultValue: 'Limit miesięczny' })} ($${cost.month_cap_usd})`}
-                  pct={cost.month_cap_pct}
-                />
-              </div>
-            </section>
+              {cost !== null && (
+                <section
+                  className="rounded-xl border border-zinc-200 bg-white p-4"
+                  aria-labelledby="agent-cost-heading"
+                  data-testid="agent-cost"
+                >
+                  <h2
+                    id="agent-cost-heading"
+                    className="flex items-center gap-2 text-sm font-semibold"
+                  >
+                    <Sparkles className="size-4 text-zinc-500" aria-hidden />
+                    {t('agent.settings.cost_heading', { defaultValue: 'Koszt i limity' })}
+                  </h2>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <dt className="text-zinc-500">
+                      {t('agent.settings.cost_today', { defaultValue: 'Dziś' })}
+                    </dt>
+                    <dd data-testid="agent-cost-today">
+                      ${cost.cost_today_usd} · {cost.tokens_today} tok · {cost.runs_today}{' '}
+                      {t('agent.settings.runs', { defaultValue: 'runów' })}
+                    </dd>
+                    <dt className="text-zinc-500">
+                      {t('agent.settings.cost_month', { defaultValue: 'Ten miesiąc' })}
+                    </dt>
+                    <dd>
+                      ${cost.cost_month_usd} · {cost.tokens_month} tok · {cost.runs_month}{' '}
+                      {t('agent.settings.runs', { defaultValue: 'runów' })}
+                    </dd>
+                  </dl>
+                  <div className="mt-3 space-y-2">
+                    <CapBar
+                      label={`${t('agent.settings.cap_day', { defaultValue: 'Limit dzienny' })} ($${cost.day_cap_usd})`}
+                      pct={cost.day_cap_pct}
+                    />
+                    <CapBar
+                      label={`${t('agent.settings.cap_month', { defaultValue: 'Limit miesięczny' })} ($${cost.month_cap_usd})`}
+                      pct={cost.month_cap_pct}
+                    />
+                  </div>
+                </section>
+              )}
+
+              <section
+                className="rounded-xl border border-zinc-200 bg-white p-4"
+                aria-labelledby="agent-transparency-heading"
+              >
+                <h2
+                  id="agent-transparency-heading"
+                  className="flex items-center gap-2 text-sm font-semibold"
+                >
+                  <ShieldCheck className="size-4 text-zinc-500" aria-hidden />
+                  {t('agent.settings.transparency_heading', {
+                    defaultValue: 'Co trafia do modelu',
+                  })}
+                </h2>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-600">
+                  <li>
+                    {t('agent.settings.transparency_intent', {
+                      defaultValue: 'Twoja intencja i kolejne wiadomości rozmowy.',
+                    })}
+                  </li>
+                  <li>
+                    {t('agent.settings.transparency_context', {
+                      defaultValue:
+                        'Kontekst widoku: kod typu obiektu, aktywny filtr, liczność selekcji (bez pełnych danych produktów).',
+                    })}
+                  </li>
+                  <li>
+                    {t('agent.settings.transparency_results', {
+                      defaultValue:
+                        'Wyniki narzędzi: liczniki, kody i minimalne projekcje (id, kod, nazwa, kompletność) — tylko to, co narzędzie zwróci.',
+                    })}
+                  </li>
+                  <li>
+                    {t('agent.settings.transparency_never', {
+                      defaultValue:
+                        'Nigdy: Twój klucz, hasła, tokeny API ani dane innych tenantów. Zapis do katalogu wyłącznie po Twojej akceptacji.',
+                    })}
+                  </li>
+                </ul>
+              </section>
+            </>
           )}
+        </div>
 
-          <section
-            className="rounded-xl border border-zinc-200 bg-white p-4"
-            aria-labelledby="agent-transparency-heading"
-          >
-            <h2
-              id="agent-transparency-heading"
-              className="flex items-center gap-2 text-sm font-semibold"
-            >
-              <ShieldCheck className="size-4 text-zinc-500" aria-hidden />
-              {t('agent.settings.transparency_heading', { defaultValue: 'Co trafia do modelu' })}
-            </h2>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-600">
-              <li>
-                {t('agent.settings.transparency_intent', {
-                  defaultValue: 'Twoja intencja i kolejne wiadomości rozmowy.',
-                })}
-              </li>
-              <li>
-                {t('agent.settings.transparency_context', {
-                  defaultValue:
-                    'Kontekst widoku: kod typu obiektu, aktywny filtr, liczność selekcji (bez pełnych danych produktów).',
-                })}
-              </li>
-              <li>
-                {t('agent.settings.transparency_results', {
-                  defaultValue:
-                    'Wyniki narzędzi: liczniki, kody i minimalne projekcje (id, kod, nazwa, kompletność) — tylko to, co narzędzie zwróci.',
-                })}
-              </li>
-              <li>
-                {t('agent.settings.transparency_never', {
-                  defaultValue:
-                    'Nigdy: Twój klucz, hasła, tokeny API ani dane innych tenantów. Zapis do katalogu wyłącznie po Twojej akceptacji.',
-                })}
-              </li>
-            </ul>
-          </section>
-        </>
-      )}
+        <AgentShortcuts />
+      </div>
     </div>
   );
 }

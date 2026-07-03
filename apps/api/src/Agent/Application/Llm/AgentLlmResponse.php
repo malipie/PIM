@@ -21,12 +21,16 @@ final readonly class AgentLlmResponse
 
     /**
      * @param list<array<string, mixed>> $contentBlocks
+     * @param int                        $cacheReadTokens     tokens served from the prompt cache (~0.1x price)
+     * @param int                        $cacheCreationTokens tokens written to the prompt cache (~1.25x price, 5-min TTL)
      */
     public function __construct(
         public string $stopReason,
         public array $contentBlocks,
         public int $inputTokens,
         public int $outputTokens,
+        public int $cacheReadTokens = 0,
+        public int $cacheCreationTokens = 0,
     ) {
     }
 

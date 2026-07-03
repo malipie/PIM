@@ -15,4 +15,18 @@ use App\Shared\Domain\Tenant;
 interface ByokConfigReaderInterface
 {
     public function isProactiveScanEnabled(Tenant $tenant): bool;
+
+    /**
+     * Per-tenant model override, or `null` for the platform default
+     * (the Agent's AgentModelSelector then picks Sonnet/Opus per tool
+     * kind). A concrete id pins every kind to that model.
+     */
+    public function modelOverride(Tenant $tenant): ?string;
+
+    /**
+     * Whether the tenant opted into Anthropic prompt caching (ephemeral
+     * cache on the stable system+tools prefix). Defaults to true when
+     * no config row exists.
+     */
+    public function isPromptCachingEnabled(Tenant $tenant): bool;
 }
