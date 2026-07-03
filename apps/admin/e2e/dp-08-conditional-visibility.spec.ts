@@ -174,7 +174,10 @@ test('DP-08 — visible_when hides and reveals a field without losing its value'
       .then(() => true)
       .catch(() => false);
     if (!onDefaultTab && groupLabel !== '') {
-      await page.getByRole('tab', { name: new RegExp(groupLabel, 'i') }).click();
+      // Tab name is label[lang] ?? code — under the EN test locale a
+      // pl-only label falls back to the snake_case CODE, so match both
+      // shapes (`dp08 grp x` / `dp08_grp_x`).
+      await page.getByRole('tab', { name: new RegExp(`dp08[_ ]grp[_ ]${suffix}`, 'i') }).click();
     }
     const driverField = page.getByText(driverCode, { exact: true }).first();
     await expect(driverField).toBeVisible();
