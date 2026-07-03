@@ -955,7 +955,6 @@
   },
   "dashboard": {
     "greeting": {
-      "hello": "Dzień dobry, {{name}} 👋",
       "title_main": "Centrum dowodzenia katalogiem.",
       "title_accent": "Co dziś chcesz zmienić?"
     },

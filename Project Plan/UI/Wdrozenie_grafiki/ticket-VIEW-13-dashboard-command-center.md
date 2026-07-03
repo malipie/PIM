@@ -80,7 +80,8 @@ To jest **relayout** (jak VIEW-07 dla edycji produktu) — nie nowy bounded cont
 5. **Centrum akcji** — pełna szerokość, 5 pozycji w gridzie 2-kol.
 
 ### 3.4a Mapping element-po-elemencie — Greeting + Agent hero
-- Greeting eyebrow: `Dzień dobry, {name} 👋` — mały tekst `text-ink-2`. Imię = mock „Kasiu" **przez i18n `defaultValue`**, docelowo z sesji (poza scope).
+- ~~Greeting eyebrow: `Dzień dobry, {name} 👋`~~ — **USUNIĘTE (decyzja operatora 2026-07-03, podczas implementacji)**: linia powitalna z imieniem nie wchodzi; sekcja zaczyna się bezpośrednio od dwutonowego H1.
+- **Marginesy strony (korekta operatora 2026-07-03):** kontener strony to gołe `space-y-6` — padding daje `<main>` z `AppLayout` (`p-4 md:p-6`), identycznie jak wszystkie inne podstrony. Bez własnych `px-*`.
 - H1 dwutonowy: `Centrum dowodzenia katalogiem.` (`text-ink`) + ` Co dziś chcesz zmienić?` (`text-ink-2`/muted) — jeden `<h1>`, drugi fragment w `<span>` muted. Rozmiar ~`text-[40px]/leading-tight display font-semibold`.
 - Agent hero: `rounded-3xl` ciemny background (navy/near-black, np. `bg-[#0f1420]`/`bg-ink` — dobrać do screena), `p-8`, `soft-shadow-lg`.
   - lewy górny: kwadratowa ikonka sparkle w zaokrąglonym boxie; obok uppercase label `AGENT · CLAUDE SONNET 4.5` (`text-[11px] tracking-wide text-white/50`).

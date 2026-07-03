@@ -11,11 +11,8 @@
  */
 
 // ---------------------------------------------------------------------------
-// Greeting + agent hero
+// Agent hero
 // ---------------------------------------------------------------------------
-
-/** Mock user first name (vocative) until the greeting reads the session. */
-export const GREETING_NAME = 'Kasiu';
 
 /** Weekly count of accepted agent changes shown in the hero footer. */
 export const AGENT_ACCEPTED_THIS_WEEK = 42;

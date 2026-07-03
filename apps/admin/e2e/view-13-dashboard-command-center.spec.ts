@@ -55,11 +55,12 @@ test('VIEW-13 — command center renders all five sections with mock values', as
   await loginAsAdmin(page);
   await page.goto('/dashboard');
 
-  // 1. Greeting — two-tone headline.
+  // 1. Greeting — two-tone headline (the "Dzień dobry" hello line was
+  // dropped per operator decision 2026-07-03).
   await expect(
     page.getByRole('heading', { level: 1, name: /Centrum dowodzenia katalogiem/ }),
   ).toBeVisible();
-  await expect(page.getByText(/Dzień dobry, Kasiu/)).toBeVisible();
+  await expect(page.getByText(/Dzień dobry/)).toHaveCount(0);
 
   // 2. Agent hero — prompt accepts focus and typing, nothing is submitted.
   const prompt = page.getByRole('textbox', { name: /Polecenie dla agenta/i });

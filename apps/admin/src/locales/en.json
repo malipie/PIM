@@ -945,7 +945,6 @@
   },
   "dashboard": {
     "greeting": {
-      "hello": "Good morning, {{name}} 👋",
       "title_main": "Catalog command center.",
       "title_accent": "What do you want to change today?"
     },

@@ -17,8 +17,11 @@ import { TeamActivityCard } from './components/TeamActivityCard';
  * banners — it must look exactly like the approved design.
  */
 export function DashboardPage() {
+  // Padding comes from the AppLayout <main> wrapper — same as every other
+  // page; the extra px-* of dashboard v2 made the margins wider than
+  // sibling views (operator correction, 2026-07-03).
   return (
-    <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-10">
+    <div className="space-y-6">
       <DashboardGreeting />
       <AgentCommandHero />
       <KpiBand />
