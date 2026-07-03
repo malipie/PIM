@@ -1012,12 +1012,6 @@ export function UniversalListPage({
           totalMatching={
             crossPageSelection.active ? crossPageSelection.totalMatched : selected.size
           }
-          onApplied={(result) => {
-            setLastBulkSession(result);
-            setSelected(new Set());
-            setShowSelectedOnly(false);
-            refetch();
-          }}
         />
       </Suspense>
 
