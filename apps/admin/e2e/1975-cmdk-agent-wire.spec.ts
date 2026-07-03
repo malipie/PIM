@@ -84,10 +84,10 @@ test('cmd+k sends a free-form command to the agent with view context', async ({ 
   const commandInput = dialog.getByRole('textbox');
   await expect(commandInput).toBeVisible();
 
-  // Free-form command → the local planner falls back → "send to agent".
+  // #2163 — every command goes straight to the agent on submit (the
+  // immediate quick-action "Zastosuj" path was removed).
   await commandInput.fill('przecen produkty festo o 10%');
   await commandInput.press('Enter');
-  await page.getByTestId('cmdk-list-ask-agent').click();
 
   await expect.poll(() => capturedBody).not.toBeNull();
   const body = capturedBody as unknown as {

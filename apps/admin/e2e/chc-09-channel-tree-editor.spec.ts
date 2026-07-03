@@ -42,7 +42,7 @@ test('build, edit, move and delete a channel navigation tree from the UI', async
     });
   }
 
-  await page.goto(`/settings/channels/${channelId}`);
+  await page.goto(`/modeling/channels/${channelId}`);
   await page.getByRole('button', { name: /Drzewo kanału|Channel tree/i }).click();
 
   const saveName = async (name: string, external?: string) => {

@@ -50,7 +50,7 @@ export function ChannelEditPage() {
       {
         onSuccess: () => {
           toast.success(t('channels.edit.success'));
-          navigate(`/settings/channels/${channel.id}`);
+          navigate(`/modeling/channels/${channel.id}`);
         },
         onError: () => {
           toast.error(t('channels.edit.error'));
@@ -63,7 +63,7 @@ export function ChannelEditPage() {
     <div className="space-y-6">
       <div className="space-y-1">
         <Button asChild variant="ghost" size="sm" className="-ml-3">
-          <Link to={`/settings/channels/${channel.id}`}>
+          <Link to={`/modeling/channels/${channel.id}`}>
             <ArrowLeft className="size-4" />
             {t('channels.back')}
           </Link>
@@ -77,7 +77,7 @@ export function ChannelEditPage() {
         defaultValues={defaultValues}
         isSubmitting={mutation.isPending}
         onSubmit={handleSubmit}
-        onCancel={() => navigate(`/settings/channels/${channel.id}`)}
+        onCancel={() => navigate(`/modeling/channels/${channel.id}`)}
       />
     </div>
   );

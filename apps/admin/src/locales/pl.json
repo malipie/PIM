@@ -1034,6 +1034,13 @@
     "back": "Wróć do atrybutów",
     "filter_type": "Typ",
     "filter_all": "Wszystkie",
+    "filter": {
+      "all": "wszystkie",
+      "system": "system",
+      "group": "Grupa atrybutów",
+      "group_search": "Szukaj grupy…",
+      "group_empty": "Brak grup"
+    },
     "empty": "Brak atrybutów dla aktualnego najemcy.",
     "write_deferred_note": "Ręczne tworzenie / edycja / drag-and-drop są odroczone do agentowego flow schema-add (Faza 2). Seeder dostarcza MVP zestaw atrybutów.",
     "fields": {
@@ -2591,13 +2598,15 @@
   },
   "modeling": {
     "title": "Modelowanie",
-    "description": "Definiuj typy obiektów, atrybuty, grupy atrybutów i kategorie używane w katalogu.",
+    "description": "Definiuj typy obiektów, atrybuty, grupy atrybutów, kategorie, kanały i wersje językowe używane w katalogu.",
     "tabs": {
       "aria_label": "Sekcje modelowania",
       "object_types": "Typy obiektów",
       "attributes": "Atrybuty",
       "attribute_groups": "Grupy atrybutów",
-      "categories": "Kategorie"
+      "categories": "Kategorie",
+      "channels": "Kanały",
+      "locales": "Wersje językowe"
     },
     "built_in_lock": {
       "label": "Zablokowane",

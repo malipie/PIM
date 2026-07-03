@@ -29,10 +29,10 @@ test.describe('NUI-01 — settings subtree in main sidebar', () => {
     // Audit card sits at the bottom of the subtree.
     await expect(subtree).toContainText(/audyt zmian|audit log/i);
 
-    // Navigating to another settings page keeps the subtree (channels has
-    // its own nested routes — regression guard for deep routes).
-    await subtree.getByRole('link', { name: /kanały|channels/i }).click();
-    await expect(page).toHaveURL(/\/settings\/channels/);
+    // Navigating to another settings page keeps the subtree. DP-03 (#2033)
+    // moved Channels/Locales to /modeling, so hop to Roles instead.
+    await subtree.getByRole('link', { name: /role|roles/i }).click();
+    await expect(page).toHaveURL(/\/settings\/roles/);
     await expect(subtree).toBeVisible();
 
     // Outside /settings the subtree unmounts.

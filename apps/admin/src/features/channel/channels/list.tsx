@@ -67,7 +67,7 @@ export function ChannelsListPage() {
           <p className="text-sm text-muted-foreground">{t('channels.list_subtitle')}</p>
         </div>
         <Button asChild>
-          <Link to="/settings/channels/new">
+          <Link to="/modeling/channels/new">
             <Plus className="size-4" />
             {t('channels.list.create_button')}
           </Link>
@@ -109,7 +109,7 @@ export function ChannelsListPage() {
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button asChild variant="ghost" size="sm">
-                        <Link to={`/settings/channels/${row.id}`}>
+                        <Link to={`/modeling/channels/${row.id}`}>
                           <Eye className="size-4" />
                           <span className="sr-only">{t('channels.actions.view')}</span>
                         </Link>
@@ -123,7 +123,7 @@ export function ChannelsListPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
-                            <Link to={`/settings/channels/${row.id}/edit`}>
+                            <Link to={`/modeling/channels/${row.id}/edit`}>
                               <Pencil className="size-4" />
                               {t('channels.list.actions.edit')}
                             </Link>

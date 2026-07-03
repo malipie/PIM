@@ -45,7 +45,7 @@ export function ChannelShowPage() {
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <Button asChild variant="ghost" size="sm" className="-ml-3">
-            <Link to="/settings/channels">
+            <Link to="/modeling/channels">
               <ArrowLeft className="size-4" />
               {t('channels.back')}
             </Link>
@@ -54,7 +54,7 @@ export function ChannelShowPage() {
           <p className="font-mono text-xs text-muted-foreground">{channel.code}</p>
         </div>
         <Button asChild>
-          <Link to={`/settings/channels/${channel.id}/edit`}>
+          <Link to={`/modeling/channels/${channel.id}/edit`}>
             <Pencil className="size-4" />
             {t('channels.list.actions.edit')}
           </Link>

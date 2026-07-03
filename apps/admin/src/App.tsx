@@ -364,10 +364,10 @@ function App() {
             { name: 'assets', list: '/assets', show: '/assets/:id' },
             {
               name: 'channels',
-              list: '/settings/channels',
-              create: '/settings/channels/new',
-              edit: '/settings/channels/:id/edit',
-              show: '/settings/channels/:id',
+              list: '/modeling/channels',
+              create: '/modeling/channels/new',
+              edit: '/modeling/channels/:id/edit',
+              show: '/modeling/channels/:id',
             },
             { name: 'locales' },
             {
@@ -527,6 +527,15 @@ function App() {
                     <Route path="categories" element={<CategoriesTreePage />} />
                     <Route path="categories/new" element={<CategoryCreatePage />} />
                     <Route path="categories/:id" element={<CategoryShowPage />} />
+                    {/* DP-03 (#2033) — Channels + Locales moved in from Settings:
+                      they scope attribute values (scopable/localizable), so they
+                      are data-model configuration. Old /settings/* paths redirect
+                      below. Backend permissions still gate every endpoint. */}
+                    <Route path="channels" element={<ChannelsListPage />} />
+                    <Route path="channels/new" element={<ChannelCreatePage />} />
+                    <Route path="channels/:id" element={<ChannelShowPage />} />
+                    <Route path="channels/:id/edit" element={<ChannelEditPage />} />
+                    <Route path="locales" element={<LocalesSettingsPage />} />
                   </Route>
                   <Route
                     path="/attributes"
@@ -583,11 +592,16 @@ function App() {
                   >
                     <Route index element={<SettingsIndex />} />
                     <Route path="menu" element={<MenuSettingsPage />} />
-                    <Route path="locales" element={<LocalesSettingsPage />} />
-                    <Route path="channels" element={<ChannelsListPage />} />
-                    <Route path="channels/new" element={<ChannelCreatePage />} />
-                    <Route path="channels/:id" element={<ChannelShowPage />} />
-                    <Route path="channels/:id/edit" element={<ChannelEditPage />} />
+                    {/* DP-03 (#2033) — back-compat redirects: Channels + Locales
+                      live under /modeling now; bookmarks keep working. */}
+                    <Route path="locales" element={<Navigate to="/modeling/locales" replace />} />
+                    <Route path="channels" element={<Navigate to="/modeling/channels" replace />} />
+                    <Route
+                      path="channels/new"
+                      element={<Navigate to="/modeling/channels/new" replace />}
+                    />
+                    <Route path="channels/:id" element={<RedirectSettingsChannelShow />} />
+                    <Route path="channels/:id/edit" element={<RedirectSettingsChannelEdit />} />
                     <Route path="users" element={<UsersSettingsPage />} />
                     <Route path="users/:id" element={<UserDetailRoute />} />
                     <Route path="roles" element={<RolesSettingsPage />} />
@@ -797,6 +811,18 @@ function RedirectApiProfileShow() {
 function RedirectApiProfileEdit() {
   const params = useParams<{ id: string }>();
   return <Navigate to={`/integrations/api-configurator/${params.id ?? ''}/edit`} replace />;
+}
+
+/** DP-03 (#2033) — back-compat redirects for the old /settings/channels/:id
+ *  bookmarks after the move to /modeling/channels. */
+function RedirectSettingsChannelShow() {
+  const params = useParams<{ id: string }>();
+  return <Navigate to={`/modeling/channels/${params.id ?? ''}`} replace />;
+}
+
+function RedirectSettingsChannelEdit() {
+  const params = useParams<{ id: string }>();
+  return <Navigate to={`/modeling/channels/${params.id ?? ''}/edit`} replace />;
 }
 
 export default App;
