@@ -2876,3 +2876,18 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 - **`attributes_indexed` NIE nadaje się jako źródło walidacji na write-path**: listener rebuildu pomija bulk (`BulkContext`), świeży obiekt ma pusty cache w tym samym flushu. Kanoniczne wiersze `ObjectValue` (`findByObject` / prime-index) są jedynym zawsze świeżym źródłem.
 - **Upserter „waliduj wszystko → gate → dopiero zapisuj"**: restrukturyzacja pętli na 3 fazy daje atomowość (422 nigdy nie zostawia w połowie zapisanego obiektu) bez zmiany semantyki per-atrybut.
 - **Zanim zbudujesz nowy mechanizm, sprawdź substrat**: DP-08 miał w tickecie „reuse DSL z DP-07", a backend conditional visibility (visibleWhen + evaluator + PATCH + serializacja w form-schema) istniał W CAŁOŚCI od UI-08.8 — ticket zrobił się czysto frontendowy. Analogicznie DP-01: backend move kategorii kompletny od VIEW-04, brakowało tylko dialogu.
+
+## Lessons z GOLIVE #2119 (2026-07-03, cold-start handover test)
+
+### Patterns to Follow
+- **Drugi stack na tej samej maszynie = `COMPOSE_PROJECT_NAME=<inny>`** — docker-compose.yml ma sztywne `name: pim`; świeży klon bez override'u podpiąłby się pod wolumeny stacka dev (`pim:db:reset` skasowałby bazę dev). Env var wygrywa z `name:` w pliku; obrazy budują się jako `<projekt>-api` (świeży build, nie reuse `pim-api`). Porty hosta trzyma tylko Caddy → dev stack `down` (bez `-v`) na czas testu.
+- **Klasa bugów „works on my machine" po splicie ról W1-1**: każdy stan bazy/obiektów utworzony HISTORYCZNIE (gdy rola app miała DDL) musi być re-derywowalny z migracji/entrypointa, inaczej świeża instalacja pada. Złapane trzy: `messenger_messages` (auto-setup pre-W1-1, #2177), komendy utrzymaniowe na default connection (#2178), `AWS_ASSETS_KEY=minioadmin` hardcode vs podmienione `MINIO_ROOT_*` (#2181). Wzorzec testu: świeży klon + świeże wolumeny + NIE-domyślne sekrety.
+- **Toast w animacji fade-in psuje axe contrast** — axe liczy kontrast w trakcie `animate-in fade-in` (blend z tłem daje np. 4.42:1 < 4.5). Spec z axe po akcji zapisującej: czekać na zniknięcie toastu albo wykluczyć `[role=status]` ze skanu.
+
+### Patterns to Avoid
+- **`tail -N` na długim runie w tle gubi wynik** — pipe `cmd | tail -15` buforuje i przy padnięciu/obcięciu tracisz summary; pełny output do pliku, tail dopiero na pliku.
+- **HTTP 200 z HTML fatal error NIE jest sukcesem curl-smoke'a** — dev-cache corruption FrankenPHP zwraca 200 + stacktrace w HTML (`/api/auth/login`). Smoke musi asertować kształt odpowiedzi (JSON z `token`), nie sam status.
+
+### Env quirks (cold-start)
+- `pim.localhost` na macOS: przeglądarka rozwiązuje sama, **Node (`page.request`) nie** — bez `/etc/hosts` 80/122 speców E2E pada na `ENOTFOUND` (#2182). CI ma wpis, dlatego zielone.
+- Świeży klon wymaga: `JWT_PASSPHRASE` w `apps/api/.env.local` + `lexik:jwt:generate-keypair` (#2176) — bez tego login 500.
