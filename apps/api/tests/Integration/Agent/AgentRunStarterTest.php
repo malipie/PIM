@@ -52,6 +52,60 @@ final class AgentRunStarterTest extends KernelTestCase
     }
 
     #[Test]
+    public function parkedRunAwaitingApprovalDoesNotBlockANewConversation(): void
+    {
+        // #2155 — a plan sitting in the approval inbox is not "executing";
+        // it must never dead-end a new conversation.
+        [$tenant, $em] = $this->tenantFixture();
+        $starter = new AgentRunStarter($this->guard(true), $this->permissiveLimits($em), $em, $this->noopBus());
+        $userId = Uuid::v7();
+
+        $parked = new AgentRun($userId, AgentRunSurface::Chat, 'parked plan');
+        $parked->markAwaitingApproval(Uuid::v7(), 42);
+        $em->persist($parked);
+        $em->flush();
+
+        $fresh = $starter->start($tenant, $userId, AgentRunSurface::Chat, 'new conversation');
+        self::assertSame(AgentRunStatus::Planning, $fresh->getStatus());
+    }
+
+    #[Test]
+    public function runAwaitingInputDoesNotBlockANewConversation(): void
+    {
+        // #2155 — a run waiting for a chat reply is paused, not running.
+        [$tenant, $em] = $this->tenantFixture();
+        $starter = new AgentRunStarter($this->guard(true), $this->permissiveLimits($em), $em, $this->noopBus());
+        $userId = Uuid::v7();
+
+        $waiting = new AgentRun($userId, AgentRunSurface::Chat, 'waiting for reply');
+        $waiting->markAwaitingInput();
+        $em->persist($waiting);
+        $em->flush();
+
+        $fresh = $starter->start($tenant, $userId, AgentRunSurface::Chat, 'start fresh instead');
+        self::assertSame(AgentRunStatus::Planning, $fresh->getStatus());
+    }
+
+    #[Test]
+    public function committingRunStillBlocks(): void
+    {
+        // #2155 — genuinely executing states (committing / planning) still
+        // enforce one-at-a-time: a concurrent start is a 409.
+        [$tenant, $em] = $this->tenantFixture();
+        $starter = new AgentRunStarter($this->guard(true), $this->permissiveLimits($em), $em, $this->noopBus());
+        $userId = Uuid::v7();
+
+        $committing = new AgentRun($userId, AgentRunSurface::Chat, 'writing the batch');
+        $committing->markAwaitingApproval(Uuid::v7(), 1);
+        $committing->markCommitting(Uuid::v7());
+        $em->persist($committing);
+        $em->flush();
+
+        $this->expectException(ActiveRunConflictException::class);
+        $starter->start($tenant, $userId, AgentRunSurface::Chat, 'try to start during commit');
+    }
+
+    #[Test]
     public function guardRefusalPersistsNothing(): void
     {
         [$tenant, $em] = $this->tenantFixture();
