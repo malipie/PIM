@@ -2911,3 +2911,12 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 
 ### Patterns to Avoid
 - **`attributes_indexed` reconcile NIE konwerguje dla atrybutów `select`** — detektor dryfu daje false-positive na envelope `{option_code: X}` bo `globalSlot()` wzbogaca slot o `provenance` a porównanie kształtu `{option_code}` się rozjeżdża (kształt `{value}` konwerguje). Dane są POPRAWNE (option_code zgodny) — to bug detektora, nie korupcja. Nie da się zaasertować „zero drift" po rebuildzie dopóki niezałatane (#2186). Wariant lekcji z AGENT-P6-05 (#1978) który wrócił dla innego kształtu envelope'u.
+## Lessons z GOLIVE #2126 (2026-07-04, i18n + macierz przeglądarek)
+
+### Patterns to Follow
+- **Macierz Firefox+WebKit = osobny playwright config** (`playwright.browser-matrix.config.ts` z projektami firefox/webkit), NIE dopisywać silników do głównego configu (Chromium-only CI lane). Odpalane on-demand.
+- **WebKit nie rozwiązuje `pim.localhost`** (jak Node — cold-start L11/#2182); obejście host `https://localhost` (Caddy TRUSTED_HOSTS ma localhost, cert obejmuje). Pod obejściem WebKit renderuje, ale konsola ma dev-szum (Vite HMR hardcoded na wss://pim.localhost + 401 cookie na innym hoście) → asercja render-only dla webkit, pełna console-clean dla firefox (rozwiązuje pim.localhost natywnie).
+- **Firefox loguje nieudane pobrania fontów woff2 z Vite `@fs` jako błędy JS konsoli** (Chromium ignoruje) — dev-only (prod bunduje fonty), filtrować `downloadable font`/`@fs.*woff2` w asercji console-clean.
+
+### Patterns to Avoid
+- **`fallbackLng='pl'` maskuje brakujące klucze EN** — 48 kluczy w pl.json bez odpowiednika w en.json niewidoczne w runtime (user EN dostaje polski string). Parytet trzeba sprawdzać skryptem (diff key-setów), nie wzrokowo; kandydat na guard CI (#2188).
