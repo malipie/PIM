@@ -17,6 +17,7 @@ use App\Import\Contracts\SchemaImportPort;
 use App\Shared\Application\TenantContext;
 use App\Shared\Contracts\Event\AgentRunCompleted;
 use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Doctrine\RlsTenantGuard;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
@@ -49,7 +50,24 @@ final readonly class AgentApprovalService
         private AgentActionAuditor $auditor,
         private \Symfony\Component\Messenger\MessageBusInterface $eventBus,
         private TenantContext $tenantContext,
+        private RlsTenantGuard $rlsTenantGuard,
     ) {
+    }
+
+    /**
+     * #2156 — re-assert the tenant RLS GUC before an approval-state write.
+     * Under FrankenPHP worker mode the DBAL connection can silently
+     * reconnect mid-request, dropping the session-scoped app.current_tenant
+     * that RlsContextListener set on kernel.request; the terminal-status
+     * UPDATE would then hit 0 rows under FORCE RLS and the run would look
+     * stuck (a reject/cancel that reported success but never persisted).
+     */
+    private function reassertRls(): void
+    {
+        $tenant = $this->tenantContext->get();
+        if ($tenant instanceof Tenant) {
+            $this->rlsTenantGuard->reassert($tenant);
+        }
     }
 
     /**
@@ -103,6 +121,7 @@ final readonly class AgentApprovalService
 
         $isSchemaBatch = $this->isSchemaBatch($batchId);
 
+        $this->reassertRls();
         $run->markCommitting($approvedBy);
         $this->entityManager->flush();
         $this->publisher->status($run);
@@ -153,6 +172,9 @@ final readonly class AgentApprovalService
             throw ApprovalConflictException::nothingToCommit();
         }
 
+        // The commit above did heavy DB work — most likely to have triggered
+        // a reconnect, so re-assert before the final terminal write.
+        $this->reassertRls();
         $run->markDone($result->bulkSessionId);
         $this->entityManager->flush();
         $this->publisher->status($run);
@@ -198,6 +220,7 @@ final readonly class AgentApprovalService
             $this->pendingChanges->reject($batchId);
         }
 
+        $this->reassertRls();
         $run->markRejected();
         $this->entityManager->flush();
         $this->publisher->status($run);
@@ -236,6 +259,7 @@ final readonly class AgentApprovalService
             $this->pendingChanges->expire($batchId);
         }
 
+        $this->reassertRls();
         $run->markCancelled();
         $this->entityManager->flush();
         $this->publisher->status($run);
@@ -284,6 +308,7 @@ final readonly class AgentApprovalService
 
         // The rollback handler's per-chunk clear() detached the run.
         $run = $this->reload($runId);
+        $this->reassertRls();
         $run->markRolledBack();
         $this->entityManager->flush();
         $this->publisher->status($run);
