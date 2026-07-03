@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
+import { getAgentCost } from '@/features/agent/api';
 import { httpErrorDetail, jsonFetch } from '@/lib/http';
 
 interface AgentKeyStatus {
@@ -19,6 +20,7 @@ interface AgentKeyStatus {
 const JSON_OPTS = { contentType: 'application/json', accept: 'application/json' } as const;
 
 const AGENT_KEY_QUERY_KEY = ['settings', 'agent-key'] as const;
+const AGENT_COST_QUERY_KEY = ['settings', 'agent-cost'] as const;
 
 /**
  * AGENT-P6-06 (#1979) — BYOK settings (Piotr, PRD §4.2): set/rotate the
@@ -27,12 +29,29 @@ const AGENT_KEY_QUERY_KEY = ['settings', 'agent-key'] as const;
  * toggle, and the §10.3 transparency copy explaining what leaves the
  * system towards the model.
  */
+function CapBar({ label, pct }: { label: string; pct: number }) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  const tone = clamped >= 90 ? 'bg-red-500' : clamped >= 70 ? 'bg-amber-500' : 'bg-emerald-500';
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs text-zinc-500">
+        <span>{label}</span>
+        <span className="tabular-nums" data-testid="agent-cap-pct">
+          {clamped}%
+        </span>
+      </div>
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-zinc-100">
+        <div className={`h-full ${tone}`} style={{ width: `${clamped}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function AiSettingsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [draftKey, setDraftKey] = useState('');
   const [busy, setBusy] = useState(false);
-
   // ADR-0021 — the status read lives in the query cache so the PUT /
   // DELETE mutations refresh it through invalidation, not manual state.
   const statusQuery = useQuery({
@@ -41,8 +60,17 @@ export function AiSettingsPage() {
   });
   const status = statusQuery.data ?? null;
 
+  // Best-effort: the cost panel should never block the key form.
+  const costQuery = useQuery({
+    queryKey: AGENT_COST_QUERY_KEY,
+    queryFn: getAgentCost,
+    retry: false,
+  });
+  const cost = costQuery.data ?? null;
+
   const reload = async () => {
     await queryClient.invalidateQueries({ queryKey: AGENT_KEY_QUERY_KEY });
+    await queryClient.invalidateQueries({ queryKey: AGENT_COST_QUERY_KEY });
   };
 
   const saveKey = async () => {
@@ -216,6 +244,45 @@ export function AiSettingsPage() {
               })}
             </p>
           </section>
+
+          {cost !== null && (
+            <section
+              className="rounded-xl border border-zinc-200 bg-white p-4"
+              aria-labelledby="agent-cost-heading"
+              data-testid="agent-cost"
+            >
+              <h2 id="agent-cost-heading" className="flex items-center gap-2 text-sm font-semibold">
+                <Sparkles className="size-4 text-zinc-500" aria-hidden />
+                {t('agent.settings.cost_heading', { defaultValue: 'Koszt i limity' })}
+              </h2>
+              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <dt className="text-zinc-500">
+                  {t('agent.settings.cost_today', { defaultValue: 'Dziś' })}
+                </dt>
+                <dd data-testid="agent-cost-today">
+                  ${cost.cost_today_usd} · {cost.tokens_today} tok · {cost.runs_today}{' '}
+                  {t('agent.settings.runs', { defaultValue: 'runów' })}
+                </dd>
+                <dt className="text-zinc-500">
+                  {t('agent.settings.cost_month', { defaultValue: 'Ten miesiąc' })}
+                </dt>
+                <dd>
+                  ${cost.cost_month_usd} · {cost.tokens_month} tok · {cost.runs_month}{' '}
+                  {t('agent.settings.runs', { defaultValue: 'runów' })}
+                </dd>
+              </dl>
+              <div className="mt-3 space-y-2">
+                <CapBar
+                  label={`${t('agent.settings.cap_day', { defaultValue: 'Limit dzienny' })} ($${cost.day_cap_usd})`}
+                  pct={cost.day_cap_pct}
+                />
+                <CapBar
+                  label={`${t('agent.settings.cap_month', { defaultValue: 'Limit miesięczny' })} ($${cost.month_cap_usd})`}
+                  pct={cost.month_cap_pct}
+                />
+              </div>
+            </section>
+          )}
 
           <section
             className="rounded-xl border border-zinc-200 bg-white p-4"

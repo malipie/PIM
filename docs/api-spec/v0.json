@@ -9893,6 +9893,32 @@
                 "x-cortex-permission": "agent.bulk_actions"
             }
         },
+        "/api/agent/cost": {
+            "get": {
+                "operationId": "api_agent_cost_get",
+                "tags": [
+                    "agent"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api agent cost",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "settings.tenant.manage"
+            }
+        },
         "/api/agent/runs": {
             "get": {
                 "operationId": "api_agent_runs_get",

@@ -155,6 +155,24 @@ export function getAgentPlan(
 }
 
 /** Statuses in which the loop is still working server-side (poll). */
+export interface AgentCostReport {
+  cost_today_usd: string;
+  cost_month_usd: string;
+  tokens_today: number;
+  tokens_month: number;
+  runs_today: number;
+  runs_month: number;
+  day_cap_usd: number;
+  month_cap_usd: number;
+  day_cap_pct: number;
+  month_cap_pct: number;
+  per_user_today: Array<{ user_id: string; runs: number; tokens: number; cost_usd: string }>;
+}
+
+export function getAgentCost(): Promise<AgentCostReport> {
+  return jsonFetch<AgentCostReport>('/api/agent/cost', JSON_OPTS);
+}
+
 export function isRunBusy(status: AgentRunStatus): boolean {
   return status === 'planning' || status === 'committing';
 }

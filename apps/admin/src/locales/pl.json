@@ -3683,7 +3683,13 @@
       "transparency_intent": "Twoja intencja i kolejne wiadomości rozmowy.",
       "transparency_context": "Kontekst widoku: kod typu obiektu, aktywny filtr, liczność selekcji (bez pełnych danych produktów).",
       "transparency_results": "Wyniki narzędzi: liczniki, kody i minimalne projekcje (id, kod, nazwa, kompletność) — tylko to, co narzędzie zwróci.",
-      "transparency_never": "Nigdy: Twój klucz, hasła, tokeny API ani dane innych tenantów. Zapis do katalogu wyłącznie po Twojej akceptacji."
+      "transparency_never": "Nigdy: Twój klucz, hasła, tokeny API ani dane innych tenantów. Zapis do katalogu wyłącznie po Twojej akceptacji.",
+      "cost_heading": "Koszt i limity",
+      "cost_today": "Dziś",
+      "cost_month": "Ten miesiąc",
+      "runs": "runów",
+      "cap_day": "Limit dzienny",
+      "cap_month": "Limit miesięczny"
     },
     "phase": {
       "planning": "Planuję…",
