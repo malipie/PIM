@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Catalog\Application\PendingChanges;
 
 use App\Catalog\Application\BatchValueWriter;
+use App\Catalog\Application\Bulk\BulkAddCategoryHandler;
+use App\Catalog\Application\Bulk\BulkMoveCategoryHandler;
+use App\Catalog\Application\Bulk\BulkRemoveCategoryHandler;
 use App\Catalog\Application\BulkContext;
 use App\Catalog\Application\Message\ObjectValuesChangedMessage;
 use App\Catalog\Application\Reindex\BulkReindexQueueInterface;
@@ -64,6 +67,9 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
         private BulkContext $bulkContext,
         private BulkReindexQueueInterface $reindexQueue,
         private MessageBusInterface $messageBus,
+        private BulkAddCategoryHandler $addCategories,
+        private BulkRemoveCategoryHandler $removeCategories,
+        private BulkMoveCategoryHandler $moveCategories,
     ) {
     }
 
@@ -88,11 +94,21 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
                 return PendingBatchCommitResult::nothingToCommit();
             }
 
-            $perObject = $this->collectAcceptedValueChanges($batchId);
-            if ([] === $perObject) {
+            [$perObject, $categoryBatch] = $this->collectAcceptedChanges($batchId);
+            if ([] !== $perObject && null !== $categoryBatch) {
+                throw new LogicException('Mixed value/category pending batches are not supported - materializers emit homogeneous batches.');
+            }
+            if ([] === $perObject && null === $categoryBatch) {
                 $connection->rollBack();
 
                 return PendingBatchCommitResult::nothingToCommit();
+            }
+
+            if (null !== $categoryBatch) {
+                $result = $this->commitCategoryBatch($tenantId, $batchId, $approvedBy, $categoryBatch);
+                $connection->commit();
+
+                return $result;
             }
 
             // collectAcceptedValueChanges() streamed with clear(), which
@@ -161,33 +177,102 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
     }
 
     /**
-     * Stream the batch once and index accepted Value changes per object.
-     * Only status=accepted rows commit — a race that rejected/expired
-     * part of the batch between accept() and here cannot leak rows in.
+     * Stream the batch once and index accepted changes: Value rows per
+     * object, Category rows as one homogeneous batch (operation +
+     * category ids are identical across the batch by construction —
+     * AssignCategoriesMaterializer emits them that way). Only
+     * status=accepted rows commit — a race that rejected/expired part of
+     * the batch between accept() and here cannot leak rows in.
      *
-     * @return array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>}>>
+     * @return array{0: array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>}>>, 1: ?array{operation: string, categoryIds: list<string>, objectIds: list<string>}}
      */
-    private function collectAcceptedValueChanges(Uuid $batchId): array
+    private function collectAcceptedChanges(Uuid $batchId): array
     {
         $perObject = [];
+        $categoryBatch = null;
 
         foreach ($this->pendingChanges->iterateBatch($batchId) as $view) {
-            if (PendingChangeStatus::Accepted !== $view->status
-                || PendingChangeType::Value !== $view->changeType
-                || null === $view->targetObjectId
-                || null === $view->attributeCode
-                || null === $view->after) {
+            if (PendingChangeStatus::Accepted !== $view->status || null === $view->targetObjectId) {
                 continue;
             }
 
-            $perObject[$view->targetObjectId->toRfc4122()][] = [
-                'code' => $view->attributeCode,
-                'before' => $view->before,
-                'after' => $view->after,
-            ];
+            if (PendingChangeType::Value === $view->changeType && null !== $view->attributeCode && null !== $view->after) {
+                $perObject[$view->targetObjectId->toRfc4122()][] = [
+                    'code' => $view->attributeCode,
+                    'before' => $view->before,
+                    'after' => $view->after,
+                ];
+                continue;
+            }
+
+            if (PendingChangeType::Category === $view->changeType && null !== $view->after) {
+                $operation = $view->after['operation'] ?? null;
+                $categoryIds = $view->after['category_ids'] ?? null;
+                if (!\is_string($operation) || !\is_array($categoryIds)) {
+                    continue;
+                }
+                if (null === $categoryBatch) {
+                    $ids = [];
+                    foreach ($categoryIds as $id) {
+                        if (\is_string($id)) {
+                            $ids[] = $id;
+                        }
+                    }
+                    $categoryBatch = ['operation' => $operation, 'categoryIds' => $ids, 'objectIds' => []];
+                }
+                $categoryBatch['objectIds'][] = $view->targetObjectId->toRfc4122();
+            }
         }
 
-        return $perObject;
+        return [$perObject, $categoryBatch];
+    }
+
+    /**
+     * AGENT-P3-05 (#1965) — commit a category batch through the EXISTING
+     * bulk category handlers: they own the junction writes, the undo-log
+     * rows the 24h rollback replays, the session completion and the
+     * Meilisearch reindex. The agent path only supplies the BulkSession
+     * (source=cmd_k_agent) so the run's bulk_operation_id points at it.
+     *
+     * @param array{operation: string, categoryIds: list<string>, objectIds: list<string>} $batch
+     */
+    private function commitCategoryBatch(string $tenantId, Uuid $batchId, Uuid $approvedBy, array $batch): PendingBatchCommitResult
+    {
+        $this->tenantContext->set($this->managedTenant($tenantId));
+
+        $actionType = match ($batch['operation']) {
+            'add' => 'add_category',
+            'remove' => 'remove_category',
+            'move' => 'move_category',
+            default => throw new LogicException(\sprintf('Unknown category operation "%s".', $batch['operation'])),
+        };
+
+        $session = new BulkSession(
+            actionType: $actionType,
+            targetObjectIds: $batch['objectIds'],
+            actionPayload: [
+                'category_ids' => $batch['categoryIds'],
+                'pending_change_batch_id' => $batchId->toRfc4122(),
+            ],
+            userId: $approvedBy,
+            source: BulkSession::SOURCE_CMD_K_AGENT,
+        );
+        $sessionId = $session->getId();
+        $this->entityManager->persist($session);
+        $this->entityManager->flush();
+
+        $counts = match ($actionType) {
+            'add_category' => $this->addCategories->handle($session, $batch['categoryIds']),
+            'remove_category' => $this->removeCategories->handle($session, $batch['categoryIds']),
+            default => $this->moveCategories->handle($session, $batch['categoryIds']),
+        };
+
+        return new PendingBatchCommitResult(
+            bulkSessionId: $sessionId,
+            committedValues: $counts['success'],
+            objectsTouched: $counts['success'],
+            issues: [],
+        );
     }
 
     /**

@@ -56,4 +56,13 @@ interface PendingChangesPort
      * @return int rows transitioned pending -> expired
      */
     public function expire(Uuid $batchId): int;
+
+    /**
+     * AGENT-P5-04 (#1973) — shallow-merge an annotation into one row's
+     * meta (e.g. the commit outcome per schema row, so rollback can tell
+     * a created attribute from an updated one).
+     *
+     * @param array<string, mixed> $meta
+     */
+    public function annotate(Uuid $changeId, array $meta): void;
 }

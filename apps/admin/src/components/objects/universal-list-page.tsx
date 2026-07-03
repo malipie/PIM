@@ -1006,6 +1006,8 @@ export function UniversalListPage({
         <CmdKPalette
           open={cmdKOpen}
           onClose={() => setCmdKOpen(false)}
+          objectTypeCode={objectTypeCode}
+          filterDsl={panelDsl}
           selectedIds={Array.from(selected)}
           totalMatching={
             crossPageSelection.active ? crossPageSelection.totalMatched : selected.size

@@ -3,8 +3,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router';
 
-import { MockBadge } from '@/components/ui/mock-badge';
+import { startAgentRun } from '@/features/agent/api';
+import { OPEN_AGENT_CHAT_EVENT } from '@/features/agent/chat/AgentChatSheet';
 import { SETTINGS_NAV_GROUPS } from '@/layout/settings-nav-data';
+import { AGENT_ENABLED } from '@/lib/features';
+import { httpErrorDetail } from '@/lib/http';
 import { isMenuRefVisible, useIdentity } from '@/lib/identity';
 import { useEffectiveMenu } from '@/lib/use-effective-menu';
 import { cn } from '@/lib/utils';
@@ -26,11 +29,30 @@ const AGENT_SUGGESTIONS = [
 ];
 
 /**
+ * AGENT-P6-02 (#1975) — start a REAL agent run from the palette and
+ * hand the conversation to the chat sheet (same backend as P6-01).
+ */
+async function askAgent(
+  intent: string,
+  context: Record<string, unknown>,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const run = await startAgentRun(intent, 'cmdk', context);
+    window.dispatchEvent(new CustomEvent(OPEN_AGENT_CHAT_EVENT, { detail: { runId: run.id } }));
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: httpErrorDetail(error) ?? String(error) };
+  }
+}
+
+/**
  * NUI-03 (#1422) — global ⌘K palette (design `Dashboard.html` CmdK).
  * The navigation section is REAL: static routes + ObjectTypes from the
  * effective menu + settings sub-pages, fuzzy-filtered, keyboard-driven.
- * The agent section stays a MOCK until epik 0.7 / Faza 2 — suggestions
- * render with a badge and never call the API.
+ * The agent section is REAL (AGENT-P6-02): the typed query starts an
+ * agent run over the P4-01 API carrying the current pathname as view
+ * context and hands off to the chat sheet; static suggestions prefill
+ * the input. Behind the AGENT_ENABLED build flag.
  *
  * On the universal list routes (`/products`, `/objects/:slug`) the
  * list-scoped CmdKPalette (VIEW-19, bulk intents) owns the mod+k
@@ -46,7 +68,24 @@ export function GlobalCmdK() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const submitToAgent = async (intent: string): Promise<void> => {
+    const text = intent.trim();
+    if (text === '' || agentBusy) return;
+    setAgentBusy(true);
+    setAgentError(null);
+    const outcome = await askAgent(text, { pathname });
+    setAgentBusy(false);
+    if (outcome.ok) {
+      setOpen(false);
+      setQuery('');
+    } else {
+      setAgentError(outcome.error);
+    }
+  };
 
   const listOwnsShortcut = pathname === '/products' || pathname.startsWith('/objects/');
 
@@ -207,27 +246,53 @@ export function GlobalCmdK() {
             )}
           </div>
 
-          <div>
-            <div className="flex items-center gap-1.5 px-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500">
-              <Sparkles className="size-3 text-orange-500" aria-hidden />
-              {t('cmdk.section_agent', { defaultValue: 'Agent' })}
-              <MockBadge
-                tooltip={t('cmdk.agent_mock_tooltip', {
-                  defaultValue: 'MOCK — agent layer wymaga oprogramowania (epik 0.7, Faza 2)',
-                })}
-              />
+          {AGENT_ENABLED && (
+            <div>
+              <div className="flex items-center gap-1.5 px-2 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500">
+                <Sparkles className="size-3 text-orange-500" aria-hidden />
+                {t('cmdk.section_agent', { defaultValue: 'Agent' })}
+              </div>
+              {query.trim() !== '' && (
+                <button
+                  type="button"
+                  onClick={() => void submitToAgent(query)}
+                  disabled={agentBusy}
+                  data-testid="cmdk-ask-agent"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-zinc-900 hover:bg-orange-50"
+                >
+                  <Sparkles className="size-3.5 shrink-0 text-orange-500" aria-hidden />
+                  <span className="flex-1 truncate">
+                    {t('cmdk.ask_agent', { defaultValue: 'Zapytaj agenta:' })} „{query.trim()}”
+                  </span>
+                </button>
+              )}
+              <ul>
+                {AGENT_SUGGESTIONS.map((suggestion) => (
+                  <li key={suggestion}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuery(suggestion);
+                        inputRef.current?.focus();
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-zinc-700 hover:bg-zinc-100"
+                    >
+                      <Sparkles className="size-3.5 shrink-0 text-zinc-400" aria-hidden />
+                      <span className="flex-1 truncate">{suggestion}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {agentError !== null && (
+                <p
+                  className="mx-2 mt-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-900"
+                  data-testid="cmdk-agent-error"
+                >
+                  {agentError}
+                </p>
+              )}
             </div>
-            <ul className="opacity-60">
-              {AGENT_SUGGESTIONS.map((suggestion) => (
-                <li key={suggestion}>
-                  <div className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-zinc-500">
-                    <Sparkles className="size-3.5 shrink-0 text-zinc-300" aria-hidden />
-                    <span className="flex-1 truncate">{suggestion}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3 border-t border-zinc-100 bg-zinc-50/60 px-5 py-2.5 text-[10.5px] text-zinc-500">

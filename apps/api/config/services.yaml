@@ -143,6 +143,14 @@ services:
         arguments:
             $devTokenEnvironment: '%kernel.environment%'
 
+    # AGENT-P6-06 (#1979) — BYOK key settings surface. The env is read
+    # directly (not via the removable pim.agent.enabled param) so this
+    # CORE controller keeps compiling when the agent module is removed;
+    # with the flag off it simply reports agent_feature_enabled=false.
+    App\Identity\Presentation\Controller\AgentKeyController:
+        arguments:
+            $agentFeatureEnabled: '%env(bool:AGENT_ENABLED)%'
+
     App\Catalog\Application\ObjectTypeService:
         arguments:
             $enableCustomObjectTypes: '%pim.catalog.enable_custom_object_types%'
@@ -189,6 +197,47 @@ services:
     # batches reach the catalog through the real bulk-path.
     App\Catalog\Contracts\Command\PendingBatchCommitPort:
         alias: App\Catalog\Application\PendingChanges\PendingBatchCommitter
+
+    # AGENT-P3-04 (#1964) — value-canonical rollback of a committed agent
+    # batch by BulkSession id.
+    App\Catalog\Contracts\Command\BulkRollbackPort:
+        alias: App\Catalog\Application\PendingChanges\ObjectValueRollbackHandler
+
+    # AGENT-P3-05 (#1965) — category-assignment-through-approval seam.
+    App\Catalog\Contracts\Command\AssignCategoriesPort:
+        alias: App\Catalog\Application\PendingChanges\AssignCategoriesMaterializer
+
+    # AGENT-P3-06 (#1966) — export-as-action seam (no approval diff).
+    App\Export\Contracts\ExportTriggerPort:
+        alias: App\Export\Application\AgentExportTrigger
+
+    # AGENT-P5-01 (#1970) — approved schema batches replay through the
+    # structural import creators.
+    App\Import\Contracts\SchemaImportPort:
+        alias: App\Import\Application\Service\AgentSchemaImportApplier
+
+    # AGENT-P7-01 (#1981) — feed configurator seam (suggest structure on
+    # a sample + regenerate-as-action).
+    App\Export\Contracts\FeedAssistPort:
+        alias: App\Export\Feed\Application\AgentFeedAssist
+
+    # AGENT-P7-02 (#1982) — ENGINE-GATED publish seam: epics 0.8/0.9
+    # swap this alias for the real connector dispatcher.
+    App\Integration\Contracts\ChannelPublishPort:
+        alias: App\Integration\Application\UnavailableChannelPublisher
+
+    # AGENT-P8-02 (#1984) — deterministic mapping baseline for the
+    # AI-assisted column suggestions.
+    App\Import\Contracts\ColumnMappingPort:
+        alias: App\Import\Application\Service\AgentColumnMappingAssist
+
+    # AGENT-P8-01 (#1983) — proactive-scan opt-in reader.
+    App\Identity\Contracts\Byok\ByokConfigReaderInterface:
+        alias: App\Identity\Application\ByokKeyManager
+
+    # AGENT-P8-05 (#1987) — per-role agent autonomy resolver.
+    App\Identity\Contracts\Policy\AgentAutonomyResolverInterface:
+        alias: App\Identity\Infrastructure\Policy\RoleAgentAutonomyResolver
 
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
@@ -454,6 +503,11 @@ services:
     App\Identity\Contracts\Audit\DataExportAuditor:
         alias: App\Identity\Infrastructure\Audit\DataExportAuditor
 
+    # AGENT-P3-07 (#1967) — agent accountability entries in the same
+    # append-only DH Auditor (resource_type=agent_run).
+    App\Identity\Contracts\Audit\AgentActionAuditor:
+        alias: App\Identity\Infrastructure\Audit\AgentActionAuditor
+
     # AUD-053 (W3-1) — "current user" port. Lets controllers outside Identity
     # (Backup; later the Import controllers) read the authenticated principal's
     # id/tenant without importing Identity\Domain\Entity\User (deptrac:
@@ -669,4 +723,34 @@ when@test:
 
         App\Catalog\Contracts\Command\PendingBatchCommitPort:
             alias: App\Catalog\Application\PendingChanges\PendingBatchCommitter
+            public: true
+
+        # AGENT-P3-04 (#1964) — and the rollback port.
+        App\Catalog\Contracts\Command\BulkRollbackPort:
+            alias: App\Catalog\Application\PendingChanges\ObjectValueRollbackHandler
+            public: true
+
+        # AGENT-P3-05 (#1965) — and the category-assignment port.
+        App\Catalog\Contracts\Command\AssignCategoriesPort:
+            alias: App\Catalog\Application\PendingChanges\AssignCategoriesMaterializer
+            public: true
+
+        # AGENT-P3-06 (#1966) — and the export trigger port.
+        App\Export\Contracts\ExportTriggerPort:
+            alias: App\Export\Application\AgentExportTrigger
+            public: true
+
+        # AGENT-P5-01 (#1970) — and the schema commit port.
+        App\Import\Contracts\SchemaImportPort:
+            alias: App\Import\Application\Service\AgentSchemaImportApplier
+            public: true
+
+        # AGENT-P7-01 (#1981) — and the feed assist port.
+        App\Export\Contracts\FeedAssistPort:
+            alias: App\Export\Feed\Application\AgentFeedAssist
+            public: true
+
+        # AGENT-P8-02 (#1984) — and the column-mapping port.
+        App\Import\Contracts\ColumnMappingPort:
+            alias: App\Import\Application\Service\AgentColumnMappingAssist
             public: true

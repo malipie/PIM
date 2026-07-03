@@ -1425,7 +1425,9 @@
     "agent": "agent",
     "agent_phase_2": "Faza 2",
     "source": "Źródło",
-    "timestamp": "Zaktualizowano"
+    "timestamp": "Zaktualizowano",
+    "agent_tooltip": "Ustawione przez agenta",
+    "agent_run": "run"
   },
   "search": {
     "placeholder": "Szukaj…",
@@ -3600,5 +3602,100 @@
     "kbd_navigate": "nawiguj",
     "kbd_open": "otwórz",
     "kbd_close": "zamknij"
+  },
+  "agent": {
+    "chat": {
+      "open": "Otwórz czat agenta",
+      "title": "Agent PIM",
+      "empty": "Opisz, co mam zrobić — np. „ustaw cenę 100 wszystkim produktom bez ceny”. Nic nie zapiszę bez Twojej akceptacji.",
+      "placeholder": "Napisz, co zrobić…",
+      "busy_placeholder": "Agent pracuje…",
+      "input": "Wiadomość do agenta",
+      "send": "Wyślij",
+      "cancel": "Anuluj run",
+      "awaiting_approval": "Plan gotowy: {{count}} zmian czeka na Twoją akceptację.",
+      "go_to_inbox": "Przejdź do skrzynki akceptacji"
+    },
+    "status": {
+      "planning": "Planuję…",
+      "awaiting_input": "Czekam na odpowiedź",
+      "awaiting_approval": "Czeka na akceptację",
+      "committing": "Zapisuję…",
+      "done": "Zakończony",
+      "rejected": "Odrzucony",
+      "cancelled": "Anulowany",
+      "error": "Błąd",
+      "rolled_back": "Cofnięty"
+    },
+    "inbox": {
+      "title": "Skrzynka akceptacji agenta",
+      "subtitle": "Nic nie trafia do katalogu bez Twojej decyzji — przejrzyj diff i zatwierdź albo odrzuć.",
+      "loading": "Wczytywanie…",
+      "empty": "Brak propozycji czekających na akceptację.",
+      "scope": "{{count}} zmian",
+      "show_diff": "Pokaż diff",
+      "approve": "Akceptuj",
+      "reject": "Odrzuć",
+      "approved": "Zatwierdzono — {{count}} zmian zapisano.",
+      "rejected": "Odrzucono — katalog bez zmian.",
+      "diff_title": "Plan zmian",
+      "diff_scope": "{{shown}} z {{total}} pozycji planu · all-or-nothing",
+      "partial": "Częściowo (wkrótce)",
+      "partial_tooltip": "Częściowa akceptacja w przygotowaniu — MVP zatwierdza cały plan.",
+      "schema_group": "grupa",
+      "schema_attribute": "atrybut",
+      "categories": "kategorie"
+    },
+    "history": {
+      "title": "Historia runów agenta",
+      "subtitle": "Twoje runy: status, zakres, koszt i „Cofnij tę operację” dla zakończonych.",
+      "go_inbox": "Skrzynka akceptacji",
+      "loading": "Wczytywanie…",
+      "empty": "Jeszcze żadnych runów — otwórz czat agenta albo Cmd+K.",
+      "expand": "Szczegóły runu",
+      "scope": "{{count}} zmian · ",
+      "rollback": "Cofnij tę operację",
+      "tokens": "tokenów",
+      "operation": "operacja",
+      "no_tools": "Run bez wywołań narzędzi.",
+      "audit_hint": "Pełna odpowiedzialność: Ustawienia → Audyt (agent_run)"
+    },
+    "settings": {
+      "title": "AI / Agent",
+      "subtitle": "Agent działa na Twoim kluczu Anthropic (BYOK). Bez aktywnego klucza agent jest wyłączony.",
+      "loading": "Wczytywanie…",
+      "feature_off": "Warstwa agenta jest globalnie wyłączona (AGENT_ENABLED) — klucz można skonfigurować, ale runy nie wystartują.",
+      "key_heading": "Klucz Anthropic",
+      "state": "Stan",
+      "state_on": "Aktywny — agent włączony",
+      "state_disabled": "Wyłączony (soft-off)",
+      "state_missing": "Brak klucza — agent wymaga klucza",
+      "prefix": "Prefiks",
+      "last_used": "Ostatnio użyty",
+      "rotate_label": "Nowy klucz (rotacja zastępuje obecny)",
+      "set_label": "Klucz API (sk-ant-…)",
+      "save": "Zapisz",
+      "disable": "Wyłącz agenta",
+      "saved": "Klucz zapisany — agent włączony.",
+      "disabled": "Agent wyłączony dla tego tenanta.",
+      "never_plaintext": "Klucz jest szyfrowany (AES-256-GCM) i nigdy nie wraca w odpowiedziach — widzisz tylko prefiks.",
+      "transparency_heading": "Co trafia do modelu",
+      "transparency_intent": "Twoja intencja i kolejne wiadomości rozmowy.",
+      "transparency_context": "Kontekst widoku: kod typu obiektu, aktywny filtr, liczność selekcji (bez pełnych danych produktów).",
+      "transparency_results": "Wyniki narzędzi: liczniki, kody i minimalne projekcje (id, kod, nazwa, kompletność) — tylko to, co narzędzie zwróci.",
+      "transparency_never": "Nigdy: Twój klucz, hasła, tokeny API ani dane innych tenantów. Zapis do katalogu wyłącznie po Twojej akceptacji.",
+      "cost_heading": "Koszt i limity",
+      "cost_today": "Dziś",
+      "cost_month": "Ten miesiąc",
+      "runs": "runów",
+      "cap_day": "Limit dzienny",
+      "cap_month": "Limit miesięczny"
+    },
+    "phase": {
+      "planning": "Planuję…",
+      "tool-call": "Wywołuję narzędzie…",
+      "materializing": "Przygotowuję plan zmian…",
+      "committing": "Zapisuję…"
+    }
   }
 }

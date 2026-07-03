@@ -6,7 +6,9 @@ import { GlobalCmdK } from '@/components/agent/global-cmd-k';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { AgentChatSheet } from '@/features/agent/chat/AgentChatSheet';
 import { ExportsLiveBridge } from '@/features/exports/hooks/ExportsLiveBridge';
+import { AGENT_ENABLED } from '@/lib/features';
 
 import { AppFooter } from './app-footer';
 import { NotificationsInboxProvider } from './notifications-context';
@@ -55,6 +57,11 @@ export function AppLayout() {
                 <div className="min-w-0 flex-1">
                   <TopbarV2 />
                 </div>
+                {AGENT_ENABLED && (
+                  <div className="pr-2">
+                    <AgentChatSheet />
+                  </div>
+                )}
               </header>
 
               <main className="flex-1 overflow-auto p-4 md:p-6">

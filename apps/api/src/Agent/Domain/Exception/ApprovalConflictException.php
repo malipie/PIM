@@ -29,6 +29,21 @@ final class ApprovalConflictException extends RuntimeException implements HttpEx
         return new self('The pending batch had no accepted rows to commit (already decided or expired).');
     }
 
+    public static function cannotReject(string $status): self
+    {
+        return new self(\sprintf('Only a run awaiting approval can be rejected; this run is "%s".', $status));
+    }
+
+    public static function cannotCancel(string $status): self
+    {
+        return new self(\sprintf('A run in status "%s" cannot be cancelled.', $status));
+    }
+
+    public static function cannotRollback(string $status): self
+    {
+        return new self(\sprintf('Only a committed (done) run can be rolled back; this run is "%s".', $status));
+    }
+
     public function getStatusCode(): int
     {
         return 409;

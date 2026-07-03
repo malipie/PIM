@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Application;
 
+use App\Identity\Contracts\Byok\ByokConfigReaderInterface;
 use App\Identity\Contracts\Byok\ByokKeyResolverInterface;
 use App\Identity\Domain\Entity\TenantAgentConfig;
 use App\Identity\Domain\Repository\TenantAgentConfigRepositoryInterface;
@@ -11,6 +12,7 @@ use App\Shared\Application\Crypto\EncryptedSecret;
 use App\Shared\Application\Crypto\EncryptionServiceInterface;
 use App\Shared\Domain\Tenant;
 use DateTimeImmutable;
+use LogicException;
 
 /**
  * Coordinates BYOK key lifecycle for a tenant (#107 / 0.11.12):
@@ -28,7 +30,7 @@ use DateTimeImmutable;
  * through `resolveKey()` — and even there it's a transient string the
  * caller is expected to hand straight to the Anthropic SDK.
  */
-final readonly class ByokKeyManager implements ByokKeyResolverInterface
+final readonly class ByokKeyManager implements ByokConfigReaderInterface, ByokKeyResolverInterface
 {
     private const int PREFIX_LENGTH = 8;
 
@@ -99,6 +101,27 @@ final readonly class ByokKeyManager implements ByokKeyResolverInterface
         $this->configs->save($config);
 
         return $plaintext;
+    }
+
+    public function isProactiveScanEnabled(Tenant $tenant): bool
+    {
+        $config = $this->configs->findForTenant($tenant);
+
+        return null !== $config && $config->isEnabled() && $config->isProactiveScanEnabled();
+    }
+
+    /**
+     * AGENT-P8-01 (#1983) — flip the proactive-scan opt-in; requires a
+     * configured key (proactivity without an agent makes no sense).
+     */
+    public function setProactiveScan(Tenant $tenant, bool $enabled): void
+    {
+        $config = $this->configs->findForTenant($tenant);
+        if (null === $config) {
+            throw new LogicException('Configure the Anthropic key before enabling the proactive scan.');
+        }
+        $config->setProactiveScanEnabled($enabled);
+        $this->configs->save($config);
     }
 
     public function hasActiveKey(Tenant $tenant): bool

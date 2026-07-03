@@ -13,4 +13,7 @@ enum AgentRunSurface: string
 {
     case Chat = 'chat';
     case CmdK = 'cmdk';
+    // AGENT-P8-01 (#1983) — runs the proactive data-steward scan opens
+    // without a human prompt.
+    case Proactive = 'proactive';
 }

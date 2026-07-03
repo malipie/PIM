@@ -355,7 +355,9 @@ final class DetectAttributesDriftCommand extends Command
             if (null !== $value->getLocale() || null !== $value->getChannelId()) {
                 continue;
             }
-            $canon[$value->getAttribute()->getCode()] = $value->getValue();
+            // AGENT-P6-05 (#1978) — the slot carries provenance now; derive
+            // it through the rebuilder so both sides compose identically.
+            $canon[$value->getAttribute()->getCode()] = $this->rebuilder->globalSlot($value);
         }
 
         return $canon;

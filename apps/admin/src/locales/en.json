@@ -1394,7 +1394,9 @@
     "agent": "agent",
     "agent_phase_2": "Faza 2",
     "source": "Source",
-    "timestamp": "Updated"
+    "timestamp": "Updated",
+    "agent_tooltip": "Set by the agent",
+    "agent_run": "run"
   },
   "search": {
     "placeholder": "Search…",
@@ -3544,5 +3546,100 @@
     "kbd_navigate": "navigate",
     "kbd_open": "open",
     "kbd_close": "close"
+  },
+  "agent": {
+    "chat": {
+      "open": "Open agent chat",
+      "title": "PIM Agent",
+      "empty": "Tell me what to do — e.g. \"set price 100 on every product without one\". Nothing is written without your approval.",
+      "placeholder": "Type what to do…",
+      "busy_placeholder": "Agent is working…",
+      "input": "Message to the agent",
+      "send": "Send",
+      "cancel": "Cancel run",
+      "awaiting_approval": "Plan ready: {{count}} change(s) await your approval.",
+      "go_to_inbox": "Go to the approval inbox"
+    },
+    "status": {
+      "planning": "Planning…",
+      "awaiting_input": "Awaiting your reply",
+      "awaiting_approval": "Awaiting approval",
+      "committing": "Committing…",
+      "done": "Done",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled",
+      "error": "Error",
+      "rolled_back": "Rolled back"
+    },
+    "inbox": {
+      "title": "Agent approval inbox",
+      "subtitle": "Nothing reaches the catalog without your decision — review the diff and approve or reject.",
+      "loading": "Loading…",
+      "empty": "No proposals awaiting approval.",
+      "scope": "{{count}} change(s)",
+      "show_diff": "Show diff",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approved": "Approved — {{count}} change(s) committed.",
+      "rejected": "Rejected — catalog untouched.",
+      "diff_title": "Change plan",
+      "diff_scope": "{{shown}} of {{total}} plan rows · all-or-nothing",
+      "partial": "Partial (soon)",
+      "partial_tooltip": "Partial approval is a hook — MVP approves the whole plan.",
+      "schema_group": "group",
+      "schema_attribute": "attribute",
+      "categories": "categories"
+    },
+    "history": {
+      "title": "Agent run history",
+      "subtitle": "Your runs: status, scope, cost and \"Undo this operation\" for completed ones.",
+      "go_inbox": "Approval inbox",
+      "loading": "Loading…",
+      "empty": "No runs yet — open the agent chat or Cmd+K.",
+      "expand": "Run details",
+      "scope": "{{count}} change(s) · ",
+      "rollback": "Undo this operation",
+      "tokens": "tokens",
+      "operation": "operation",
+      "no_tools": "No tool calls in this run.",
+      "audit_hint": "Full accountability: Settings → Audit (agent_run)"
+    },
+    "settings": {
+      "title": "AI / Agent",
+      "subtitle": "The agent runs on your Anthropic key (BYOK). Without an active key the agent is off.",
+      "loading": "Loading…",
+      "feature_off": "The agent layer is globally disabled (AGENT_ENABLED) — you can configure the key, but runs will not start.",
+      "key_heading": "Anthropic key",
+      "state": "State",
+      "state_on": "Active — agent enabled",
+      "state_disabled": "Disabled (soft-off)",
+      "state_missing": "No key — the agent requires a key",
+      "prefix": "Prefix",
+      "last_used": "Last used",
+      "rotate_label": "New key (rotation replaces the current one)",
+      "set_label": "API key (sk-ant-…)",
+      "save": "Save",
+      "disable": "Disable agent",
+      "saved": "Key saved — agent enabled.",
+      "disabled": "Agent disabled for this tenant.",
+      "never_plaintext": "The key is encrypted (AES-256-GCM) and never returned — you only ever see the prefix.",
+      "transparency_heading": "What reaches the model",
+      "transparency_intent": "Your intent and the follow-up conversation messages.",
+      "transparency_context": "View context: object type code, the active filter, selection counts (no full product data).",
+      "transparency_results": "Tool results: counts, codes and minimal projections (id, code, name, completeness) — only what a tool returns.",
+      "transparency_never": "Never: your key, passwords, API tokens or other tenants’ data. Catalog writes happen only after your approval.",
+      "cost_heading": "Cost & limits",
+      "cost_today": "Today",
+      "cost_month": "This month",
+      "runs": "runs",
+      "cap_day": "Daily cap",
+      "cap_month": "Monthly cap"
+    },
+    "phase": {
+      "planning": "Planning…",
+      "tool-call": "Calling a tool…",
+      "materializing": "Materializing the plan…",
+      "committing": "Committing…"
+    }
   }
 }

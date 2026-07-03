@@ -8,6 +8,7 @@ use App\Shared\Domain\Tenant;
 use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use InvalidArgumentException;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -41,6 +42,14 @@ class Role
      * default stays explicit-grant.
      */
     private bool $autoGrantNewObjectTypes;
+
+    /**
+     * AGENT-P8-05 (#1987) — how much the agent may DO for holders of
+     * this role: 'off' (no agent), 'read_only' (grounding tools only),
+     * 'propose' (default - full tool surface; write/schema still always
+     * go through the approval gate).
+     */
+    private string $agentAutonomy = 'propose';
 
     private DateTimeImmutable $createdAt;
 
@@ -108,6 +117,19 @@ class Role
     public function isGlobal(): bool
     {
         return null === $this->tenant;
+    }
+
+    public function getAgentAutonomy(): string
+    {
+        return $this->agentAutonomy;
+    }
+
+    public function setAgentAutonomy(string $autonomy): void
+    {
+        if (!\in_array($autonomy, ['off', 'read_only', 'propose'], true)) {
+            throw new InvalidArgumentException(\sprintf('Unknown agent autonomy "%s" (off|read_only|propose).', $autonomy));
+        }
+        $this->agentAutonomy = $autonomy;
     }
 
     public function getCreatedAt(): DateTimeImmutable
