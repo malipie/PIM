@@ -20,6 +20,9 @@ use App\Catalog\Domain\Entity\Attribute;
  *
  * Rules:
  *   - `min_amount` (numeric)
+ *   - `max_amount` (numeric) — DP-06 (#2036): the jsonb-schemas contract
+ *     always declared it, the engine just never read it (docs drift found
+ *     while building the DP-05 rules UI)
  *   - `currencies` (list<string>) — restrict the allowed currency set, only
  *     enforced when a currency is supplied
  */
@@ -45,6 +48,10 @@ final class PriceValidator implements AttributeValueValidatorInterface
         $min = $rules['min_amount'] ?? null;
         if ((\is_int($amount) || \is_float($amount)) && (\is_int($min) || \is_float($min)) && $amount < $min) {
             $errors[] = new ValidationError('value.amount', 'price.below_min', \sprintf('Price amount %s below min %s.', (string) $amount, (string) $min));
+        }
+        $max = $rules['max_amount'] ?? null;
+        if ((\is_int($amount) || \is_float($amount)) && (\is_int($max) || \is_float($max)) && $amount > $max) {
+            $errors[] = new ValidationError('value.amount', 'price.above_max', \sprintf('Price amount %s above max %s.', (string) $amount, (string) $max));
         }
         $allowed = $rules['currencies'] ?? null;
         if (\is_string($currency) && \is_array($allowed) && !\in_array($currency, $allowed, true)) {

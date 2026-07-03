@@ -69,4 +69,55 @@ final class TextValidatorTest extends TestCase
         self::assertSame([], $ok);
         self::assertSame('text.pattern_mismatch', $bad[0]->code);
     }
+
+    #[Test]
+    public function urlFormatAcceptsValidUrlsAndRejectsGarbage(): void
+    {
+        $this->attribute->updateValidationRules(['format' => 'url']);
+
+        self::assertSame(
+            [],
+            $this->validator->validate($this->attribute, ['value' => 'http://example.com/path?q=1']),
+        );
+
+        $bad = $this->validator->validate($this->attribute, ['value' => 'not a url']);
+        self::assertSame('text.invalid_url', $bad[0]->code);
+    }
+
+    #[Test]
+    public function requireHttpsRejectsPlainHttp(): void
+    {
+        $this->attribute->updateValidationRules(['format' => 'url', 'require_https' => true]);
+
+        self::assertSame(
+            [],
+            $this->validator->validate($this->attribute, ['value' => 'https://example.com/a.pdf']),
+        );
+
+        $bad = $this->validator->validate($this->attribute, ['value' => 'http://example.com/a.pdf']);
+        self::assertSame('text.https_required', $bad[0]->code);
+    }
+
+    #[Test]
+    public function isoCountryFormatValidatesAlpha2CaseInsensitively(): void
+    {
+        $this->attribute->updateValidationRules(['format' => 'iso_country']);
+
+        self::assertSame([], $this->validator->validate($this->attribute, ['value' => 'PL']));
+        self::assertSame([], $this->validator->validate($this->attribute, ['value' => 'de']));
+
+        $bad = $this->validator->validate($this->attribute, ['value' => 'XX']);
+        self::assertSame('text.invalid_iso_country', $bad[0]->code);
+
+        $word = $this->validator->validate($this->attribute, ['value' => 'Polska']);
+        self::assertSame('text.invalid_iso_country', $word[0]->code);
+    }
+
+    #[Test]
+    public function unknownFormatKeyIsIgnored(): void
+    {
+        $this->attribute->updateValidationRules(['format' => 'some_future_format']);
+
+        self::assertSame([], $this->validator->validate($this->attribute, ['value' => 'anything']));
+    }
 }

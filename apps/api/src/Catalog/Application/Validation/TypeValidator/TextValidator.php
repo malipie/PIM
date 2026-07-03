@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Catalog\Application\Validation\TypeValidator;
 
 use App\Catalog\Application\Validation\AttributeValueValidatorInterface;
+use App\Catalog\Application\Validation\IsoCountryCodes;
 use App\Catalog\Application\Validation\ValidationError;
 use App\Catalog\Domain\Entity\Attribute;
+
+use const FILTER_VALIDATE_URL;
 
 /**
  * `text` AttributeType validator.
@@ -15,6 +18,10 @@ use App\Catalog\Domain\Entity\Attribute;
  *   - `max_length` (int): UTF-8 character cap
  *   - `min_length` (int): UTF-8 character floor
  *   - `pattern` (string): PCRE regex (must match the whole value)
+ *   - `format` (string, DP-06 #2036): `url` (valid absolute URL; add
+ *     `require_https: true` to force the https scheme) or `iso_country`
+ *     (ISO 3166-1 alpha-2 code, case-insensitive). Unknown format keys
+ *     are ignored — graceful degradation, same as IdentifierValidator.
  */
 final class TextValidator implements AttributeValueValidatorInterface
 {
@@ -41,6 +48,17 @@ final class TextValidator implements AttributeValueValidatorInterface
         $pattern = $rules['pattern'] ?? null;
         if (\is_string($pattern) && '' !== $pattern && 1 !== preg_match($pattern, $raw)) {
             $errors[] = new ValidationError('value.value', 'text.pattern_mismatch', \sprintf('Text does not match pattern %s.', $pattern));
+        }
+
+        $format = $rules['format'] ?? null;
+        if ('url' === $format) {
+            if (false === filter_var($raw, FILTER_VALIDATE_URL)) {
+                $errors[] = new ValidationError('value.value', 'text.invalid_url', \sprintf('"%s" is not a valid URL.', $raw));
+            } elseif (true === ($rules['require_https'] ?? null) && !str_starts_with(strtolower($raw), 'https://')) {
+                $errors[] = new ValidationError('value.value', 'text.https_required', \sprintf('URL "%s" must use the https scheme.', $raw));
+            }
+        } elseif ('iso_country' === $format && !IsoCountryCodes::isValid($raw)) {
+            $errors[] = new ValidationError('value.value', 'text.invalid_iso_country', \sprintf('"%s" is not an ISO 3166-1 alpha-2 country code.', $raw));
         }
 
         return $errors;
