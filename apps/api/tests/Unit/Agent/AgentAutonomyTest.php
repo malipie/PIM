@@ -68,7 +68,12 @@ final class AgentAutonomyTest extends TestCase
 
             public function autonomyForUser(Uuid $userId): string
             {
-                return \in_array($this->level, ['off', 'read_only', 'propose'], true) ? $this->level : 'off';
+                // Narrow via a local: PHPStan does not carry in_array()
+                // narrowing across repeated property fetches, so the
+                // interface's literal-union return needs the copy.
+                $level = $this->level;
+
+                return \in_array($level, ['off', 'read_only', 'propose'], true) ? $level : 'off';
             }
         };
 

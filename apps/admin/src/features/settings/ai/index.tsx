@@ -1,9 +1,10 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { KeyRound, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
-import { type AgentCostReport, getAgentCost } from '@/features/agent/api';
+import { getAgentCost } from '@/features/agent/api';
 import { httpErrorDetail, jsonFetch } from '@/lib/http';
 
 interface AgentKeyStatus {
@@ -17,6 +18,9 @@ interface AgentKeyStatus {
 }
 
 const JSON_OPTS = { contentType: 'application/json', accept: 'application/json' } as const;
+
+const AGENT_KEY_QUERY_KEY = ['settings', 'agent-key'] as const;
+const AGENT_COST_QUERY_KEY = ['settings', 'agent-cost'] as const;
 
 /**
  * AGENT-P6-06 (#1979) — BYOK settings (Piotr, PRD §4.2): set/rotate the
@@ -45,28 +49,29 @@ function CapBar({ label, pct }: { label: string; pct: number }) {
 
 export function AiSettingsPage() {
   const { t } = useTranslation();
-  const [status, setStatus] = useState<AgentKeyStatus | null>(null);
+  const queryClient = useQueryClient();
   const [draftKey, setDraftKey] = useState('');
   const [busy, setBusy] = useState(false);
-  const [cost, setCost] = useState<AgentCostReport | null>(null);
+  // ADR-0021 — the status read lives in the query cache so the PUT /
+  // DELETE mutations refresh it through invalidation, not manual state.
+  const statusQuery = useQuery({
+    queryKey: AGENT_KEY_QUERY_KEY,
+    queryFn: () => jsonFetch<AgentKeyStatus>('/api/settings/agent-key', JSON_OPTS),
+  });
+  const status = statusQuery.data ?? null;
 
-  const reload = useCallback(async () => {
-    try {
-      setStatus(await jsonFetch<AgentKeyStatus>('/api/settings/agent-key', JSON_OPTS));
-      // Best-effort: the cost panel should never block the key form.
-      try {
-        setCost(await getAgentCost());
-      } catch {
-        setCost(null);
-      }
-    } catch (error) {
-      toast.error(httpErrorDetail(error) ?? String(error));
-    }
-  }, []);
+  // Best-effort: the cost panel should never block the key form.
+  const costQuery = useQuery({
+    queryKey: AGENT_COST_QUERY_KEY,
+    queryFn: getAgentCost,
+    retry: false,
+  });
+  const cost = costQuery.data ?? null;
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  const reload = async () => {
+    await queryClient.invalidateQueries({ queryKey: AGENT_KEY_QUERY_KEY });
+    await queryClient.invalidateQueries({ queryKey: AGENT_COST_QUERY_KEY });
+  };
 
   const saveKey = async () => {
     const key = draftKey.trim();
@@ -121,10 +126,16 @@ export function AiSettingsPage() {
       </div>
 
       {status === null ? (
-        <p className="flex items-center gap-2 text-sm text-zinc-500" role="status">
-          <Loader2 className="size-4 animate-spin" aria-hidden />
-          {t('agent.settings.loading', { defaultValue: 'Wczytywanie…' })}
-        </p>
+        statusQuery.isError ? (
+          <p className="text-sm text-red-600" role="alert">
+            {httpErrorDetail(statusQuery.error) ?? String(statusQuery.error)}
+          </p>
+        ) : (
+          <p className="flex items-center gap-2 text-sm text-zinc-500" role="status">
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+            {t('agent.settings.loading', { defaultValue: 'Wczytywanie…' })}
+          </p>
+        )
       ) : (
         <>
           {!status.agent_feature_enabled && (

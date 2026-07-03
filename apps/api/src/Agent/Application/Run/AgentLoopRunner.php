@@ -165,6 +165,21 @@ final readonly class AgentLoopRunner
                     }
                 }
 
+                // A write tool (bulk edit / schema import) clears the EM
+                // mid-loop, detaching the run and the context tenant.
+                // Re-attach both before persisting the tool-result message
+                // and any status transition below (AGENT-P9-01 red-team).
+                if (!$this->entityManager->contains($run)) {
+                    $reloaded = $this->entityManager->find(AgentRun::class, $run->getId());
+                    if ($reloaded instanceof AgentRun) {
+                        $run = $reloaded;
+                    }
+                    $managedTenant = $this->entityManager->find(Tenant::class, $tenant->getId()->toRfc4122());
+                    if ($managedTenant instanceof Tenant) {
+                        $context = new AgentToolContext($run->getUserId(), $managedTenant, $run->getContext());
+                    }
+                }
+
                 $this->persistMessage($run, AgentMessage::ROLE_TOOL, $toolResults);
                 $messages[] = ['role' => 'user', 'content' => $toolResults];
             }
@@ -243,6 +258,13 @@ final readonly class AgentLoopRunner
     private function persistMessage(AgentRun $run, string $role, array $content): void
     {
         $message = new AgentMessage($run, $role, $content);
+        // Assign the run's managed tenant directly: a clearing write tool
+        // detaches the TenantContext tenant, so the TenantAssignmentListener
+        // cannot stamp this message here (AGENT-P9-01).
+        $runTenant = $run->getTenant();
+        if ($runTenant instanceof Tenant) {
+            $message->assignTenant($runTenant);
+        }
         $this->entityManager->persist($message);
         $this->entityManager->flush();
     }

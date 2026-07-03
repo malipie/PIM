@@ -74,20 +74,33 @@ final readonly class AttributesIndexedRebuilder
             if (null !== $value->getLocale() || null !== $value->getChannelId()) {
                 continue;
             }
-            // AGENT-P6-05 (#1978) — the projection carries the provenance
-            // signal (and the agent run id) so the admin's badges answer
-            // "who set this?" without touching object_values on read.
-            $slot = $value->getValue();
-            $slot['provenance'] = $value->getProvenance()->value;
-            $meta = $value->getProvenanceMeta();
-            if (isset($meta['agent_run_id']) && \is_string($meta['agent_run_id'])) {
-                $slot['provenance_meta'] = ['agent_run_id' => $meta['agent_run_id']];
-            }
-            $indexed[$value->getAttribute()->getCode()] = $slot;
+            $indexed[$value->getAttribute()->getCode()] = $this->globalSlot($value);
         }
 
         $object->updateAttributeIndex($indexed);
         $object->recordCompleteness($this->computeCompleteness($object, $values, $indexed));
+    }
+
+    /**
+     * The cache slot for one GLOBAL ObjectValue row — the value envelope
+     * enriched with the provenance signal (AGENT-P6-05, #1978) so the
+     * admin's badges answer "who set this?" without touching
+     * object_values on read. The drift detector MUST derive its expected
+     * reading through this same method: any second slot composer would
+     * make every rebuilt object report a false mismatch.
+     *
+     * @return array<string, mixed>
+     */
+    public function globalSlot(ObjectValue $value): array
+    {
+        $slot = $value->getValue();
+        $slot['provenance'] = $value->getProvenance()->value;
+        $meta = $value->getProvenanceMeta();
+        if (isset($meta['agent_run_id']) && \is_string($meta['agent_run_id'])) {
+            $slot['provenance_meta'] = ['agent_run_id' => $meta['agent_run_id']];
+        }
+
+        return $slot;
     }
 
     /**

@@ -6,6 +6,7 @@ import { toast } from '@/components/ui/toast';
 import { startAgentRun } from '@/features/agent/api';
 import { OPEN_AGENT_CHAT_EVENT } from '@/features/agent/chat/AgentChatSheet';
 import { AGENT_ENABLED } from '@/lib/features';
+import type { FilterDsl } from '@/lib/filters/filter-dsl';
 import { httpErrorDetail, jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -51,7 +52,7 @@ interface CmdKPaletteProps {
   onApplied: (result: BulkActionResult) => void;
   /** AGENT-P6-02 (#1975) — view context carried into agent runs. */
   objectTypeCode?: string;
-  filterDsl?: Record<string, unknown> | null;
+  filterDsl?: FilterDsl | null;
 }
 
 interface CmdKPlan {

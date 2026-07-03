@@ -45,35 +45,24 @@ final readonly class GuardedToolExecutor
         $tool = $this->registry->find($toolName);
         $kind = null !== $tool ? $tool->kind()->value : 'unknown';
 
-        $toolCall = new AgentToolCall($run, $toolName, $kind, $arguments);
         $startedAt = microtime(true);
+        /** @var array<string, mixed> $summary */
+        $summary = ['failed' => true];
 
         try {
             $result = $this->registry->execute($toolName, $arguments, $context);
-            $toolCall->complete(
-                $this->summarize($result),
-                rbacChecked: true,
-                durationMs: $this->elapsedMs($startedAt),
-            );
+            $summary = $this->summarize($result);
 
             return ['is_error' => false, 'content' => $result];
         } catch (ToolAccessDeniedException $denied) {
-            $toolCall->complete(
-                ['forbidden' => true],
-                rbacChecked: true,
-                durationMs: $this->elapsedMs($startedAt),
-            );
+            $summary = ['forbidden' => true];
 
             return [
                 'is_error' => true,
                 'content' => ['error' => 'forbidden', 'message' => $denied->getMessage()],
             ];
         } catch (Throwable $failure) {
-            $toolCall->complete(
-                ['failed' => true],
-                rbacChecked: true,
-                durationMs: $this->elapsedMs($startedAt),
-            );
+            $summary = ['failed' => true];
 
             // The message may reference internals; the model gets a
             // generic failure, the trace keeps the exception class only.
@@ -82,8 +71,25 @@ final readonly class GuardedToolExecutor
                 'content' => ['error' => 'tool_failed', 'exception' => $failure::class],
             ];
         } finally {
-            $this->entityManager->persist($toolCall);
-            $this->entityManager->flush();
+            // A write tool (bulk edit / schema import) clears the EM mid-run,
+            // which detaches $run - build the audit row against a MANAGED
+            // run reference so the trace persists whatever the tool did to
+            // the identity map (AGENT-P9-01 red-team surfaced this).
+            $managedRun = $this->entityManager->contains($run)
+                ? $run
+                : $this->entityManager->find(AgentRun::class, $run->getId());
+            if ($managedRun instanceof AgentRun) {
+                $toolCall = new AgentToolCall($managedRun, $toolName, $kind, $arguments);
+                // Assign the run's managed tenant directly so the persist does
+                // not depend on TenantContext still holding a managed tenant.
+                $runTenant = $managedRun->getTenant();
+                if ($runTenant instanceof \App\Shared\Domain\Tenant) {
+                    $toolCall->assignTenant($runTenant);
+                }
+                $toolCall->complete($summary, rbacChecked: true, durationMs: $this->elapsedMs($startedAt));
+                $this->entityManager->persist($toolCall);
+                $this->entityManager->flush();
+            }
         }
     }
 
