@@ -3684,6 +3684,12 @@
       "transparency_context": "Kontekst widoku: kod typu obiektu, aktywny filtr, liczność selekcji (bez pełnych danych produktów).",
       "transparency_results": "Wyniki narzędzi: liczniki, kody i minimalne projekcje (id, kod, nazwa, kompletność) — tylko to, co narzędzie zwróci.",
       "transparency_never": "Nigdy: Twój klucz, hasła, tokeny API ani dane innych tenantów. Zapis do katalogu wyłącznie po Twojej akceptacji."
+    },
+    "phase": {
+      "planning": "Planuję…",
+      "tool-call": "Wywołuję narzędzie…",
+      "materializing": "Przygotowuję plan zmian…",
+      "committing": "Zapisuję…"
     }
   }
 }
