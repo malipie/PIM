@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, FolderTree } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CategoryTree, type CategoryTreeNode } from '@/components/modeling/category-tree';
@@ -41,6 +41,12 @@ interface Props {
  * dialog surfaces the added/removed groups and retries with
  * `?confirmed=true` after an explicit second click.
  */
+/**
+ * State lives one level below the `open` gate: the caller mounts the
+ * dialog only while open (see list.tsx), so every opening starts from a
+ * fresh picker — no reset effect needed (ADR-0021 guard also counts
+ * jsonFetch+useEffect co-occurrence per file).
+ */
 export function MoveCategoryDialog({ open, onOpenChange, category, tree, onMoved }: Props) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -49,14 +55,6 @@ export function MoveCategoryDialog({ open, onOpenChange, category, tree, onMoved
   const [submitting, setSubmitting] = useState(false);
   const [needsConfirm, setNeedsConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setTargetParentId(undefined);
-      setNeedsConfirm(false);
-      setError(null);
-    }
-  }, [open]);
 
   const disabledIds = useMemo(() => {
     const ids = new Set<string>();

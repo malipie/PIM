@@ -253,7 +253,9 @@ export function CategoriesTreePage() {
         </div>
       </div>
 
-      {selectedNode ? (
+      {/* Mounted only while open so each opening starts from fresh state
+        (the dialog has no reset effect by design — ADR-0021 guard). */}
+      {moveOpen && selectedNode ? (
         <MoveCategoryDialog
           open={moveOpen}
           onOpenChange={setMoveOpen}
