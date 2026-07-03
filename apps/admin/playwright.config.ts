@@ -27,6 +27,10 @@ export default defineConfig({
   // residual cases.
   globalSetup: './e2e/global-setup.ts',
   testDir: './e2e',
+  // The GOLIVE #2126 cross-browser matrix runs Firefox + WebKit via its own
+  // dedicated config (playwright.browser-matrix.config.ts). Keep it out of the
+  // default Chromium CI lane — its console-clean gate is engine/host-specific.
+  testIgnore: '**/golive-2126-browser-matrix.spec.ts',
   fullyParallel: false,
   forbidOnly: ciMode,
   retries: ciMode ? 2 : 0,
