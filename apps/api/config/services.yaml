@@ -221,6 +221,11 @@ services:
     App\Export\Contracts\FeedAssistPort:
         alias: App\Export\Feed\Application\AgentFeedAssist
 
+    # AGENT-P7-02 (#1982) — ENGINE-GATED publish seam: epics 0.8/0.9
+    # swap this alias for the real connector dispatcher.
+    App\Integration\Contracts\ChannelPublishPort:
+        alias: App\Integration\Application\UnavailableChannelPublisher
+
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
     # "is this {value: ...} payload valid against this Attribute?" without
