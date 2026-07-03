@@ -125,6 +125,36 @@ final class AssignCategoriesFlowTest extends KernelTestCase
         self::assertSame('Unknown category.', $proposal->rejected[1]['reason']);
     }
 
+    #[Test]
+    public function selectionScopeTargetsOnlyTheSelectedObjects(): void
+    {
+        // #2153 — "add category Botki for the 2 selected products" must
+        // touch only those, not every product in the view.
+        [$em, $product, $category] = $this->fixture();
+
+        $productType = $product->getObjectType();
+        $other = new CatalogObject($productType, 'FESTO-2');
+        $em->persist($other);
+        $em->flush();
+
+        $batchId = Uuid::v7();
+        $proposal = $this->port()->materializeCategoryAssignments(
+            batchId: $batchId,
+            userId: Uuid::v7(),
+            objectTypeCode: 'product',
+            filterDsl: [],
+            categoryIds: [$category->getId()->toRfc4122()],
+            operation: 'add',
+            selectedIds: [$product->getId()->toRfc4122()],
+        );
+
+        self::assertSame(1, $proposal->affectedObjects, 'only the selected product, not FESTO-2');
+
+        $rows = $this->pendingChanges()->listBatch($batchId);
+        self::assertCount(1, $rows);
+        self::assertTrue($product->getId()->equals($rows[0]->targetObjectId ?? Uuid::v4()));
+    }
+
     /**
      * @return array{0: EntityManagerInterface, 1: CatalogObject, 2: CatalogObject}
      */

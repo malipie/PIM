@@ -62,6 +62,7 @@ final readonly class AssignCategoriesMaterializer implements AssignCategoriesPor
         array $filterDsl,
         array $categoryIds,
         string $operation,
+        ?array $selectedIds = null,
     ): CategoryAssignProposal {
         if (!\in_array($operation, self::OPERATIONS, true)) {
             throw new InvalidArgumentException(\sprintf('Unknown operation "%s" (use add, remove or move).', $operation));
@@ -85,7 +86,7 @@ final readonly class AssignCategoriesMaterializer implements AssignCategoriesPor
 
         $objectIds = [];
         if ([] !== $validCategoryIds) {
-            $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl);
+            $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl, $selectedIds);
         }
 
         $affectedObjects = 0;
@@ -135,14 +136,39 @@ final readonly class AssignCategoriesMaterializer implements AssignCategoriesPor
     }
 
     /**
+     * When $selectedIds is given (the operator's current SELECTION, #2153)
+     * it is THE selector, validated against tenant + object type so a stray
+     * id can never widen the scope. Otherwise the filter DSL is the selector
+     * ([] = every object of the type).
+     *
      * @param array<string, mixed> $filterDsl
+     * @param list<mixed>|null     $selectedIds
      *
      * @return list<string>
      */
-    private function resolveObjectIds(Tenant $tenant, ObjectType $objectType, array $filterDsl): array
+    private function resolveObjectIds(Tenant $tenant, ObjectType $objectType, array $filterDsl, ?array $selectedIds = null): array
     {
+        $params = [
+            'tenant' => $tenant->getId()->toRfc4122(),
+            'otid' => $objectType->getId()->toRfc4122(),
+        ];
+        $types = [];
         $where = '';
-        if ([] !== $filterDsl) {
+
+        if (null !== $selectedIds) {
+            $clean = [];
+            foreach ($selectedIds as $id) {
+                if (\is_string($id) && Uuid::isValid($id)) {
+                    $clean[] = $id;
+                }
+            }
+            if ([] === $clean) {
+                return [];
+            }
+            $where = ' AND co.id IN (:ids)';
+            $params['ids'] = $clean;
+            $types['ids'] = ArrayParameterType::STRING;
+        } elseif ([] !== $filterDsl) {
             $this->filterResolver->validate($filterDsl);
             $fragment = $this->filterResolver->toCountSql($filterDsl);
             if (null === $fragment) {
@@ -155,10 +181,8 @@ final readonly class AssignCategoriesMaterializer implements AssignCategoriesPor
         // Doctrine TenantFilter); RLS is the backstop.
         $rows = $this->entityManager->getConnection()->fetchFirstColumn(
             'SELECT co.id FROM objects co WHERE co.tenant_id = :tenant AND co.object_type_id = :otid'.$where,
-            [
-                'tenant' => $tenant->getId()->toRfc4122(),
-                'otid' => $objectType->getId()->toRfc4122(),
-            ],
+            $params,
+            $types,
         );
 
         $ids = [];
