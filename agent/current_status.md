@@ -52,6 +52,16 @@
 - **Kluczowe odkrycia researchu:** backend move kategorii KOMPLETNY (`PATCH /api/categories/{id}/move` + move-impact, tylko FE brak — DP-01 #2031); „user bez maila" = email zostaje loginem, luka to admin set-password z panelu (DP-02 #2032); silnik walidacji atrybutów pokrywa ~70% listy PIMCore-minimum (23 klucze reguł, checksums GTIN/EAN), brak tylko UI konfiguracji (DP-05 #2035).
 - **Kolejność sugerowana:** DP-03 #2033 (nav: kanały+locale→Modelowanie) → DP-04 #2034 (filtr atrybutów po grupie) → DP-01 → DP-05 → DP-02 → DP-06 #2036 (iso_country/url) → DP-07 #2037 (cross-field validation, **needs-planning/ADR**) → DP-08 #2039 (conditional visibility, blocked by #2037) → DP-09 #2038 (jednostki bazowe, optional).
 
+## 2026-07-03: Epik GOLIVE — plan testów przedprodukcyjnych (backlog utworzony, realizacja niezaczęta)
+- **Co:** plan wszystkich finalnych testów przed go-live. Dokument `Project Plan/15-plan-testow-przedprodukcyjnych.md`. Label `epik-GOLIVE`, milestone #51, **23 issues #2119–#2141** w 3 blokach sekwencyjnych.
+- **Blok A (równolegle z epikami DP/FE, ~40–55h):** handover-readiness audit (cold-start #2119 + struktura/dług #2120 + licencje/raport #2121), restore drill pgBackRest+PITR #2122, threat-model+security-checklist #2123, przygotowanie load k6+seed50k #2124, fresh-install migracje/reindex #2125, i18n+przeglądarki #2126.
+- **Blok B (po code freeze, ~50–70h):** baseline CI #2127, load 50k+endurance #2128, red-team 15-pkt #2129, regresja 5 CRITICAL #2130, **deep audit multi-agent** (setup+taint #2131 → sweep+weryfikacja #2132 → PoC regresyjny #2133), izolacja tenantów na żywo #2134, smoke krytycznych ścieżek #2135, agent live LLM #2136, chaos+alerting #2137.
+- **Blok C (produkcja+launch, ~25–35h):** deploy prod+TLS+sekrety #2138, SMTP+monitoring+rollback #2139, RODO+prawne #2140, UAT IdoSell+soft launch #2141.
+- **Lokalnie vs hosting:** Blok A i B w pełni lokalnie na `pim.localhost` (B6 wymaga klucza Anthropic, nie hostingu; B1 = CI). Blok C wymaga hostingu — nie da się lokalnie tylko: deliverability SMTP (SPF/DKIM/inbox) i soft launch (dostęp partnerów). Load p95 lokalnie = proxy, bezwzględny gate <300ms potwierdzić na prod-podobnym HW.
+- **B3+ deep audit (dodane na życzenie operatora):** semantyczne śledzenie taint (źródło→ujście) ponad skanery; wiel-agentowy fan-out + adwersaryjna weryfikacja; PoC regresyjny (proof-of-fix) dla każdego HIGH/CRITICAL. Tickety security mają defensywny framing autoryzacyjny (redukcja dual-use model-switch). Kompensuje brak zewnętrznego pentestu (odłożony do fazy SaaS — residual risk zaakceptowany).
+- **Blokery:** klucz API Anthropic (B6 #2136), wybór hostingu (C1a #2138).
+- **Następny krok:** Blok A startuje od razu. Blok B po zamrożeniu kodu (koniec DP+FE). PR planu: #2143 (czysty rebuild po tym jak #2142 odbił się od nieaktualnego detached HEAD).
+
 ## APIC — postęp implementacji (2026-06-28/29)
 - **M1 Consumer Foundation:** P1-01..09 + P1-07 hub (#1816), P1-08 wizard 1–2 (#1817).
 - **M2 Descriptor + Mapping (KOMPLETNE):** P2-01..09 (#1818–#1826). P2-10/11 = deferred §7 hooks.
