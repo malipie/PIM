@@ -697,7 +697,11 @@ export function UserDetailPage() {
         </div>
       </div>
 
-      <SetPasswordModal user={user} open={setPasswordOpen} onOpenChange={setSetPasswordOpen} />
+      {/* Mounted only while open so each opening starts from fresh state
+        (the modal has no reset effect by design — ADR-0021 guard). */}
+      {setPasswordOpen ? (
+        <SetPasswordModal user={user} open={setPasswordOpen} onOpenChange={setSetPasswordOpen} />
+      ) : null}
     </div>
   );
 }

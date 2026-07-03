@@ -1,5 +1,5 @@
 import { KeyRound } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
@@ -31,18 +31,13 @@ export function SetPasswordModal({
   onDone?: () => void;
 }) {
   const { t } = useTranslation();
+  // No reset effect by design (ADR-0021 guard counts jsonFetch+useEffect
+  // co-occurrence): the caller mounts the modal only while open, so every
+  // opening starts from fresh state.
   const [password, setPassword] = useState('');
   const [forceChange, setForceChange] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setPassword('');
-      setForceChange(true);
-      setError(null);
-    }
-  }, [open]);
 
   const submit = async () => {
     if (password.length < 12 || submitting) return;
