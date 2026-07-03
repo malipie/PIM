@@ -30,18 +30,20 @@ interface Props {
 }
 
 const IDENTIFIER_FORMATS = ['', 'ean13', 'gtin14', 'isbn13', 'isbn10'] as const;
+// DP-06 (#2036) — text carries its own format family (TextValidator).
+const TEXT_FORMATS = ['', 'url', 'iso_country'] as const;
 const COLOR_FORMATS = ['hex', 'rgb'] as const;
 
 /** Per-type map of which editors render. Types absent here have no configurable rules. */
 const TYPE_FIELDS: Record<string, readonly string[]> = {
-  text: ['min_length', 'max_length', 'pattern'],
+  text: ['min_length', 'max_length', 'text_format', 'pattern'],
   textarea: ['min_length', 'max_length'],
   wysiwyg: ['max_length'],
   email: ['pattern'],
   identifier: ['format', 'pattern'],
   number: ['min', 'max', 'decimal_precision'],
   metric: ['min', 'max', 'decimal_precision', 'units'],
-  price: ['min_amount', 'currencies'],
+  price: ['min_amount', 'max_amount', 'currencies'],
   date: ['min', 'max'],
   datetime: ['min', 'max'],
   multiselect: ['min_count', 'max_count'],
@@ -132,6 +134,16 @@ export function ValidationRulesSection({ type, value, onChange, disabled }: Prop
           disabled={disabled}
         />
       ) : null}
+      {fields.includes('max_amount') ? (
+        <RuleField
+          id="rule-max-amount"
+          label={t('attributes.rules.max_amount', { defaultValue: 'Maks. kwota' })}
+          placeholder="np. 9999"
+          value={value.max_amount}
+          onChange={(v) => set('max_amount', toNumber(v))}
+          disabled={disabled}
+        />
+      ) : null}
       {fields.includes('min_count') ? (
         <NumberField
           id="rule-min-count"
@@ -197,6 +209,57 @@ export function ValidationRulesSection({ type, value, onChange, disabled }: Prop
               </option>
             ))}
           </select>
+        </div>
+      ) : null}
+      {fields.includes('text_format') ? (
+        <div>
+          <Label
+            className="text-[11.5px] font-medium text-muted-foreground"
+            htmlFor="rule-text-format"
+          >
+            {t('attributes.rules.text_format', { defaultValue: 'Format wartości' })}
+          </Label>
+          <select
+            id="rule-text-format"
+            value={typeof value.format === 'string' ? value.format : ''}
+            onChange={(e) => {
+              const next = { ...value };
+              if (e.target.value === '') {
+                delete next.format;
+                delete next.require_https;
+              } else {
+                next.format = e.target.value;
+                if (e.target.value !== 'url') delete next.require_https;
+              }
+              onChange(next);
+            }}
+            disabled={disabled}
+            className="mt-1.5 h-10 w-full rounded-md border border-input bg-background px-3 font-mono text-sm"
+          >
+            {TEXT_FORMATS.map((f) => (
+              <option key={f} value={f}>
+                {f === ''
+                  ? t('attributes.rules.format_none', { defaultValue: '— brak —' })
+                  : f === 'url'
+                    ? t('attributes.rules.text_format_url', { defaultValue: 'URL' })
+                    : t('attributes.rules.text_format_iso_country', {
+                        defaultValue: 'Kod kraju (ISO 3166-1)',
+                      })}
+              </option>
+            ))}
+          </select>
+          {value.format === 'url' ? (
+            <label className="mt-2 flex items-center gap-2 text-[12px] text-zinc-700">
+              <input
+                type="checkbox"
+                checked={value.require_https === true}
+                onChange={(e) => set('require_https', e.target.checked ? true : undefined)}
+                disabled={disabled}
+                className="size-3.5 accent-zinc-900"
+              />
+              {t('attributes.rules.require_https', { defaultValue: 'Wymagaj https' })}
+            </label>
+          ) : null}
         </div>
       ) : null}
       {fields.includes('color_format') ? (
