@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Loader2, MessageSquare, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, MessageSquare, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -8,7 +8,9 @@ import {
   type AgentRunDetail,
   type AgentRunStatus,
   type AgentRunSummary,
+  cancelAgentRun,
   getAgentRun,
+  isRunTerminal,
   listAgentRuns,
   rollbackAgentRun,
 } from '@/features/agent/api';
@@ -85,6 +87,22 @@ export function AgentHistoryPage() {
       await reload();
     } catch (error) {
       // P5-04 boundary: a schema-op with data refuses with reasons.
+      setRollbackError(httpErrorDetail(error) ?? String(error));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // A non-terminal run (awaiting_input left unanswered, a stuck plan)
+  // blocks starting a new one ("1 active run per user"). Cancelling it
+  // here is the escape hatch so the user isn't wedged.
+  const cancel = async (run: AgentRunSummary) => {
+    setBusyId(run.id);
+    setRollbackError(null);
+    try {
+      await cancelAgentRun(run.id);
+      await reload();
+    } catch (error) {
       setRollbackError(httpErrorDetail(error) ?? String(error));
     } finally {
       setBusyId(null);
@@ -187,6 +205,18 @@ export function AgentHistoryPage() {
                   >
                     <MessageSquare className="mr-1 size-3.5" aria-hidden />
                     {t('agent.history.continue', { defaultValue: 'Kontynuuj w czacie' })}
+                  </Button>
+                )}
+                {!isRunTerminal(run.status) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busyId === run.id}
+                    onClick={() => void cancel(run)}
+                    data-testid="agent-history-cancel"
+                  >
+                    <X className="mr-1 size-3.5" aria-hidden />
+                    {t('agent.history.cancel', { defaultValue: 'Anuluj run' })}
                   </Button>
                 )}
                 {run.status === 'done' && (
