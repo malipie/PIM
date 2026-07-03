@@ -13,10 +13,13 @@ namespace App\Export\Domain\Enum;
  *   (Marcin snapshot path).
  * `saved_profile_run` — `POST /api/exports/profiles/{id}/run`
  *   one-click rerun.
+ * `agent` — triggered by the agent's trigger_export tool
+ *   (AGENT-P3-06); same pipeline, distinct provenance for telemetry.
  */
 enum ExportSource: string
 {
     case ListContext = 'list_context';
     case CentralTab = 'central_tab';
     case SavedProfileRun = 'saved_profile_run';
+    case Agent = 'agent';
 }
