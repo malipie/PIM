@@ -1,5 +1,5 @@
 import { useOne } from '@refinedev/core';
-import { ArrowLeft, Pencil } from 'lucide-react';
+import { ArrowLeft, FolderTree, Pencil } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
@@ -135,8 +135,19 @@ export function CategoryShowPage() {
         ) : null}
         <p className="font-mono text-[12px] text-ink-2">{category.code}</p>
         {category.path ? (
-          <p className="text-[12px] text-muted-foreground">
-            {t('categories.fields.path')}: <code className="font-mono">{category.path}</code>
+          <p className="flex items-center gap-2 text-[12px] text-muted-foreground">
+            <span>
+              {t('categories.fields.path')}: <code className="font-mono">{category.path}</code>
+            </span>
+            {/* DP-01 (#2031) — the Move dialog needs the full per-OT tree,
+              which only the list page has loaded; deep-link there with
+              `?move=1` so it auto-opens for this node. */}
+            <Button asChild size="sm" variant="ghost" className="h-6 gap-1 rounded-lg px-2">
+              <Link to={`/modeling/categories?selected=${category.id}&move=1`}>
+                <FolderTree className="size-3" />
+                {t('categories.move_action', { defaultValue: 'Przenieś' })}
+              </Link>
+            </Button>
           </p>
         ) : null}
       </div>

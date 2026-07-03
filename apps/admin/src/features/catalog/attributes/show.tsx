@@ -28,6 +28,11 @@ import {
   RelationConfigPanel,
   type RelationConfigValue,
 } from '@/components/modeling/relation-config-panel';
+import {
+  hasValidationRulesUi,
+  type ValidationRules,
+  ValidationRulesSection,
+} from '@/components/modeling/validation-rules-section';
 import { WhereUsedList } from '@/components/modeling/where-used-list';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -178,6 +183,15 @@ function Editor({
     previewFields: attribute.relationPreviewFields ?? [],
   });
 
+  // DP-05 (#2035) — per-type validation rules editor. Holds the FULL
+  // validationRules object (unknown keys like advanced_fields pass through
+  // untouched); only rendered for non-relation types, so it never races the
+  // relation save path that also writes validationRules.
+  const initialRules: ValidationRules = { ...(attribute.validationRules ?? {}) };
+  const [rules, setRules] = useState<ValidationRules>(initialRules);
+  const rulesDirty =
+    attribute.type !== 'relation' && JSON.stringify(rules) !== JSON.stringify(initialRules);
+
   // MODR-08 follow-up — fetch `relationPreviewFields` from a dedicated
   // endpoint because ApiPlatform's GET /api/attributes/{id} omits the
   // property from its JSON-LD response (PropertyInfo discovery quirk —
@@ -254,6 +268,7 @@ function Editor({
     scopable !== (attribute.scopable ?? false),
     filterable !== (attribute.filterable ?? false),
     relationDirty,
+    rulesDirty,
   ].filter(Boolean).length;
   const dirty = dirtyFields > 0;
 
@@ -268,6 +283,7 @@ function Editor({
     setLocalizable(attribute.localizable ?? false);
     setScopable(attribute.scopable ?? false);
     setFilterable(attribute.filterable ?? false);
+    setRules(initialRules);
     setError(null);
   };
 
@@ -304,6 +320,11 @@ function Editor({
         body.relationPreviewFields = relationConfig.previewFields
           .map((c) => c.trim())
           .filter((c) => c !== '');
+      }
+      if (rulesDirty) {
+        // DP-05 (#2035) — full-object write: the editor preserved any keys
+        // it does not render, so no merge is needed here.
+        body.validationRules = rules;
       }
       await jsonFetch(`/api/attributes/${attribute.id}`, {
         method: 'PATCH',
@@ -559,6 +580,26 @@ function Editor({
               />
             </div>
           </div>
+
+          {hasValidationRulesUi(attribute.type) ? (
+            <div className="mt-6 border-t border-zinc-100 pt-6">
+              <div className="mb-3 text-[11.5px] font-medium text-muted-foreground">
+                {t('attributes.rules.section_title', { defaultValue: 'Reguły walidacji' })}
+              </div>
+              <p className="mb-3 text-[11.5px] text-muted-foreground">
+                {t('attributes.rules.section_hint', {
+                  defaultValue:
+                    'Reguły walidacji wartości — egzekwowane przy każdym zapisie (ręcznym, imporcie, agencie).',
+                })}
+              </p>
+              <ValidationRulesSection
+                type={attribute.type}
+                value={rules}
+                onChange={setRules}
+                disabled={isSystem || saving}
+              />
+            </div>
+          ) : null}
         </Card>
 
         {isOption ? <AllowedValuesCard attribute={attribute} locale={locale} /> : null}
