@@ -1034,6 +1034,13 @@
     "back": "Wróć do atrybutów",
     "filter_type": "Typ",
     "filter_all": "Wszystkie",
+    "filter": {
+      "all": "wszystkie",
+      "system": "system",
+      "group": "Grupa atrybutów",
+      "group_search": "Szukaj grupy…",
+      "group_empty": "Brak grup"
+    },
     "empty": "Brak atrybutów dla aktualnego najemcy.",
     "write_deferred_note": "Ręczne tworzenie / edycja / drag-and-drop są odroczone do agentowego flow schema-add (Faza 2). Seeder dostarcza MVP zestaw atrybutów.",
     "fields": {

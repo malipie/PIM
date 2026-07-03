@@ -920,6 +920,18 @@
                         },
                         "style": "form",
                         "explode": true
+                    },
+                    {
+                        "name": "attributeGroup",
+                        "in": "query",
+                        "description": "Scope the collection to attributes assigned to the given AttributeGroup (UUID). Matches both the attribute_group_attributes junction (ADR-012) and the legacy attributes.group_id FK (ADR-009).",
+                        "required": false,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "form",
+                        "explode": false
                     }
                 ],
                 "x-cortex-permission": "attribute.read"
