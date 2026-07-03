@@ -13,6 +13,11 @@ import {
   type RelationConfigValue,
 } from '@/components/modeling/relation-config-panel';
 import { SettingToggleRow } from '@/components/modeling/setting-toggle-row';
+import {
+  hasValidationRulesUi,
+  type ValidationRules,
+  ValidationRulesSection,
+} from '@/components/modeling/validation-rules-section';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -123,6 +128,11 @@ export function AttributeCreatePage() {
   // cardinality before submit.
   const [relationConfig, setRelationConfig] =
     useState<RelationConfigValue>(DEFAULT_RELATION_CONFIG);
+
+  // DP-05 (#2035) — per-type validation rules. Reset on type switch: keys
+  // are type-specific (min_length for text vs min for number) and stale
+  // keys from a previous type would 422 or silently no-op.
+  const [validationRules, setValidationRules] = useState<ValidationRules>({});
   const objectTypesQuery = useQuery<ObjectTypePickerRow[]>({
     queryKey: ['relation-config', 'object_types'],
     queryFn: async () => {
@@ -163,6 +173,9 @@ export function AttributeCreatePage() {
         }
         const preview = relationConfig.previewFields.map((c) => c.trim()).filter((c) => c !== '');
         if (preview.length > 0) body.relationPreviewFields = preview;
+      } else if (Object.keys(validationRules).length > 0) {
+        // DP-05 (#2035) — per-type rules configured in the Walidacja section.
+        body.validationRules = validationRules;
       }
 
       const response = await jsonFetch<{ id?: string }>('/api/attributes', {
@@ -349,6 +362,7 @@ export function AttributeCreatePage() {
                   type="button"
                   onClick={() => {
                     setValues({ ...values, type });
+                    setValidationRules({});
                     // MODR-07 (#929) — picking `relation` pre-selects the
                     // built-in "Powiązania" group as the default home for
                     // the new attribute. Operator can still remove it from
@@ -435,6 +449,22 @@ export function AttributeCreatePage() {
                 onChange={(next) => setValues({ ...values, filterable: next })}
               />
             </div>
+            {hasValidationRulesUi(values.type) ? (
+              <div className="mt-4 border-t border-zinc-100 pt-4">
+                <p className="mb-3 text-[11.5px] text-muted-foreground">
+                  {t('attributes.rules.section_hint', {
+                    defaultValue:
+                      'Reguły walidacji wartości — egzekwowane przy każdym zapisie (ręcznym, imporcie, agencie).',
+                  })}
+                </p>
+                <ValidationRulesSection
+                  type={values.type}
+                  value={validationRules}
+                  onChange={setValidationRules}
+                  disabled={submitting}
+                />
+              </div>
+            ) : null}
           </Section>
 
           <Section
