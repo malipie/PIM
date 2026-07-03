@@ -47,10 +47,12 @@
 - **⚠️ Working tree współdzielony:** w trakcie maratonu pojawiły się cudze unstaged bumpy manifestów (composer/package jak z dependabota) → odłożone na `git stash` (label `foreign-worktree-changes`); vendor w kontenerze zdryfował do phpstan 2.2.3 przy locku 2.2.2 → naprawione `composer install`.
 - **Następny krok:** merge #2069→P2-02→P2-03 i #2079→#2080; potem M3 (P3-01 bulk_edit_values → P3-02 approve/commit → P3-03 reject/cancel → P3-04 rollback → P3-05 kategorie → P3-06 trigger_export → P3-07 audyt) = UC2, dalej M4 API → M6 FE.
 
-## 2026-07-02: Epik DP — Drobne poprawki (backlog utworzony, implementacja niezaczęta)
-- **Co:** lista drobnych poprawek operatora (kategorie/users/nawigacja/atrybuty/walidacje) zinterpretowana z researchem kodu (5 agentów Explore) i rozpisana na backlog. Label `epik-DP`, 9 issues **#2031–#2039** (DP-01..DP-09), bez pliku backlogu w Project Plan (decyzja operatora: label only).
-- **Kluczowe odkrycia researchu:** backend move kategorii KOMPLETNY (`PATCH /api/categories/{id}/move` + move-impact, tylko FE brak — DP-01 #2031); „user bez maila" = email zostaje loginem, luka to admin set-password z panelu (DP-02 #2032); silnik walidacji atrybutów pokrywa ~70% listy PIMCore-minimum (23 klucze reguł, checksums GTIN/EAN), brak tylko UI konfiguracji (DP-05 #2035).
-- **Kolejność sugerowana:** DP-03 #2033 (nav: kanały+locale→Modelowanie) → DP-04 #2034 (filtr atrybutów po grupie) → DP-01 → DP-05 → DP-02 → DP-06 #2036 (iso_country/url) → DP-07 #2037 (cross-field validation, **needs-planning/ADR**) → DP-08 #2039 (conditional visibility, blocked by #2037) → DP-09 #2038 (jednostki bazowe, optional).
+## 2026-07-03: Epik DP — Drobne poprawki (MARATON w toku)
+- **Backlog:** label `epik-DP`, 9 issues **#2031–#2039** (DP-01..DP-09); research 5 agentów Explore (2026-07-02).
+- **Postęp maratonu:** DP-03 ✅ **MERGED** (PR #2166, kanały+locale→Modelowanie z redirectami) · DP-04 ✅ **MERGED** (PR #2167, `?attributeGroup=` filtr junction-OR-legacy + combobox z URL-state) · DP-01 PR #2168 (MoveCategoryDialog; fix: reset-effect usunięty pod guard ADR-0021 jsonFetch+useEffect) · DP-05 PR #2169 (ValidationRulesSection per-typ + live-tester regexa) · DP-02 PR #2170 (`POST /api/users/{id}/password` + `revokeAllForUser` + modal; gitleaks:allow na dummy-hasłach e2e wymagał amend) · DP-06 branch (iso_country/url/require_https + price max_amount — **dryf docs↔engine domknięty**; UI wiring po merge DP-05).
+- **Live smoki (wszystkie na pim.localhost):** DP-04 filtr 125→37; DP-05 `max_length=3` → 422 na produkcie; DP-02 pełny cykl konta bez skrzynki (201→204→login nowym hasłem 200→self-reset 409→deactivate 200); DP-06 „Polska"→422/„PL"→200 + http→422/https→200.
+- **CI gotchas maratonu:** merge do main anuluje in-flight Playwrighty innych PR-ów (150 passed + „operation was canceled" = rerun, nie debug); gitleaks skanuje per-commit → allow-comment musi być w TYM SAMYM commicie (amend+force-push).
+- **Pozostało:** DP-07 #2037 (cross-field validation — **ADR + Plan Mode przed implementacją**) → DP-08 #2039 (blocked by #2037) → DP-09 #2038 (optional — default per ticket body: nie podejmować bez realnej potrzeby).
 
 ## APIC — postęp implementacji (2026-06-28/29)
 - **M1 Consumer Foundation:** P1-01..09 + P1-07 hub (#1816), P1-08 wizard 1–2 (#1817).

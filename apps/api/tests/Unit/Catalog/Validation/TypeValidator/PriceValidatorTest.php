@@ -60,4 +60,15 @@ final class PriceValidatorTest extends TestCase
         self::assertSame('price.below_min', $low[0]->code);
         self::assertSame('price.unsupported_currency', $unsupported[0]->code);
     }
+
+    #[Test]
+    public function maxAmountEnforced(): void
+    {
+        $this->attribute->updateValidationRules(['max_amount' => 100]);
+
+        self::assertSame([], $this->validator->validate($this->attribute, ['amount' => 99.99]));
+
+        $high = $this->validator->validate($this->attribute, ['amount' => 100.01]);
+        self::assertSame('price.above_max', $high[0]->code);
+    }
 }

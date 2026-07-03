@@ -97,7 +97,8 @@ Schema unionowa — pole `validation_rules` jest interpretowane przez validator 
     "min_length":   { "type": "integer", "minimum": 0, "description": "text, wysiwyg" },
     "pattern":      { "type": "string", "description": "text, email — regex JS-compatible (email: extra domain allow-list on top of RFC 5322 check)" },
     "color_format": { "enum": ["hex", "rgb"], "description": "color (#1177) — `hex` (#RRGGBB, default) or `rgb` (rgb(r, g, b))" },
-    "format":       { "enum": ["ean13", "gtin14", "isbn13", "isbn10"], "description": "identifier (#1179) — digit count + check digit (GTIN mod-10 / ISBN-10 mod-11)" },
+    "format":       { "enum": ["ean13", "gtin14", "isbn13", "isbn10", "url", "iso_country"], "description": "identifier (#1179) — digit count + check digit (GTIN mod-10 / ISBN-10 mod-11); text (DP-06 #2036) — `url` (valid absolute URL) or `iso_country` (ISO 3166-1 alpha-2, case-insensitive)" },
+    "require_https": { "type": "boolean", "description": "text (DP-06 #2036) — z `format: url` wymusza schemat https" },
     "min":          { "type": ["number", "string"], "description": "number, metric, price (number); date, datetime (ISO 8601 string — floor)" },
     "max":          { "type": ["number", "string"], "description": "number, metric, price (number); date, datetime (ISO 8601 string — ceil)" },
     "min_amount":   { "type": "number", "description": "price — wymóg na amount" },
@@ -120,6 +121,8 @@ Schema unionowa — pole `validation_rules` jest interpretowane przez validator 
 { "min": 0, "currencies": ["PLN", "EUR", "USD"] } // price
 { "max_count": 5 }                                 // tags (multiselect)
 { "min_date": "2020-01-01" }                       // release_date (date)
+{ "format": "url", "require_https": true }         // datasheet_url (text)
+{ "format": "iso_country" }                        // country_of_origin (text)
 ```
 
 ### Notki
