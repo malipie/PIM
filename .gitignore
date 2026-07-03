@@ -115,3 +115,4 @@ docker-compose.override.yml
 
 # Audyt 2026-06 — surowe outputy skanerów (regenerowalne, entropia myli secret-scan)
 docs/audit/2026-06/raw/
+scripts/load/results/
