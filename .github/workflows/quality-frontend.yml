@@ -86,7 +86,10 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20 got outgrown by the suite (~16.5m tests + ~4m stack setup): the job
+    # died as "canceled" AFTER "15x passed", masquerading as merge-ref flake.
+    # Keep headroom; revisit when the suite gets sharded.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
