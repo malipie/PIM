@@ -165,6 +165,17 @@ class PendingChange implements TenantScoped
         return $this->meta;
     }
 
+    /**
+     * AGENT-P5-04 (#1973) — shallow-merge producer/commit annotations
+     * (e.g. schema_outcome: created|updated) into the meta payload.
+     *
+     * @param array<string, mixed> $patch
+     */
+    public function mergeMeta(array $patch): void
+    {
+        $this->meta = array_merge($this->meta ?? [], $patch);
+    }
+
     public function getCostUsd(): ?string
     {
         return $this->costUsd;

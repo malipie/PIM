@@ -11,7 +11,6 @@ use App\Agent\Application\Tool\ToolKind;
 use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentRun;
-use App\Agent\Domain\Exception\ApprovalConflictException;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangeStatus;
 use App\Catalog\Contracts\PendingChanges\PendingChangeType;
@@ -115,13 +114,12 @@ final class AgentSchemaFlowTest extends KernelTestCase
         $again = $this->approval()->approve($run->getId(), Uuid::v7());
         self::assertTrue($approved->getBulkOperationId()?->equals($again->getBulkOperationId() ?? Uuid::v4()) ?? false);
 
-        // Schema rollback boundary: refused until P5-04, never a 500.
-        try {
-            $this->approval()->rollback($run->getId());
-            self::fail('schema rollback must refuse before P5-04');
-        } catch (ApprovalConflictException $conflict) {
-            self::assertStringContainsString('P5-04', $conflict->getMessage());
-        }
+        // Schema rollback (P5-04): the created, still-dataless schema
+        // rolls back cleanly - detailed boundaries in AgentSchemaRollbackTest.
+        $rolledBack = $this->approval()->rollback($run->getId());
+        self::assertSame(AgentRunStatus::RolledBack, $rolledBack->getStatus());
+        $group = $conn->fetchOne("SELECT COUNT(*) FROM attribute_groups WHERE code = 'dimensions'");
+        self::assertSame(0, (int) (\is_scalar($group) ? $group : -1));
     }
 
     /**

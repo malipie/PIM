@@ -154,6 +154,16 @@ final class PendingChangesService implements PendingChangesPort
         return $this->transition($batchId, PendingChangeStatus::Expired);
     }
 
+    public function annotate(Uuid $changeId, array $meta): void
+    {
+        $change = $this->entityManager->find(PendingChange::class, $changeId);
+        if (!$change instanceof PendingChange) {
+            return;
+        }
+        $change->mergeMeta($meta);
+        $this->entityManager->flush();
+    }
+
     private function transition(Uuid $batchId, PendingChangeStatus $target): int
     {
         // Bulk DQL UPDATE bypasses the Doctrine TenantFilter (SQLFilter only

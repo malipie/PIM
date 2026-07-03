@@ -230,13 +230,18 @@ final readonly class AgentApprovalService
 
         $batchId = $run->getPendingChangeBatchId();
         if ($batchId instanceof Uuid && $this->isSchemaBatch($batchId)) {
-            // AGENT-P5-04 (#1973) delivers dataless-only schema rollback;
-            // until then a schema run refuses instead of 500ing on a
-            // BulkSession lookup that never existed.
-            throw ApprovalConflictException::cannotRollback('schema (rollback boundaries land in P5-04)');
-        }
+            // AGENT-P5-04 (#1973) — dataless-only boundary: delete what the
+            // batch CREATED, and only when no data/attachments exist; any
+            // offender blocks the WHOLE rollback with reasons.
+            $schemaResult = $this->schemaCommits->rollbackSchemaBatch($batchId);
+            if (!$schemaResult->performed) {
+                $reasons = implode(' ', array_map(static fn (array $b): string => $b['reason'], $schemaResult->blocked));
 
-        $this->rollbacks->rollbackSession($bulkOperationId);
+                throw ApprovalConflictException::cannotRollback('schema: '.$reasons);
+            }
+        } else {
+            $this->rollbacks->rollbackSession($bulkOperationId);
+        }
 
         // The rollback handler's per-chunk clear() detached the run.
         $run = $this->reload($runId);
