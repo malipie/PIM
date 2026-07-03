@@ -80,7 +80,7 @@ final class AgentLoopRunnerTest extends KernelTestCase
     }
 
     #[Test]
-    public function writeToolMaterializationStopsAtAwaitingApproval(): void
+    public function writeToolMaterializationEndsAtAwaitingApproval(): void
     {
         [$run, $tenant, $em] = $this->fixture();
 
@@ -88,8 +88,9 @@ final class AgentLoopRunnerTest extends KernelTestCase
             new AgentLlmResponse('tool_use', [
                 ['type' => 'tool_use', 'id' => 'tu_1', 'name' => 'fake_write', 'input' => ['value' => 100]],
             ], 900, 150),
-            // Would be a next turn — the loop must never request it.
-            new AgentLlmResponse('end_turn', [['type' => 'text', 'text' => 'unreachable']], 1, 1),
+            // AGENT-P8-03 — the loop lets the model close its plan with a
+            // summary turn; approval happens at end_turn.
+            new AgentLlmResponse('end_turn', [['type' => 'text', 'text' => 'Plan gotowy.']], 100, 20),
         ]);
 
         $this->runner($llm, $em, [new PingTool(), $this->fakeWriteTool()])->run($run, $tenant);
@@ -97,7 +98,33 @@ final class AgentLoopRunnerTest extends KernelTestCase
         self::assertSame(AgentRunStatus::AwaitingApproval, $run->getStatus());
         self::assertSame(self::BATCH_ID, $run->getPendingChangeBatchId()?->toRfc4122());
         self::assertSame(1800, $run->getAffectedCount());
-        self::assertSame(900, $run->getTokensInput(), 'the loop must stop right after materialization (no extra LLM turn)');
+    }
+
+    #[Test]
+    public function multiStepPlanAccumulatesIntoOneBatch(): void
+    {
+        [$run, $tenant, $em] = $this->fixture();
+
+        $recorder = $this->recordingWriteTool();
+        $llm = $this->scriptedLlm([
+            new AgentLlmResponse('tool_use', [
+                ['type' => 'tool_use', 'id' => 'tu_1', 'name' => 'fake_write', 'input' => ['step' => 1]],
+            ], 500, 50),
+            new AgentLlmResponse('tool_use', [
+                ['type' => 'tool_use', 'id' => 'tu_2', 'name' => 'fake_write', 'input' => ['step' => 2]],
+            ], 500, 50),
+            new AgentLlmResponse('end_turn', [['type' => 'text', 'text' => 'Zbiorczy plan gotowy.']], 100, 20),
+        ]);
+
+        $this->runner($llm, $em, [new PingTool(), $recorder])->run($run, $tenant);
+
+        self::assertSame(AgentRunStatus::AwaitingApproval, $run->getStatus());
+        self::assertSame(self::BATCH_ID, $run->getPendingChangeBatchId()?->toRfc4122());
+        self::assertSame(3600, $run->getAffectedCount(), 'the collective plan sums both steps');
+        // The SECOND call inherited the batch id from the first (loop
+        // injection) - both steps land in ONE approval.
+        self::assertArrayNotHasKey('pending_change_batch_id', $recorder->calls[0]);
+        self::assertSame(self::BATCH_ID, $recorder->calls[1]['pending_change_batch_id'] ?? null);
     }
 
     #[Test]
@@ -229,6 +256,52 @@ final class AgentLoopRunnerTest extends KernelTestCase
             maxToolCallsPerRun: 10,
             maxTokensPerRun: 100_000,
         );
+    }
+
+    /**
+     * @return AgentToolInterface&object{calls: list<array<string, mixed>>}
+     */
+    private function recordingWriteTool(): AgentToolInterface
+    {
+        return new class implements AgentToolInterface {
+            /** @var list<array<string, mixed>> */
+            public array $calls = [];
+
+            public function name(): string
+            {
+                return 'fake_write';
+            }
+
+            public function description(): string
+            {
+                return 'Recording write tool.';
+            }
+
+            public function parametersSchema(): array
+            {
+                return ['type' => 'object', 'properties' => [], 'required' => []];
+            }
+
+            public function requiredPermission(): string
+            {
+                return 'object.write';
+            }
+
+            public function kind(): ToolKind
+            {
+                return ToolKind::Write;
+            }
+
+            public function execute(array $arguments, AgentToolContext $context): array
+            {
+                $this->calls[] = $arguments;
+
+                return [
+                    'pending_change_batch_id' => AgentLoopRunnerTest::BATCH_ID,
+                    'affected_count' => 1800,
+                ];
+            }
+        };
     }
 
     private function fakeWriteTool(): AgentToolInterface

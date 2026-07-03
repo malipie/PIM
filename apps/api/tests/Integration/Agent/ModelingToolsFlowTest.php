@@ -75,6 +75,38 @@ final class ModelingToolsFlowTest extends KernelTestCase
     }
 
     #[Test]
+    public function crossFamilyBatchAppendIsRefused(): void
+    {
+        [$em] = $this->fixture();
+
+        // A value batch exists...
+        $valueBatch = Uuid::v7();
+        $this->pendingChanges()->materialize($valueBatch, 'agent', [
+            new \App\Catalog\Contracts\PendingChanges\PendingChangeDraft(
+                changeType: \App\Catalog\Contracts\PendingChanges\PendingChangeType::Value,
+                targetObjectId: Uuid::v7(),
+                attributeCode: 'price',
+                before: null,
+                after: ['value' => 100],
+            ),
+        ]);
+
+        // ...and a SCHEMA tool asked to append to it (loop injection in a
+        // mixed multi-step plan) must refuse with guidance, not poison it.
+        $result = $this->attributeTool()->execute([
+            'code' => 'weight',
+            'type' => 'metric',
+            'label' => ['pl' => 'Waga'],
+            'pending_change_batch_id' => $valueBatch->toRfc4122(),
+        ], $this->context());
+
+        self::assertArrayHasKey('error', $result);
+        self::assertIsString($result['error']);
+        self::assertStringContainsString('value', $result['error']);
+        self::assertStringContainsString('new', $result['error']);
+    }
+
+    #[Test]
     public function unknownTypeIsRefusedWithoutMaterializing(): void
     {
         $this->fixture();

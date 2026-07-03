@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Agent\Application\Tool;
 
 use App\Catalog\Contracts\Command\AssignCategoriesPort;
+use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
+use App\Catalog\Contracts\PendingChanges\PendingChangeType;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -18,6 +20,7 @@ final readonly class AssignCategoriesTool implements AgentToolInterface
 {
     public function __construct(
         private AssignCategoriesPort $assignments,
+        private PendingChangesPort $pendingChangesReader,
     ) {
     }
 
@@ -50,6 +53,10 @@ final readonly class AssignCategoriesTool implements AgentToolInterface
                     'type' => 'array',
                     'items' => ['type' => 'string'],
                     'description' => 'UUIDs of the target category objects.',
+                ],
+                'pending_change_batch_id' => [
+                    'type' => 'string',
+                    'description' => 'Append to an existing proposal batch (multi-step plans accumulate into one approval). Usually injected automatically.',
                 ],
                 'operation' => [
                     'type' => 'string',
@@ -93,8 +100,13 @@ final readonly class AssignCategoriesTool implements AgentToolInterface
         /** @var array<string, mixed> $filterDslArray */
         $filterDslArray = $filterDsl ?? [];
 
+        [$batchId, $batchError] = $this->resolveBatch($arguments['pending_change_batch_id'] ?? null, PendingChangeType::Category);
+        if (null === $batchId) {
+            return ['error' => $batchError];
+        }
+
         $proposal = $this->assignments->materializeCategoryAssignments(
-            batchId: Uuid::v7(),
+            batchId: $batchId,
             userId: $context->userId,
             objectTypeCode: $objectTypeCode,
             filterDsl: $filterDslArray,
@@ -117,5 +129,31 @@ final readonly class AssignCategoriesTool implements AgentToolInterface
             'rejected' => $proposal->rejected,
             'note' => 'Proposal awaits human approval in the inbox. Nothing is committed yet.',
         ];
+    }
+
+    /**
+     * AGENT-P8-03 (#1985) — resolve the target batch for a multi-step
+     * plan: 'new' forces a fresh proposal, a valid UUID appends ONLY if
+     * the existing batch holds the same change family (mixing families
+     * in one batch would poison the commit path).
+     *
+     * @return array{0: ?Uuid, 1: ?string} [batchId, error]
+     */
+    private function resolveBatch(mixed $requested, PendingChangeType $family): array
+    {
+        if (!\is_string($requested) || 'new' === $requested || !Uuid::isValid($requested)) {
+            return [Uuid::v7(), null];
+        }
+        $batchId = Uuid::fromString($requested);
+        $rows = $this->pendingChangesReader->listBatch($batchId, 1);
+        if ([] !== $rows && $rows[0]->changeType !== $family) {
+            return [null, \sprintf(
+                'The current plan batch holds %s changes - this tool materializes %s. Finish the current plan for approval first, or pass pending_change_batch_id: "new" to open a separate proposal.',
+                $rows[0]->changeType->value,
+                $family->value,
+            )];
+        }
+
+        return [$batchId, null];
     }
 }
