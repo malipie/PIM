@@ -22,11 +22,15 @@ use Symfony\Component\Uid\Uuid;
 interface BulkEditValuesPort
 {
     /**
-     * @param array<string, mixed> $filterDsl selector ([] = every object of the type)
-     * @param array<string, mixed> $changes   attribute code => raw value
-     * @param string               $mode      overwrite|only_empty - runtime-validated (a literal
-     *                                        union here makes the adapter's defensive guard
-     *                                        "always true" for PHPStan)
+     * @param array<string, mixed> $filterDsl   selector ([] = every object of the type)
+     * @param array<string, mixed> $changes     attribute code => raw value
+     * @param string               $mode        overwrite|only_empty - runtime-validated (a literal
+     *                                          union here makes the adapter's defensive guard
+     *                                          "always true" for PHPStan)
+     * @param list<mixed>|null     $selectedIds the operator's current SELECTION (#2153): when
+     *                                          non-null it is THE selector (validated against
+     *                                          tenant + object type), taking precedence over
+     *                                          $filterDsl. null = fall back to $filterDsl.
      *
      * @throws InvalidArgumentException on unknown object type / attribute / invalid DSL
      */
@@ -37,6 +41,7 @@ interface BulkEditValuesPort
         array $filterDsl,
         array $changes,
         string $mode,
+        ?array $selectedIds = null,
     ): ValueEditProposal;
 
     /**
@@ -47,8 +52,12 @@ interface BulkEditValuesPort
      * division-by-zero are skipped, never errored. Same approval path: the
      * result is a pending_changes batch, committed post-accept.
      *
-     * @param array<string, mixed> $filterDsl selector ([] = every object of the type)
-     * @param string               $operator  one of + - * / % (runtime-validated)
+     * @param array<string, mixed> $filterDsl   selector ([] = every object of the type)
+     * @param string               $operator    one of + - * / % (runtime-validated)
+     * @param list<mixed>|null     $selectedIds the operator's current SELECTION (#2153): when
+     *                                          non-null it is THE selector (validated against
+     *                                          tenant + object type), taking precedence over
+     *                                          $filterDsl. null = fall back to $filterDsl.
      *
      * @throws InvalidArgumentException on unknown object type / unsupported operator / invalid DSL
      */
@@ -60,5 +69,6 @@ interface BulkEditValuesPort
         string $attrCode,
         string $operator,
         float $operand,
+        ?array $selectedIds = null,
     ): ValueEditProposal;
 }

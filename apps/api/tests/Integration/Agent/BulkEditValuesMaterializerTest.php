@@ -308,6 +308,75 @@ final class BulkEditValuesMaterializerTest extends KernelTestCase
         self::assertSame('Attribute is outside your edit permissions.', $proposal->rejected[0]['reason']);
     }
 
+    #[Test]
+    public function selectionScopeTargetsOnlyTheSelectedObjectsAndIgnoresForeignIds(): void
+    {
+        // #2153 — when the operator has rows selected, the write targets
+        // exactly that selection (validated against tenant + type: a bogus
+        // id simply matches no row, it cannot widen the scope).
+        [, $em, $type] = $this->fixture();
+
+        $a = new CatalogObject($type, 'SEL-A');
+        $b = new CatalogObject($type, 'SEL-B');
+        $c = new CatalogObject($type, 'SEL-C');
+        foreach ([$a, $b, $c] as $obj) {
+            $em->persist($obj);
+        }
+        $em->flush();
+
+        $batchId = Uuid::v7();
+        $proposal = $this->port()->materializeValueEdits(
+            batchId: $batchId,
+            userId: Uuid::v7(),
+            objectTypeCode: 'product',
+            filterDsl: [],
+            changes: ['price' => 100],
+            mode: 'overwrite',
+            selectedIds: [$a->getId()->toRfc4122(), $c->getId()->toRfc4122(), Uuid::v7()->toRfc4122()],
+        );
+
+        self::assertSame(2, $proposal->affectedObjects, 'only the two real selected objects (foreign id ignored)');
+        self::assertSame(2, $proposal->materializedChanges);
+
+        $rows = $this->pendingChanges()->listBatch($batchId);
+        $ids = [];
+        foreach ($rows as $row) {
+            $ids[] = $row->targetObjectId?->toRfc4122();
+        }
+        sort($ids);
+        $expected = [$a->getId()->toRfc4122(), $c->getId()->toRfc4122()];
+        sort($expected);
+        self::assertSame($expected, $ids, 'SEL-B (not selected) must be untouched');
+    }
+
+    #[Test]
+    public function arithmeticSelectionScopeTargetsOnlyTheSelectedObjects(): void
+    {
+        [, $em, $type] = $this->fixture();
+
+        $a = new CatalogObject($type, 'ARSEL-A');
+        $a->updateAttributeIndex(['price' => ['value' => 100]]);
+        $b = new CatalogObject($type, 'ARSEL-B');
+        $b->updateAttributeIndex(['price' => ['value' => 200]]);
+        $em->persist($a);
+        $em->persist($b);
+        $em->flush();
+
+        $proposal = $this->port()->materializeArithmeticEdits(
+            batchId: Uuid::v7(),
+            userId: Uuid::v7(),
+            objectTypeCode: 'product',
+            filterDsl: [],
+            attrCode: 'price',
+            operator: '*',
+            operand: 2.0,
+            selectedIds: [$a->getId()->toRfc4122()],
+        );
+
+        self::assertSame(1, $proposal->affectedObjects, 'only the selected object is adjusted');
+        self::assertSame(1, $proposal->materializedChanges);
+    }
+
     /**
      * @return array{0: Tenant, 1: EntityManagerInterface, 2: ObjectType}
      */

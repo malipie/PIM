@@ -24,6 +24,10 @@ interface AssignCategoriesPort
      * @param string               $operation   add|remove|move - runtime-validated (a literal
      *                                          union here makes the adapter's defensive guard
      *                                          "always true" for PHPStan)
+     * @param list<mixed>|null     $selectedIds the operator's current SELECTION (#2153): when
+     *                                          non-null it is THE selector (validated against
+     *                                          tenant + object type), taking precedence over
+     *                                          $filterDsl. null = fall back to $filterDsl.
      *
      * @throws InvalidArgumentException on unknown object type / invalid DSL / unknown operation
      */
@@ -34,5 +38,6 @@ interface AssignCategoriesPort
         array $filterDsl,
         array $categoryIds,
         string $operation,
+        ?array $selectedIds = null,
     ): CategoryAssignProposal;
 }

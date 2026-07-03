@@ -24,6 +24,8 @@ use Symfony\Component\Uid\Uuid;
  */
 final readonly class AdjustNumericValuesTool implements AgentToolInterface
 {
+    use ResolvesSelectionScope;
+
     public function __construct(
         private BulkEditValuesPort $bulkEdits,
         private PendingChangesPort $pendingChangesReader,
@@ -41,7 +43,9 @@ final readonly class AdjustNumericValuesTool implements AgentToolInterface
             .'multiply/add/subtract/divide/modulo by an operand, computed per object from its CURRENT value. '
             .'Use this instead of bulk_edit_values when the user asks to change a value RELATIVE to itself ("raise price by 10%%" -> operator "*", operand 1.1; "double the price" -> "*", 2). '
             .'Nothing is written - the proposal is materialized for human approval and you MUST report the returned counts. '
-            .'Objects whose current value is empty/non-numeric are skipped. Ground the selector with aggregate_count first; omit filter_dsl to use the active view.';
+            .'Objects whose current value is empty/non-numeric are skipped. Ground the selector with aggregate_count first. '
+            .'Selector precedence: explicit object_ids, else filter_dsl, else the operator\'s current SELECTION (selected_ids in the view context), else the active view. '
+            .'When the view context has a non-empty selected_ids and the user did not clearly ask for the whole list, act on the SELECTION (omit object_ids and filter_dsl).';
     }
 
     public function parametersSchema(): array
@@ -66,9 +70,14 @@ final readonly class AdjustNumericValuesTool implements AgentToolInterface
                     'type' => 'string',
                     'description' => 'ObjectType code (e.g. product). Default: product.',
                 ],
+                'object_ids' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Selector (highest precedence): explicit object UUIDs to adjust, e.g. the operator\'s current selection. Omit to fall back to filter_dsl / the view selection.',
+                ],
                 'filter_dsl' => [
                     'type' => 'object',
-                    'description' => 'Selector: canonical filter DSL. Omit to use the active view filter. An empty selector targets EVERY object of the type - be sure that is what the user wants.',
+                    'description' => 'Selector: canonical filter DSL. Omit to use the current selection (selected_ids) or the active view filter. An empty selector targets EVERY object of the type - be sure that is what the user wants.',
                 ],
                 'pending_change_batch_id' => [
                     'type' => 'string',
@@ -107,13 +116,7 @@ final readonly class AdjustNumericValuesTool implements AgentToolInterface
 
         $objectTypeCode = \is_string($arguments['object_type_code'] ?? null) ? $arguments['object_type_code'] : 'product';
 
-        $filterDsl = \is_array($arguments['filter_dsl'] ?? null) ? $arguments['filter_dsl'] : null;
-        $viewFilter = $context->viewContext['filter_dsl'] ?? null;
-        if (null === $filterDsl && \is_array($viewFilter)) {
-            $filterDsl = $viewFilter;
-        }
-        /** @var array<string, mixed> $filterDslArray */
-        $filterDslArray = $filterDsl ?? [];
+        [$selectedIds, $filterDslArray] = $this->resolveScope($arguments, $context);
 
         [$batchId, $batchError] = $this->resolveBatch($arguments['pending_change_batch_id'] ?? null, PendingChangeType::Value);
         if (null === $batchId) {
@@ -128,6 +131,7 @@ final readonly class AdjustNumericValuesTool implements AgentToolInterface
             attrCode: $attrCode,
             operator: $operator,
             operand: $operand,
+            selectedIds: $selectedIds,
         );
 
         if (0 === $proposal->materializedChanges) {
