@@ -95,7 +95,7 @@ final class AttributeGroupFilterApiTest extends CatalogApiTestCase
         /** @var list<array{code?: string}> $rows */
         $rows = $response->toArray();
 
-        return array_values(array_map(static fn (array $row): string => $row['code'] ?? '', $rows));
+        return array_map(static fn (array $row): string => $row['code'] ?? '', $rows);
     }
 
     private function createGroup(\ApiPlatform\Symfony\Bundle\Test\Client $client, string $code): string
