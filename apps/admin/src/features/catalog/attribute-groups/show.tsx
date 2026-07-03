@@ -28,6 +28,7 @@ import { BuiltInLockBadge } from '@/components/modeling/built-in-lock-badge';
 import { CreateAttributeInGroupDialog } from '@/components/modeling/create-attribute-in-group-dialog';
 import { DangerZoneCard } from '@/components/modeling/danger-zone-card';
 import { LocaleTabsField } from '@/components/modeling/locale-tabs-field';
+import { VisibleWhenRuleDialog } from '@/components/modeling/visible-when-rule-dialog';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -149,6 +150,8 @@ function Editor({
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  // DP-08 (#2039) — which member's visible_when rule is being edited.
+  const [ruleTarget, setRuleTarget] = useState<MemberRow | null>(null);
 
   const isSystem = group.systemGroup === true;
   const isLegacyOptionalGroup = isLegacyOptionalSystemGroupCode(group.code);
@@ -557,6 +560,7 @@ function Editor({
                       onDetach={() => {
                         void detach(row.attribute.id);
                       }}
+                      onEditRule={() => setRuleTarget(row)}
                     />
                   ))}
                 </div>
@@ -589,11 +593,8 @@ function Editor({
                     </span>
                     <button
                       type="button"
-                      disabled
-                      title={t('modeling.attributeGroups.rules_edit_action_pending', {
-                        defaultValue: 'Edytor reguły — VIEW-03c',
-                      })}
-                      className="ml-auto inline-flex items-center gap-1 text-[11.5px] text-muted-foreground/60"
+                      onClick={() => setRuleTarget(m)}
+                      className="ml-auto inline-flex items-center gap-1 text-[11.5px] text-muted-foreground hover:text-foreground"
                     >
                       <Eye className="size-3.5" />
                       {t('modeling.attributeGroups.rules_edit_action', {
@@ -721,6 +722,23 @@ function Editor({
         </div>
       ) : null}
 
+      {/* DP-08 (#2039) — mounted only while open (fresh state per opening). */}
+      {ruleTarget !== null ? (
+        <VisibleWhenRuleDialog
+          groupId={group.id}
+          attributeId={ruleTarget.attribute.id}
+          attributeCode={ruleTarget.attribute.code}
+          siblingCodes={sortedMembers
+            .filter((m) => m.attribute.id !== ruleTarget.attribute.id)
+            .map((m) => m.attribute.code)}
+          initialRule={ruleTarget.visible_when}
+          onOpenChange={(open) => {
+            if (!open) setRuleTarget(null);
+          }}
+          onSaved={() => reload()}
+        />
+      ) : null}
+
       <AddAttributesFromLibraryDialog
         open={pickerOpen}
         onOpenChange={setPickerOpen}
@@ -784,11 +802,14 @@ function SortableMemberRow({
   locale,
   onToggleRequired,
   onDetach,
+  onEditRule,
 }: {
   row: MemberRow;
   locale: string;
   onToggleRequired: (next: boolean) => void;
   onDetach: () => void;
+  /** DP-08 (#2039) — opens the visible_when editor for this member. */
+  onEditRule: () => void;
 }) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -827,15 +848,23 @@ function SortableMemberRow({
         {row.attribute.type}
       </span>
       {row.visible_when ? (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 px-2 py-1 font-mono text-[11px] text-orange-700">
+        <button
+          type="button"
+          onClick={onEditRule}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 px-2 py-1 text-left font-mono text-[11px] text-orange-700 transition hover:bg-orange-100"
+        >
           when {row.visible_when.field}={String(row.visible_when.value)}
-        </span>
+        </button>
       ) : (
-        <span className="text-[11px] text-zinc-300">
-          {t('modeling.attributeGroups.members_no_visibility_rule', {
-            defaultValue: 'brak reguły widoczności',
+        <button
+          type="button"
+          onClick={onEditRule}
+          className="text-left text-[11px] text-zinc-300 transition hover:text-zinc-600"
+        >
+          {t('modeling.attributeGroups.members_add_visibility_rule', {
+            defaultValue: '+ reguła widoczności',
           })}
-        </span>
+        </button>
       )}
       <label className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
         <input
