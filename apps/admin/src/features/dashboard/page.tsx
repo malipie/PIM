@@ -1,67 +1,35 @@
-import { ActivityChart } from './components/ActivityChart';
-import { AlertCenter } from './components/AlertCenter';
-import { BackupWidget } from './components/BackupWidget';
-import { ChannelDistribution } from './components/ChannelDistribution';
-import { CompletenessMetrics } from './components/CompletenessMetrics';
-import { DashboardMockBanner } from './components/DashboardMockBanner';
-import { HeroAgentPanel } from './components/HeroAgentPanel';
-import { KpiCards } from './components/KpiCards';
-import { RecentAgentActivity } from './components/RecentAgentActivity';
-import { SyncsStatusPanel } from './components/SyncsStatusPanel';
-import { TopEditedProducts } from './components/TopEditedProducts';
-import { useDashboardCounts } from './use-dashboard-counts';
+import { ActionCenter } from './components/ActionCenter';
+import { AgentCommandHero } from './components/AgentCommandHero';
+import { CatalogHealthCard } from './components/CatalogHealthCard';
+import { DashboardGreeting } from './components/DashboardGreeting';
+import { KpiBand } from './components/KpiBand';
+import { TeamActivityCard } from './components/TeamActivityCard';
 
 /**
- * Dashboard v2 (NUI-02 #1421) — row layout per `Dashboard.html`:
- * Hero → KPI → [Activity | Sync] → [Completeness | Channels] →
- * [Alerts | Agent activity] → [Backup | Top edited].
+ * Dashboard "command center" (VIEW-13 #2143) — pixel-perfect static mock of
+ * the approved redesign: greeting → dark agent hero → KPI band →
+ * [catalog health | team activity] → action center.
  *
- * KPI entity totals (useDashboardCounts) and the overall completeness ring
- * (useDashboardCompleteness, AUD-058 #1610) are LIVE; the remaining blocks
- * stay mock and are flagged by both a per-widget MockBadge and the explicit
- * DashboardMockBanner — backend follow-ups in
+ * Every value on this page is static mock data (see ./mocks.ts) — the
+ * per-widget backends land later via
  * Project Plan/UI/Wdrozenie_grafiki/dashboard-do-oprogramowania.md.
+ * Per operator decision (2026-07-03) the page carries NO mock badges or
+ * banners — it must look exactly like the approved design.
  */
 export function DashboardPage() {
-  const { data: counts = {}, isPending } = useDashboardCounts();
-
+  // Padding comes from the AppLayout <main> wrapper — same as every other
+  // page; the extra px-* of dashboard v2 made the margins wider than
+  // sibling views (operator correction, 2026-07-03).
   return (
-    <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-10">
-      <DashboardMockBanner />
-      <HeroAgentPanel />
-      <KpiCards counts={counts} isPending={isPending} />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <ActivityChart />
-        </div>
-        <div>
-          <SyncsStatusPanel />
-        </div>
+    <div className="space-y-6">
+      <DashboardGreeting />
+      <AgentCommandHero />
+      <KpiBand />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <CatalogHealthCard />
+        <TeamActivityCard />
       </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <CompletenessMetrics />
-        </div>
-        <div>
-          <ChannelDistribution />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div>
-          <AlertCenter />
-        </div>
-        <div>
-          <RecentAgentActivity />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div>
-          <BackupWidget />
-        </div>
-        <div className="lg:col-span-2">
-          <TopEditedProducts />
-        </div>
-      </div>
+      <ActionCenter />
     </div>
   );
 }

@@ -946,8 +946,6 @@
     "breadcrumb_aria": "Ścieżka nawigacji",
     "search_agent_placeholder": "Zapytaj agenta lub szukaj...",
     "agent_mock_tooltip": "MOCK · Agent layer wymaga oprogramowania (epik 0.7, Faza 2)",
-    "audit_log": "Audit log",
-    "audit_log_tooltip": "MOCK · Audit log wymaga endpointu BE",
     "history": "Historia",
     "agent_pill_tooltip": "Nawigacja ⌘K działa; sekcja agenta = MOCK (epik 0.7, Faza 2)"
   },
@@ -956,79 +954,78 @@
     "requires_implementation": "MOCK · Wymaga oprogramowania"
   },
   "dashboard": {
-    "hero": {
-      "badge": "Agent · Claude Sonnet 4.5",
-      "title": "Zapytaj agenta lub szukaj w katalogu",
-      "subtitle": "Pulpit pokazuje ruch w PIM, status integracji i propozycje agenta. Wszystkie bloki są makietą; backend dorabiamy w kolejnych ticketach.",
-      "cta": "Zapytaj agenta",
-      "cta_disabled_hint": "Mock — wymaga warstwy agenta (Faza 2)"
+    "greeting": {
+      "title_main": "Centrum dowodzenia katalogiem.",
+      "title_accent": "Co dziś chcesz zmienić?"
+    },
+    "agent": {
+      "label": "Agent · Claude Sonnet 4.5",
+      "prompt_example": "stwórz feed XML dla Google Shopping z kategorii Pneumatyka",
+      "prompt_aria": "Polecenie dla agenta",
+      "press": "naciśnij",
+      "ask": "Zapytaj agenta",
+      "accepted_this_week": "{{count}} zaakceptowanych zmian w tym tygodniu",
+      "actions": {
+        "add_attribute": "Dodaj atrybut",
+        "seo_descriptions": "Generuj opisy SEO",
+        "bulk_categories": "Bulk update kategorii",
+        "translations": "Tłumaczenia PL→DE",
+        "feed_export": "Eksport feed XML"
+      }
     },
     "kpi": {
-      "products": "Produkty",
-      "attributes": "Atrybuty",
-      "families": "Grupy atrybutów",
-      "categories": "Kategorie",
-      "enabled_share": "Aktywne produkty",
-      "completeness_avg": "Średnia kompletność",
-      "last_sync_minutes": "Ostatnia synchronizacja",
-      "open_alerts": "Otwarte alerty",
-      "settings_trigger": "Wybierz KPI",
-      "settings_title": "Wybierz KPI",
-      "settings_description": "Wybierz do {{max}} kafelków na pulpicie. Selekcja zapisuje się w przeglądarce.",
-      "settings_count": "{{count}} z {{max}} wybranych",
-      "settings_mock_tooltip": "Konfiguracja zapisywana lokalnie (localStorage), MOCK"
+      "products": {
+        "label": "Produkty",
+        "hint": "łącznie w katalogu"
+      },
+      "publish_ready": {
+        "label": "Gotowe do publikacji",
+        "hint": "≥ 80% kompletności"
+      },
+      "avg_completeness": {
+        "label": "Średnia kompletność",
+        "hint": "wszystkie kanały"
+      },
+      "open_alerts": {
+        "label": "Otwarte alerty",
+        "hint": "wymaga interwencji"
+      },
+      "period_30d": "30 dni",
+      "no_trend": "24h · brak trendu"
+    },
+    "health": {
+      "eyebrow": "Zdrowie danych",
+      "title": "Kompletność katalogu",
+      "weekly_trend": "+ {{count}} pkt / tydz.",
+      "ring_caption": "gotowe do publikacji",
+      "ring_aria": "{{percent}}% produktów gotowych do publikacji",
+      "channels_header": "Kompletność wg kanału",
+      "channels_sort": "sort: najgorszy pierwszy"
     },
     "activity": {
-      "title": "Aktywność",
-      "legend_added": "dodane",
-      "legend_modified": "zmodyfikowane",
-      "range_aria": "Zakres aktywności",
+      "eyebrow": "Aktywność katalogu",
+      "title": "Tempo pracy zespołu",
       "range_7d": "7 dni",
       "range_30d": "30 dni",
-      "range_90d": "90 dni"
+      "range_90d": "90 dni",
+      "legend_added": "Dodane",
+      "legend_modified": "Zmodyfikowane",
+      "avg_per_day": "średnio {{count}} zmian / dzień",
+      "chart_aria": "Wykres dziennych zmian w katalogu — dodane i zmodyfikowane produkty",
+      "most_edited": "Najczęściej edytowane",
+      "full_list": "Pełna lista",
+      "edits_suffix": "edycji"
     },
-    "top_edited": {
-      "title": "Najczęściej edytowane",
-      "subtitle": "ostatnie 30 dni"
-    },
-    "syncs": {
-      "title": "Status synchronizacji",
-      "force": "Wymuś",
-      "force_disabled": "Mock — wymaga POST /api/integrations/{id}/sync"
-    },
-    "mock_banner": {
-      "title": "Część widżetów pokazuje dane demonstracyjne",
-      "body": "Liczby KPI oraz kafelek „Kompletność” (ogólna) są na żywo z API. Pozostałe bloki — aktywność, status synchronizacji, alerty, aktywność agenta, backup, dystrybucja kanałów i ranking edytowanych — to makieta (funkcje w przygotowaniu)."
-    },
-    "completeness": {
-      "title": "Kompletność",
-      "subtitle": "ogólna i per kanał — wskazuje gotowość do publikacji",
-      "overall": "Ogólna",
-      "publish_ready": "{{count}} z {{total}} ≥ {{threshold}}%",
-      "channel_mock_tooltip": "MOCK — kompletność per kanał wymaga mapowania kanał↔typ (epik 0.6)"
-    },
-    "agent_activity": {
-      "title": "Ostatnia aktywność agenta",
-      "subtitle": "ostatnie 6 wpisów audit",
-      "filter": "Filtruj"
-    },
-    "alerts": {
-      "title": "Alerty",
-      "subtitle": "ostatnie 5",
-      "configure": "Skonfiguruj alerty"
-    },
-    "channel_dist": {
-      "title": "Dystrybucja kanałów",
-      "unit": "produktów",
-      "export": "Eksportuj raport"
-    },
-    "backup": {
-      "title": "Backup bazy",
-      "healthy": "Healthy",
-      "rpo": "RPO 15 min",
-      "last_label": "Ostatni",
-      "size_label": "Rozmiar",
-      "heatmap_label": "Ostatnie 14 dni"
+    "action_center": {
+      "eyebrow": "Wymaga uwagi",
+      "title": "Centrum akcji",
+      "cases_count": "{{count}} spraw",
+      "critical_count": "{{count}} krytyczne",
+      "warning_count": "{{count}} ostrzeżenia",
+      "show_all": "Pokaż wszystkie ( {{count}} )",
+      "mark_read": "oznacz jako przeczytane",
+      "severity_critical": "Krytyczny",
+      "severity_warning": "Ostrzeżenie"
     }
   },
   "attributes": {
