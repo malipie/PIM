@@ -74,6 +74,82 @@ final class AdjustNumericValuesToolTest extends TestCase
         $tool->execute(['attr_code' => 'price', 'operator' => '+', 'operand' => 5], $context);
 
         self::assertSame(['field' => 'status', 'op' => 'eq', 'value' => 'draft'], $port->lastFilterDsl);
+        self::assertNull($port->lastSelectedIds);
+    }
+
+    #[Test]
+    public function usesTheContextSelectionOverTheViewFilter(): void
+    {
+        // #2153 — the operator has rows selected: default to the selection,
+        // not the whole view.
+        $port = $this->port(new ValueEditProposal(Uuid::v7(), 2, 2, 0, []));
+        $tool = new AdjustNumericValuesTool($port, $this->pendingChanges());
+
+        $context = new AgentToolContext(Uuid::v7(), new Tenant('alpha', 'Alpha'), [
+            'selected_ids' => ['id-1', 'id-2'],
+            'filter_dsl' => ['field' => 'status', 'op' => 'eq', 'value' => 'draft'],
+        ]);
+
+        $tool->execute(['attr_code' => 'price', 'operator' => '*', 'operand' => 1.2], $context);
+
+        self::assertSame(['id-1', 'id-2'], $port->lastSelectedIds, 'the selection is the selector');
+        self::assertSame([], $port->lastFilterDsl, 'the view filter is not applied when a selection exists');
+    }
+
+    #[Test]
+    public function explicitObjectIdsArgumentWinsOverTheSelection(): void
+    {
+        $port = $this->port(new ValueEditProposal(Uuid::v7(), 1, 1, 0, []));
+        $tool = new AdjustNumericValuesTool($port, $this->pendingChanges());
+
+        $context = new AgentToolContext(Uuid::v7(), new Tenant('alpha', 'Alpha'), [
+            'selected_ids' => ['id-1', 'id-2'],
+        ]);
+
+        $tool->execute([
+            'attr_code' => 'price', 'operator' => '*', 'operand' => 2,
+            'object_ids' => ['explicit-1'],
+        ], $context);
+
+        self::assertSame(['explicit-1'], $port->lastSelectedIds);
+    }
+
+    #[Test]
+    public function explicitFilterDslArgumentSuppressesTheSelection(): void
+    {
+        // Passing a filter is a deliberate broader-scope choice by the model
+        // (e.g. after the user confirmed "the whole list").
+        $port = $this->port(new ValueEditProposal(Uuid::v7(), 5, 5, 0, []));
+        $tool = new AdjustNumericValuesTool($port, $this->pendingChanges());
+
+        $context = new AgentToolContext(Uuid::v7(), new Tenant('alpha', 'Alpha'), [
+            'selected_ids' => ['id-1', 'id-2'],
+        ]);
+
+        $tool->execute([
+            'attr_code' => 'price', 'operator' => '*', 'operand' => 2,
+            'filter_dsl' => ['field' => 'brand', 'op' => 'eq', 'value' => 'Acme'],
+        ], $context);
+
+        self::assertNull($port->lastSelectedIds);
+        self::assertSame(['field' => 'brand', 'op' => 'eq', 'value' => 'Acme'], $port->lastFilterDsl);
+    }
+
+    #[Test]
+    public function anEmptyContextSelectionIsIgnored(): void
+    {
+        $port = $this->port(new ValueEditProposal(Uuid::v7(), 1, 1, 0, []));
+        $tool = new AdjustNumericValuesTool($port, $this->pendingChanges());
+
+        $context = new AgentToolContext(Uuid::v7(), new Tenant('alpha', 'Alpha'), [
+            'selected_ids' => [],
+            'filter_dsl' => ['field' => 'status', 'op' => 'eq', 'value' => 'draft'],
+        ]);
+
+        $tool->execute(['attr_code' => 'price', 'operator' => '+', 'operand' => 5], $context);
+
+        self::assertNull($port->lastSelectedIds, 'empty selection is not a selection');
+        self::assertSame(['field' => 'status', 'op' => 'eq', 'value' => 'draft'], $port->lastFilterDsl);
     }
 
     #[Test]
@@ -193,6 +269,8 @@ final class RecordingBulkEditValuesPort implements BulkEditValuesPort
     public ?string $lastObjectTypeCode = null;
     /** @var array<string, mixed>|null */
     public ?array $lastFilterDsl = null;
+    /** @var list<mixed>|null */
+    public ?array $lastSelectedIds = null;
 
     public function __construct(private readonly ValueEditProposal $proposal)
     {
@@ -205,8 +283,11 @@ final class RecordingBulkEditValuesPort implements BulkEditValuesPort
         array $filterDsl,
         array $changes,
         string $mode,
+        ?array $selectedIds = null,
     ): ValueEditProposal {
         $this->called = true;
+        $this->lastFilterDsl = $filterDsl;
+        $this->lastSelectedIds = $selectedIds;
 
         return $this->proposal;
     }
@@ -219,6 +300,7 @@ final class RecordingBulkEditValuesPort implements BulkEditValuesPort
         string $attrCode,
         string $operator,
         float $operand,
+        ?array $selectedIds = null,
     ): ValueEditProposal {
         $this->called = true;
         $this->lastAttrCode = $attrCode;
@@ -226,6 +308,7 @@ final class RecordingBulkEditValuesPort implements BulkEditValuesPort
         $this->lastOperand = $operand;
         $this->lastObjectTypeCode = $objectTypeCode;
         $this->lastFilterDsl = $filterDsl;
+        $this->lastSelectedIds = $selectedIds;
 
         return $this->proposal;
     }

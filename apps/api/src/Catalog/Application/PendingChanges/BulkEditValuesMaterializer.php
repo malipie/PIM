@@ -66,6 +66,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
         array $filterDsl,
         array $changes,
         string $mode,
+        ?array $selectedIds = null,
     ): ValueEditProposal {
         if (!\in_array($mode, ['overwrite', 'only_empty'], true)) {
             throw new InvalidArgumentException(\sprintf('Unknown mode "%s" (use overwrite or only_empty).', $mode));
@@ -87,7 +88,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
 
         [$validChanges, $rejected] = $this->screenChanges($tenant, $userId, $changes);
 
-        $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl);
+        $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl, $selectedIds);
 
         $affectedObjects = 0;
         $materialized = 0;
@@ -123,6 +124,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
         string $attrCode,
         string $operator,
         float $operand,
+        ?array $selectedIds = null,
     ): ValueEditProposal {
         if (!\in_array($operator, ['+', '-', '*', '/', '%'], true)) {
             throw new InvalidArgumentException(\sprintf('Unsupported operator "%s" (use + - * / %%).', $operator));
@@ -160,7 +162,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
         $skipped = 0;
 
         if ($attribute instanceof Attribute) {
-            $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl);
+            $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl, $selectedIds);
             if ([] !== $objectIds) {
                 $drafts = $this->arithmeticDraftGenerator(
                     $tenant,
@@ -235,14 +237,43 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
     }
 
     /**
+     * Resolve the objects a bulk operation targets. When $selectedIds is
+     * given (the operator's current SELECTION, #2153), the selector is that
+     * list — validated against tenant + object type so a stray/foreign id
+     * from the model or client can never widen the scope (RLS is the
+     * backstop; this is the explicit predicate). Otherwise the selector is
+     * the filter DSL ([] = every object of the type).
+     *
      * @param array<string, mixed> $filterDsl
+     * @param list<mixed>|null      $selectedIds explicit selection, or null to use the filter
      *
      * @return list<string>
      */
-    private function resolveObjectIds(Tenant $tenant, ObjectType $objectType, array $filterDsl): array
+    private function resolveObjectIds(Tenant $tenant, ObjectType $objectType, array $filterDsl, ?array $selectedIds = null): array
     {
+        $params = [
+            'tenant' => $tenant->getId()->toRfc4122(),
+            'otid' => $objectType->getId()->toRfc4122(),
+        ];
+        $types = [];
         $where = '';
-        if ([] !== $filterDsl) {
+
+        if (null !== $selectedIds) {
+            $clean = [];
+            foreach ($selectedIds as $id) {
+                if (\is_string($id) && Uuid::isValid($id)) {
+                    $clean[] = $id;
+                }
+            }
+            if ([] === $clean) {
+                return [];
+            }
+            // Intersect the selection with tenant + type — never trust the
+            // raw id list; a foreign/mistyped id simply yields no row.
+            $where = ' AND co.id IN (:ids)';
+            $params['ids'] = $clean;
+            $types['ids'] = \Doctrine\DBAL\ArrayParameterType::STRING;
+        } elseif ([] !== $filterDsl) {
             $this->filterResolver->validate($filterDsl);
             $fragment = $this->filterResolver->toCountSql($filterDsl);
             if (null === $fragment) {
@@ -256,10 +287,8 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
         // as the XMLF feed scope (ExportBuilderFeedValues).
         $rows = $this->entityManager->getConnection()->fetchFirstColumn(
             'SELECT co.id FROM objects co WHERE co.tenant_id = :tenant AND co.object_type_id = :otid'.$where,
-            [
-                'tenant' => $tenant->getId()->toRfc4122(),
-                'otid' => $objectType->getId()->toRfc4122(),
-            ],
+            $params,
+            $types,
         );
 
         $ids = [];

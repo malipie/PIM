@@ -18,6 +18,8 @@ use Symfony\Component\Uid\Uuid;
  */
 final readonly class BulkEditValuesTool implements AgentToolInterface
 {
+    use ResolvesSelectionScope;
+
     public function __construct(
         private BulkEditValuesPort $bulkEdits,
         private PendingChangesPort $pendingChangesReader,
@@ -31,9 +33,11 @@ final readonly class BulkEditValuesTool implements AgentToolInterface
 
     public function description(): string
     {
-        return 'Propose a bulk value edit: set attribute values on every object matching a filter DSL. Nothing is written to the catalog - '
+        return 'Propose a bulk value edit: set attribute values on a set of objects. Nothing is written to the catalog - '
             .'the proposal is materialized for human approval and you MUST report the returned counts to the user. '
-            .'Ground the selector with aggregate_count first. If the user refers to the current view, omit filter_dsl.';
+            .'Selector precedence: explicit object_ids, else filter_dsl, else the operator\'s current SELECTION (selected_ids in the view context), else the active view filter. '
+            .'When the view context has a non-empty selected_ids and the user did not clearly ask for the whole list, act on the SELECTION (omit object_ids and filter_dsl). '
+            .'Ground the selector with aggregate_count first.';
     }
 
     public function parametersSchema(): array
@@ -45,9 +49,14 @@ final readonly class BulkEditValuesTool implements AgentToolInterface
                     'type' => 'string',
                     'description' => 'ObjectType code (e.g. product). Default: product.',
                 ],
+                'object_ids' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Selector (highest precedence): explicit object UUIDs to edit, e.g. the operator\'s current selection. Omit to fall back to filter_dsl / the view selection.',
+                ],
                 'filter_dsl' => [
                     'type' => 'object',
-                    'description' => 'Selector: canonical filter DSL. Omit to use the active view filter. An empty selector targets EVERY object of the type - be sure that is what the user wants.',
+                    'description' => 'Selector: canonical filter DSL. Omit to use the current selection (selected_ids) or the active view filter. An empty selector targets EVERY object of the type - be sure that is what the user wants.',
                 ],
                 'changes' => [
                     'type' => 'object',
@@ -85,13 +94,7 @@ final readonly class BulkEditValuesTool implements AgentToolInterface
         $modeRaw = $arguments['mode'] ?? null;
         $mode = \in_array($modeRaw, ['overwrite', 'only_empty'], true) ? $modeRaw : 'only_empty';
 
-        $filterDsl = \is_array($arguments['filter_dsl'] ?? null) ? $arguments['filter_dsl'] : null;
-        $viewFilter = $context->viewContext['filter_dsl'] ?? null;
-        if (null === $filterDsl && \is_array($viewFilter)) {
-            $filterDsl = $viewFilter;
-        }
-        /** @var array<string, mixed> $filterDslArray */
-        $filterDslArray = $filterDsl ?? [];
+        [$selectedIds, $filterDslArray] = $this->resolveScope($arguments, $context);
 
         [$batchId, $batchError] = $this->resolveBatch($arguments['pending_change_batch_id'] ?? null, PendingChangeType::Value);
         if (null === $batchId) {
@@ -105,6 +108,7 @@ final readonly class BulkEditValuesTool implements AgentToolInterface
             filterDsl: $filterDslArray,
             changes: $changes,
             mode: $mode,
+            selectedIds: $selectedIds,
         );
 
         if (0 === $proposal->materializedChanges) {
