@@ -109,14 +109,37 @@ The orchestrator will:
 2. `docker compose stop database` — clean shutdown so the WAL is consistent.
 3. `docker compose run --rm --no-deps --entrypoint /bin/sh database -c …` —
    wipes `$PGDATA` and runs `pgbackrest restore` against the existing volume.
-4. `docker compose up -d --wait database api` — postgres replays WAL from the
-   repo on start-up; healthchecks block until everything is back.
+   For `--type time` the wrapper passes `--target-action=promote` so the
+   cluster finishes recovery **read-write** (a bare `--type=time` leaves it
+   paused in read-only hot-standby until `pg_promote()`).
+4. `docker compose up -d --wait database` — postgres replays WAL from the repo.
+5. **Re-grant `pim_app`** — the wrapper re-applies the runtime role's schema
+   grants (idempotent). A physical restore can land the cluster missing them
+   and the W1-1 migration does **not** re-run, so `pim_app` would otherwise hit
+   `permission denied for schema public`. Manual equivalent:
+   ```sql
+   GRANT USAGE ON SCHEMA public TO pim_app;
+   GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO pim_app;
+   GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO pim_app;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO pim_app;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO pim_app;
+   ```
+6. `docker compose up -d --wait api` — healthchecks block until everything is back.
+
+> **PITR quirk (fixed #2196):** the `--target` timestamp contains a space; the
+> wrapper now double-quotes each pgBackRest arg so it stays a single argument.
+> A repeatable drill lives at `scripts/restore-drill.sh` (inserts before/after
+> markers, restores to a point between them, asserts precision + RTO).
 
 ### Verify
 
 ```bash
+# RLS bypass as owner sees the recovered rows:
 docker compose exec database \
-    psql -U pim -d pim -c "SELECT count(*) FROM products;"
+    psql -U pim -d pim -c "SELECT count(*) FROM objects;"
+# app role can query (RLS shows 0 without a tenant GUC — that is expected):
+docker compose exec database \
+    psql -U pim_app -d pim -c "SELECT count(*) FROM objects;"
 
 curl -k https://pim.localhost/api/products | head
 ```
