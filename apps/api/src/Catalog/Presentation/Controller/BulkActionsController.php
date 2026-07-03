@@ -246,12 +246,14 @@ final class BulkActionsController
 
     private function previewIncrement(mixed $current, string $operator, float $operand): mixed
     {
-        if (!is_numeric($current)) {
+        // attributes_indexed slots are envelopes {value: X}; read the
+        // scalar from inside before the arithmetic (mirrors the handler).
+        $scalar = \is_array($current) ? ($current['value'] ?? null) : $current;
+        if (!is_numeric($scalar)) {
             return $current;
         }
-        $base = (float) $current;
-
-        return match ($operator) {
+        $base = (float) $scalar;
+        $result = match ($operator) {
             '+' => $base + $operand,
             '-' => $base - $operand,
             '*' => $base * $operand,
@@ -259,6 +261,11 @@ final class BulkActionsController
             '%' => 0.0 === $operand ? null : fmod($base, $operand),
             default => $base,
         };
+        if (null === $result) {
+            return null;
+        }
+
+        return \is_array($current) ? ['value' => $result] + $current : ['value' => $result];
     }
 
     #[Route('/api/products/bulk-actions/{actionType}', name: 'pim_bulk_actions_apply', methods: ['POST'])]
