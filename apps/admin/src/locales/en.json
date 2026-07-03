@@ -2530,13 +2530,15 @@
   },
   "modeling": {
     "title": "Modeling",
-    "description": "Define ObjectTypes, Attributes, Attribute Groups and Categories used across the catalog.",
+    "description": "Define ObjectTypes, Attributes, Attribute Groups, Categories, Channels and Locales used across the catalog.",
     "tabs": {
       "aria_label": "Modeling sections",
       "object_types": "Object Types",
       "attributes": "Attributes",
       "attribute_groups": "Attribute Groups",
-      "categories": "Categories"
+      "categories": "Categories",
+      "channels": "Channels",
+      "locales": "Locales"
     },
     "built_in_lock": {
       "label": "Locked",

@@ -121,6 +121,10 @@ export function GlobalCmdK() {
     const entries: NavEntry[] = [
       { label: t('nav.dashboard'), route: '/dashboard', group: groupNav },
       { label: t('nav.modeling'), route: '/modeling', group: groupNav },
+      // DP-03 (#2033): Channels + Locales left SETTINGS_NAV_GROUPS for the
+      // modeling shell — keep them reachable from the palette.
+      { label: t('modeling.tabs.channels'), route: '/modeling/channels', group: groupNav },
+      { label: t('modeling.tabs.locales'), route: '/modeling/locales', group: groupNav },
       { label: t('nav.multimedia'), route: '/assets', group: groupNav },
       { label: t('nav.imports'), route: '/integrations/imports/sessions', group: groupNav },
       { label: t('nav.exports'), route: '/integrations/exports/sessions', group: groupNav },

@@ -32,9 +32,9 @@ export function ChannelCreatePage() {
           toast.success(t('channels.create.success'));
           const created = response.data;
           if (created?.id) {
-            navigate(`/settings/channels/${created.id}`);
+            navigate(`/modeling/channels/${created.id}`);
           } else {
-            navigate('/settings/channels');
+            navigate('/modeling/channels');
           }
         },
         onError: () => {
@@ -48,7 +48,7 @@ export function ChannelCreatePage() {
     <div className="space-y-6">
       <div className="space-y-1">
         <Button asChild variant="ghost" size="sm" className="-ml-3">
-          <Link to="/settings/channels">
+          <Link to="/modeling/channels">
             <ArrowLeft className="size-4" />
             {t('channels.back')}
           </Link>
@@ -60,7 +60,7 @@ export function ChannelCreatePage() {
         mode="create"
         isSubmitting={mutation.isPending}
         onSubmit={handleSubmit}
-        onCancel={() => navigate('/settings/channels')}
+        onCancel={() => navigate('/modeling/channels')}
       />
     </div>
   );

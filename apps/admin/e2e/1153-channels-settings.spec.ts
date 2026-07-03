@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { loginAsAdmin, uniqueSku } from './helpers/auth';
 
 /**
- * #1153 (channels epic) — the channels settings page (`/settings/channels`)
+ * #1153 (channels epic) — the channels settings page (`/modeling/channels`)
  * already ships full CRUD over `/api/channels` (list / create / edit /
  * delete + locale & currency pickers). This spec is the missing E2E gate:
  * it verifies an operator can create a channel end-to-end and see it in
@@ -26,7 +26,7 @@ test('operator creates a channel via the settings page', async ({ page }) => {
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '_')}`;
 
-  await page.goto('/settings/channels/new');
+  await page.goto('/modeling/channels/new');
   await expect(page.locator('#channel-code')).toBeVisible();
   await page.locator('#channel-code').fill(code);
   await page.locator('#channel-name').fill('Kanał E2E');
@@ -45,6 +45,6 @@ test('operator creates a channel via the settings page', async ({ page }) => {
   await expect(page.getByText(code).first()).toBeVisible();
 
   // And it appears in the channels list.
-  await page.goto('/settings/channels');
+  await page.goto('/modeling/channels');
   await expect(page.getByText(code).first()).toBeVisible();
 });

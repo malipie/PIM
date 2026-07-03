@@ -2578,13 +2578,15 @@
   },
   "modeling": {
     "title": "Modelowanie",
-    "description": "Definiuj typy obiektów, atrybuty, grupy atrybutów i kategorie używane w katalogu.",
+    "description": "Definiuj typy obiektów, atrybuty, grupy atrybutów, kategorie, kanały i wersje językowe używane w katalogu.",
     "tabs": {
       "aria_label": "Sekcje modelowania",
       "object_types": "Typy obiektów",
       "attributes": "Atrybuty",
       "attribute_groups": "Grupy atrybutów",
-      "categories": "Kategorie"
+      "categories": "Kategorie",
+      "channels": "Kanały",
+      "locales": "Wersje językowe"
     },
     "built_in_lock": {
       "label": "Zablokowane",

@@ -59,7 +59,7 @@ test('map a master category to a channel node from the channel mapping tab', asy
   });
 
   // 3. Open the channel "Kategorie kanału" tab.
-  await page.goto(`/settings/channels/${channelId}`);
+  await page.goto(`/modeling/channels/${channelId}`);
   // The admin renders in EN or PL depending on the session locale — match both.
   await page.getByRole('button', { name: /Channel categories|Kategorie kanału/i }).click();
 

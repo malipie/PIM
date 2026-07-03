@@ -16,7 +16,7 @@ test.describe('#1280 — add-locale modal scroll', () => {
     test.setTimeout(120_000);
 
     await loginAsAdmin(page);
-    await page.goto('/settings/locales');
+    await page.goto('/modeling/locales');
 
     await page.getByRole('button', { name: /dodaj lokalizacj|add locale/i }).click();
 
