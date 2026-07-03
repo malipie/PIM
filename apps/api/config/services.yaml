@@ -143,6 +143,14 @@ services:
         arguments:
             $devTokenEnvironment: '%kernel.environment%'
 
+    # AGENT-P6-06 (#1979) — BYOK key settings surface. The env is read
+    # directly (not via the removable pim.agent.enabled param) so this
+    # CORE controller keeps compiling when the agent module is removed;
+    # with the flag off it simply reports agent_feature_enabled=false.
+    App\Identity\Presentation\Controller\AgentKeyController:
+        arguments:
+            $agentFeatureEnabled: '%env(bool:AGENT_ENABLED)%'
+
     App\Catalog\Application\ObjectTypeService:
         arguments:
             $enableCustomObjectTypes: '%pim.catalog.enable_custom_object_types%'
