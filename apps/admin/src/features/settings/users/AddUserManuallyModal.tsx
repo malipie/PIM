@@ -156,6 +156,16 @@ export function AddUserManuallyModal({ open, onOpenChange, onSuccess }: AddUserM
                 placeholder="ada@example.com"
                 autoComplete="email"
               />
+              {/* DP-02 (#2032) — email is the login identifier; deliverability
+                is never verified, so panel-managed accounts (warehouse staff,
+                kiosk logins) work with a placeholder address as long as the
+                welcome email stays unchecked. */}
+              <p className="text-[11.5px] text-muted-foreground">
+                {t('settings.users.add_manually.email_hint', {
+                  defaultValue:
+                    'Email pełni rolę loginu — nie musi być prawdziwą skrzynką (np. magazyn1@firma.pl). Przy adresie bez skrzynki odznacz wysyłkę welcome maila.',
+                })}
+              </p>
             </div>
 
             <div className="space-y-1.5">

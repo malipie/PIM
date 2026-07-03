@@ -19576,6 +19576,45 @@
                 "x-cortex-permission": "user.admin"
             }
         },
+        "/api/users/{id}/password": {
+            "post": {
+                "operationId": "api_users_id_password_post",
+                "tags": [
+                    "users"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api users id password",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "user.admin"
+            }
+        },
         "/api/users/{id}/reactivate": {
             "post": {
                 "operationId": "api_users_id_reactivate_post",
