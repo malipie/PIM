@@ -2855,3 +2855,24 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 
 ### Proces
 - **Dwie sesje w jednym working tree = wyścigi o checkout** (checkout+pull w trakcie cudzego commita, stash cudzych plików, skasowany remote branch z otwartym PR-em). Sesja porządkująca MUSI iść do własnego `git worktree` i nie dotykać brancha, na którym pracuje druga sesja.
+
+## Lessons z epiku DP — maraton drobnych poprawek (2026-07-03, DP-01..DP-09)
+
+### CI / infra
+- **`timeout-minutes: 20` na jobie Playwright maskował się jako flake**: run ginął jako „The operation was canceled" TUŻ PO „15x passed" (testy ~16.5m + setup stacka ~4m > 20m). Trzy PR-y z rzędu diagnozowane błędnie jako wyścig merge-refów. Sygnatura: fail o długości ~20m z kompletem zielonych testów w logu → sprawdź timeout joba, nie testy. Podniesione do 30m (#2171).
+- **Gitleaks skanuje per-commit** — `// gitleaks:allow` dopisany w NOWYM commicie nie czyści findingu ze starego; komentarz musi być w TYM SAMYM commicie (amend + force-push na własnym branchu).
+- **Guard ADR-0021 (jsonFetch+useEffect, baseline 61) vs wyścig merge-refów**: dwa równoległe merge'e wpuściły na main 62. plik (SetPasswordModal przeszedł CI, bo jego merge-ref liczony był przed merge'em MoveCategoryDialog). Wzorzec naprawczy: **mount-on-open zamiast reset-effectu** — `{open ? <Dialog/> : null}` daje świeży stan bez `useEffect` i bez wpisu do baseline.
+- **Watcher `gh pr checks` po pushu ma okno wyścigu**: stare checki znikają zanim nowe się zarejestrują → `pending=0, fail=0` ≠ zielono. Po pushu odczekaj aż pojawią się NOWE checki, dopiero potem licz pending.
+- **Zmiana `Serializer/*.xml` wymaga `cache:clear`** — metadata cache serializera przeżywa restart workera FrankenPHP (nowe pole „znika" z API mimo poprawnego XML-a).
+- **php-cs-fixer degraduje inline `/** @var */` do `/*` (zwykły komentarz)** gdy uzna go za docblock w złym miejscu → CI PHPStan traci type-narrowing, którego lokalny run (przed fixerem) jeszcze widział. Zamiast castów `@var` buduj jawnie typowaną kopię.
+
+### Playwright
+- **`locator('div').filter({has: text}).first()` łapie NAJBARDZIEJ ZEWNĘTRZNY kontener** (root strony) — akcja trafia w pierwszy pasujący przycisk CAŁEJ strony, nie wiersza. Zawężaj do kontenera wiersza (np. `[class*="grid-cols-"]`) i bierz `.last()`/scoped locator. Kosztowało godzinę fałszywego debugowania „gating nie działa" (działał od początku).
+- **`page.getByDisplayValue` nie istnieje w Playwright** (to API testing-library) — użyj `expect(locator).toHaveValue()`.
+- **Limiter `/api/auth/refresh` wyczerpuje się po wielu specach z browser-side API** (każde wywołanie = refresh) — pusta odpowiedź z API w specu po serii runów to najpierw `restart redis`, nie debug kodu.
+- **Token JWT admina żyje tylko w pamięci modułu** (nie localStorage) — spec robiący własne API-calle mintuje token przez `POST /api/auth/refresh` (HttpOnly cookie) w `page.evaluate`.
+
+### Wzorce DP-07/DP-08 (cross-field + visibility)
+- **`attributes_indexed` NIE nadaje się jako źródło walidacji na write-path**: listener rebuildu pomija bulk (`BulkContext`), świeży obiekt ma pusty cache w tym samym flushu. Kanoniczne wiersze `ObjectValue` (`findByObject` / prime-index) są jedynym zawsze świeżym źródłem.
+- **Upserter „waliduj wszystko → gate → dopiero zapisuj"**: restrukturyzacja pętli na 3 fazy daje atomowość (422 nigdy nie zostawia w połowie zapisanego obiektu) bez zmiany semantyki per-atrybut.
+- **Zanim zbudujesz nowy mechanizm, sprawdź substrat**: DP-08 miał w tickecie „reuse DSL z DP-07", a backend conditional visibility (visibleWhen + evaluator + PATCH + serializacja w form-schema) istniał W CAŁOŚCI od UI-08.8 — ticket zrobił się czysto frontendowy. Analogicznie DP-01: backend move kategorii kompletny od VIEW-04, brakowało tylko dialogu.
