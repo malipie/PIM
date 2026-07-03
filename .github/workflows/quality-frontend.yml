@@ -37,8 +37,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  guards:
-    name: Frontend lint guards
+  # #2148 — the five fast frontend gates (guards, biome, typecheck,
+  # vitest, build) run in ONE job so a single PR run stays under the
+  # GitHub Free 20-concurrent-job cap, and pnpm install runs once instead
+  # of four times. The two bash guards run first (fail in seconds, no
+  # Node needed); each remaining step still fails the job independently.
+  # Playwright E2E stays its own job (heavy docker stack, own timeout).
+  frontend-checks:
+    name: Frontend checks (guards + biome + tsc + vitest + build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -46,18 +52,12 @@ jobs:
       # AUD-055 — block new jsonFetch+useEffect reads (stale-data anti-pattern,
       # ADR-0021). AUD-057 — block new admin source files growing past the
       # max-lines threshold (ADR-0021 sibling: readability). Both are pure
-      # bash guards over apps/admin/src — no Node/pnpm needed.
+      # bash guards over apps/admin/src — no Node/pnpm needed, run first.
       - name: jsonFetch + useEffect guard (ADR-0021)
         run: bash scripts/lint-jsonfetch-useeffect.sh
 
       - name: Admin max-lines guard
         run: bash scripts/lint-admin-max-lines.sh
-
-  biome:
-    name: Biome strict
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
         with:
@@ -74,65 +74,11 @@ jobs:
       - name: Biome check
         run: pnpm --filter @pim/admin lint
 
-  typecheck:
-    name: TypeScript noEmit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.2
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: TypeScript typecheck
         run: pnpm --filter @pim/admin typecheck
 
-  unit:
-    name: Vitest unit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.2
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Vitest
         run: pnpm --filter @pim/admin test
-
-  build:
-    name: Vite build (smoke)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.33.2
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm --filter @pim/admin build

@@ -2,6 +2,10 @@ name: Security audit
 
 # composer audit + pnpm audit on every PR + nightly main.
 # Blocks merge on high/critical CVEs (failed audit returns non-zero).
+#
+# #2148 — composer + pnpm audit share one job (was two) so a single PR
+# run stays under the GitHub Free 20-concurrent-job cap. Both audits run
+# sequentially; each still fails the job independently.
 
 on:
   pull_request:
@@ -15,34 +19,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  composer-audit:
-    name: composer audit
+  dependency-audit:
+    name: Dependency audit (composer + pnpm)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api
     steps:
       - uses: actions/checkout@v7
+
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
           extensions: ctype, iconv, intl
           tools: composer:v2
+
       - name: composer audit
+        working-directory: apps/api
         run: composer audit --no-dev --abandoned=fail --locked
 
-  pnpm-audit:
-    name: pnpm audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 10.33.2
+
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
+
       - run: pnpm install --frozen-lockfile
+
       - name: pnpm audit
         run: pnpm audit --audit-level=high

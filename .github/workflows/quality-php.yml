@@ -49,11 +49,39 @@ defaults:
     working-directory: apps/api
 
 jobs:
-  phpstan:
-    name: PHPStan max
+  # #2148 — the fast PHP static gates share ONE job (was seven: phpstan,
+  # deptrac, php-cs-fixer, openapi-spec + three shell linters) so a single
+  # PR run stays under the GitHub Free 20-concurrent-job cap, and the
+  # checkout + PHP + composer-install setup runs once instead of four
+  # times. The three shell linters run first (fail in seconds, before
+  # composer install); each remaining step still fails the job
+  # independently. Heavy/isolated jobs stay separate below (semgrep pin,
+  # phpunit shards, benchmark, agent-removability).
+  static:
+    name: PHP static (phpstan + deptrac + cs-fixer + openapi + shell linters)
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth:0 — tracked-secrets-lint needs the real tree on
+      # push-to-main (git ls-files), not a shallow clone.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # HARD-07 — raw SQL bypassing TenantFilter. AUD-017/021 — pgBackRest
+      # backup cron wiring. AUD-005/010 — real secrets in tracked .env
+      # files. Pure shell, run before composer install so they fail in
+      # seconds. working-directory: . (repo root; job default is apps/api).
+      - name: Lint raw SQL escape hatches
+        working-directory: .
+        run: bash scripts/lint-raw-sql.sh
+
+      - name: Lint backup cron wiring
+        working-directory: .
+        run: bash scripts/lint-backup-cron.sh
+
+      - name: Lint tracked env files for real secrets
+        working-directory: .
+        run: bash scripts/lint-tracked-secrets.sh
 
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -81,7 +109,7 @@ jobs:
           openssl genpkey -algorithm RSA -out config/jwt/private.pem -aes256 -pass pass:ci -pkeyopt rsa_keygen_bits:4096
           openssl pkey -in config/jwt/private.pem -passin pass:ci -pubout -out config/jwt/public.pem
 
-      - name: Warm up cache (PHPStan needs the dev container.xml)
+      - name: Warm up cache (PHPStan + OpenAPI export need the dev container.xml)
         run: php bin/console cache:clear --env=dev
         env:
           APP_ENV: dev
@@ -99,86 +127,32 @@ jobs:
           APP_ENV: dev
           JWT_PASSPHRASE: ci
 
-  deptrac:
-    name: Deptrac (architectural fitness)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Setup PHP 8.4
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.4"
-          extensions: ctype, iconv, intl
-          coverage: none
-          tools: composer:v2
-
-      - name: Cache Composer
-        uses: actions/cache@v6
-        with:
-          path: |
-            apps/api/vendor
-            ~/.composer/cache
-          key: ${{ runner.os }}-composer-${{ hashFiles('apps/api/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
-
-      - name: Install dependencies
-        run: composer install --no-interaction --no-progress --prefer-dist
-
       - name: Deptrac analyse
         run: vendor/bin/deptrac analyse --no-progress --no-cache
 
-  raw-sql-lint:
-    # HARD-07 — guard-rail for raw SQL bypassing TenantFilter.
-    # Cheap shell job; runs before composer install so failures
-    # surface in seconds without burning CI minutes.
-    name: Raw SQL tenant-safe lint
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
-    steps:
-      - uses: actions/checkout@v7
+      - name: PHP-CS-Fixer
+        run: composer cs-check
 
-      - name: Lint raw SQL escape hatches
-        run: bash scripts/lint-raw-sql.sh
+      # Re-export the OpenAPI spec and compare against the snapshot at
+      # docs/api-spec/v0.json. Fails when a PR changes API surface without
+      # bumping the spec — same idea as a Doctrine schema drift check.
+      - name: Export OpenAPI spec
+        run: php bin/console api:openapi:export | python3 -m json.tool > /tmp/v0.expected.json
+        env:
+          APP_ENV: dev
+          APP_DEBUG: "0"
+          DATABASE_URL: postgresql://pim:ChangeMeInDev@127.0.0.1:5432/pim?serverVersion=16&charset=utf8
+          JWT_PASSPHRASE: ci
 
-  backup-cron-lint:
-    # AUD-017 / AUD-021 — guard-rail keeping the pgBackRest backup cron alive.
-    # Fails if start-pim.sh stops registering the postgres crontab via
-    # `crontab -u` (dcron silently ignores an unregistered per-user file —
-    # the bug that killed the cron for ~49 days) or if the Dockerfile schedule
-    # drops the full / diff / weekly restore-test entries. Cheap shell job.
-    name: Backup cron wiring lint
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Lint backup cron wiring
-        run: bash scripts/lint-backup-cron.sh
-
-  tracked-secrets-lint:
-    # AUD-005 / AUD-010 — guard-rail against real secrets committed to VCS.
-    # Fails if a non-template `.env.<env>` file is tracked, or if any tracked
-    # `.env*` file carries a real (high-entropy / credential-bearing) value.
-    # Cheap shell job; complements gitleaks/trufflehog (security-secrets.yml)
-    # with a deterministic repo-hygiene assertion. Needs full history so
-    # `git ls-files` sees the real tree on push-to-main, not a shallow clone.
-    name: Tracked secrets lint
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Lint tracked env files for real secrets
-        run: bash scripts/lint-tracked-secrets.sh
+      - name: Compare against snapshot
+        working-directory: ${{ github.workspace }}
+        run: |
+          if ! diff -u docs/api-spec/v0.json /tmp/v0.expected.json; then
+            echo "::error::OpenAPI spec drift — re-export with"
+            echo "::error::    docker compose exec -T api php bin/console api:openapi:export | python3 -m json.tool > docs/api-spec/v0.json"
+            echo "::error::and commit the result."
+            exit 1
+          fi
 
   semgrep-cortex:
     # RBAC-P6-008 / #720 — Cortex-specific Semgrep rules (the static-
@@ -224,35 +198,6 @@ jobs:
             --error --no-rewrite-rule-ids \
             --severity ERROR --severity WARNING \
             apps/api/src apps/admin/src
-
-  php-cs-fixer:
-    name: PHP-CS-Fixer (dry-run)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Setup PHP 8.4
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.4"
-          extensions: ctype, iconv, intl
-          coverage: none
-          tools: composer:v2
-
-      - name: Cache Composer
-        uses: actions/cache@v6
-        with:
-          path: |
-            apps/api/vendor
-            ~/.composer/cache
-          key: ${{ runner.os }}-composer-${{ hashFiles('apps/api/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
-
-      - name: Install dependencies
-        run: composer install --no-interaction --no-progress --prefer-dist
-
-      - name: PHP-CS-Fixer
-        run: composer cs-check
 
   phpunit:
     # AUD-083 — shard the suite across testsuites so `api` and `integration`
@@ -519,57 +464,3 @@ jobs:
         run: pnpm --filter @pim/admin build
         env:
           VITE_AGENT_ENABLED: "false"
-
-  openapi-spec:
-    name: OpenAPI spec drift
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Setup PHP 8.4
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.4"
-          extensions: ctype, iconv, intl, opcache, pdo_pgsql
-          coverage: none
-          tools: composer:v2
-
-      - name: Cache Composer
-        uses: actions/cache@v6
-        with:
-          path: |
-            apps/api/vendor
-            ~/.composer/cache
-          key: ${{ runner.os }}-composer-${{ hashFiles('apps/api/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
-
-      - name: Install dependencies
-        run: composer install --no-interaction --no-progress --prefer-dist
-
-      - name: Generate JWT keypair (cache:warmup boots Lexik)
-        run: |
-          mkdir -p config/jwt
-          openssl genpkey -algorithm RSA -out config/jwt/private.pem -aes256 -pass pass:ci -pkeyopt rsa_keygen_bits:4096
-          openssl pkey -in config/jwt/private.pem -passin pass:ci -pubout -out config/jwt/public.pem
-
-      # Re-export the OpenAPI spec and compare against the snapshot
-      # at `docs/api-spec/v0.json`. The CI fails when a PR changes API
-      # surface without bumping the spec — same idea as a Doctrine
-      # schema drift check, applied to the contract integrators read.
-      - name: Export OpenAPI spec
-        run: php bin/console api:openapi:export | python3 -m json.tool > /tmp/v0.expected.json
-        env:
-          APP_ENV: dev
-          APP_DEBUG: "0"
-          DATABASE_URL: postgresql://pim:ChangeMeInDev@127.0.0.1:5432/pim?serverVersion=16&charset=utf8
-          JWT_PASSPHRASE: ci
-
-      - name: Compare against snapshot
-        working-directory: ${{ github.workspace }}
-        run: |
-          if ! diff -u docs/api-spec/v0.json /tmp/v0.expected.json; then
-            echo "::error::OpenAPI spec drift — re-export with"
-            echo "::error::    docker compose exec -T api php bin/console api:openapi:export | python3 -m json.tool > docs/api-spec/v0.json"
-            echo "::error::and commit the result."
-            exit 1
-          fi
