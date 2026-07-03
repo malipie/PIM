@@ -2839,3 +2839,19 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 - **Provenance badge: zdjęty desaturacja `opacity-70` + znacznik „Faza 2"** — oblewał axe AA kontrast; warstwa żyje od 0.7, pełny kontrast purple.
 - **Intercept API do kontraktu bez klucza BYOK** — specy P6-02/03/04/07 mockują `page.route('**/api/agent/...')` żeby asertować kontrakt (payload kontekstu, diff, rollback-boundary 409, SSE degradację) bez działającego LLM; ścieżki backendowe pokryte ApiTestCase/integration. BYOK settings (P6-06) i cost (P9-02) smoke'owane na ŻYWYM API (real set/rotate/disable, real status).
 - **Dev-cache heal z memory potwierdzony**: po branch-switchach `/api/*` rzucał HTML Fatal → nuke `var/cache/dev`+warmup+`restart api redis` (nie regresja).
+
+## Lessons z merge-trainu epiku 0.7 (2026-07-03, sesja porządkująca)
+
+### CI / GitHub mechanika stacked PR-ów
+- **`cancel-in-progress` + ruchliwy main = fałszywe czerwone**: concurrency group per merge-ref; każdy push/merge do main unieważnia w locie Playwrighty pozostałych PR-ów. Logi takich „failów" kończą się `N passed` + `The operation was canceled` — ZAWSZE sprawdź `gh run view <id> -q .conclusion` zanim uznasz fail za realny (tu: ~90% czerwieni to były anulowania).
+- **Kasowanie brancha BAZOWEGO stacked PR-a ZAMYKA go** (GitHub nie retargetuje przy delete przez API), a zamkniętego PR-a z nieistniejącą bazą **nie da się reopenąć**. Obejście: push starej bazy → reopen → `gh pr edit --base main` → delete bazy. Prewencja: przed trainem zretargetować CAŁY stack na main (`gh pr edit --base main` nie triggeruje CI — event `edited`).
+- **Formality merge `-X ours` + asercja drzewa**: przy squash-merge'owaniu stacka bottom-up, `git merge origin/main -X ours` w branchu dziecka daje drzewo IDENTYCZNE z już zwalidowanym head-SHA (asercja `rev-parse HEAD^{tree}`) — zielone CI z head pokrywa merge-commit, nie trzeba czekać na re-run. Konflikty add/add to artefakty squasha (strona main pusta), `-X ours` rozwiązuje poprawnie.
+- **Squash-merge potrafi COFNĄĆ config na main** (#2084 usunął `imports: services_agent.yaml` + szeroki exclude) — main zielony, moduł martwy w DI. Po każdym merge'u PR-a dotykającego configów DI: grep markera na main.
+
+### Testy
+- **CI pinuje `MESSENGER_TRANSPORT_DSN=in-memory://`** (lokalnie `.env.test` = sync://) — test integracyjny asertujący skutek wiadomości async musi drenować transport (`getSent()` → `dispatch(msg, [new ReceivedStamp('async')])`, wzorzec w `AgentProvenanceProjectionTest`). Inaczej: zielone lokalnie, `[]` na CI.
+- **Kernel-suity DA SIĘ odpalić lokalnie na dowolnym drzewie**: `docker run --entrypoint sh -v <worktree>/apps/api:/app -v pim_api_vendor:/app/vendor --network pim_default` + dedykowana baza (`pim_stackfix`) + skopiowane `config/jwt/*.pem` i `.env.test.local` z main tree. Koryguje wcześniejsze „iteracja tylko przez CI".
+- **Jedna kompozycja slotu projekcji**: wzbogacenie `attributes_indexed` o provenance tylko w Rebuilderze zepsuło drift-detector (fałszywy mismatch na każdym obiekcie) — każdy drugi kompozytor slotu to bug; ekstrakt `globalSlot()` i oba czytniki przez niego.
+
+### Proces
+- **Dwie sesje w jednym working tree = wyścigi o checkout** (checkout+pull w trakcie cudzego commita, stash cudzych plików, skasowany remote branch z otwartym PR-em). Sesja porządkująca MUSI iść do własnego `git worktree` i nie dotykać brancha, na którym pracuje druga sesja.
