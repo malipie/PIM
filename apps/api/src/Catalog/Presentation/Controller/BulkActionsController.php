@@ -403,21 +403,125 @@ final class BulkActionsController
      */
     private function extractCategoryIds(array $payload): array
     {
-        $raw = $payload['category_ids'] ?? null;
-        if (!\is_array($raw) || [] === $raw) {
-            throw new BadRequestHttpException('payload.category_ids must be a non-empty array.');
-        }
-        $out = [];
-        foreach ($raw as $id) {
-            if (\is_string($id) && '' !== $id) {
-                $out[] = $id;
+        $rawIds = $payload['category_ids'] ?? null;
+        if (\is_array($rawIds) && [] !== $rawIds) {
+            $out = [];
+            foreach ($rawIds as $id) {
+                if (\is_string($id) && '' !== $id) {
+                    $out[] = $id;
+                }
+            }
+            if ([] !== $out) {
+                return $out;
             }
         }
-        if ([] === $out) {
-            throw new BadRequestHttpException('payload.category_ids has no valid entries.');
+
+        // #2161 — the Cmd+K planner emits human-friendly category_codes
+        // ("dodaj kategorię botki"), not UUIDs. Resolve each token to a
+        // category object id by CODE or display NAME (case-insensitive), so
+        // the quick action actually applies instead of returning a 400.
+        $rawCodes = $payload['category_codes'] ?? null;
+        if (\is_array($rawCodes) && [] !== $rawCodes) {
+            $codes = [];
+            foreach ($rawCodes as $code) {
+                if (\is_string($code) && '' !== trim($code)) {
+                    $codes[] = trim($code);
+                }
+            }
+            if ([] !== $codes) {
+                return $this->resolveCategoryRefs($codes);
+            }
         }
 
-        return $out;
+        throw new BadRequestHttpException('payload.category_ids (or category_codes) must be a non-empty array.');
+    }
+
+    /**
+     * Resolve category references (code or display name, case-insensitive)
+     * to category object ids within the current tenant. Unknown references
+     * are a clear 404 naming them, never a silent drop.
+     *
+     * @param list<string> $refs
+     *
+     * @return list<string>
+     */
+    private function resolveCategoryRefs(array $refs): array
+    {
+        $tenant = $this->tenantContext->get();
+        if (null === $tenant) {
+            throw new BadRequestHttpException('No tenant context.');
+        }
+
+        $lowered = array_values(array_unique(array_map('mb_strtolower', $refs)));
+
+        // tenant-safe: explicit tenant_id predicate; RLS is the backstop.
+        // Match code OR name (scalar envelope value + pl/en localized value).
+        $rows = $this->em->getConnection()->fetchAllAssociative(
+            "SELECT co.id, co.code, co.attributes_indexed->'name' AS name
+             FROM objects co
+             JOIN object_types ot ON ot.id = co.object_type_id
+             WHERE co.tenant_id = :tenant AND ot.kind = 'category'",
+            ['tenant' => $tenant->getId()->toRfc4122()],
+        );
+
+        $byRef = [];
+        foreach ($rows as $row) {
+            $id = $row['id'] ?? null;
+            if (!\is_string($id)) {
+                continue;
+            }
+            foreach ($this->categoryRefKeys($row) as $key) {
+                // First match wins; codes/names are expected unique per tenant.
+                $byRef[$key] ??= $id;
+            }
+        }
+
+        $ids = [];
+        $missing = [];
+        foreach ($lowered as $ref) {
+            if (isset($byRef[$ref])) {
+                $ids[] = $byRef[$ref];
+            } else {
+                $missing[] = $ref;
+            }
+        }
+        if ([] !== $missing) {
+            throw new NotFoundHttpException(\sprintf('Nie znaleziono kategorii: %s.', implode(', ', $missing)));
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * Lower-cased lookup keys for a category row: its code and every display
+     * name shape (scalar envelope value, and pl/en of a localized value).
+     *
+     * @param array<string, mixed> $row
+     *
+     * @return list<string>
+     */
+    private function categoryRefKeys(array $row): array
+    {
+        $keys = [];
+        $code = $row['code'] ?? null;
+        if (\is_string($code) && '' !== $code) {
+            $keys[] = mb_strtolower($code);
+        }
+
+        $nameRaw = $row['name'] ?? null;
+        $name = \is_string($nameRaw) ? json_decode($nameRaw, true) : $nameRaw;
+        $value = \is_array($name) ? ($name['value'] ?? null) : $name;
+        if (\is_string($value) && '' !== $value) {
+            $keys[] = mb_strtolower($value);
+        } elseif (\is_array($value)) {
+            foreach ($value as $localized) {
+                if (\is_string($localized) && '' !== $localized) {
+                    $keys[] = mb_strtolower($localized);
+                }
+            }
+        }
+
+        return $keys;
     }
 
     /**
