@@ -60,6 +60,17 @@ final readonly class AgentRunStarter
         return $run;
     }
 
+    /**
+     * "Active" means GENUINELY EXECUTING — planning (the async loop is
+     * calling the LLM) or committing (writing the approved batch). A run
+     * parked for the human — awaiting_input (waiting for a chat reply) or
+     * awaiting_approval (the autonomous stretch is done, the plan sits in
+     * the inbox) — costs nothing and MUST NOT block a new conversation:
+     * otherwise a parked (or stuck) run is a dead-end with no reliable
+     * escape. The parked run stays in the inbox/history for its own
+     * accept/reject/resume decision. Mirrors the partial unique index
+     * (Version20260703130000).
+     */
     private function hasActiveRun(Uuid $userId): bool
     {
         $count = $this->entityManager->createQueryBuilder()
@@ -70,8 +81,6 @@ final readonly class AgentRunStarter
             ->setParameter('user', $userId, 'uuid')
             ->setParameter('active', [
                 AgentRunStatus::Planning->value,
-                AgentRunStatus::AwaitingInput->value,
-                AgentRunStatus::AwaitingApproval->value,
                 AgentRunStatus::Committing->value,
             ])
             ->getQuery()
