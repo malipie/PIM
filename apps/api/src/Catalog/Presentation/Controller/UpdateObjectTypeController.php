@@ -195,14 +195,19 @@ final class UpdateObjectTypeController
         if (!\is_array($raw) || !array_is_list($raw)) {
             throw new BadRequestHttpException('validationRules must be a JSON list.');
         }
+        $clean = [];
         foreach ($raw as $entry) {
             if (!\is_array($entry)) {
                 throw new BadRequestHttpException('validationRules entries must be objects.');
             }
+            $ruleEntry = [];
+            foreach ($entry as $key => $value) {
+                $ruleEntry[(string) $key] = $value;
+            }
+            $clean[] = $ruleEntry;
         }
 
-        /* @var list<array<string, mixed>> $raw */
-        return $raw;
+        return $clean;
     }
 
     /**
