@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\PendingChanges;
 
+use App\Catalog\Application\Bulk\BulkRollbackHandler;
 use App\Catalog\Application\BulkContext;
 use App\Catalog\Application\Message\ObjectValuesChangedMessage;
 use App\Catalog\Application\Reindex\BulkReindexQueueInterface;
@@ -51,6 +52,7 @@ final readonly class ObjectValueRollbackHandler implements BulkRollbackPort
         private BulkContext $bulkContext,
         private BulkReindexQueueInterface $reindexQueue,
         private MessageBusInterface $messageBus,
+        private BulkRollbackHandler $projectionRollback,
     ) {
     }
 
@@ -62,6 +64,14 @@ final readonly class ObjectValueRollbackHandler implements BulkRollbackPort
         }
         if (!$session->isRollbackAvailable()) {
             throw new BadRequestHttpException('Rollback window expired or already used.');
+        }
+
+        // AGENT-P3-05 (#1965) — category (and other junction/projection)
+        // sessions were committed by the existing bulk handlers and are
+        // reverted by the existing rollback path; only the agent's
+        // value-canonical multi_attribute_edit sessions need this handler.
+        if ('multi_attribute_edit' !== $session->getActionType()) {
+            return $this->projectionRollback->rollback($session);
         }
 
         set_time_limit(0);
