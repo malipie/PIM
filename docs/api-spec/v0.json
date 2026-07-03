@@ -24000,6 +24000,20 @@
                             ]
                         }
                     },
+                    "validationRules": {
+                        "readOnly": true,
+                        "description": "DP-07 (#2037, ADR-0025) \u2014 cross-field rules (`compare` / `require_when`)\nstored as a JSONB list; shape guarded by CrossFieldRules::fromArray at\nthe write edge (ObjectTypeService), read by CrossFieldRulesValidator.",
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            }
+                        }
+                    },
                     "labelAttribute": {
                         "anyOf": [
                             {
@@ -24149,6 +24163,20 @@
                                         "string",
                                         "null"
                                     ]
+                                }
+                            },
+                            "validationRules": {
+                                "readOnly": true,
+                                "description": "DP-07 (#2037, ADR-0025) \u2014 cross-field rules (`compare` / `require_when`)\nstored as a JSONB list; shape guarded by CrossFieldRules::fromArray at\nthe write edge (ObjectTypeService), read by CrossFieldRulesValidator.",
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
                                 }
                             },
                             "labelAttribute": {

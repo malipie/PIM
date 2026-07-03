@@ -72,6 +72,7 @@ final class UpdateObjectTypeController
                 abstract: $this->boolOrNull($body['abstract'] ?? null),
                 allowedParentTypeIds: $this->idListOrNull($body['allowedParentTypeIds'] ?? null),
                 completenessRules: $this->mapOrNull($body['completenessRules'] ?? null),
+                validationRules: $this->ruleListOrNull($body['validationRules'] ?? null),
                 exposeToMainMenu: $this->boolOrNull($body['exposeToMainMenu'] ?? null),
                 isCategorizable: $this->boolOrNull($body['isCategorizable'] ?? null),
                 hasMultimedia: $this->boolOrNull($body['hasMultimedia'] ?? null),
@@ -95,6 +96,7 @@ final class UpdateObjectTypeController
             'abstract' => $objectType->isAbstract(),
             'allowedParentTypeIds' => $objectType->getAllowedParentTypeIds(),
             'completenessRules' => $objectType->getCompletenessRules(),
+            'validationRules' => $objectType->getValidationRules(),
             'exposeToMainMenu' => $objectType->isExposedToMainMenu(),
             'isCategorizable' => $objectType->isCategorizable(),
             'hasMultimedia' => $objectType->hasMultimedia(),
@@ -176,6 +178,31 @@ final class UpdateObjectTypeController
         }
 
         return array_values(array_unique($clean));
+    }
+
+    /**
+     * DP-07 (#2037) — validationRules must be a JSON list of objects; the
+     * deep shape (rule types, operators, referenced codes) is validated in
+     * ObjectTypeService via CrossFieldRules::fromArray.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    private function ruleListOrNull(mixed $raw): ?array
+    {
+        if (null === $raw) {
+            return null;
+        }
+        if (!\is_array($raw) || !array_is_list($raw)) {
+            throw new BadRequestHttpException('validationRules must be a JSON list.');
+        }
+        foreach ($raw as $entry) {
+            if (!\is_array($entry)) {
+                throw new BadRequestHttpException('validationRules entries must be objects.');
+            }
+        }
+
+        /* @var list<array<string, mixed>> $raw */
+        return $raw;
     }
 
     /**

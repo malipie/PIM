@@ -33,9 +33,19 @@ final class BatchValueWriter
     /** @var array<string, true> "attributeId|value" of identifier values seen in this chunk (in-file duplicates) */
     private array $chunkIdentifiers = [];
 
+    /**
+     * DP-07 (#2037) — objectId => code => existing NON-EMPTY global envelope,
+     * built in the same primeChunk() row loop (zero extra queries). Feeds the
+     * cross-field pre-pass in writeMany().
+     *
+     * @var array<string, array<string, array<string, mixed>>>
+     */
+    private array $globalEnvelopeIndex = [];
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly ValueWriteCore $core,
+        private readonly CrossFieldRulesValidator $crossFieldRules,
     ) {
     }
 
@@ -51,6 +61,7 @@ final class BatchValueWriter
     {
         $this->scopeIndex = [];
         $this->chunkIdentifiers = [];
+        $this->globalEnvelopeIndex = [];
 
         if ([] === $objects || [] === $attributesByCode) {
             return;
@@ -74,6 +85,11 @@ final class BatchValueWriter
                 $row->getLocale(),
                 $row->getChannelId(),
             )] = $row;
+
+            if (null === $row->getLocale() && null === $row->getChannelId()
+                && !ValueWriteCore::isEmptyEnvelope($row->getValue())) {
+                $this->globalEnvelopeIndex[$row->getObject()->getId()->toRfc4122()][$row->getAttribute()->getCode()] = $row->getValue();
+            }
         }
     }
 
@@ -95,9 +111,49 @@ final class BatchValueWriter
         $issues = [];
         $changed = 0;
 
+        // Normalise + route once; the per-write loop below and the DP-07
+        // cross-field pre-pass share the prepared entries.
+        $prepared = [];
         foreach ($writes as $write) {
             $attribute = $write['attribute'];
-            $envelope = $this->core->normalise($attribute->getType(), $write['envelope']);
+            [$targetLocale, $targetChannel] = $tenant instanceof Tenant
+                ? $this->core->routeScope($attribute, $tenant, $write['locale'], $write['channelId'])
+                : [$write['locale'], $write['channelId']];
+            $prepared[] = [
+                'attribute' => $attribute,
+                'envelope' => $this->core->normalise($attribute->getType(), $write['envelope']),
+                'locale' => $targetLocale,
+                'channelId' => $targetChannel,
+            ];
+        }
+
+        // DP-07 (#2037, ADR-0025) — cross-field pre-pass: evaluate the rules
+        // against existing global envelopes (primeChunk index) overlaid with
+        // this row's writes. Broken `compare` skips the implicated incoming
+        // writes (invalid data must not land); `require_when` is report-only
+        // (the target is empty — there is nothing to skip).
+        $skipCodes = [];
+        $rules = $this->crossFieldRules->rulesFor($object->getObjectType());
+        if ([] !== $rules) {
+            $baseView = $this->globalEnvelopeIndex[$object->getId()->toRfc4122()] ?? [];
+            $view = $this->crossFieldRules->overlay($baseView, $prepared);
+            foreach ($this->crossFieldRules->evaluate($rules, $view) as $violation) {
+                $issues[] = ['attributeCode' => $violation->attributeCode, 'kind' => 'cross_field', 'message' => $violation->message];
+                if ('compare' === $violation->ruleType) {
+                    foreach ($violation->referencedCodes as $code) {
+                        $skipCodes[$code] = true;
+                    }
+                }
+            }
+        }
+
+        foreach ($prepared as $write) {
+            $attribute = $write['attribute'];
+            $envelope = $write['envelope'];
+
+            if (isset($skipCodes[$attribute->getCode()])) {
+                continue;
+            }
 
             $requiredViolation = $this->core->requiredViolation($attribute, $envelope);
             if (null !== $requiredViolation) {
@@ -135,9 +191,9 @@ final class BatchValueWriter
                 $this->chunkIdentifiers[$chunkKey] = true;
             }
 
-            [$targetLocale, $targetChannel] = $tenant instanceof Tenant
-                ? $this->core->routeScope($attribute, $tenant, $write['locale'], $write['channelId'])
-                : [$write['locale'], $write['channelId']];
+            // Scope already routed in the prepare pass.
+            $targetLocale = $write['locale'];
+            $targetChannel = $write['channelId'];
 
             $existing = $this->scopeIndex[$this->scopeKey($object->getId(), $attribute->getId(), $targetLocale, $targetChannel)] ?? null;
             if ($existing instanceof ObjectValue) {

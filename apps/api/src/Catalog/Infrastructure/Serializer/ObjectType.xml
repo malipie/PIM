@@ -45,6 +45,10 @@
             <group>admin:read</group>
             <group>admin:write</group>
         </attribute>
+        <attribute name="validationRules">
+            <group>admin:read</group>
+            <group>admin:write</group>
+        </attribute>
         <attribute name="hierarchical">
             <group>admin:read</group>
             <group>integration:read</group>

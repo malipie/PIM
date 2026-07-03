@@ -41,6 +41,8 @@ final class ObjectTypeSchemaVersionBumper
         'abstract',
         'allowedParentTypeIds',
         'completenessRules',
+        // DP-07 (#2037, ADR-0025) — cross-field rules shape the form contract.
+        'validationRules',
     ];
 
     public function preUpdate(PreUpdateEventArgs $args): void

@@ -145,6 +145,8 @@ final class ImportRunHandlerRefreshTest extends CatalogApiTestCase
             undoLogger: self::getContainer()->get(\App\Import\Application\Service\ImportUndoLogger::class),
             columnGrammar: self::getContainer()->get(\App\Import\Application\Service\ImportColumnGrammar::class),
             valueWriter: self::getContainer()->get(\App\Catalog\Application\BatchValueWriter::class),
+            crossFieldRules: self::getContainer()->get(\App\Catalog\Application\CrossFieldRulesValidator::class),
+            attributeRepository: self::getContainer()->get(\App\Catalog\Domain\Repository\AttributeRepositoryInterface::class),
             catalogObjects: self::getContainer()->get(\App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface::class),
             objectCategories: self::getContainer()->get(\App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface::class),
             assets: self::getContainer()->get(\App\Asset\Domain\Repository\AssetRepositoryInterface::class),

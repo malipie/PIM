@@ -65,6 +65,15 @@ class ObjectType implements TenantScoped
      * @var array<string, mixed>
      */
     private array $completenessRules = [];
+
+    /**
+     * DP-07 (#2037, ADR-0025) — cross-field rules (`compare` / `require_when`)
+     * stored as a JSONB list; shape guarded by CrossFieldRules::fromArray at
+     * the write edge (ObjectTypeService), read by CrossFieldRulesValidator.
+     *
+     * @var list<array<string, mixed>>
+     */
+    private array $validationRules = [];
     private ?Attribute $labelAttribute = null;
     private ?Attribute $imageAttribute = null;
 
@@ -288,6 +297,23 @@ class ObjectType implements TenantScoped
     public function updateCompletenessRules(array $rules): void
     {
         $this->completenessRules = $rules;
+        $this->touch();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function getValidationRules(): array
+    {
+        return $this->validationRules;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rules canonical stored shape (CrossFieldRules::toStoredArray)
+     */
+    public function updateValidationRules(array $rules): void
+    {
+        $this->validationRules = $rules;
         $this->touch();
     }
 
