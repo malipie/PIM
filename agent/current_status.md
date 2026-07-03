@@ -60,7 +60,7 @@
 - **Lokalnie vs hosting:** Blok A i B w pełni lokalnie na `pim.localhost` (B6 wymaga klucza Anthropic, nie hostingu; B1 = CI). Blok C wymaga hostingu — nie da się lokalnie tylko: deliverability SMTP (SPF/DKIM/inbox) i soft launch (dostęp partnerów). Load p95 lokalnie = proxy, bezwzględny gate <300ms potwierdzić na prod-podobnym HW.
 - **B3+ deep audit (dodane na życzenie operatora):** semantyczne śledzenie taint (źródło→ujście) ponad skanery; wiel-agentowy fan-out + adwersaryjna weryfikacja; PoC regresyjny (proof-of-fix) dla każdego HIGH/CRITICAL. Tickety security mają defensywny framing autoryzacyjny (redukcja dual-use model-switch). Kompensuje brak zewnętrznego pentestu (odłożony do fazy SaaS — residual risk zaakceptowany).
 - **Blokery:** klucz API Anthropic (B6 #2136), wybór hostingu (C1a #2138).
-- **Następny krok:** Blok A startuje od razu. Blok B po zamrożeniu kodu (koniec DP+FE). PR planu: #2143 (czysty rebuild po tym jak #2142 odbił się od nieaktualnego detached HEAD).
+- **Następny krok:** Blok A startuje od razu. Blok B po zamrożeniu kodu (koniec DP+FE). PR planu: #2150 (czysty rebuild po tym jak #2142 odbił się od nieaktualnego detached HEAD i pokazywał 6 niezwiązanych plików agenta — zamknięty).
 
 ## APIC — postęp implementacji (2026-06-28/29)
 - **M1 Consumer Foundation:** P1-01..09 + P1-07 hub (#1816), P1-08 wizard 1–2 (#1817).
