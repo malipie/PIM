@@ -4,7 +4,6 @@ import { useLocation } from 'react-router';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { type BreadcrumbItem, PageHeader } from '@/components/ui-v2/page-header';
 
-import { AuditLogStatus } from './audit-log-status';
 import { BulkSessionsPopover } from './bulk-sessions-popover';
 import { LanguageSwitcher } from './language-switcher';
 import { NotificationsBell } from './notifications-bell';
@@ -46,7 +45,8 @@ const ROUTE_CRUMBS: RouteCrumb[] = [
 /**
  * Global topbar v2 (EXR-03): ui-v2 PageHeader breadcrumb + per-page
  * action slot (PageActionsContext) + fixed actions (language switcher,
- * disabled history icon, notifications, audit status).
+ * disabled history icon, notifications). The audit-log status pill was
+ * removed in VIEW-13 (#2143) per operator decision.
  */
 export function TopbarV2() {
   const { t } = useTranslation();
@@ -82,9 +82,6 @@ export function TopbarV2() {
           </Tooltip>
           <BulkSessionsPopover />
           <NotificationsBell />
-          <div className="hidden md:block">
-            <AuditLogStatus />
-          </div>
         </>
       }
     />
