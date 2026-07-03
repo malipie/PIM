@@ -5,10 +5,12 @@ import { NavLink, Outlet, useLocation } from 'react-router';
 /**
  * UI-08.9 (#264) — Modeling layout shell. UI-03b polish (#365) added KPI
  * counters next to each tab so operators see the catalogue size at a glance.
+ * DP-03 (#2033) moved Channels and Locales in from Settings — they scope
+ * attribute values (scopable/localizable), so they belong to the data model.
  *
- * Renders a 4-tab top bar (Object Types / Attributes / Attribute Groups /
- * Categories) that drives the `/modeling/*` route tree. Active tab is
- * derived from the current pathname so a deep-link (e.g.
+ * Renders a 6-tab top bar (Object Types / Attributes / Attribute Groups /
+ * Categories / Channels / Locales) that drives the `/modeling/*` route tree.
+ * Active tab is derived from the current pathname so a deep-link (e.g.
  * `/modeling/attributes/{id}`) still highlights the parent tab.
  */
 
@@ -16,7 +18,8 @@ interface TabDef {
   value: string;
   to: string;
   label: string;
-  resource: 'object_types' | 'attributes' | 'attribute_groups' | 'categories';
+  /** Locales has no Refine list resource (custom /api/tenant-locales) — no badge. */
+  resource?: 'object_types' | 'attributes' | 'attribute_groups' | 'categories' | 'channels';
 }
 
 const TABS: readonly TabDef[] = [
@@ -44,10 +47,21 @@ const TABS: readonly TabDef[] = [
     label: 'modeling.tabs.categories',
     resource: 'categories',
   },
+  {
+    value: 'channels',
+    to: '/modeling/channels',
+    label: 'modeling.tabs.channels',
+    resource: 'channels',
+  },
+  {
+    value: 'locales',
+    to: '/modeling/locales',
+    label: 'modeling.tabs.locales',
+  },
 ] as const;
 
 interface TabBadgeProps {
-  resource: TabDef['resource'];
+  resource: NonNullable<TabDef['resource']>;
   isActive: boolean;
 }
 
@@ -117,7 +131,7 @@ export function ModelingLayout() {
               }
             >
               <span>{t(tab.label)}</span>
-              <TabBadge resource={tab.resource} isActive={isActive} />
+              {tab.resource ? <TabBadge resource={tab.resource} isActive={isActive} /> : null}
             </NavLink>
           );
         })}

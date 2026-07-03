@@ -34,8 +34,8 @@ test.describe('VIEW-06 — Settings · Channels · CRUD + mapping editor', () =>
 
     const uniqueCode = `e2e_${Date.now().toString(36)}`;
 
-    // 1. Navigate to /settings/channels — list page renders with CTA.
-    await page.goto('/settings/channels');
+    // 1. Navigate to /modeling/channels — list page renders with CTA.
+    await page.goto('/modeling/channels');
     await expect(page.getByRole('heading', { name: /kana[łl]y|channels/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /nowy kana[łl]|new channel/i })).toBeVisible();
 
@@ -56,7 +56,7 @@ test.describe('VIEW-06 — Settings · Channels · CRUD + mapping editor', () =>
     await page.getByRole('button', { name: /^mapping$/i }).click();
 
     // 6. Back to list — the freshly created channel is listed.
-    await page.goto('/settings/channels');
+    await page.goto('/modeling/channels');
     await expect(page.getByText(uniqueCode)).toBeVisible();
   });
 });

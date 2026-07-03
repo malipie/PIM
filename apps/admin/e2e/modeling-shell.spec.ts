@@ -74,7 +74,8 @@ test('Modeling shell + Dashboard mock — full handoff smoke', async ({ page }) 
     await expect(item).toHaveAttribute('aria-disabled', 'true');
   }
 
-  // 1. /modeling lands on object-types and renders the 4-tab tablist.
+  // 1. /modeling lands on object-types and renders the 6-tab tablist
+  // (DP-03 #2033 moved Channels + Locales in from Settings).
   await page.goto('/modeling');
   await expect(page).toHaveURL(/\/modeling\/object-types$/);
 
@@ -86,6 +87,8 @@ test('Modeling shell + Dashboard mock — full handoff smoke', async ({ page }) 
     /attributes|atrybuty/i,
     /attribute groups|grupy atrybutów/i,
     /categories|kategorie/i,
+    /channels|kanały/i,
+    /locales|wersje językowe/i,
   ];
   for (const name of tabNames) {
     await expect(tablist.getByRole('tab', { name })).toBeVisible();
