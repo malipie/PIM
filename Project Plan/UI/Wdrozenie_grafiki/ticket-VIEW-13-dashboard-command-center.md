@@ -32,7 +32,8 @@ To jest **relayout** (jak VIEW-07 dla edycji produktu) — nie nowy bounded cont
 
 ### 3.1 Routing
 - Bez zmian: trasa `/dashboard` (`App.tsx:466`), catch-all `*` → `/dashboard` (`App.tsx:757`). Auth wymagany (istniejący guard).
-- Top bar („Dashboard" + selektor PL + dzwonek powiadomień) = **app shell / istniejący `TopBar`** — poza scope tego ticketu, **chyba że** obecny header wizualnie odbiega od screena (do weryfikacji w Kroku 1 implementacji; jeśli tak — drobny restyle w tym samym ticketcie). Strona posiada layout od sekcji „Dzień dobry" w dół.
+- Top bar („Dashboard" + selektor PL + dzwonek powiadomień) = **app shell / istniejący `topbar-v2.tsx`** — **zostaje jak jest** (decyzja operatora), strona posiada layout od sekcji „Dzień dobry" w dół.
+- **Jedyny wyjątek in-scope w top barze:** usunąć pill „Audit log: aktywny · ostatnia zmiana 14 min temu" wraz z labelką MOCK — komponent `AuditLogStatus` (`src/layout/audit-log-status.tsx`), użyty tylko w `topbar-v2.tsx:86`. Usunąć render (blok `<div className="hidden md:block"><AuditLogStatus /></div>`) + import (`topbar-v2.tsx:7`) + plik `audit-log-status.tsx` (+ ewentualne testy). To jedyny odnośnik, więc usunięcie jest bezpieczne.
 
 ### 3.2 Komponenty — plan reuse / rebuild / remove
 
@@ -50,9 +51,11 @@ To jest **relayout** (jak VIEW-07 dla edycji produktu) — nie nowy bounded cont
 | `BackupWidget` | **REMOVE z layoutu** | sekcja System/Backup **nie występuje** na screenie |
 | `RecentAgentActivity` | **REMOVE z layoutu** | osobna karta aktywności agenta **nie występuje** na screenie |
 | `SyncsStatusPanel` | **REMOVE z layoutu** | przestarzały (hardkodowane Shopify/BaseLinker); sync reprezentowane w Centrum akcji |
-| `DashboardMockBanner` | **DECYZJA** (patrz §9) | amber baner „dane demonstracyjne" **nie występuje** na screenie |
+| `DashboardMockBanner` | **REMOVE** (decyzja operatora) | amber baner „dane demonstracyjne" **nie występuje** na screenie; usunąć z `page.tsx`, plik + test skasować jeśli nieużywane gdzie indziej |
 
 > **Uwaga:** „REMOVE z layoutu" = usunięcie z `page.tsx`, nie kasowanie plików (mogą wrócić w innym wariancie dashboardu). Jeśli komponent nie jest importowany nigdzie indziej — usuń plik + testy, żeby nie zostawić martwego kodu (zweryfikuj `grep`).
+>
+> **BEZ LABELEK „MOCK" (decyzja operatora):** na dashboardzie **nie dodajemy żadnej labelki `MockBadge` / „makieta" / „wkrótce"** — ani na kartach, ani w rogach, ani w top barze. Cały ekran jest statyczną makietą, ale wizualnie ma być czysty jak na screenie. Istniejący `MockBadge` (`@/components/ui/mock-badge`) **nie jest** używany w nowych komponentach dashboardu. (Poza zakresem: `MockBadge` w innych częściach apki — sidebar, agent-search, imports — zostają nietknięte.)
 
 **Nowe komponenty do napisania:**
 - `DashboardGreeting` — „Dzień dobry, {imię} 👋" + dwutonowy H1 „Centrum dowodzenia katalogiem. **Co dziś chcesz zmienić?**".
@@ -184,7 +187,9 @@ Każdy kafel: etykieta (`text-ink-2`), duża wartość (`display text-[40px] fon
 - [ ] `CompletenessMetrics` — rebuild: ring + pasek + legenda + `ChannelCompletenessList`.
 - [ ] `ActivityChart` — rebuild: toggle 7/30/90d + wykres 2-serie + `MostEditedList`.
 - [ ] `ActionCenter` + `ActionCenterItem` — pełnoszerokie, 5 pozycji, liczniki severity, CTA.
-- [ ] Usunięcie z layoutu: `ChannelDistribution`, `BackupWidget`, `RecentAgentActivity`, `SyncsStatusPanel`; decyzja o `DashboardMockBanner` (§9). Usuń martwe pliki + ich testy jeśli nieużywane nigdzie indziej (`grep` przed usunięciem).
+- [ ] Usunięcie z layoutu: `ChannelDistribution`, `BackupWidget`, `RecentAgentActivity`, `SyncsStatusPanel`, `DashboardMockBanner`. Usuń martwe pliki + ich testy jeśli nieużywane nigdzie indziej (`grep` przed usunięciem).
+- [ ] **Top bar cleanup:** usunąć `AuditLogStatus` (pill „Audit log: aktywny … MOCK") z `topbar-v2.tsx` (render + import) + skasować `src/layout/audit-log-status.tsx` (+ test).
+- [ ] **Zero labelek „MOCK":** żaden nowy komponent dashboardu nie renderuje `MockBadge` ani „makieta"/„wkrótce".
 - [ ] i18n: klucze `dashboard.*` w `pl.json` + `en.json`.
 - [ ] a11y: landmarki, aria-labels, toggle keyboard nav, kontrast na ciemnym hero.
 
@@ -261,8 +266,10 @@ Każdy kafel: etykieta (`text-ink-2`), duża wartość (`display text-[40px] fon
 - Realny top bar z powiadomieniami (dzwonek) i selektorem języka — jeśli nie jest już częścią app shell.
 - Widgety z v2 zdjęte z tego layoutu (ChannelDistribution, BackupWidget, RecentAgentActivity, SyncsStatusPanel) — jeśli operator zechce je wrócić w innym miejscu, osobny ticket.
 
-**Decyzja do potwierdzenia przez operatora:**
-- **`DashboardMockBanner`** (amber „dane demonstracyjne", AUD-058 #1610) **nie występuje na screenie**. Pixel-perfect ⇒ usunąć z widoku. Ale repo ma regułę uczciwości „mock ≠ live". **Rekomendacja:** usunąć baner (cały ekran jest mock i tak), zachować honesty przez subtelny per-widget `MockBadge` w rogu kart LUB jeden dyskretny pill „makieta" w nagłówku strony. Domyślnie w tym ticketcie: **usuwam baner, zostawiam dyskretny `MockBadge` w rogu kart** — do zmiany jeśli operator woli inaczej.
+**Decyzje operatora (2026-07-03) — rozstrzygnięte:**
+- **`DashboardMockBanner`** (amber „dane demonstracyjne", AUD-058 #1610) → **USUNĄĆ**. Bez zamiennika.
+- **Żadnych labelek „MOCK" na dashboardzie** → **nie dodawać** `MockBadge` / „makieta" / „wkrótce" nigdzie (karty, rogi, top bar). Ekran ma być wizualnie czysty jak screen, mimo że dane są statyczne.
+- **Top bar** → zostaje jak jest, **z jednym wyjątkiem:** usunąć pill „Audit log: aktywny · ostatnia zmiana 14 min temu" + jego labelkę MOCK (`AuditLogStatus`).
 
 **Edge cases pokryte:** responsywność (1-kolumna na tablet/mobile), keyboard nav toggle, disabled prompt bez wysyłki, brak console errors.
 
