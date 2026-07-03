@@ -127,6 +127,7 @@ final class AgentKeySettingsApiTest extends ApiTestCase
         $status = $client->request('GET', '/api/settings/agent-key')->toArray(false);
         self::assertNull($status['model']);
         self::assertTrue($status['prompt_caching_enabled']);
+        self::assertIsArray($status['selectable_models']);
         self::assertContains('claude-haiku-4-5', $status['selectable_models']);
 
         // A settings change requires a configured key.
