@@ -201,6 +201,113 @@ final class BulkEditValuesMaterializerTest extends KernelTestCase
         self::assertSame('name', $rows[0]->attributeCode);
     }
 
+    #[Test]
+    public function arithmeticMultiplyMaterializesComputedDiffPerObject(): void
+    {
+        // The agent counterpart of the manual increment_numeric bulk
+        // action: "double the price" -> operator '*', operand 2. The
+        // after-value is computed per object from its current envelope
+        // value, still through the approval path (nothing committed).
+        [, $em, $type] = $this->fixture();
+
+        $cheap = new CatalogObject($type, 'CHEAP-1');
+        $cheap->updateAttributeIndex(['price' => ['value' => 100, 'provenance' => 'manual']]);
+        $em->persist($cheap);
+
+        $pricey = new CatalogObject($type, 'PRICEY-1');
+        $pricey->updateAttributeIndex(['price' => ['value' => 250]]);
+        $em->persist($pricey);
+
+        $noPrice = new CatalogObject($type, 'NOPRICE-A');
+        $noPrice->updateAttributeIndex(['name' => ['value' => 'Bez ceny']]);
+        $em->persist($noPrice);
+        $em->flush();
+
+        $batchId = Uuid::v7();
+        $proposal = $this->port()->materializeArithmeticEdits(
+            batchId: $batchId,
+            userId: Uuid::v7(),
+            objectTypeCode: 'product',
+            filterDsl: [],
+            attrCode: 'price',
+            operator: '*',
+            operand: 2.0,
+        );
+
+        self::assertSame(2, $proposal->affectedObjects, 'both priced objects computed');
+        self::assertSame(2, $proposal->materializedChanges);
+        self::assertSame(1, $proposal->skippedExisting, 'the object with no price is skipped, not errored');
+        self::assertSame([], $proposal->rejected);
+
+        // SEC: nothing committed — the catalog stays at the old values.
+        $conn = $em->getConnection();
+        $live = $conn->fetchOne(
+            "SELECT (attributes_indexed->'price'->>'value')::numeric FROM objects WHERE code = :c",
+            ['c' => 'CHEAP-1'],
+        );
+        self::assertEqualsWithDelta(100.0, (float) (\is_scalar($live) ? $live : -1), 0.0001);
+
+        // The batch carries the computed before->after diff with provenance=agent.
+        $rows = $this->pendingChanges()->listBatch($batchId);
+        $byObject = [];
+        foreach ($rows as $row) {
+            self::assertSame('agent', $row->provenance);
+            self::assertSame('price', $row->attributeCode);
+            $byObject[$row->targetObjectId?->toRfc4122() ?? ''] = $row;
+        }
+        $cheapRow = $byObject[$cheap->getId()->toRfc4122()] ?? null;
+        self::assertNotNull($cheapRow);
+        self::assertSame(['value' => 100, 'provenance' => 'manual'], $cheapRow->before, 'before keeps the full envelope');
+        self::assertSame(['value' => 200.0], $cheapRow->after, '100 * 2 = 200');
+    }
+
+    #[Test]
+    public function arithmeticDivideByZeroSkipsInsteadOfErroring(): void
+    {
+        [, $em, $type] = $this->fixture();
+        $obj = new CatalogObject($type, 'DIV-1');
+        $obj->updateAttributeIndex(['price' => ['value' => 100]]);
+        $em->persist($obj);
+        $em->flush();
+
+        $proposal = $this->port()->materializeArithmeticEdits(
+            batchId: Uuid::v7(),
+            userId: Uuid::v7(),
+            objectTypeCode: 'product',
+            filterDsl: [],
+            attrCode: 'price',
+            operator: '/',
+            operand: 0.0,
+        );
+
+        self::assertSame(0, $proposal->materializedChanges);
+        self::assertSame(1, $proposal->skippedExisting, 'division by zero is skipped, never errored');
+        self::assertSame([], $proposal->rejected);
+    }
+
+    #[Test]
+    public function arithmeticRejectsAttributeOutsideEditScope(): void
+    {
+        [, $em, $type] = $this->fixture();
+        $obj = new CatalogObject($type, 'RBAC-A');
+        $obj->updateAttributeIndex(['price' => ['value' => 100]]);
+        $em->persist($obj);
+        $em->flush();
+
+        $proposal = $this->port(rbacAllows: false)->materializeArithmeticEdits(
+            batchId: Uuid::v7(),
+            userId: Uuid::v7(),
+            objectTypeCode: 'product',
+            filterDsl: [],
+            attrCode: 'price',
+            operator: '*',
+            operand: 2.0,
+        );
+
+        self::assertSame(0, $proposal->materializedChanges, 'nothing may be materialized outside the user scope');
+        self::assertSame('Attribute is outside your edit permissions.', $proposal->rejected[0]['reason']);
+    }
+
     /**
      * @return array{0: Tenant, 1: EntityManagerInterface, 2: ObjectType}
      */

@@ -115,6 +115,76 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
         );
     }
 
+    public function materializeArithmeticEdits(
+        Uuid $batchId,
+        Uuid $userId,
+        string $objectTypeCode,
+        array $filterDsl,
+        string $attrCode,
+        string $operator,
+        float $operand,
+    ): ValueEditProposal {
+        if (!\in_array($operator, ['+', '-', '*', '/', '%'], true)) {
+            throw new InvalidArgumentException(\sprintf('Unsupported operator "%s" (use + - * / %%).', $operator));
+        }
+
+        $tenant = $this->tenantContext->get();
+        if (!$tenant instanceof Tenant) {
+            throw new LogicException('Cannot materialize arithmetic edits without a current tenant.');
+        }
+
+        $objectType = $this->entityManager->getRepository(ObjectType::class)
+            ->findOneBy(['code' => $objectTypeCode, 'tenant' => $tenant]);
+        if (!$objectType instanceof ObjectType) {
+            throw new InvalidArgumentException(\sprintf('Unknown object type "%s".', $objectTypeCode));
+        }
+
+        // Existence + per-attribute RBAC on the single target attribute
+        // (mirrors screenChanges, minus value validation — the result is
+        // computed per object, not supplied).
+        $rejected = [];
+        $attribute = '' === $attrCode ? null : $this->entityManager->getRepository(Attribute::class)
+            ->findOneBy(['code' => $attrCode, 'tenant' => $tenant]);
+        if (!$attribute instanceof Attribute) {
+            $rejected[] = ['code' => $attrCode, 'reason' => 'Unknown attribute.'];
+        } elseif (!$this->permissions->canEditAttribute($userId, $attribute->getId())) {
+            $rejected[] = ['code' => $attrCode, 'reason' => 'Attribute is outside your edit permissions.'];
+            $attribute = null;
+        }
+
+        $affectedObjects = 0;
+        $materialized = 0;
+        // Non-numeric current values (and division-by-zero) are skipped,
+        // never errored — the operator cannot apply, so the object is left
+        // untouched and counted here.
+        $skipped = 0;
+
+        if ($attribute instanceof Attribute) {
+            $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl);
+            if ([] !== $objectIds) {
+                $drafts = $this->arithmeticDraftGenerator(
+                    $tenant,
+                    $objectIds,
+                    $attrCode,
+                    $operator,
+                    $operand,
+                    $affectedObjects,
+                    $materialized,
+                    $skipped,
+                );
+                $this->pendingChanges->materialize($batchId, Provenance::Agent->value, $drafts);
+            }
+        }
+
+        return new ValueEditProposal(
+            batchId: $batchId,
+            affectedObjects: $affectedObjects,
+            materializedChanges: $materialized,
+            skippedExisting: $skipped,
+            rejected: $rejected,
+        );
+    }
+
     /**
      * Per-attribute screening: existence, per-attribute RBAC by user id,
      * value validation with the manual-edit validators.
@@ -272,5 +342,89 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
                 }
             }
         }
+    }
+
+    /**
+     * Streams arithmetic drafts: reads the current scalar from the
+     * attributes_indexed envelope per object, applies the operator, and
+     * yields a before->after diff. Non-numeric current values and
+     * division-by-zero are skipped (counted), never errored.
+     *
+     * @param list<string> $objectIds
+     *
+     * @return Generator<PendingChangeDraft>
+     */
+    private function arithmeticDraftGenerator(
+        Tenant $tenant,
+        array $objectIds,
+        string $attrCode,
+        string $operator,
+        float $operand,
+        int &$affectedObjects,
+        int &$materialized,
+        int &$skipped,
+    ): Generator {
+        $connection = $this->entityManager->getConnection();
+
+        foreach (array_chunk($objectIds, self::ID_CHUNK) as $chunk) {
+            // tenant-safe: ids were selected under the tenant predicate above.
+            $rows = $connection->fetchAllAssociative(
+                'SELECT co.id, co.attributes_indexed FROM objects co WHERE co.tenant_id = :tenant AND co.id IN (:ids)',
+                ['tenant' => $tenant->getId()->toRfc4122(), 'ids' => $chunk],
+                ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
+            );
+
+            foreach ($rows as $row) {
+                $objectId = \is_string($row['id'] ?? null) ? $row['id'] : null;
+                if (null === $objectId) {
+                    continue;
+                }
+                $indexedRaw = $row['attributes_indexed'] ?? '{}';
+                $indexed = \is_string($indexedRaw) ? json_decode($indexedRaw, true) : $indexedRaw;
+                if (!\is_array($indexed)) {
+                    $indexed = [];
+                }
+
+                /** @var array<string, mixed>|null $before */
+                $before = \is_array($indexed[$attrCode] ?? null) ? $indexed[$attrCode] : null;
+                if (null !== $before && !\array_key_exists('value', $before)) {
+                    $before = ['value' => $before];
+                }
+                $beforeValue = null !== $before ? ($before['value'] ?? null) : null;
+                if (!is_numeric($beforeValue)) {
+                    ++$skipped;
+                    continue;
+                }
+
+                $result = $this->applyOperator((float) $beforeValue, $operator, $operand);
+                if (null === $result) {
+                    ++$skipped;
+                    continue;
+                }
+
+                ++$affectedObjects;
+                ++$materialized;
+
+                yield new PendingChangeDraft(
+                    changeType: PendingChangeType::Value,
+                    targetObjectId: Uuid::fromString($objectId),
+                    attributeCode: $attrCode,
+                    before: $before,
+                    after: ['value' => $result],
+                );
+            }
+        }
+    }
+
+    private function applyOperator(float $base, string $operator, float $operand): ?float
+    {
+        return match ($operator) {
+            '+' => $base + $operand,
+            '-' => $base - $operand,
+            '*' => $base * $operand,
+            '/' => 0.0 === $operand ? null : $base / $operand,
+            '%' => 0.0 === $operand ? null : fmod($base, $operand),
+            default => null,
+        };
     }
 }
