@@ -13,7 +13,7 @@ use Symfony\Component\Uid\Uuid;
  * the approval gate ("the big batch is ready - come and look").
  *
  * Lives in Shared\Contracts (not the Agent module) so the CORE webhook
- * fan-out may subscribe without referencing App\Agent - the
+ * fan-out may subscribe without referencing the Agent module - the
  * removability gate (ADR-0024) stays clean: with the module gone,
  * nothing dispatches this event and the subscriber is a dead branch.
  */
