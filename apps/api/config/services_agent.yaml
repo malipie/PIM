@@ -22,6 +22,25 @@ parameters:
     # availability additionally requires an active BYOK key.
     pim.agent.enabled: '%env(bool:AGENT_ENABLED)%'
 
+    # AGENT-P1-03 (#1955) — in-run hard limits (PRD 10.4 / architecture
+    # 8.5 subset enforced inside the loop; hourly/daily/monthly budgets
+    # + kill-switch land in P1-04) and per-MTok USD pricing per model
+    # tier (cost accounting on agent_runs).
+    pim.agent.limits.tool_calls_per_run: 10
+    pim.agent.limits.tokens_per_run: 100000
+    pim.agent.pricing.default_input_per_mtok: 3.0
+    pim.agent.pricing.default_output_per_mtok: 15.0
+    pim.agent.pricing.schema_input_per_mtok: 5.0
+    pim.agent.pricing.schema_output_per_mtok: 25.0
+
+    # AGENT-P1-04 (#1956) — 8.5 budgets; windows are UTC (day/month) and
+    # sliding (hour). Exceeding a window IS the kill-switch: refusals
+    # last until the window rolls over (midnight UTC / month end).
+    pim.agent.limits.tool_calls_per_hour_per_user: 50
+    pim.agent.limits.tokens_per_day_per_user: 500000
+    pim.agent.limits.cost_per_day_per_tenant_usd: 20.0
+    pim.agent.limits.cost_per_month_per_tenant_usd: 300.0
+
 services:
     _defaults:
         autowire: true
@@ -43,6 +62,10 @@ services:
             # AGENT-P1-01 (#1953) — module-namespace migrations
             # (AgentMigrations\*) are not App\Agent\* classes.
             - '../src/Agent/Infrastructure/Migrations/'
+            # AGENT-P4-01 (#1968) — test-only LLM stand-in; excluded so the
+            # SDK client stays the single AgentLlmClientInterface
+            # implementation outside when@test.
+            - '../src/Agent/Infrastructure/Testing/'
 
     # AGENT-P0-06 (#1949) — Anthropic client on the tenant's BYOK key;
     # scalar knobs are not autowired.
@@ -66,11 +89,49 @@ services:
         arguments:
             $topicBase: '%env(MERCURE_TOPIC_BASE)%'
 
+    # AGENT-P9-02 (#1989) — cost aggregator uses the same §8.5 caps the
+    # limit guard enforces (P1-04 knobs).
+    App\Agent\Application\Cost\AgentCostAggregator:
+        arguments:
+            $dayCapUsd: '%pim.agent.limits.cost_per_day_per_tenant_usd%'
+            $monthCapUsd: '%pim.agent.limits.cost_per_month_per_tenant_usd%'
+
+    # AGENT-P1-03 (#1955) — loop limits + cost accounting knobs.
+    App\Agent\Application\Run\AgentLoopRunner:
+        arguments:
+            $maxToolCallsPerRun: '%pim.agent.limits.tool_calls_per_run%'
+            $maxTokensPerRun: '%pim.agent.limits.tokens_per_run%'
+
+    # AGENT-P1-04 (#1956) — 8.5 budget guard knobs.
+    App\Agent\Application\Limits\AgentLimitGuard:
+        arguments:
+            $toolCallsPerHourPerUser: '%pim.agent.limits.tool_calls_per_hour_per_user%'
+            $tokensPerDayPerUser: '%pim.agent.limits.tokens_per_day_per_user%'
+            $costPerDayPerTenantUsd: '%pim.agent.limits.cost_per_day_per_tenant_usd%'
+            $costPerMonthPerTenantUsd: '%pim.agent.limits.cost_per_month_per_tenant_usd%'
+
+    App\Agent\Application\Run\UsageCostCalculator:
+        arguments:
+            $defaultInputPerMtok: '%pim.agent.pricing.default_input_per_mtok%'
+            $defaultOutputPerMtok: '%pim.agent.pricing.default_output_per_mtok%'
+            $schemaInputPerMtok: '%pim.agent.pricing.schema_input_per_mtok%'
+            $schemaOutputPerMtok: '%pim.agent.pricing.schema_output_per_mtok%'
+
 when@test:
     services:
-        # AGENT-P3-02 (#1962) — approval gate under integration test; the
-        # container would otherwise inline the service (no consumer yet
-        # until the P4-01 endpoints land).
+        # AGENT-P3-02 (#1962) — approval gate under integration test.
         test.agent.approval:
             alias: App\Agent\Application\Approval\AgentApprovalService
             public: true
+
+        # AGENT-P8-01 (#1983) — proactive scanner under integration test.
+        test.agent.proactive:
+            alias: App\Agent\Application\Proactive\ProactiveStewardScanner
+            public: true
+
+        # AGENT-P4-01 (#1968) — the API suite runs the loop inline
+        # (sync transports); a canned LLM keeps it deterministic and
+        # offline.
+        App\Agent\Infrastructure\Testing\CannedAgentLlmClient: ~
+        App\Agent\Application\Llm\AgentLlmClientInterface:
+            alias: App\Agent\Infrastructure\Testing\CannedAgentLlmClient

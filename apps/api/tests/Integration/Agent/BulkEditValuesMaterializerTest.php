@@ -173,6 +173,34 @@ final class BulkEditValuesMaterializerTest extends KernelTestCase
         self::assertSame('Attribute is outside your edit permissions.', $proposal->rejected[0]['reason']);
     }
 
+    #[Test]
+    public function worksOnOtherObjectTypesThanProduct(): void
+    {
+        // AGENT-P8-05 (#1987) — the tools are ObjectType-agnostic: the
+        // same materializer handles a CATEGORY-kind type (and any custom
+        // kind) because the engines are parameterized by type, not
+        // hard-coded to product.
+        [$tenant, $em] = $this->fixture();
+        $categoryType = new ObjectType('landing_category', ObjectKind::Category, ['en' => 'Landing category']);
+        $em->persist($categoryType);
+        $em->persist(new CatalogObject($categoryType, 'CAT-LANDING'));
+        $em->flush();
+
+        $proposal = $this->port()->materializeValueEdits(
+            batchId: $batchId = Uuid::v7(),
+            userId: Uuid::v7(),
+            objectTypeCode: 'landing_category',
+            filterDsl: [],
+            changes: ['name' => 'Landing DE'],
+            mode: 'overwrite',
+        );
+
+        self::assertSame(1, $proposal->affectedObjects);
+        $rows = $this->pendingChanges()->listBatch($batchId);
+        self::assertCount(1, $rows);
+        self::assertSame('name', $rows[0]->attributeCode);
+    }
+
     /**
      * @return array{0: Tenant, 1: EntityManagerInterface, 2: ObjectType}
      */

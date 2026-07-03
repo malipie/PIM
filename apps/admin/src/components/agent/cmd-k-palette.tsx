@@ -3,7 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { toast } from '@/components/ui/toast';
-import { jsonFetch } from '@/lib/http';
+import { startAgentRun } from '@/features/agent/api';
+import { OPEN_AGENT_CHAT_EVENT } from '@/features/agent/chat/AgentChatSheet';
+import { AGENT_ENABLED } from '@/lib/features';
+import type { FilterDsl } from '@/lib/filters/filter-dsl';
+import { httpErrorDetail, jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 /**
@@ -46,6 +50,9 @@ interface CmdKPaletteProps {
   selectedIds: string[];
   totalMatching: number;
   onApplied: (result: BulkActionResult) => void;
+  /** AGENT-P6-02 (#1975) — view context carried into agent runs. */
+  objectTypeCode?: string;
+  filterDsl?: FilterDsl | null;
 }
 
 interface CmdKPlan {
@@ -71,6 +78,8 @@ export function CmdKPalette({
   selectedIds,
   totalMatching,
   onApplied,
+  objectTypeCode,
+  filterDsl,
 }: CmdKPaletteProps) {
   const { t } = useTranslation();
   const [command, setCommand] = useState('');
@@ -145,6 +154,29 @@ export function CmdKPalette({
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'apply failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const askAgent = async (): Promise<void> => {
+    const text = command.trim();
+    if (text === '' || isLoading) return;
+    setIsLoading(true);
+    try {
+      // AGENT-P6-02 (#1975) — free-form intents leave the 6 canned bulk
+      // intents to the local planner and go to the REAL agent, carrying
+      // exactly what the user is looking at (PRD §5.1).
+      const run = await startAgentRun(text, 'cmdk', {
+        object_type_code: objectTypeCode,
+        filter_dsl: filterDsl ?? null,
+        selected_ids: selectedIds,
+        total_matching: totalMatching,
+      });
+      window.dispatchEvent(new CustomEvent(OPEN_AGENT_CHAT_EVENT, { detail: { runId: run.id } }));
+      onClose();
+    } catch (e) {
+      toast.error(httpErrorDetail(e) ?? (e instanceof Error ? e.message : 'agent start failed'));
     } finally {
       setIsLoading(false);
     }
@@ -238,11 +270,29 @@ export function CmdKPalette({
                   </div>
                 </>
               ) : (
-                <div className="text-[12.5px] text-zinc-700">
-                  {plan.fallback_hint ??
-                    t('agent.cmd_k.fallback', {
-                      defaultValue: 'Komenda nie pasuje do MVP intentu.',
-                    })}
+                <div className="space-y-2">
+                  <div className="text-[12.5px] text-zinc-700">
+                    {AGENT_ENABLED
+                      ? t('agent.cmd_k.fallback_agent', {
+                          defaultValue:
+                            'Komenda nie pasuje do szybkich akcji — wyślij ją do agenta PIM.',
+                        })
+                      : (plan.fallback_hint ??
+                        t('agent.cmd_k.fallback', {
+                          defaultValue: 'Komenda nie pasuje do MVP intentu.',
+                        }))}
+                  </div>
+                  {AGENT_ENABLED && (
+                    <button
+                      type="button"
+                      onClick={() => void askAgent()}
+                      disabled={isLoading}
+                      data-testid="cmdk-list-ask-agent"
+                      className="h-9 px-4 rounded-lg bg-orange-500 text-white text-[12.5px] font-medium hover:bg-orange-600 disabled:opacity-60"
+                    >
+                      {t('agent.cmd_k.ask_agent', { defaultValue: 'Wyślij do agenta PIM' })}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

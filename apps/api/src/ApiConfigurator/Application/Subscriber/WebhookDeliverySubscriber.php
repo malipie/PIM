@@ -15,6 +15,8 @@ use App\Catalog\Contracts\Event\ObjectCreated;
 use App\Catalog\Contracts\Event\ObjectEnabledChanged;
 use App\Catalog\Contracts\Event\ObjectPublished;
 use App\Shared\Application\TenantContext;
+use App\Shared\Contracts\Event\AgentRunAwaitingApproval;
+use App\Shared\Contracts\Event\AgentRunCompleted;
 use App\Shared\Domain\DomainEvent;
 use DateTimeInterface;
 use Psr\Log\LoggerInterface;
@@ -91,6 +93,32 @@ final readonly class WebhookDeliverySubscriber
     {
         $this->fanOut('object.archived', $event, [
             'objectId' => $event->aggregateId(),
+        ]);
+    }
+
+    /**
+     * AGENT-P8-04 (#1986) — agent lifecycle webhooks. The events live in
+     * Shared\Contracts (not the Agent module), so this CORE subscriber
+     * never references the Agent module (removability, ADR-0024);
+     * with the module removed nothing dispatches them.
+     */
+    #[AsMessageHandler]
+    public function onAgentRunAwaitingApproval(AgentRunAwaitingApproval $event): void
+    {
+        $this->fanOut(AgentRunAwaitingApproval::NAME, $event, [
+            'runId' => $event->aggregateId(),
+            'intent' => $event->intent,
+            'affectedCount' => $event->affectedCount,
+        ]);
+    }
+
+    #[AsMessageHandler]
+    public function onAgentRunCompleted(AgentRunCompleted $event): void
+    {
+        $this->fanOut(AgentRunCompleted::NAME, $event, [
+            'runId' => $event->aggregateId(),
+            'intent' => $event->intent,
+            'outcome' => $event->outcome,
         ]);
     }
 
