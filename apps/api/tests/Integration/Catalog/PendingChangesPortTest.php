@@ -8,6 +8,9 @@ use App\Catalog\Contracts\PendingChanges\PendingChangeDraft;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangeStatus;
 use App\Catalog\Contracts\PendingChanges\PendingChangeType;
+use App\Catalog\Domain\Entity\CatalogObject;
+use App\Catalog\Domain\Entity\ObjectType;
+use App\Catalog\Domain\ObjectKind;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
@@ -187,6 +190,40 @@ final class PendingChangesPortTest extends KernelTestCase
         self::assertSame(450, $port->materialize($batchId, 'agent', $drafts));
         self::assertSame(450, $port->countBatch($batchId));
         self::assertSame(450, $port->accept($batchId));
+    }
+
+    #[Test]
+    public function listBatchEnrichesRowsWithTargetObjectCodeAndName(): void
+    {
+        // #2154 — the approval diff must identify the product (SKU + name),
+        // not just show a bare attribute delta. listBatch resolves both in
+        // one extra query from the target object's row.
+        $tenant = $this->createTenant('alpha');
+        $this->activateTenantFilter($tenant);
+
+        $em = $this->em();
+        $type = new ObjectType('product', ObjectKind::Product, ['en' => 'Product']);
+        $em->persist($type);
+        $object = new CatalogObject($type, 'SKU-ENRICH-1');
+        $object->updateAttributeIndex(['name' => ['value' => ['pl' => 'Torebka Monnari', 'en' => 'Monnari Bag']]]);
+        $em->persist($object);
+        $em->flush();
+
+        $batchId = Uuid::v7();
+        $this->port()->materialize($batchId, 'agent', [
+            new PendingChangeDraft(
+                changeType: PendingChangeType::Value,
+                targetObjectId: $object->getId(),
+                attributeCode: 'price_gross',
+                before: ['value' => 100],
+                after: ['value' => 120],
+            ),
+        ]);
+
+        $rows = $this->port()->listBatch($batchId);
+        self::assertCount(1, $rows);
+        self::assertSame('SKU-ENRICH-1', $rows[0]->targetObjectCode);
+        self::assertSame('Torebka Monnari', $rows[0]->targetObjectName, 'PL-preferred name from the envelope');
     }
 
     /**

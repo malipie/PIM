@@ -98,7 +98,84 @@ final class PendingChangesService implements PendingChangesPort
             ->getQuery()
             ->getResult();
 
-        return array_map($this->toView(...), $rows);
+        // #2154 — enrich the list view with each target object's SKU + name
+        // in ONE extra query (no N+1), so the approval diff shows product
+        // identity, not a bare attribute delta.
+        $identities = $this->loadObjectIdentities($rows);
+
+        return array_map(fn (PendingChange $change): PendingChangeView => $this->toView($change, $identities), $rows);
+    }
+
+    /**
+     * @param list<PendingChange> $rows
+     *
+     * @return array<string, array{code: string, name: ?string}> keyed by object id
+     */
+    private function loadObjectIdentities(array $rows): array
+    {
+        $ids = [];
+        foreach ($rows as $row) {
+            $objectId = $row->getTargetObjectId();
+            if ($objectId instanceof Uuid) {
+                $ids[$objectId->toRfc4122()] = true;
+            }
+        }
+        if ([] === $ids) {
+            return [];
+        }
+
+        // tenant-safe: RLS scopes `objects` to the current tenant; the ids
+        // come from this tenant's batch. Single IN () query, no N+1.
+        $result = $this->entityManager->getConnection()->fetchAllAssociative(
+            "SELECT co.id, co.code, co.attributes_indexed->'name' AS name FROM objects co WHERE co.id IN (:ids)",
+            ['ids' => array_keys($ids)],
+            ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
+        );
+
+        $identities = [];
+        foreach ($result as $objectRow) {
+            $id = $objectRow['id'] ?? null;
+            $code = $objectRow['code'] ?? null;
+            if (!\is_string($id) || !\is_string($code)) {
+                continue;
+            }
+            $nameRaw = $objectRow['name'] ?? null;
+            $nameSlot = \is_string($nameRaw) ? json_decode($nameRaw, true) : $nameRaw;
+            $identities[$id] = ['code' => $code, 'name' => $this->extractDisplayName($nameSlot)];
+        }
+
+        return $identities;
+    }
+
+    /**
+     * Best-effort display name from the attributes_indexed `name` slot,
+     * which may be an envelope ({value: ...}), a localized map
+     * ({pl: ..., en: ...}), or a bare scalar. Prefer PL, then EN, then any.
+     */
+    private function extractDisplayName(mixed $slot): ?string
+    {
+        if (\is_string($slot)) {
+            return '' === $slot ? null : $slot;
+        }
+        if (!\is_array($slot)) {
+            return null;
+        }
+        if (\array_key_exists('value', $slot)) {
+            return $this->extractDisplayName($slot['value']);
+        }
+        foreach (['pl', 'en'] as $locale) {
+            $candidate = $slot[$locale] ?? null;
+            if (\is_string($candidate) && '' !== $candidate) {
+                return $candidate;
+            }
+        }
+        foreach ($slot as $candidate) {
+            if (\is_string($candidate) && '' !== $candidate) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     public function iterateBatch(Uuid $batchId): iterable
@@ -213,8 +290,14 @@ final class PendingChangesService implements PendingChangesPort
         }
     }
 
-    private function toView(PendingChange $change): PendingChangeView
+    /**
+     * @param array<string, array{code: string, name: ?string}> $identities object id => SKU/name (#2154)
+     */
+    private function toView(PendingChange $change, array $identities = []): PendingChangeView
     {
+        $objectId = $change->getTargetObjectId();
+        $identity = null !== $objectId ? ($identities[$objectId->toRfc4122()] ?? null) : null;
+
         return new PendingChangeView(
             id: $change->getId(),
             batchId: $change->getBatchId(),
@@ -230,6 +313,8 @@ final class PendingChangesService implements PendingChangesPort
             meta: $change->getMeta(),
             createdAt: $change->getCreatedAt(),
             decidedAt: $change->getDecidedAt(),
+            targetObjectCode: $identity['code'] ?? null,
+            targetObjectName: $identity['name'] ?? null,
         );
     }
 }
