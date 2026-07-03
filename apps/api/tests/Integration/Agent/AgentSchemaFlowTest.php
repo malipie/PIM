@@ -133,6 +133,17 @@ final class AgentSchemaFlowTest extends KernelTestCase
         $em = $this->em();
         $em->persist($tenant);
         $em->flush();
+
+        // The structural cell grammar validates label.<locale> suffixes
+        // against ACTIVE TenantLocale rows (Channel BC), not
+        // Tenant::enabledLocales.
+        $pl = new \App\Channel\Domain\Entity\Locale('pl_PL', 'Polski');
+        $en = new \App\Channel\Domain\Entity\Locale('en_US', 'English');
+        $em->persist($pl);
+        $em->persist($en);
+        $em->persist(new \App\Channel\Domain\Entity\TenantLocale($pl, isDefault: true, tenant: $tenant));
+        $em->persist(new \App\Channel\Domain\Entity\TenantLocale($en, tenant: $tenant));
+        $em->flush();
         self::getContainer()->get(TenantContext::class)->set($tenant);
         self::getContainer()->get(TenantFilterConfigurator::class)->apply();
 
