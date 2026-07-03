@@ -63,7 +63,10 @@ case "${TYPE}" in
             echo "--type time requires --target 'YYYY-MM-DD HH:MM:SS[+TZ]'" >&2
             exit 2
         fi
-        PGBACKREST_ARGS+=("--type=time" "--target=${TARGET}")
+        # --target-action=promote so Postgres finishes recovery read-WRITE
+        # instead of pausing in read-only hot-standby (a plain --type=time
+        # leaves the cluster paused until pg_promote(); the api cannot write).
+        PGBACKREST_ARGS+=("--type=time" "--target=${TARGET}" "--target-action=promote")
         ;;
     *) echo "Unsupported --type '${TYPE}' (use latest|time|immediate)" >&2; exit 2 ;;
 esac
@@ -103,14 +106,39 @@ run docker compose stop database
 # 3. Wipe + restore inside a one-shot container that reuses the database
 #    service's image, volumes and env vars. --entrypoint "" plus a custom
 #    command lets us shell in and run pgbackrest as the postgres user.
+# Double-quote every pgbackrest arg. The invocation is nested inside
+# `su -s /bin/sh postgres -c '...'` (single-quoted), so double quotes here are
+# literal to that inner shell and keep a --target value containing a space (the
+# "YYYY-MM-DD HH:MM:SS" timestamp) as ONE argument. `${ARR[*]}` string-joins and
+# silently splits it, which pgBackRest rejects with "invalid command '<time>'".
+QUOTED_ARGS=""
+for arg in "${PGBACKREST_ARGS[@]}"; do
+    QUOTED_ARGS+=" \"${arg}\""
+done
 RESTORE_CMD="rm -rf /var/lib/postgresql/data/* /var/lib/postgresql/data/.[!.]* 2>/dev/null; "
-RESTORE_CMD+="exec su -s /bin/sh postgres -c 'pgbackrest ${PGBACKREST_ARGS[*]}'"
+RESTORE_CMD+="exec su -s /bin/sh postgres -c 'pgbackrest${QUOTED_ARGS}'"
 
 run docker compose run --rm --no-deps --entrypoint /bin/sh database -c "${RESTORE_CMD}"
 
-# 4+5. Bring postgres + api back. archive_command resumes as soon as postgres
-# starts. The --wait flag blocks until healthchecks pass.
+# 4. Bring postgres back. archive_command resumes as soon as postgres starts.
 run docker compose up -d --wait database
+
+# 4b. Re-grant the runtime role. A physical restore can land the cluster with
+# the pre-W1-1 grant state (or the app role's schema grants otherwise dropped);
+# the W1-1 migration does NOT re-run on a restore, so `pim_app` would hit
+# "permission denied for schema public". Idempotent — safe on every restore.
+if ! ${DRY_RUN}; then
+    echo "==> Re-granting pim_app (post-restore quirk)"
+    docker compose exec -T database psql -U "${POSTGRES_USER:-pim}" -d "${POSTGRES_DB:-pim}" <<'SQL' || true
+GRANT USAGE ON SCHEMA public TO pim_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO pim_app;
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO pim_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO pim_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO pim_app;
+SQL
+fi
+
+# 5. Bring api back. The --wait flag blocks until healthchecks pass.
 run docker compose up -d --wait api
 
 cat <<EOF
