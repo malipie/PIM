@@ -1,6 +1,7 @@
 import { lazy } from 'react';
 
 import { isLegacyOptionalSystemGroupCode } from '@/lib/legacy-attribute-groups';
+import { isVisibleWhen } from '@/lib/visible-when';
 import { AttrGroupCard } from './attr-group-card';
 import { AttrRow } from './attr-row';
 import {
@@ -82,6 +83,13 @@ export function ProductDetailContent({
   onFieldChange,
   onToggleGroup,
 }: ProductDetailContentProps) {
+  // DP-08 (#2039) — conditional visibility: a member whose `visible_when`
+  // rule fails against the CURRENT form values is not rendered. Reactive by
+  // construction (fieldValue reads the live draft), and hidden values are
+  // deliberately NOT cleared — flipping the driver back reveals them intact.
+  const visibleAttributes = (group: GroupMeta) =>
+    group.attributes.filter((attr) => isVisibleWhen(attr.visible_when, fieldValue));
+
   const renderStackedGroup = (group: GroupMeta) => (
     <AttrGroupCard
       key={group.id}
@@ -94,7 +102,7 @@ export function ProductDetailContent({
       onToggle={() => onToggleGroup(group.id)}
       isSystem={isLegacyOptionalSystemGroupCode(group.code)}
     >
-      {group.attributes.map((attr) => (
+      {visibleAttributes(group).map((attr) => (
         <AttrRow
           key={attr.id}
           attribute={attr}
