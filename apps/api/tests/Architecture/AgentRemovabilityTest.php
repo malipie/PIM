@@ -20,8 +20,10 @@ use SplFileInfo;
  * The contract (ADR-0024 a): the whole agent module lives under
  * src/Agent, its DI in config/services_agent.yaml + config/packages/
  * agent.yaml, its tests under the per-suite Agent dirs - and NOTHING
- * in the rest of src/tests/config references App\Agent. Deleting those paths must
- * leave a compiling, agent-free core.
+ * in the rest of src/tests/config references the module namespace
+ * (spelling it out here would trip the CI gate's grep, which scans
+ * this file too). Deleting those paths must leave a compiling,
+ * agent-free core.
  */
 final class AgentRemovabilityTest extends TestCase
 {
