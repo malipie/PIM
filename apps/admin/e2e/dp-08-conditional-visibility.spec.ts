@@ -78,9 +78,30 @@ test('DP-08 — visible_when hides and reveals a field without losing its value'
       }>;
     }
   ).effectiveGroups;
-  const group = groups.find((g) => g.display_mode === 'stacked' && !g.is_system_group);
-  expect(group, 'demo product needs a stacked non-system group').toBeTruthy();
-  const groupId = group?.id ?? '';
+  const existing = groups.find((g) => g.display_mode === 'stacked' && !g.is_system_group);
+
+  // CI fixtures ship no operator groups — create one and declare it on the
+  // product's ObjectType so the spec is self-sufficient in every environment.
+  let groupId = existing?.id ?? '';
+  let createdGroupId: string | null = null;
+  let groupLabel = '';
+  if (groupId === '') {
+    const objectTypeId = (schema.body as { objectType: { id: string } }).objectType.id;
+    groupLabel = `dp08 grp ${suffix}`;
+    const createdGroup = await browserApi(page, 'POST', '/api/attribute_groups', {
+      code: `dp08_grp_${suffix}`,
+      label: { pl: groupLabel },
+    });
+    expect(createdGroup.status, JSON.stringify(createdGroup.body)).toBe(201);
+    createdGroupId = (createdGroup.body as { id: string }).id;
+    groupId = createdGroupId;
+    const declared = await browserApi(
+      page,
+      'POST',
+      `/api/object_types/${objectTypeId}/groups/${groupId}`,
+    );
+    expect(declared.status, JSON.stringify(declared.body)).toBeLessThan(300);
+  }
 
   const attrIds: string[] = [];
   for (const code of [driverCode, depCode]) {
@@ -142,8 +163,19 @@ test('DP-08 — visible_when hides and reveals a field without losing its value'
       { productId, depCode },
     );
 
-    // Product form: driver empty → dependent hidden.
+    // Product form: driver empty → dependent hidden. A freshly created
+    // group may render as its own TAB — open it first (gating is identical
+    // on both paths, renderStackedGroup serves tab groups too).
     await page.goto(`/products/${productId}`);
+    const onDefaultTab = await page
+      .getByText(driverCode, { exact: true })
+      .first()
+      .waitFor({ state: 'visible', timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!onDefaultTab && groupLabel !== '') {
+      await page.getByRole('tab', { name: new RegExp(groupLabel, 'i') }).click();
+    }
     const driverField = page.getByText(driverCode, { exact: true }).first();
     await expect(driverField).toBeVisible();
     await expect(page.getByText(depCode, { exact: true })).toHaveCount(0);
@@ -203,6 +235,16 @@ test('DP-08 — visible_when hides and reveals a field without losing its value'
     for (const attrId of attrIds) {
       await browserApi(page, 'DELETE', `/api/attribute_groups/${groupId}/attributes/${attrId}`);
       await browserApi(page, 'DELETE', `/api/attributes/${attrId}`);
+    }
+    if (createdGroupId !== null) {
+      // Spec-created group: undeclare from the ObjectType, then drop it.
+      const objectTypeId = (schema.body as { objectType: { id: string } }).objectType.id;
+      await browserApi(
+        page,
+        'DELETE',
+        `/api/object_types/${objectTypeId}/groups/${createdGroupId}`,
+      );
+      await browserApi(page, 'DELETE', `/api/attribute_groups/${createdGroupId}`);
     }
   }
 });
