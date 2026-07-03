@@ -214,6 +214,8 @@ final readonly class AgentRunController
                 'change_type' => $row->changeType->value,
                 'status' => $row->status->value,
                 'target_object_id' => $row->targetObjectId?->toRfc4122(),
+                'target_object_code' => $row->targetObjectCode,
+                'target_object_name' => $row->targetObjectName,
                 'attribute_code' => $row->attributeCode,
                 'scope_locale' => $row->scopeLocale,
                 'scope_channel' => $row->scopeChannel,

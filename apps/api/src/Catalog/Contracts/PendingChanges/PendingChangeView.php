@@ -34,6 +34,12 @@ final readonly class PendingChangeView
         public ?array $meta,
         public DateTimeImmutable $createdAt,
         public ?DateTimeImmutable $decidedAt,
+        // #2154 — the target object's SKU + display name, so the approval
+        // diff reads "SKU · Name · attr: before -> after" instead of a bare
+        // number. Populated by list reads (the inbox); null on the streaming
+        // commit path, which does not need them.
+        public ?string $targetObjectCode = null,
+        public ?string $targetObjectName = null,
     ) {
     }
 }

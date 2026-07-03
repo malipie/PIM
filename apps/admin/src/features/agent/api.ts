@@ -135,6 +135,8 @@ export interface AgentPlanRow {
   change_type: 'value' | 'schema' | 'category';
   status: string;
   target_object_id: string | null;
+  target_object_code: string | null;
+  target_object_name: string | null;
   attribute_code: string | null;
   scope_locale: string | null;
   scope_channel: string | null;

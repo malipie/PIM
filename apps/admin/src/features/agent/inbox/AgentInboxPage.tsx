@@ -27,11 +27,33 @@ function planLine(
         : t('agent.inbox.schema_attribute', { defaultValue: 'atrybut' });
     return `+ ${kind} ${row.attribute_code ?? '?'}`;
   }
+  // #2154 — lead with the product identity (SKU · name) so the operator
+  // can tell WHICH product each diff row touches, not just the raw delta.
+  const identity = objectIdentity(row);
   if (row.change_type === 'category') {
     const op = typeof row.after?.operation === 'string' ? row.after.operation : '?';
-    return `${row.target_object_id ?? '?'} · ${t('agent.inbox.categories', { defaultValue: 'kategorie' })}: ${op}`;
+    return `${identity} · ${t('agent.inbox.categories', { defaultValue: 'kategorie' })}: ${op}`;
   }
-  return `${row.attribute_code ?? '?'}: ${beforeValue} → ${afterValue}`;
+  return `${identity} · ${row.attribute_code ?? '?'}: ${beforeValue} → ${afterValue}`;
+}
+
+/**
+ * "SKU · Name", falling back to whatever identity we have (#2154). The
+ * backend fills target_object_code/name on list reads; a bare id is the
+ * last resort.
+ */
+function objectIdentity(row: AgentPlanRow): string {
+  const parts: string[] = [];
+  if (row.target_object_code) {
+    parts.push(row.target_object_code);
+  }
+  if (row.target_object_name) {
+    parts.push(row.target_object_name);
+  }
+  if (parts.length > 0) {
+    return parts.join(' · ');
+  }
+  return row.target_object_id ?? '?';
 }
 
 /**
