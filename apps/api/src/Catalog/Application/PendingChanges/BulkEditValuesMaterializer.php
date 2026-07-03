@@ -245,7 +245,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
      * the filter DSL ([] = every object of the type).
      *
      * @param array<string, mixed> $filterDsl
-     * @param list<mixed>|null      $selectedIds explicit selection, or null to use the filter
+     * @param list<mixed>|null     $selectedIds explicit selection, or null to use the filter
      *
      * @return list<string>
      */

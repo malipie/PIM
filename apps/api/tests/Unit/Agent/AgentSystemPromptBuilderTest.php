@@ -26,7 +26,7 @@ final class AgentSystemPromptBuilderTest extends TestCase
             'total_matching' => 95,
         ]);
 
-        $prompt = (new AgentSystemPromptBuilder())->build($run);
+        $prompt = new AgentSystemPromptBuilder()->build($run);
 
         self::assertStringContainsString('SELECTION SCOPE', $prompt);
         self::assertStringContainsString('1 object(s) SELECTED', $prompt);
@@ -41,7 +41,7 @@ final class AgentSystemPromptBuilderTest extends TestCase
             'filter_dsl' => ['field' => 'brand', 'op' => 'eq', 'value' => 'Acme'],
         ]);
 
-        $prompt = (new AgentSystemPromptBuilder())->build($run);
+        $prompt = new AgentSystemPromptBuilder()->build($run);
 
         self::assertStringNotContainsString('SELECTION SCOPE', $prompt);
     }
@@ -53,7 +53,7 @@ final class AgentSystemPromptBuilderTest extends TestCase
             'selected_ids' => [],
         ]);
 
-        $prompt = (new AgentSystemPromptBuilder())->build($run);
+        $prompt = new AgentSystemPromptBuilder()->build($run);
 
         self::assertStringNotContainsString('SELECTION SCOPE', $prompt);
     }

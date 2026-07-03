@@ -27,7 +27,7 @@ interface BulkEditValuesPort
      * @param string               $mode        overwrite|only_empty - runtime-validated (a literal
      *                                          union here makes the adapter's defensive guard
      *                                          "always true" for PHPStan)
-     * @param list<mixed>|null      $selectedIds the operator's current SELECTION (#2153): when
+     * @param list<mixed>|null     $selectedIds the operator's current SELECTION (#2153): when
      *                                          non-null it is THE selector (validated against
      *                                          tenant + object type), taking precedence over
      *                                          $filterDsl. null = fall back to $filterDsl.
@@ -54,7 +54,7 @@ interface BulkEditValuesPort
      *
      * @param array<string, mixed> $filterDsl   selector ([] = every object of the type)
      * @param string               $operator    one of + - * / % (runtime-validated)
-     * @param list<mixed>|null      $selectedIds the operator's current SELECTION (#2153): when
+     * @param list<mixed>|null     $selectedIds the operator's current SELECTION (#2153): when
      *                                          non-null it is THE selector (validated against
      *                                          tenant + object type), taking precedence over
      *                                          $filterDsl. null = fall back to $filterDsl.
