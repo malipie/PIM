@@ -27,6 +27,11 @@
         <field name="enabledAt" type="datetime_immutable" column="enabled_at"/>
         <field name="disabledAt" type="datetime_immutable" column="disabled_at" nullable="true"/>
         <field name="lastUsedAt" type="datetime_immutable" column="last_used_at" nullable="true"/>
+        <field name="proactiveScanEnabled" type="boolean" column="proactive_scan_enabled">
+            <options>
+                <option name="default">false</option>
+            </options>
+        </field>
 
         <field name="createdAt" type="datetime_immutable" column="created_at"/>
         <field name="updatedAt" type="datetime_immutable" column="updated_at"/>

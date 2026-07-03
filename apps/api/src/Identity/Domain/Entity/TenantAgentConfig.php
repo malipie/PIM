@@ -55,6 +55,13 @@ class TenantAgentConfig implements TenantScoped
 
     private ?DateTimeImmutable $lastUsedAt = null;
 
+    /**
+     * AGENT-P8-01 (#1983) — opt-in for the proactive data-steward scan
+     * (anomalies/gaps reported without a prompt). Off by default: a
+     * tenant must explicitly choose proactivity.
+     */
+    private bool $proactiveScanEnabled = false;
+
     private DateTimeImmutable $createdAt;
 
     private DateTimeImmutable $updatedAt;
@@ -158,6 +165,17 @@ class TenantAgentConfig implements TenantScoped
     public function getDisabledAt(): ?DateTimeImmutable
     {
         return $this->disabledAt;
+    }
+
+    public function isProactiveScanEnabled(): bool
+    {
+        return $this->proactiveScanEnabled;
+    }
+
+    public function setProactiveScanEnabled(bool $enabled): void
+    {
+        $this->proactiveScanEnabled = $enabled;
+        $this->updatedAt = new DateTimeImmutable();
     }
 
     public function getLastUsedAt(): ?DateTimeImmutable

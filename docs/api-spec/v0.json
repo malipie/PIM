@@ -18610,6 +18610,30 @@
                 ],
                 "x-pim-source": "custom-route",
                 "x-cortex-permission": "settings.tenant.manage"
+            },
+            "patch": {
+                "operationId": "api_settings_agent_key_patch",
+                "tags": [
+                    "settings"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api settings agent key",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "settings.tenant.manage"
             }
         },
         "/api/smart-filter-presets": {
