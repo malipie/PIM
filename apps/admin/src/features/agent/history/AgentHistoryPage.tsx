@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Loader2, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, MessageSquare, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -12,6 +12,7 @@ import {
   listAgentRuns,
   rollbackAgentRun,
 } from '@/features/agent/api';
+import { OPEN_AGENT_CHAT_EVENT } from '@/features/agent/chat/AgentChatSheet';
 import { httpErrorDetail } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -173,6 +174,21 @@ export function AgentHistoryPage() {
                   {' · '}
                   {new Date(run.started_at).toLocaleString()}
                 </span>
+                {run.status === 'awaiting_input' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      window.dispatchEvent(
+                        new CustomEvent(OPEN_AGENT_CHAT_EVENT, { detail: { runId: run.id } }),
+                      )
+                    }
+                    data-testid="agent-history-continue"
+                  >
+                    <MessageSquare className="mr-1 size-3.5" aria-hidden />
+                    {t('agent.history.continue', { defaultValue: 'Kontynuuj w czacie' })}
+                  </Button>
+                )}
                 {run.status === 'done' && (
                   <Button
                     variant="outline"
@@ -216,6 +232,36 @@ export function AgentHistoryPage() {
                           })}
                         </span>
                       </div>
+                      {detail.messages.length > 0 && (
+                        <div className="space-y-1.5" data-testid="agent-history-transcript">
+                          {detail.messages.map((message, index) => {
+                            const text = message.content
+                              .map((block) => ('text' in block ? block.text : ''))
+                              .join('')
+                              .trim();
+                            if (text === '') return null;
+                            return (
+                              <div
+                                // biome-ignore lint/suspicious/noArrayIndexKey: transcript is append-only and static per run
+                                key={index}
+                                className={cn(
+                                  'rounded-lg px-3 py-2 text-[13px]',
+                                  message.role === 'user'
+                                    ? 'bg-zinc-100 text-zinc-800'
+                                    : 'bg-purple-50 text-purple-900',
+                                )}
+                              >
+                                <span className="mb-0.5 block text-[10.5px] font-semibold uppercase tracking-wide opacity-60">
+                                  {message.role === 'user'
+                                    ? t('agent.history.you', { defaultValue: 'Ty' })
+                                    : t('agent.history.agent', { defaultValue: 'Agent' })}
+                                </span>
+                                <span className="whitespace-pre-wrap">{text}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                       {detail.tool_calls.length === 0 ? (
                         <p className="text-zinc-500">
                           {t('agent.history.no_tools', {
