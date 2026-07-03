@@ -190,6 +190,11 @@ services:
     App\Catalog\Contracts\Command\PendingBatchCommitPort:
         alias: App\Catalog\Application\PendingChanges\PendingBatchCommitter
 
+    # AGENT-P3-04 (#1964) — value-canonical rollback of a committed agent
+    # batch by BulkSession id.
+    App\Catalog\Contracts\Command\BulkRollbackPort:
+        alias: App\Catalog\Application\PendingChanges\ObjectValueRollbackHandler
+
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
     # "is this {value: ...} payload valid against this Attribute?" without
@@ -669,4 +674,9 @@ when@test:
 
         App\Catalog\Contracts\Command\PendingBatchCommitPort:
             alias: App\Catalog\Application\PendingChanges\PendingBatchCommitter
+            public: true
+
+        # AGENT-P3-04 (#1964) — and the rollback port.
+        App\Catalog\Contracts\Command\BulkRollbackPort:
+            alias: App\Catalog\Application\PendingChanges\ObjectValueRollbackHandler
             public: true
