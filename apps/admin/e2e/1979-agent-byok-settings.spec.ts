@@ -44,17 +44,19 @@ test('BYOK settings set, rotate-visible-prefix and disable on the live API', asy
   await page.getByTestId('agent-model-select').selectOption('claude-haiku-4-5');
   await expect(page.getByTestId('agent-model-select')).toHaveValue('claude-haiku-4-5');
 
-  // Idempotent: the E2E hits the live PATCH endpoint and the DB is NOT
-  // reset between Playwright retries, so don't assume the starting state.
-  // Force it on, prove the toggle turns it off, then restore it on.
+  // The toggle is a controlled checkbox whose state only flips after the
+  // async PATCH + query refetch, so Playwright's check()/uncheck() (which
+  // expect the DOM to change on click) fail. Use click() + expect() with
+  // auto-retry instead. Idempotent: the E2E hits the live PATCH endpoint
+  // and the DB is NOT reset between retries, so force a known state first.
   const caching = page.getByTestId('agent-caching-toggle');
   if (!(await caching.isChecked())) {
-    await caching.check();
+    await caching.click();
+    await expect(caching).toBeChecked();
   }
-  await expect(caching).toBeChecked();
-  await caching.uncheck();
+  await caching.click();
   await expect(caching).not.toBeChecked();
-  await caching.check();
+  await caching.click();
   await expect(caching).toBeChecked();
 
   // Disable: soft-off for the tenant.
