@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Agent;
 
+use App\Catalog\Application\BuiltInObjectTypeSeeder;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Export\Contracts\ExportTriggerPort;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
@@ -47,9 +49,12 @@ final class TriggerExportTest extends KernelTestCase
         );
 
         $row = $em->getConnection()->fetchAssociative(
-            'SELECT source, format, status FROM export_sessions WHERE id = :id',
+            'SELECT source, format, status, error_message FROM export_sessions WHERE id = :id',
             ['id' => $sessionId->toRfc4122()],
         );
+        if (\is_array($row) && 'error' === ($row['status'] ?? null)) {
+            self::fail('export failed: '.(\is_string($row['error_message'] ?? null) ? $row['error_message'] : 'unknown'));
+        }
         self::assertIsArray($row);
         self::assertSame('agent', $row['source'], 'the session must carry agent provenance');
         self::assertSame('csv', $row['format']);
@@ -83,8 +88,11 @@ final class TriggerExportTest extends KernelTestCase
         self::getContainer()->get(TenantContext::class)->set($tenant);
         self::getContainer()->get(TenantFilterConfigurator::class)->apply();
 
-        $type = new ObjectType('product', ObjectKind::Product, ['en' => 'Product']);
-        $em->persist($type);
+        // The export runner resolves the BUILT-IN Product ObjectType.
+        self::getContainer()->get(BuiltInObjectTypeSeeder::class)->seed($tenant);
+        $type = self::getContainer()->get(ObjectTypeRepositoryInterface::class)
+            ->findBuiltInByKind(ObjectKind::Product, $tenant);
+        \assert($type instanceof ObjectType);
         $em->persist(new Attribute('name', ['en' => 'Name'], AttributeType::Text));
         $em->persist(new CatalogObject($type, 'SKU-1'));
         $em->flush();
