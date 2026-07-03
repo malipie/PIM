@@ -2902,3 +2902,12 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 - **`K6_VUS`/`K6_DURATION` to NATYWNE opcje k6** — dla skryptu z własnym blokiem `scenarios`/`iterations` (feed-pull, auth-login, import-start) k6 NADPISUJE definicję i leci z natywną skalą. Feed-pull dostał 13k req/min i wysycił limiter 120/h. Wzorzec: rate-limited smoki pinują kształt w skrypcie, orkiestrator NIE przekazuje im native-override (case per scenariusz w wrapperze); własne progi env nazywać BEZ prefiksu `K6_`.
 - **`set -u` + pusta tablica bash** (`ARR=(); "${ARR[@]}"`) = „unbound variable" na bash < 4.4 (macOS) — nieszkodliwy placeholder element zamiast pustej tablicy.
 - **Limiter `feed_pull` siedzi w puli filesystem `cache.rate_limiter`, nie w Redis** — restart api/redis go NIE czyści; reset przez `cache:pool:clear cache.rate_limiter`. (Redis DBSIZE=0 mimo aktywnego limitera to nie bug — to inny backend.)
+
+## Lessons z GOLIVE #2125 (2026-07-04, fresh-install / from-zero rebuild)
+
+### Patterns to Follow
+- **Reindex-od-zera = `--purge`, inaczej sieroty.** `pim:search:reindex` bez `--purge` tylko upsertuje z Postgresa i NIE usuwa dokumentów-widm po wierszach skasowanych w PG (obserwacja: 646 docs Meili vs 211 obiektów PG = 435 sierot po cyklach seed/purge). Spójność (`meili numberOfDocuments == count(objects)`) osiągalna tylko po `--purge`. Harness: `scripts/fresh-install-verify.sh`.
+- **Consistency-check bez niszczenia danych**: reindex --purge + detect-attributes-drift --reconcile przebudowują TYLKO projekcje z kanonu (`object_values` nietknięte) → można je odpalić na żywym dev/prod bez drop-a bazy. Pełny drop+migrate za `--with-migrations --force`.
+
+### Patterns to Avoid
+- **`attributes_indexed` reconcile NIE konwerguje dla atrybutów `select`** — detektor dryfu daje false-positive na envelope `{option_code: X}` bo `globalSlot()` wzbogaca slot o `provenance` a porównanie kształtu `{option_code}` się rozjeżdża (kształt `{value}` konwerguje). Dane są POPRAWNE (option_code zgodny) — to bug detektora, nie korupcja. Nie da się zaasertować „zero drift" po rebuildzie dopóki niezałatane (#2186). Wariant lekcji z AGENT-P6-05 (#1978) który wrócił dla innego kształtu envelope'u.
