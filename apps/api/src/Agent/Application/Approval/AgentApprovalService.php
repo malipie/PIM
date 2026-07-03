@@ -11,7 +11,9 @@ use App\Agent\Domain\Exception\ApprovalConflictException;
 use App\Catalog\Contracts\Command\BulkRollbackPort;
 use App\Catalog\Contracts\Command\PendingBatchCommitPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
+use App\Catalog\Contracts\PendingChanges\PendingChangeType;
 use App\Identity\Contracts\Audit\AgentActionAuditor;
+use App\Import\Contracts\SchemaImportPort;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
@@ -39,6 +41,7 @@ final readonly class AgentApprovalService
         private PendingBatchCommitPort $commits,
         private BulkRollbackPort $rollbacks,
         private PendingChangesPort $pendingChanges,
+        private SchemaImportPort $schemaCommits,
         private AgentProgressPublisher $publisher,
         private AgentActionAuditor $auditor,
     ) {
@@ -64,16 +67,31 @@ final readonly class AgentApprovalService
             throw ApprovalConflictException::noBatch();
         }
 
+        $isSchemaBatch = $this->isSchemaBatch($batchId);
+
         $run->markCommitting($approvedBy);
         $this->entityManager->flush();
         $this->publisher->status($run);
 
         try {
-            $result = $this->commits->commitAcceptedBatch($batchId, $approvedBy, [
-                'agent_run_id' => $run->getId()->toRfc4122(),
-                'model' => $run->getModel(),
-                'intent' => $run->getIntent(),
-            ]);
+            if ($isSchemaBatch) {
+                // AGENT-P5-01 (#1970) — schema batches replay through the
+                // structural import port; the batch id is the operation
+                // handle (no BulkSession - P5-04 owns schema rollback).
+                $schemaResult = $this->schemaCommits->commitSchemaBatch($batchId, $approvedBy);
+                $result = new \App\Catalog\Contracts\Command\PendingBatchCommitResult(
+                    bulkSessionId: $schemaResult->committed ? $batchId : null,
+                    committedValues: $schemaResult->created + $schemaResult->updated,
+                    objectsTouched: $schemaResult->created + $schemaResult->updated,
+                    issues: array_map(static fn (string $m): array => ['objectId' => '', 'attributeCode' => '', 'message' => $m], $schemaResult->messages),
+                );
+            } else {
+                $result = $this->commits->commitAcceptedBatch($batchId, $approvedBy, [
+                    'agent_run_id' => $run->getId()->toRfc4122(),
+                    'model' => $run->getModel(),
+                    'intent' => $run->getIntent(),
+                ]);
+            }
         } catch (Throwable $failure) {
             // A DBAL failure closes the EntityManager; the error status
             // still has to land, so mark it on a fresh manager.
@@ -210,6 +228,14 @@ final readonly class AgentApprovalService
             throw ApprovalConflictException::cannotRollback($run->getStatus()->value);
         }
 
+        $batchId = $run->getPendingChangeBatchId();
+        if ($batchId instanceof Uuid && $this->isSchemaBatch($batchId)) {
+            // AGENT-P5-04 (#1973) delivers dataless-only schema rollback;
+            // until then a schema run refuses instead of 500ing on a
+            // BulkSession lookup that never existed.
+            throw ApprovalConflictException::cannotRollback('schema (rollback boundaries land in P5-04)');
+        }
+
         $this->rollbacks->rollbackSession($bulkOperationId);
 
         // The rollback handler's per-chunk clear() detached the run.
@@ -234,6 +260,19 @@ final readonly class AgentApprovalService
         }
 
         return $run;
+    }
+
+    /**
+     * Peek the batch kind: materializers emit homogeneous batches, so
+     * the first row decides the commit path.
+     */
+    private function isSchemaBatch(Uuid $batchId): bool
+    {
+        foreach ($this->pendingChanges->iterateBatch($batchId) as $view) {
+            return PendingChangeType::Schema === $view->changeType;
+        }
+
+        return false;
     }
 
     private function reload(Uuid $runId): AgentRun

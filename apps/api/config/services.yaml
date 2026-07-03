@@ -203,6 +203,11 @@ services:
     App\Export\Contracts\ExportTriggerPort:
         alias: App\Export\Application\AgentExportTrigger
 
+    # AGENT-P5-01 (#1970) — approved schema batches replay through the
+    # structural import creators.
+    App\Import\Contracts\SchemaImportPort:
+        alias: App\Import\Application\Service\AgentSchemaImportApplier
+
     # Per-AttributeType validator dispatcher (#39). The factory wires up
     # one validator per AttributeType so the rest of the app can ask
     # "is this {value: ...} payload valid against this Attribute?" without
@@ -702,4 +707,9 @@ when@test:
         # AGENT-P3-06 (#1966) — and the export trigger port.
         App\Export\Contracts\ExportTriggerPort:
             alias: App\Export\Application\AgentExportTrigger
+            public: true
+
+        # AGENT-P5-01 (#1970) — and the schema commit port.
+        App\Import\Contracts\SchemaImportPort:
+            alias: App\Import\Application\Service\AgentSchemaImportApplier
             public: true
