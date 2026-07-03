@@ -1394,7 +1394,9 @@
     "agent": "agent",
     "agent_phase_2": "Faza 2",
     "source": "Source",
-    "timestamp": "Updated"
+    "timestamp": "Updated",
+    "agent_tooltip": "Set by the agent",
+    "agent_run": "run"
   },
   "search": {
     "placeholder": "Search…",

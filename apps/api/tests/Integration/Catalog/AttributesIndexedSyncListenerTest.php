@@ -68,7 +68,8 @@ final class AttributesIndexedSyncListenerTest extends KernelTestCase
         $em->clear();
         $reloaded = $this->repository()->findByCode('SKU-1', ObjectKind::Product, $this->tenant);
         self::assertNotNull($reloaded);
-        self::assertSame(['option_code' => 'red'], $reloaded->getAttributesIndexed()['color']);
+        // AGENT-P6-05 (#1978) — the projection slot carries provenance.
+        self::assertSame(['provenance' => 'manual', 'option_code' => 'red'], $reloaded->getAttributesIndexed()['color']);
         // 1 of 2 required fields present → 50%.
         self::assertSame(50, $reloaded->getCompleteness()['global']);
     }
@@ -117,7 +118,7 @@ final class AttributesIndexedSyncListenerTest extends KernelTestCase
         $em->clear();
         $reloaded = $this->repository()->findByCode('SKU-LOC', ObjectKind::Product, $this->tenant);
         self::assertNotNull($reloaded);
-        self::assertSame(['value' => 'Nazwa PL'], $reloaded->getAttributesIndexed()['name']);
+        self::assertSame(['value' => 'Nazwa PL', 'provenance' => 'manual'], $reloaded->getAttributesIndexed()['name']);
     }
 
     #[Test]

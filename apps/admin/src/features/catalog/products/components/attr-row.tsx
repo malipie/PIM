@@ -38,6 +38,8 @@ export interface AttrRowProps {
   attribute: AttributeMeta;
   value: unknown;
   provenance: Provenance;
+  /** AGENT-P6-05 (#1978) — agent run id for the badge tooltip. */
+  provenanceSource?: string | null;
   locale: ProductLocale;
   isEditing: boolean;
   isLocked: boolean;
@@ -102,6 +104,7 @@ export function AttrRow({
   attribute,
   value,
   provenance,
+  provenanceSource,
   locale,
   isEditing,
   isLocked,
@@ -458,7 +461,7 @@ export function AttrRow({
             <Copy className="size-3.5" aria-hidden />
           </button>
         ) : (
-          <ProvenanceBadge provenance={provenance} />
+          <ProvenanceBadge provenance={provenance} source={provenanceSource ?? undefined} />
         )}
       </div>
     </div>
