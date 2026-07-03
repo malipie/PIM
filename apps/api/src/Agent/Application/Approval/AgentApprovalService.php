@@ -14,6 +14,9 @@ use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangeType;
 use App\Identity\Contracts\Audit\AgentActionAuditor;
 use App\Import\Contracts\SchemaImportPort;
+use App\Shared\Application\TenantContext;
+use App\Shared\Contracts\Event\AgentRunCompleted;
+use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
@@ -44,7 +47,38 @@ final readonly class AgentApprovalService
         private SchemaImportPort $schemaCommits,
         private AgentProgressPublisher $publisher,
         private AgentActionAuditor $auditor,
+        private \Symfony\Component\Messenger\MessageBusInterface $eventBus,
+        private TenantContext $tenantContext,
     ) {
+    }
+
+    /**
+     * AGENT-P8-04 (#1986) — terminal outcomes fan out to tenant webhooks
+     * through the core delivery infra (Shared event, best-effort).
+     */
+    private function announceCompletion(AgentRun $run): void
+    {
+        try {
+            // The fan-out stamps WebhookDelivery rows with the context
+            // tenant - re-attach a managed one (earlier port calls may
+            // have cleared the EM and detached it).
+            $tenant = $run->getTenant();
+            if ($tenant instanceof Tenant) {
+                $managed = $this->entityManager->find(Tenant::class, $tenant->getId()->toRfc4122());
+                if ($managed instanceof Tenant) {
+                    $this->tenantContext->set($managed);
+                }
+            }
+
+            $this->eventBus->dispatch(new AgentRunCompleted(
+                $run->getId(),
+                $run->getIntent(),
+                $run->getStatus()->value,
+            ));
+        } catch (Throwable) {
+            // Webhook fan-out is best-effort; the decision itself already
+            // committed and is audited.
+        }
     }
 
     public function approve(Uuid $runId, Uuid $approvedBy): AgentRun
@@ -136,6 +170,7 @@ final readonly class AgentApprovalService
             'tokens_output' => $run->getTokensOutput(),
             'cost_usd' => $run->getCostUsd(),
         ]);
+        $this->announceCompletion($run);
 
         return $run;
     }
@@ -170,6 +205,9 @@ final readonly class AgentApprovalService
         $this->auditor->recordAgentAction('agent_run_rejected', $run->getId()->toRfc4122(), $run->getUserId()->toRfc4122(), [
             'pending_change_batch_id' => $batchId?->toRfc4122(),
         ]);
+        // LAST: an inline (sync-transport) delivery failure rolls back and
+        // closes the EM - nothing may need it afterwards.
+        $this->announceCompletion($run);
 
         return $run;
     }
@@ -205,6 +243,7 @@ final readonly class AgentApprovalService
         $this->auditor->recordAgentAction('agent_run_cancelled', $run->getId()->toRfc4122(), $run->getUserId()->toRfc4122(), [
             'pending_change_batch_id' => $batchId?->toRfc4122(),
         ]);
+        $this->announceCompletion($run);
 
         return $run;
     }
@@ -253,6 +292,7 @@ final readonly class AgentApprovalService
             'bulk_operation_id' => $bulkOperationId->toRfc4122(),
             'model' => $run->getModel(),
         ]);
+        $this->announceCompletion($run);
 
         return $run;
     }

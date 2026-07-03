@@ -48,6 +48,7 @@ final readonly class AgentLoopRunner
         private AgentSystemPromptBuilder $prompts,
         private UsageCostCalculator $costs,
         private EntityManagerInterface $entityManager,
+        private \Symfony\Component\Messenger\MessageBusInterface $eventBus,
         private int $maxToolCallsPerRun,
         private int $maxTokensPerRun,
     ) {
@@ -152,6 +153,18 @@ final readonly class AgentLoopRunner
                         \Symfony\Component\Uid\Uuid::fromString($materialized['batch_id']),
                         $materialized['affected_count'],
                     );
+
+                    // AGENT-P8-04 (#1986) — "the batch is ready" webhook
+                    // (best-effort fan-out via the core delivery infra).
+                    try {
+                        $this->eventBus->dispatch(new \App\Shared\Contracts\Event\AgentRunAwaitingApproval(
+                            $run->getId(),
+                            $run->getIntent(),
+                            $materialized['affected_count'],
+                        ));
+                    } catch (Throwable) {
+                        // Never let a webhook failure kill the run.
+                    }
 
                     return;
                 }
