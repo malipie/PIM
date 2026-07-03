@@ -467,6 +467,11 @@ services:
     App\Identity\Contracts\Audit\DataExportAuditor:
         alias: App\Identity\Infrastructure\Audit\DataExportAuditor
 
+    # AGENT-P3-07 (#1967) — agent accountability entries in the same
+    # append-only DH Auditor (resource_type=agent_run).
+    App\Identity\Contracts\Audit\AgentActionAuditor:
+        alias: App\Identity\Infrastructure\Audit\AgentActionAuditor
+
     # AUD-053 (W3-1) — "current user" port. Lets controllers outside Identity
     # (Backup; later the Import controllers) read the authenticated principal's
     # id/tenant without importing Identity\Domain\Entity\User (deptrac:
