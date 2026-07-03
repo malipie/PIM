@@ -1,7 +1,7 @@
-import { useList } from '@refinedev/core';
-import { useQuery } from '@tanstack/react-query';
-import { Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useInvalidate, useList } from '@refinedev/core';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { FolderTree, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 
@@ -12,7 +12,9 @@ import {
 } from '@/components/modeling/category-tree';
 import { DeclareAttributeGroupDialog } from '@/components/modeling/declare-attribute-group-dialog';
 import { ModelingPageHeader } from '@/components/modeling/modeling-page-header';
+import { MoveCategoryDialog } from '@/components/modeling/move-category-dialog';
 import { ObjectTypeFilterDropdown } from '@/components/modeling/object-type-filter-dropdown';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MockBadge } from '@/components/ui/mock-badge';
 import { jsonFetch } from '@/lib/http';
@@ -111,6 +113,12 @@ export function CategoriesTreePage() {
   const targetObjectTypeId = searchParams.get('targetObjectTypeId') ?? '';
   const targetType: string = searchParams.get('targetType') ?? 'product';
   const selectedId = searchParams.get('selected') ?? null;
+  // DP-01 (#2031) — `?move=1` (deep-link from show.tsx) auto-opens the Move
+  // dialog for the selected node once the tree resolves.
+  const moveRequested = searchParams.get('move') === '1';
+  const [moveOpen, setMoveOpen] = useState(false);
+  const invalidate = useInvalidate();
+  const queryClient = useQueryClient();
 
   const { result } = useList<CategoryEntry>({
     resource: 'categories',
@@ -138,6 +146,27 @@ export function CategoriesTreePage() {
     () => collectAllAncestorIds(tree, selectedId),
     [tree, selectedId],
   );
+
+  const selectedNode = useMemo(
+    () => (selectedId ? findNode(tree, selectedId) : null),
+    [tree, selectedId],
+  );
+
+  useEffect(() => {
+    if (moveRequested && selectedNode) {
+      setMoveOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('move');
+      setSearchParams(next, { replace: true });
+    }
+  }, [moveRequested, selectedNode, searchParams, setSearchParams]);
+
+  const handleMoved = () => {
+    // Fresh paths for the whole tree + any per-category panels (usage,
+    // declared/effective groups key off ['categories', id, ...]).
+    invalidate({ resource: 'categories', invalidates: ['list', 'detail'] });
+    void queryClient.invalidateQueries({ queryKey: ['categories'] });
+  };
 
   const handleSelect = (id: string) => {
     const next = new URLSearchParams(searchParams);
@@ -210,6 +239,7 @@ export function CategoriesTreePage() {
               targetType={targetType}
               locale={i18n.language}
               tree={tree}
+              onMoveRequest={() => setMoveOpen(true)}
             />
           ) : (
             <Card className="p-12">
@@ -222,6 +252,16 @@ export function CategoriesTreePage() {
           )}
         </div>
       </div>
+
+      {selectedNode ? (
+        <MoveCategoryDialog
+          open={moveOpen}
+          onOpenChange={setMoveOpen}
+          category={selectedNode}
+          tree={tree}
+          onMoved={handleMoved}
+        />
+      ) : null}
     </div>
   );
 }
@@ -232,12 +272,14 @@ function CategoryDetailPanel({
   targetType,
   locale,
   tree,
+  onMoveRequest,
 }: {
   categoryId: string;
   targetObjectTypeId: string;
   targetType: string;
   locale: string;
   tree: CategoryTreeNode[];
+  onMoveRequest: () => void;
 }) {
   const { t } = useTranslation();
   const [declareOpen, setDeclareOpen] = useState(false);
@@ -320,7 +362,18 @@ function CategoryDetailPanel({
               <span>{node?.icon ?? '📂'}</span>
               <span>{node?.label ?? '—'}</span>
             </div>
-            <div className="mt-1 font-mono text-[12px] text-zinc-500">{node?.path ?? '—'}</div>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="font-mono text-[12px] text-zinc-500">{node?.path ?? '—'}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 gap-1 rounded-lg px-2 text-[11.5px] text-zinc-500 hover:text-zinc-900"
+                onClick={onMoveRequest}
+              >
+                <FolderTree className="size-3" />
+                {t('categories.move_action', { defaultValue: 'Przenieś' })}
+              </Button>
+            </div>
           </div>
           {usage ? (
             <div className="text-right">
