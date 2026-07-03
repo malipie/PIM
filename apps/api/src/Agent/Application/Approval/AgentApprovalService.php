@@ -9,6 +9,7 @@ use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\Entity\AgentRun;
 use App\Agent\Domain\Exception\ApprovalConflictException;
 use App\Catalog\Contracts\Command\PendingBatchCommitPort;
+use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
@@ -34,6 +35,7 @@ final readonly class AgentApprovalService
         private EntityManagerInterface $entityManager,
         private ManagerRegistry $managerRegistry,
         private PendingBatchCommitPort $commits,
+        private PendingChangesPort $pendingChanges,
         private AgentProgressPublisher $publisher,
     ) {
     }
@@ -98,6 +100,77 @@ final readonly class AgentApprovalService
         $run->markDone($result->bulkSessionId);
         $this->entityManager->flush();
         $this->publisher->status($run);
+
+        return $run;
+    }
+
+    /**
+     * AGENT-P3-03 (#1963) — the clean "no": every pending proposal of the
+     * run's batch transitions to rejected and the run lands on rejected.
+     * The catalog is untouched by construction — nothing ever reached it
+     * before an approve. Idempotent: a second reject returns as-is.
+     */
+    public function reject(Uuid $runId): AgentRun
+    {
+        $run = $this->load($runId);
+
+        if (AgentRunStatus::Rejected === $run->getStatus()) {
+            return $run;
+        }
+
+        if (AgentRunStatus::AwaitingApproval !== $run->getStatus()) {
+            throw ApprovalConflictException::cannotReject($run->getStatus()->value);
+        }
+
+        $batchId = $run->getPendingChangeBatchId();
+        if ($batchId instanceof Uuid) {
+            $this->pendingChanges->reject($batchId);
+        }
+
+        $run->markRejected();
+        $this->entityManager->flush();
+        $this->publisher->status($run);
+
+        return $run;
+    }
+
+    /**
+     * AGENT-P3-03 (#1963) — interrupt a run mid-flight (planning /
+     * awaiting_input / awaiting_approval). A materialized batch expires so
+     * no dead proposals linger; committing cannot be cancelled (the commit
+     * is a single atomic transaction — it either fully lands or fully
+     * rolls back). Idempotent: a second cancel returns as-is.
+     */
+    public function cancel(Uuid $runId): AgentRun
+    {
+        $run = $this->load($runId);
+
+        if (AgentRunStatus::Cancelled === $run->getStatus()) {
+            return $run;
+        }
+
+        if (AgentRunStatus::Committing === $run->getStatus() || $run->getStatus()->isTerminal()) {
+            throw ApprovalConflictException::cannotCancel($run->getStatus()->value);
+        }
+
+        $batchId = $run->getPendingChangeBatchId();
+        if ($batchId instanceof Uuid) {
+            $this->pendingChanges->expire($batchId);
+        }
+
+        $run->markCancelled();
+        $this->entityManager->flush();
+        $this->publisher->status($run);
+
+        return $run;
+    }
+
+    private function load(Uuid $runId): AgentRun
+    {
+        $run = $this->entityManager->find(AgentRun::class, $runId);
+        if (!$run instanceof AgentRun) {
+            throw new LogicException(\sprintf('Agent run "%s" not found.', $runId->toRfc4122()));
+        }
 
         return $run;
     }
