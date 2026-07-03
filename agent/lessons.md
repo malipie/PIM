@@ -2891,3 +2891,14 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 ### Env quirks (cold-start)
 - `pim.localhost` na macOS: przeglądarka rozwiązuje sama, **Node (`page.request`) nie** — bez `/etc/hosts` 80/122 speców E2E pada na `ENOTFOUND` (#2182). CI ma wpis, dlatego zielone.
 - Świeży klon wymaga: `JWT_PASSPHRASE` w `apps/api/.env.local` + `lexik:jwt:generate-keypair` (#2176) — bez tego login 500.
+
+## Lessons z GOLIVE #2124 (2026-07-04, k6 load prep + seed 50k)
+
+### Patterns to Follow
+- **Seeder kanoniczny, projekcje realnym pathem.** `pim:load:seed` pisze WYŁĄCZNIE `object_values` (envelope `{value}`), a `attributes_indexed` + Meili buduje się osobno przez `pim:catalog:detect-attributes-drift --reconcile` + `pim:search:reindex`. Zero drugiego kompozytora slotu (lekcja z drift-detektora) i darmowy re-użytek jako ćwiczenie fresh-install rebuild (#2125). Zmierzone: 300 prod × 200 atrybutów = 10082 wierszy wartości, peak 58 MiB.
+- **Komendy CLI utrzymaniowe = owner connection.** Konsola łączy się jako `pim_app` (FORCE RLS, brak request-scoped GUC) i widzi 0 wierszy → seed/reconcile/reindex owijać `DATABASE_URL="$DATABASE_URL_OWNER"` (jak entrypoint `pim:dev:ensure-seeded`). Bez tego `pim:load:seed` twierdził „Built-in product ObjectType missing".
+
+### Patterns to Avoid
+- **`K6_VUS`/`K6_DURATION` to NATYWNE opcje k6** — dla skryptu z własnym blokiem `scenarios`/`iterations` (feed-pull, auth-login, import-start) k6 NADPISUJE definicję i leci z natywną skalą. Feed-pull dostał 13k req/min i wysycił limiter 120/h. Wzorzec: rate-limited smoki pinują kształt w skrypcie, orkiestrator NIE przekazuje im native-override (case per scenariusz w wrapperze); własne progi env nazywać BEZ prefiksu `K6_`.
+- **`set -u` + pusta tablica bash** (`ARR=(); "${ARR[@]}"`) = „unbound variable" na bash < 4.4 (macOS) — nieszkodliwy placeholder element zamiast pustej tablicy.
+- **Limiter `feed_pull` siedzi w puli filesystem `cache.rate_limiter`, nie w Redis** — restart api/redis go NIE czyści; reset przez `cache:pool:clear cache.rate_limiter`. (Redis DBSIZE=0 mimo aktywnego limitera to nie bug — to inny backend.)
