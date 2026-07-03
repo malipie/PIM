@@ -555,11 +555,24 @@
       "title": "Użytkownicy",
       "intro": "Zarządzaj kontami w obrębie tenanta. Zaproszenia magic link, MFA i przypisanie ról dochodzą w kolejnych ticketach.",
       "invite_cta": "Zaproś użytkownika",
+      "set_password": {
+        "title": "Ustaw nowe hasło",
+        "description": "Nowe hasło dla {{email}}. Wszystkie aktywne sesje użytkownika zostaną unieważnione.",
+        "password_label": "Nowe hasło (min. 12 znaków)",
+        "force_change_label": "Wymuś zmianę hasła przy pierwszym logowaniu",
+        "cta": "Ustaw hasło",
+        "toast_success": "Hasło ustawione. Sesje użytkownika zostały unieważnione.",
+        "error_generic": "Nie udało się ustawić hasła.",
+        "row_title": "Ustaw nowe hasło",
+        "row_description": "Dla kont bez działającej skrzynki (email pełni rolę loginu) — reset mailowy ich nie dosięgnie. Sesje użytkownika zostaną unieważnione.",
+        "self_hint": "Własne hasło zmienisz w Ustawienia → Bezpieczeństwo."
+      },
       "add_manually": {
         "cta": "Dodaj ręcznie",
         "title": "Dodaj użytkownika ręcznie",
         "intro": "Tworzysz konto bez magic-link — admin podaje hasło bezpośrednio. Użytkownik staje się aktywny od razu; jeśli wymusisz zmianę hasła, przy pierwszym logowaniu pójdzie na ekran zmiany hasła.",
         "field_email": "E-mail",
+        "email_hint": "Email pełni rolę loginu — nie musi być prawdziwą skrzynką (np. magazyn1@firma.pl). Przy adresie bez skrzynki odznacz wysyłkę welcome maila.",
         "field_display_name": "Nazwa wyświetlana (opcjonalne)",
         "field_role": "Rola",
         "field_password": "Hasło",
@@ -1056,6 +1069,13 @@
     },
     "filter_type": "Typ",
     "filter_all": "Wszystkie",
+    "filter": {
+      "all": "wszystkie",
+      "system": "system",
+      "group": "Grupa atrybutów",
+      "group_search": "Szukaj grupy…",
+      "group_empty": "Brak grup"
+    },
     "empty": "Brak atrybutów dla aktualnego najemcy.",
     "write_deferred_note": "Ręczne tworzenie / edycja / drag-and-drop są odroczone do agentowego flow schema-add (Faza 2). Seeder dostarcza MVP zestaw atrybutów.",
     "fields": {
@@ -1355,6 +1375,19 @@
     "list_title": "Kategorie",
     "list_subtitle": "Hierarchiczna taksonomia oparta o ltree (Postgres).",
     "back": "Wróć do kategorii",
+    "move_action": "Przenieś",
+    "move_dialog": {
+      "title": "Przenieś kategorię „{{label}}\"",
+      "description": "Wybierz nowego rodzica. Całe poddrzewo przenosi się razem z kategorią; nie można przenieść kategorii do niej samej ani do jej potomka.",
+      "to_root": "Poziom główny (root)",
+      "impact_title": "Wpływ na produkty: {{count}}",
+      "impact_added": "Dojdą grupy:",
+      "impact_removed": "Znikną grupy:",
+      "cta": "Przenieś",
+      "confirm_cta": "Potwierdź mimo wpływu na produkty",
+      "success": "Kategoria „{{label}}\" przeniesiona.",
+      "error": "Przeniesienie nie powiodło się."
+    },
     "tree_aria": "Drzewo kategorii",
     "empty": "Brak kategorii dla aktualnego najemcy.",
     "expand": "Rozwiń",

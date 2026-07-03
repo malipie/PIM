@@ -46,6 +46,25 @@ class DoctrineRefreshTokenRepository extends ServiceEntityRepository implements 
     }
 
     /**
+     * DP-02 (#2032) — revoke every still-active token of one user, across
+     * families. Used by the admin set-password endpoint so a password reset
+     * cuts off any session the previous credential holder might still have.
+     * Single UPDATE, mirrors revokeFamily().
+     */
+    public function revokeAllForUser(Uuid $userId, DateTimeImmutable $when): void
+    {
+        $em = $this->getEntityManager();
+        $em->createQuery(
+            'UPDATE '.RefreshToken::class.' t '
+            .'SET t.revokedAt = :when '
+            .'WHERE t.userId = :userId AND t.revokedAt IS NULL',
+        )
+            ->setParameter('userId', $userId, 'uuid')
+            ->setParameter('when', $when)
+            ->execute();
+    }
+
+    /**
      * Drop tokens whose `expires_at` is before `$cutoff`. Returns affected row
      * count so a future maintenance command (epic 0.11) can log progress.
      */
