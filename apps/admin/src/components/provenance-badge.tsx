@@ -6,9 +6,8 @@ import { cn } from '@/lib/utils';
  * Provenance source for a single attribute value (#61 / 0.6.8).
  *
  * Mirrors the backend `ObjectValue.provenance` enum (sekcja 5
- * architektury). The `agent` variant ships with a desaturated tone +
- * "Faza 2" tooltip — backend already accepts the value, but the agent
- * layer (epic 0.7) lands later.
+ * architektury). The `agent` variant is LIVE since epik 0.7 (AGENT-P6-04/05):
+ * full-contrast purple, same treatment as the other provenances.
  */
 export type Provenance = 'manual' | 'import' | 'integration' | 'agent';
 
@@ -40,11 +39,6 @@ export function ProvenanceBadge({
       title={tooltip}
     >
       {label}
-      {provenance === 'agent' ? (
-        <span className="text-[8px] tracking-normal opacity-70">
-          {t('provenance.agent_phase_2', { defaultValue: 'Faza 2' })}
-        </span>
-      ) : null}
     </span>
   );
 }
@@ -53,7 +47,7 @@ const TONES: Record<Provenance, string> = {
   manual: 'bg-slate-100 text-slate-700',
   import: 'bg-blue-100 text-blue-900',
   integration: 'bg-orange-100 text-orange-900',
-  agent: 'bg-purple-100 text-purple-900 opacity-70',
+  agent: 'bg-purple-100 text-purple-900',
 };
 
 function buildTooltip(

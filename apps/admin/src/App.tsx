@@ -40,6 +40,10 @@ const AgentInboxPage = lazyPage(
   () => import('@/features/agent/inbox/AgentInboxPage'),
   'AgentInboxPage',
 );
+const AgentHistoryPage = lazyPage(
+  () => import('@/features/agent/history/AgentHistoryPage'),
+  'AgentHistoryPage',
+);
 const ApiProfileCreatePage = lazyPage(
   () => import('@/features/api-configurator/api-profiles/create'),
   'ApiProfileCreatePage',
@@ -470,6 +474,7 @@ function App() {
                   <Route index element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
                   {AGENT_ENABLED && <Route path="/agent/inbox" element={<AgentInboxPage />} />}
+                  {AGENT_ENABLED && <Route path="/agent/history" element={<AgentHistoryPage />} />}
                   {/* UP-10 (#1026) — `/products` default is the
                     UniversalListPage parametrized for the built-in
                     product ObjectType (ADR-009 pixel-perfect parity
