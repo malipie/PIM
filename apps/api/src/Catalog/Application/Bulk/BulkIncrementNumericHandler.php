@@ -75,16 +75,22 @@ final class BulkIncrementNumericHandler extends AbstractBulkHandler
         }
 
         $indexed = $object->getAttributesIndexed();
-        $oldValue = $indexed[$this->attrCode] ?? null;
+        $slot = $indexed[$this->attrCode] ?? null;
+        // attributes_indexed stores the JSONB envelope {value: X, provenance?...}
+        // per docs/api/jsonb-schemas.md — the numeric lives INSIDE the slot,
+        // not as a bare scalar. Reading the slot directly (as this handler
+        // did) made is_numeric() false for every row → the whole batch was
+        // silently skipped as "not numeric". Read the scalar from the slot.
+        $oldScalar = \is_array($slot) ? ($slot['value'] ?? null) : $slot;
 
-        if (!is_numeric($oldValue)) {
+        if (!is_numeric($oldScalar)) {
             ++$counters->skipped;
             $this->em->persist(new BulkLog(
                 $session->getId(),
                 $object->getId(),
                 null,
-                $oldValue,
-                $oldValue,
+                $slot,
+                $slot,
                 BulkLog::LEVEL_WARNING,
                 'Value is not numeric',
             ));
@@ -92,8 +98,8 @@ final class BulkIncrementNumericHandler extends AbstractBulkHandler
             return;
         }
 
-        $current = (float) $oldValue;
-        $newValue = match ($this->operator) {
+        $current = (float) $oldScalar;
+        $newScalar = match ($this->operator) {
             '+' => $current + $this->operand,
             '-' => $current - $this->operand,
             '*' => $current * $this->operand,
@@ -102,13 +108,13 @@ final class BulkIncrementNumericHandler extends AbstractBulkHandler
             default => null,
         };
 
-        if (null === $newValue) {
+        if (null === $newScalar) {
             ++$counters->error;
             $this->em->persist(new BulkLog(
                 $session->getId(),
                 $object->getId(),
                 null,
-                $oldValue,
+                $slot,
                 null,
                 BulkLog::LEVEL_ERROR,
                 'Division by zero',
@@ -117,15 +123,19 @@ final class BulkIncrementNumericHandler extends AbstractBulkHandler
             return;
         }
 
-        $indexed[$this->attrCode] = $newValue;
+        // Write the new scalar back INTO the envelope, preserving the rest
+        // of the slot (e.g. provenance). The `+` union keeps 'value' from
+        // the left operand and any other keys from the existing slot.
+        $newSlot = \is_array($slot) ? ['value' => $newScalar] + $slot : ['value' => $newScalar];
+        $indexed[$this->attrCode] = $newSlot;
         $object->updateAttributeIndex($indexed);
         $object->markTouchedByBulkSession($session->getId());
         $this->em->persist(new BulkLog(
             $session->getId(),
             $object->getId(),
             null,
-            $oldValue,
-            $newValue,
+            $slot,
+            $newSlot,
             BulkLog::LEVEL_INFO,
             null,
         ));

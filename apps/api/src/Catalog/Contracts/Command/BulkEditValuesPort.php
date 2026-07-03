@@ -38,4 +38,27 @@ interface BulkEditValuesPort
         array $changes,
         string $mode,
     ): ValueEditProposal;
+
+    /**
+     * Materialize an ARITHMETIC edit (the manual `increment_numeric` bulk
+     * action, exposed to the agent): apply `operator`+`operand` to a
+     * numeric attribute across the selector, computing the after-value per
+     * object from its current value. Non-numeric current values and
+     * division-by-zero are skipped, never errored. Same approval path: the
+     * result is a pending_changes batch, committed post-accept.
+     *
+     * @param array<string, mixed> $filterDsl selector ([] = every object of the type)
+     * @param string               $operator  one of + - * / % (runtime-validated)
+     *
+     * @throws InvalidArgumentException on unknown object type / unsupported operator / invalid DSL
+     */
+    public function materializeArithmeticEdits(
+        Uuid $batchId,
+        Uuid $userId,
+        string $objectTypeCode,
+        array $filterDsl,
+        string $attrCode,
+        string $operator,
+        float $operand,
+    ): ValueEditProposal;
 }
