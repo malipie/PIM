@@ -3,6 +3,12 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-04 (wieczór): #2246 — żywy bloczek agenta na dashboardzie + dynamiczne quick actions (PR #2247)
+- **Co:** hero dashboardu (VIEW-13) przestaje być mockiem: submit → realny run (`surface: 'dashboard'`, nowy case enum, bez migracji) → handoff do AgentChatSheet (`OPEN_AGENT_CHAT_EVENT`) → pełna pętla + approval w Skrzynce. **Auto-dziedziczenie:** wolny tekst z definicji (ToolRegistry/tag `agent.tool`); chipy przez `GET /api/agent/capabilities` z rejestru (RBAC+autonomy per user) — narzędzie deklaruje chip opcjonalnym `ProvidesQuickActionInterface` (5 narzędzi na start), ⌘K konsumuje ten sam endpoint (usunięte hardcoded `AGENT_SUGGESTIONS`). Licznik „42 zaakceptowanych zmian" usunięty (decyzja operatora); chipy SEO/tłumaczenia wypadły (brak narzędzi — wrócą automatycznie gdy powstaną).
+- **Decyzje bezpieczeństwa capabilities:** zawsze 200 `{enabled, reason, actions}` (discovery, `#[NoPermissionRequired]` z uzasadnieniem); **permission przed guardem BYOK** (user bez `agent.bulk_actions` nie pozna stanu klucza tenanta — finding z adwersaryjnego review, naprawiony przed pushem); autonomy off ⇒ `enabled:true, actions:[]` (spójne z ⌘K).
+- **Testy:** `AgentCapabilitiesApiTest` 7 case'ów (RBAC-filtering na personach legacy catalog_manager+PRD marketing, maskowanie BYOK, autonomy off) + `surface:'dashboard'`→201 + Playwright `2246-*.spec.ts` (5 testów: submit/chipy/409-adopcja/⌘K-parity/dim+CTA) + `view-13` zaktualizowany (placeholder, stub capabilities, licznik out). Lokalnie: PHPUnit Agent 143/143, PHPStan 0, cs-fixer 0, Deptrac 0, vitest 120/120, build + removability build. OpenAPI +25 linii.
+- **Stan:** PR #2247 w CI. Po merge: live smoke (SMOKE TEST RULE) → close #2246 z proofem. Worktree: `PIM-worktrees/dashboard-agent-hero`.
+
 ## 2026-07-04 (sesja follow-up + load + agent live): GOLIVE — 5 ticketów zamkniętych, agent live smoke, 4 nowe findingi
 - **Dyrektywa:** wszystko lokalnie bez hostingu (zaakceptowane). W trakcie sesji **operator wprowadził klucz Anthropic BYOK** → odblokowany #2136.
 - **✅ Zamknięte z live-proofem (5):**
