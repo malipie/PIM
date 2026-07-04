@@ -9,6 +9,7 @@ use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Identity\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Tenant;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -30,13 +31,18 @@ final class BulkActionsPerActionPermissionApiTest extends CatalogApiTestCase
     #[Test]
     public function marketingCannotBulkDeleteProducts(): void
     {
-        $this->seedMarketingUser();
-        $admin = $this->authenticatedClient();
+        $marketingJwt = $this->seedMarketingUser();
+        // ONE client for the whole test — API Platform's test client only
+        // supports a single active kernel; swap the Bearer per request
+        // instead of calling createClient() twice (the second reboot
+        // invalidates the first client's handle).
+        $client = static::createClient();
+        $adminJwt = $this->jwtFor(self::ADMIN_EMAIL);
         $productOt = $this->objectTypeIdFor(ObjectKind::Product);
 
         // Admin creates a product to target.
-        $created = $admin->request('POST', '/api/products', [
-            'headers' => ['content-type' => 'application/ld+json'],
+        $created = $client->request('POST', '/api/products', [
+            'headers' => ['content-type' => 'application/ld+json', 'authorization' => 'Bearer '.$adminJwt],
             'body' => json_encode([
                 'code' => 'BULK-PERM-1',
                 'objectTypeId' => $productOt,
@@ -48,9 +54,8 @@ final class BulkActionsPerActionPermissionApiTest extends CatalogApiTestCase
         \assert(\is_string($productId));
 
         // Marketing (has bulk_operations, lacks products.delete) → 403.
-        $marketing = $this->authenticatedClient(self::MARKETING_EMAIL);
-        $marketing->request('POST', '/api/products/bulk-actions/delete', [
-            'headers' => ['content-type' => 'application/json'],
+        $client->request('POST', '/api/products/bulk-actions/delete', [
+            'headers' => ['content-type' => 'application/json', 'authorization' => 'Bearer '.$marketingJwt],
             'body' => json_encode([
                 'target_ids' => [$productId],
                 'payload' => [],
@@ -60,12 +65,14 @@ final class BulkActionsPerActionPermissionApiTest extends CatalogApiTestCase
         self::assertResponseStatusCodeSame(403);
 
         // The product must still exist — the denied bulk op changed nothing.
-        $admin->request('GET', '/api/products/'.$productId);
+        $client->request('GET', '/api/products/'.$productId, [
+            'headers' => ['authorization' => 'Bearer '.$adminJwt],
+        ]);
         self::assertResponseStatusCodeSame(200);
 
         // Control: the admin (super_admin → has products.delete) CAN bulk-delete.
-        $admin->request('POST', '/api/products/bulk-actions/delete', [
-            'headers' => ['content-type' => 'application/json'],
+        $client->request('POST', '/api/products/bulk-actions/delete', [
+            'headers' => ['content-type' => 'application/json', 'authorization' => 'Bearer '.$adminJwt],
             'body' => json_encode([
                 'target_ids' => [$productId],
                 'payload' => [],
@@ -75,7 +82,15 @@ final class BulkActionsPerActionPermissionApiTest extends CatalogApiTestCase
         self::assertResponseStatusCodeSame(200);
     }
 
-    private function seedMarketingUser(): void
+    private function jwtFor(string $email): string
+    {
+        $user = self::getContainer()->get(UserRepositoryInterface::class)->findByEmail($email);
+        \assert($user instanceof User);
+
+        return self::getContainer()->get(JWTTokenManagerInterface::class)->create($user);
+    }
+
+    private function seedMarketingUser(): string
     {
         $em = $this->em();
         $tenant = $em->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
@@ -92,8 +107,6 @@ final class BulkActionsPerActionPermissionApiTest extends CatalogApiTestCase
         $em->persist($user);
         $em->flush();
 
-        // Sanity: the fixture is only meaningful while marketing exists.
-        $seeded = self::getContainer()->get(UserRepositoryInterface::class)->findByEmail(self::MARKETING_EMAIL);
-        \assert($seeded instanceof User);
+        return self::getContainer()->get(JWTTokenManagerInterface::class)->create($user);
     }
 }
