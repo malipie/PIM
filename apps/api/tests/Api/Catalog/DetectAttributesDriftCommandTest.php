@@ -4,7 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Api\Catalog;
 
+use App\Catalog\Domain\AttributeType;
+use App\Catalog\Domain\Entity\Attribute;
+use App\Catalog\Domain\Entity\AttributeOption;
+use App\Catalog\Domain\Entity\ObjectType;
+use App\Catalog\Domain\Entity\ObjectTypeAttribute;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
+use App\Shared\Application\TenantContext;
+use App\Shared\Domain\Tenant;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -117,6 +125,73 @@ final class DetectAttributesDriftCommandTest extends CatalogApiTestCase
         $exitCode = $tester->execute(['--tenant' => self::TENANT_CODE, '--kind' => 'product']);
         self::assertSame(Command::SUCCESS, $exitCode, $tester->getDisplay());
         self::assertStringContainsString('No drift', $tester->getDisplay());
+    }
+
+    /**
+     * GOLIVE #2186 — select values written through the REAL path (API write →
+     * sync listener → globalSlot → jsonb) must NOT drift: Postgres jsonb
+     * reorders object keys (`provenance` sorts before `option_code`), so the
+     * old strict key-order-sensitive comparison reported an eternal false
+     * mismatch that no --reconcile could clear.
+     */
+    #[Test]
+    public function selectValueWrittenThroughRealPathReportsNoDrift(): void
+    {
+        $this->seedSelectWithOptions('drift_color', ['red', 'green']);
+        $this->seedSelectWithOptions('drift_tags', ['new', 'sale'], AttributeType::Multiselect);
+        $client = $this->authenticatedClient();
+        $productOt = $this->objectTypeIdFor(ObjectKind::Product);
+
+        $response = $client->request('POST', '/api/products', [
+            'headers' => ['content-type' => 'application/ld+json'],
+            'body' => json_encode([
+                'code' => 'DRIFT-SEL-1',
+                'objectTypeId' => $productOt,
+                'attributes' => [
+                    'drift_color' => ['option_code' => 'green'],
+                    'drift_tags' => ['option_codes' => ['new', 'sale']],
+                ],
+            ], JSON_THROW_ON_ERROR),
+        ]);
+        self::assertResponseStatusCodeSame(201);
+
+        $tester = $this->commandTester();
+        $exitCode = $tester->execute(['--tenant' => self::TENANT_CODE, '--kind' => 'product']);
+        self::assertSame(Command::SUCCESS, $exitCode, $tester->getDisplay());
+        self::assertStringContainsString('No drift', $tester->getDisplay());
+    }
+
+    /**
+     * @param list<string> $optionCodes
+     */
+    private function seedSelectWithOptions(
+        string $code,
+        array $optionCodes,
+        AttributeType $type = AttributeType::Select,
+    ): void {
+        $em = $this->em();
+        $tenant = $em->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
+        \assert($tenant instanceof Tenant);
+        self::getContainer()->get(TenantContext::class)->set($tenant);
+
+        $product = self::getContainer()
+            ->get(ObjectTypeRepositoryInterface::class)
+            ->findBuiltInByKind(ObjectKind::Product, $tenant);
+        \assert($product instanceof ObjectType);
+
+        $attribute = new Attribute($code, ['pl' => $code, 'en' => $code], $type);
+        $em->persist($attribute);
+        $position = 0;
+        foreach ($optionCodes as $optionCode) {
+            $em->persist(new AttributeOption(
+                attribute: $attribute,
+                code: $optionCode,
+                label: ['pl' => ucfirst($optionCode), 'en' => ucfirst($optionCode)],
+                position: $position++,
+            ));
+        }
+        $em->persist(new ObjectTypeAttribute($product, $attribute, false, 1));
+        $em->flush();
     }
 
     private function createTextAttribute(
