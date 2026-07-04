@@ -4,14 +4,43 @@ import { expect, type Page, test } from '@playwright/test';
 import { loginAsAdmin } from './helpers/auth';
 
 /**
- * VIEW-13 (#2143) — dashboard "command center" redesign, static mock.
+ * VIEW-13 (#2143) — dashboard "command center" redesign.
  *
  * Asserts the pixel-perfect layout renders end-to-end: greeting + dark agent
- * hero, the four pinned KPI tiles, catalog health card (ring + buckets +
- * per-channel completeness), team activity card (range toggle + most edited)
- * and the full-width action center. Also locks in the operator decisions:
- * no MOCK badges anywhere on the page and no audit-log pill in the topbar.
+ * hero (LIVE since #2246 — chips come from /api/agent/capabilities, stubbed
+ * here for determinism), the four pinned KPI tiles, catalog health card
+ * (ring + buckets + per-channel completeness), team activity card (range
+ * toggle + most edited) and the full-width action center. Also locks in the
+ * operator decisions: no MOCK badges anywhere on the page and no audit-log
+ * pill in the topbar.
  */
+
+const CAPABILITIES_STUB = {
+  enabled: true,
+  reason: null,
+  actions: [
+    {
+      id: 'create_update_attribute',
+      label: { pl: 'Dodaj atrybut', en: 'Add attribute' },
+      prompt: { pl: 'Dodaj atrybut [nazwa]', en: 'Add attribute [name]' },
+    },
+    {
+      id: 'generate_feed',
+      label: { pl: 'Eksport feed XML', en: 'Export XML feed' },
+      prompt: { pl: 'Wygeneruj feed XML', en: 'Generate the XML feed' },
+    },
+  ],
+};
+
+async function stubCapabilities(page: Page) {
+  await page.route('**/api/agent/capabilities', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(CAPABILITIES_STUB),
+    }),
+  );
+}
 
 async function expectNoViolations(page: Page) {
   // Let CSS transitions settle before axe samples computed colors.
@@ -52,6 +81,7 @@ test('VIEW-13 — command center renders all five sections with mock values', as
     }
   });
 
+  await stubCapabilities(page);
   await loginAsAdmin(page);
   await page.goto('/dashboard');
 
@@ -62,16 +92,20 @@ test('VIEW-13 — command center renders all five sections with mock values', as
   ).toBeVisible();
   await expect(page.getByText(/Dzień dobry/)).toHaveCount(0);
 
-  // 2. Agent hero — prompt accepts focus and typing, nothing is submitted.
+  // 2. Agent hero — LIVE since #2246: the prompt starts empty (the mock's
+  // prefilled example moved to the placeholder), chips render from the
+  // stubbed capabilities, and the weekly-stats counter is gone.
   const prompt = page.getByRole('textbox', { name: /Polecenie dla agenta/i });
-  await expect(prompt).toHaveValue(/stwórz feed XML dla Google Shopping/);
+  await expect(prompt).toHaveValue('');
+  await expect(prompt).toHaveAttribute('placeholder', /stwórz feed XML dla Google Shopping/);
   await prompt.click();
   await prompt.fill('test polecenia');
   await expect(prompt).toHaveValue('test polecenia');
   // exact — the sidebar search trigger is also named "Zapytaj agenta lub szukaj...".
   await expect(page.getByRole('button', { name: 'Zapytaj agenta', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Generuj opisy SEO' })).toBeVisible();
-  await expect(page.getByText('42 zaakceptowanych zmian w tym tygodniu')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dodaj atrybut', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Eksport feed XML', exact: true })).toBeVisible();
+  await expect(page.getByText(/zaakceptowanych zmian w tym tygodniu/)).toHaveCount(0);
 
   // 3. KPI band — the four pinned tiles with exact mock values.
   // ("10 984" also renders inside the health card, hence .first()).
@@ -120,6 +154,7 @@ test('VIEW-13 — command center renders all five sections with mock values', as
 });
 
 test('VIEW-13 — dashboard passes the axe-core WCAG A/AA scan', async ({ page }) => {
+  await stubCapabilities(page);
   await loginAsAdmin(page);
   await page.goto('/dashboard');
   await expect(page.getByRole('heading', { name: 'Centrum akcji' })).toBeVisible();

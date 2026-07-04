@@ -972,19 +972,14 @@
       "title_accent": "Co dziś chcesz zmienić?"
     },
     "agent": {
-      "label": "Agent · Claude Sonnet 4.5",
+      "label": "Agent AI",
       "prompt_example": "stwórz feed XML dla Google Shopping z kategorii Pneumatyka",
       "prompt_aria": "Polecenie dla agenta",
       "press": "naciśnij",
       "ask": "Zapytaj agenta",
-      "accepted_this_week": "{{count}} zaakceptowanych zmian w tym tygodniu",
-      "actions": {
-        "add_attribute": "Dodaj atrybut",
-        "seo_descriptions": "Generuj opisy SEO",
-        "bulk_categories": "Bulk update kategorii",
-        "translations": "Tłumaczenia PL→DE",
-        "feed_export": "Eksport feed XML"
-      }
+      "disabled_byok": "Agent wymaga skonfigurowania klucza API (BYOK).",
+      "disabled": "Agent jest niedostępny na tym koncie.",
+      "configure_ai": "Przejdź do Ustawienia → AI"
     },
     "kpi": {
       "products": {

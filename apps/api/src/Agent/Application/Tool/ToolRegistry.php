@@ -61,6 +61,31 @@ final readonly class ToolRegistry
     }
 
     /**
+     * #2246 — quick-action chips for the user-visible subset (dashboard
+     * hero + Cmd+K). RBAC/autonomy filtering comes for free via
+     * {@see availableFor}; a tool opts in by implementing
+     * {@see ProvidesQuickActionInterface}.
+     *
+     * @return list<AgentQuickAction>
+     */
+    public function quickActionsFor(Uuid $userId): array
+    {
+        $actions = [];
+        foreach ($this->availableFor($userId) as $tool) {
+            if ($tool instanceof ProvidesQuickActionInterface) {
+                $actions[] = $tool->quickAction();
+            }
+        }
+
+        usort(
+            $actions,
+            static fn (AgentQuickAction $a, AgentQuickAction $b): int => [$a->priority, $a->id] <=> [$b->priority, $b->id],
+        );
+
+        return $actions;
+    }
+
+    /**
      * Anthropic tool-use definitions for the user-visible subset
      * (PHP SDK camelCase key `inputSchema`).
      *

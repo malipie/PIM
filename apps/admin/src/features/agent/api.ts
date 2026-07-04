@@ -19,7 +19,7 @@ export type AgentRunStatus =
 export interface AgentRunSummary {
   id: string;
   status: AgentRunStatus;
-  surface: 'chat' | 'cmdk' | 'proactive';
+  surface: 'chat' | 'cmdk' | 'proactive' | 'dashboard';
   intent: string;
   model: string | null;
   pending_change_batch_id: string | null;
@@ -69,7 +69,7 @@ const JSON_OPTS = { contentType: 'application/json', accept: 'application/json' 
 
 export function startAgentRun(
   intent: string,
-  surface: 'chat' | 'cmdk',
+  surface: 'chat' | 'cmdk' | 'dashboard',
   context: Record<string, unknown> = {},
 ): Promise<AgentRunSummary> {
   return jsonFetch<AgentRunSummary>('/api/agent/runs', {
@@ -173,6 +173,28 @@ export interface AgentCostReport {
 
 export function getAgentCost(): Promise<AgentCostReport> {
   return jsonFetch<AgentCostReport>('/api/agent/cost', JSON_OPTS);
+}
+
+/**
+ * #2246 — agent capability discovery: quick-action chips derived from
+ * the backend tool registry (RBAC-filtered per user), plus availability
+ * for graceful degradation. A tool that implements
+ * ProvidesQuickActionInterface shows up here with zero UI wiring.
+ */
+export interface AgentQuickActionDto {
+  id: string;
+  label: { pl: string; en: string };
+  prompt: { pl: string; en: string };
+}
+
+export interface AgentCapabilities {
+  enabled: boolean;
+  reason: 'feature_disabled' | 'missing_byok_key' | 'no_permission' | null;
+  actions: AgentQuickActionDto[];
+}
+
+export function getAgentCapabilities(): Promise<AgentCapabilities> {
+  return jsonFetch<AgentCapabilities>('/api/agent/capabilities', JSON_OPTS);
 }
 
 export function isRunBusy(status: AgentRunStatus): boolean {

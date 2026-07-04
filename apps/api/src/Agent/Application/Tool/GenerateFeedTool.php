@@ -13,7 +13,7 @@ use Symfony\Component\Uid\Uuid;
  * path as the admin's "Generuj teraz". Without a feed_id the tool
  * lists the tenant's feeds so the model can ask the user which one.
  */
-final readonly class GenerateFeedTool implements AgentToolInterface
+final readonly class GenerateFeedTool implements AgentToolInterface, ProvidesQuickActionInterface
 {
     public function __construct(
         private FeedAssistPort $feeds,
@@ -49,6 +49,19 @@ final readonly class GenerateFeedTool implements AgentToolInterface
     public function kind(): ToolKind
     {
         return ToolKind::Action;
+    }
+
+    public function quickAction(): AgentQuickAction
+    {
+        return new AgentQuickAction(
+            id: $this->name(),
+            label: ['pl' => 'Eksport feed XML', 'en' => 'Export XML feed'],
+            prompt: [
+                'pl' => 'Wygeneruj feed XML [nazwa feedu]',
+                'en' => 'Generate the XML feed [feed name]',
+            ],
+            priority: 30,
+        );
     }
 
     public function execute(array $arguments, AgentToolContext $context): array

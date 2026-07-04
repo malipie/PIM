@@ -114,6 +114,18 @@ final class AgentRunsApiTest extends ApiTestCase
     }
 
     #[Test]
+    public function dashboardSurfaceIsAccepted(): void
+    {
+        // #2246 — the dashboard hero is the third human entry point.
+        $this->seedByokKey();
+        $response = $this->authenticatedClient()->request('POST', '/api/agent/runs', [
+            'json' => ['intent' => 'pokaż raport kompletności produktów', 'surface' => 'dashboard'],
+        ]);
+        self::assertSame(201, $response->getStatusCode());
+        self::assertSame('dashboard', $response->toArray(false)['surface']);
+    }
+
+    #[Test]
     public function startRunsTheLoopInlineAndDetailShowsTheTranscript(): void
     {
         $this->seedByokKey();

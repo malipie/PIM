@@ -16,7 +16,7 @@ use Symfony\Component\Uid\Uuid;
  * before a human accepts; the commit (P3-02) goes through the existing
  * bulk category handlers, so the 24h rollback comes for free.
  */
-final readonly class AssignCategoriesTool implements AgentToolInterface
+final readonly class AssignCategoriesTool implements AgentToolInterface, ProvidesQuickActionInterface
 {
     use ResolvesSelectionScope;
 
@@ -85,6 +85,19 @@ final readonly class AssignCategoriesTool implements AgentToolInterface
     public function kind(): ToolKind
     {
         return ToolKind::Write;
+    }
+
+    public function quickAction(): AgentQuickAction
+    {
+        return new AgentQuickAction(
+            id: $this->name(),
+            label: ['pl' => 'Bulk update kategorii', 'en' => 'Bulk category update'],
+            prompt: [
+                'pl' => 'Przypisz produkty [filtr lub zaznaczenie] do kategorii [kategoria]',
+                'en' => 'Assign products [filter or selection] to category [category]',
+            ],
+            priority: 20,
+        );
     }
 
     public function execute(array $arguments, AgentToolContext $context): array
