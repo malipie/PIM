@@ -59,6 +59,11 @@ final class IndexSettingsTemplate
         'status', 'enabled',
         'completeness_pct', 'sync_status_aggregate',
         'category', 'parentId', 'mime_type',
+        // #2237 — the natural key (`code`, aliased `sku` in the DSL) is the
+        // primary way an agent or user grounds a single product ("edit
+        // SKU X"). Exact-match filtering on it needs it filterable in Meili;
+        // FilterDslResolver maps `sku -> code` so both spellings resolve here.
+        'code',
     ];
 
     /**
