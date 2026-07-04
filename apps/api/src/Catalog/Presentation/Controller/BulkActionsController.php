@@ -20,6 +20,7 @@ use App\Catalog\Domain\Entity\BulkSession;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
+use App\Identity\Contracts\Policy\PermissionCheckerInterface;
 use App\Shared\Application\BulkOperationLock;
 use App\Shared\Application\TenantContext;
 use App\Shared\Application\UserIdentityAware;
@@ -28,6 +29,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -49,10 +51,27 @@ use Throwable;
  */
 final class BulkActionsController
 {
+    /**
+     * GOLIVE #2129 (red-team point 6) — the endpoint-level
+     * `products.bulk_operations` grant is coarse: a role holding it but NOT
+     * the per-action permission (e.g. Marketing, which lacks
+     * `products.delete`) could delete products via this path while the
+     * single-item `DELETE /api/products/{id}` (voter `is_granted('DELETE')`)
+     * correctly refused. Each destructive/creative action re-asserts its own
+     * permission before dispatch so the bulk path can never widen a role.
+     *
+     * @var array<string, string>
+     */
+    private const array PER_ACTION_PERMISSION = [
+        'delete' => 'products.delete',
+        'duplicate' => 'products.add',
+    ];
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly TenantContext $tenantContext,
         private readonly Security $security,
+        private readonly PermissionCheckerInterface $permissionChecker,
         private readonly CatalogObjectRepositoryInterface $catalogObjects,
         private readonly BulkSetAttributeHandler $setAttributeHandler,
         private readonly BulkClearAttributeHandler $clearAttributeHandler,
@@ -280,6 +299,16 @@ final class BulkActionsController
         }
         $user = $this->security->getUser();
         $userId = $user instanceof UserIdentityAware ? $user->getId() : null;
+
+        // #2129 — re-assert the per-action permission (see PER_ACTION_PERMISSION).
+        // The endpoint attribute only proves `products.bulk_operations`; a
+        // destructive action additionally needs its own grant so the bulk
+        // path cannot escalate a role beyond the single-item endpoint.
+        $requiredPermission = self::PER_ACTION_PERMISSION[$actionType] ?? null;
+        if (null !== $requiredPermission
+            && (null === $userId || !$this->permissionChecker->userHasPermission($userId, $requiredPermission))) {
+            throw new AccessDeniedHttpException(\sprintf('Missing permission "%s" for bulk action "%s".', $requiredPermission, $actionType));
+        }
 
         /** @var array<string, mixed> $body */
         $body = json_decode($request->getContent(), true) ?? [];
