@@ -71,10 +71,13 @@ pnpm stack:logs   # tail logów
 docker compose exec -T api php bin/console pim:db:reset --with-fixtures --force
 #    Manualny odpowiednik to TRZY kroki (audit:schema:update jest wymagany —
 #    tabele *_audit są poza pipeline'em migracji; bez tego INSERT do audytowanej
-#    encji wywala 500 "relation '*_audit' does not exist"):
+#    encji wywala 500 "relation '*_audit' does not exist").
+#    UWAGA (#2178): po splicie ról W1-1 audit:schema:update i fixtures:load
+#    wymagają roli owner — stąd swap DATABASE_URL (migrate ma własne połączenie
+#    owner w konfiguracji; pim:db:reset robi ten swap sam):
 #      docker compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction
-#      docker compose exec -T api php bin/console audit:schema:update --force
-#      docker compose exec -T api php bin/console doctrine:fixtures:load --no-interaction
+#      docker compose exec -T api sh -c 'DATABASE_URL="$DATABASE_URL_OWNER" php bin/console audit:schema:update --force'
+#      docker compose exec -T api sh -c 'DATABASE_URL="$DATABASE_URL_OWNER" php bin/console doctrine:fixtures:load --no-interaction'
 
 # 5. Sprawdź single-origin i zaloguj się (admin@demo.localhost / changeme)
 curl -sk https://pim.localhost/api/docs.jsonld | head  # Hydra/JSON-LD API documentation
@@ -116,12 +119,17 @@ Robi po kolei: `doctrine:database:drop` → `create` → `migrations:migrate` �
 `--force` (pomiń pytanie potwierdzające), `--force-prod` (dopuść `APP_ENV=prod` —
 domyślnie odmawia). Używaj **tylko na bazie deweloperskiej**.
 
+Komenda **sama przełącza się na połączenie owner** (`DATABASE_URL_OWNER`,
+rola `pim`) — po splicie ról W1-1 runtime'owa rola `pim_app` nie ma DDL ani
+BYPASSRLS, więc drop/create/audit/fixtures pod nią padają (#2178). Nie trzeba
+(i nie należy) ręcznie podmieniać env-varów. Drop wykonuje się jako
+`DROP DATABASE … WITH (FORCE)` — sesje trzymane przez api/worker są zrywane
+atomowo, **nie trzeba zatrzymywać kontenerów** przed resetem.
+
 > **OSTRZEŻENIE — wipe stanu manualnego.** `pim:db:reset` (i `pnpm stack:reset`)
 > kasują bazę i ładują od nowa tylko fixtures. **Nie odtwarzają** custom
 > ObjectType / grup atrybutów / danych utworzonych ręcznie przez UI — ten stan
 > przepada. Zrób smoke-test/eksport zanim zresetujesz, albo uprzedź operatora.
-> (Jeśli worker api działa, najpierw `docker compose stop api`, żeby FrankenPHP
-> zwolnił połączenie.)
 
 ### `exec` vs `exec -T`
 
