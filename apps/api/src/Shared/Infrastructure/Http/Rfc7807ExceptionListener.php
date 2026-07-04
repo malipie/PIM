@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Http;
 
+use League\Flysystem\FilesystemException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -74,6 +75,31 @@ final class Rfc7807ExceptionListener implements EventSubscriberInterface
         }
 
         $throwable = $event->getThrowable();
+        $request = $event->getRequest();
+
+        // #2221 (chaos dry-run #2137) — an object-storage outage (MinIO/S3
+        // unreachable mid-write) escapes Flysystem as a FilesystemException,
+        // which is NOT an HttpExceptionInterface: pre-fix it fell through to
+        // the stock HTML 500 page even on `/api/*`. Storage loss is an
+        // infrastructure outage, not a domain error, so every storage-backed
+        // custom route maps it to a 503 problem+json here. The `detail` is a
+        // FIXED string — Flysystem messages embed storage keys/paths
+        // (information leak, AUD-042); logging already happened in Symfony's
+        // ErrorListener::logKernelException at higher priority.
+        if ($throwable instanceof FilesystemException && $this->isCustomApiRequest($request)) {
+            $event->setResponse(new JsonResponse(
+                data: [
+                    'type' => $this->typeForStatus(Response::HTTP_SERVICE_UNAVAILABLE),
+                    'title' => Response::$statusTexts[Response::HTTP_SERVICE_UNAVAILABLE],
+                    'status' => Response::HTTP_SERVICE_UNAVAILABLE,
+                    'detail' => 'Object storage is temporarily unavailable. Try again later.',
+                ],
+                status: Response::HTTP_SERVICE_UNAVAILABLE,
+                headers: ['content-type' => 'application/problem+json'],
+            ));
+
+            return;
+        }
 
         // Only HTTP exceptions carry a status + safe public message. Domain
         // exceptions (500s) keep Symfony's handling so they are logged and
@@ -81,8 +107,6 @@ final class Rfc7807ExceptionListener implements EventSubscriberInterface
         if (!$throwable instanceof HttpExceptionInterface) {
             return;
         }
-
-        $request = $event->getRequest();
 
         if (!$this->isCustomApiRequest($request)) {
             return;

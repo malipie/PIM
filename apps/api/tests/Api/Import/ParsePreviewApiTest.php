@@ -6,6 +6,8 @@ namespace App\Tests\Api\Import;
 
 use App\Shared\Domain\Tenant;
 use App\Tests\Api\Catalog\CatalogApiTestCase;
+use League\Flysystem\FilesystemOperator;
+use League\Flysystem\UnableToWriteFile;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -137,6 +139,51 @@ final class ParsePreviewApiTest extends CatalogApiTestCase
         ]);
 
         self::assertResponseStatusCodeSame(400);
+    }
+
+    /**
+     * #2221 (chaos dry-run #2137) — object storage down mid-upload must
+     * degrade to a 503 problem+json, not an HTML 500. The stubbed operator
+     * throws the same {@see UnableToWriteFile} the S3 adapter raises when
+     * MinIO is unreachable; the RFC 7807 listener maps it to 503. The
+     * `detail` stays a fixed message — Flysystem exception messages carry
+     * storage keys/paths and must never surface.
+     */
+    #[Test]
+    public function parsePreviewAnswers503ProblemJsonWhenObjectStorageIsDown(): void
+    {
+        $csvPath = $this->writeCsv();
+
+        try {
+            $client = $this->authenticatedClient();
+
+            $storage = $this->createStub(FilesystemOperator::class);
+            $storage->method('writeStream')->willThrowException(
+                UnableToWriteFile::atLocation('tenant/staged/whatever/sample.csv', 'connection refused'),
+            );
+            static::getContainer()->set('imports.storage', $storage);
+
+            $client->request('POST', '/api/import-sessions/parse-preview', [
+                'extra' => [
+                    'parameters' => [],
+                    'files' => [
+                        'file' => new UploadedFile($csvPath, 'sample.csv', 'text/csv', null, true),
+                    ],
+                ],
+            ]);
+
+            self::assertResponseStatusCodeSame(503);
+            self::assertResponseHeaderSame('content-type', 'application/problem+json');
+            $body = $this->decodeJson($client->getResponse()?->getContent());
+
+            self::assertSame(503, $body['status']);
+            self::assertSame('Service Unavailable', $body['title']);
+            $detail = $body['detail'];
+            self::assertIsString($detail);
+            self::assertStringNotContainsString('staged', $detail, 'storage keys/paths must never leak into the problem detail');
+        } finally {
+            @unlink($csvPath);
+        }
     }
 
     /**
