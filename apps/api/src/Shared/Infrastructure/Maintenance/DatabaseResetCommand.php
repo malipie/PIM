@@ -268,6 +268,7 @@ final class DatabaseResetCommand extends Command
         $maintenance = DriverManager::getConnection($params);
         try {
             $quoted = $maintenance->getDatabasePlatform()->quoteSingleIdentifier($dbname);
+            // tenant-safe: infrastructure (dev-only whole-database drop on the maintenance DB; no tenant-scoped rows are queried)
             $maintenance->executeStatement(sprintf('DROP DATABASE IF EXISTS %s WITH (FORCE)', $quoted));
         } finally {
             $maintenance->close();
