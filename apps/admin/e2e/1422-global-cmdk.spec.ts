@@ -11,16 +11,11 @@ import { loginAsAdmin } from './helpers/auth';
  * double binding).
  */
 test('NUI-03 — global palette navigates, agent section is live', async ({ page }) => {
-  await loginAsAdmin(page);
-  await page.goto('/dashboard');
-  // Wait for the app shell to hydrate before firing the shortcut.
-  await expect(
-    page.getByRole('button', { name: /zapytaj agenta|ask the agent/i }).first(),
-  ).toBeVisible();
-
   // Suggestions come from the tool registry via GET /api/agent/capabilities
   // (#2246) — stub it so the assertion is deterministic regardless of the
-  // stack's BYOK-key state.
+  // stack's BYOK-key state. Registered BEFORE the dashboard loads: the agent
+  // hero fetches capabilities on mount and react-query would cache the real
+  // (BYOK-less) response for the palette otherwise.
   await page.route('**/api/agent/capabilities', (route) =>
     route.fulfill({
       status: 200,
@@ -38,6 +33,13 @@ test('NUI-03 — global palette navigates, agent section is live', async ({ page
       }),
     }),
   );
+
+  await loginAsAdmin(page);
+  await page.goto('/dashboard');
+  // Wait for the app shell to hydrate before firing the shortcut.
+  await expect(
+    page.getByRole('button', { name: /zapytaj agenta|ask the agent/i }).first(),
+  ).toBeVisible();
 
   // Open via keyboard.
   await page.keyboard.press('ControlOrMeta+k');
