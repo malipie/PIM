@@ -108,10 +108,48 @@ final class EnsureSeededCommand extends Command
             return Command::SUCCESS;
         }
 
+        // GOLIVE #2178 follow-up — before resetting, wait for any concurrent
+        // lifecycle operation to finish. `pim:db:reset` FORCE-drops the
+        // database, which kills this container's Messenger consumer; the
+        // restart re-runs this command, which would otherwise see the
+        // half-reset (empty) database and chain a SECOND reset that kills the
+        // first one's fixtures load. The advisory lock lives on the
+        // maintenance DB (cluster-wide, survives the drop): block until the
+        // concurrent reset completes, then re-check — if it just seeded the
+        // database, there is nothing left to do.
+        try {
+            $maintenance = MaintenanceConnectionFactory::fromConnection($this->connection);
+            try {
+                // tenant-safe: infrastructure (cluster-wide advisory lock on the maintenance DB; no tenant-scoped data)
+                $maintenance->fetchOne(\sprintf('SELECT pg_advisory_lock(%d)', MaintenanceConnectionFactory::LIFECYCLE_LOCK_KEY));
+            } finally {
+                // Closing the session releases the lock immediately — we only
+                // needed to WAIT, not to hold it (the chained reset below
+                // re-acquires it on its own session; holding ours would
+                // deadlock the child).
+                $maintenance->close();
+            }
+        } catch (DbalException) {
+            // Lock acquisition is best-effort: without it we simply fall back
+            // to the pre-lock behaviour (re-check + reset).
+        }
+
+        // A session opened before a concurrent FORCE drop is dead — discard
+        // it so the re-check below connects fresh against the new database.
+        $this->connection->close();
+
+        if ($this->tableExists('users') && $this->userCount() > 0 && $this->adminUserExists()) {
+            if (!$quiet) {
+                $io->success('Database was seeded by a concurrent reset while we waited — nothing to do.');
+            }
+
+            return Command::SUCCESS;
+        }
+
         $io->section('Empty database — running pim:db:reset --with-fixtures');
 
-        // Release our DBAL connection so 'doctrine:database:drop' (chained
-        // by pim:db:reset) is not blocked by our own session in postgres.
+        // Release our DBAL connection so the drop chained by pim:db:reset is
+        // not blocked by our own session in postgres.
         $this->connection->close();
 
         $resetInput = new ArrayInput([

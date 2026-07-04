@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Maintenance;
 
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
 use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -152,19 +151,51 @@ final class DatabaseResetCommand extends Command
         // the sessions atomically inside the drop. Runs on the owner
         // connection (`pim`), which holds the required privileges in every
         // compose-provisioned environment.
-        $io->section('→ DROP DATABASE … WITH (FORCE)');
         try {
-            $this->dropDatabaseWithForce();
+            $maintenance = MaintenanceConnectionFactory::fromConnection($this->ownerConnection);
         } catch (Throwable $e) {
-            $io->error(sprintf('Dropping the database failed: %s', $e->getMessage()));
+            $io->error(sprintf('Cannot open the maintenance connection: %s', $e->getMessage()));
 
             return Command::FAILURE;
         }
-        // Discard sessions the FORCE drop just killed (see constructor note);
-        // every chained step below reconnects lazily against the new database.
-        $this->defaultConnection->close();
-        $this->ownerConnection->close();
 
+        try {
+            // GOLIVE #2178 follow-up — serialise database lifecycle actors.
+            // The FORCE drop below kills the worker's Messenger session; the
+            // restarted worker's entrypoint re-runs ensure-seeded, which sees
+            // a half-reset (empty) database and chains ANOTHER reset — two
+            // unserialised resets then kill each other mid-fixtures (observed:
+            // "terminating connection due to administrator command" during
+            // fixtures:load on a fresh clone). The advisory lock is
+            // cluster-wide and held on the maintenance DB, so it survives the
+            // drop; concurrent actors block here until this run completes.
+            $io->section('→ acquire lifecycle advisory lock');
+            // tenant-safe: infrastructure (cluster-wide advisory lock on the maintenance DB; no tenant-scoped data)
+            $maintenance->fetchOne(sprintf('SELECT pg_advisory_lock(%d)', MaintenanceConnectionFactory::LIFECYCLE_LOCK_KEY));
+
+            $io->section('→ DROP DATABASE … WITH (FORCE)');
+            try {
+                $this->dropDatabaseWithForce($maintenance);
+            } catch (Throwable $e) {
+                $io->error(sprintf('Dropping the database failed: %s', $e->getMessage()));
+
+                return Command::FAILURE;
+            }
+            // Discard sessions the FORCE drop just killed (see constructor
+            // note); every chained step reconnects lazily against the new
+            // database.
+            $this->defaultConnection->close();
+            $this->ownerConnection->close();
+
+            return $this->runResetSteps($io, $output, true === $loadFixtures, $env);
+        } finally {
+            // Closing the session releases the advisory lock.
+            $maintenance->close();
+        }
+    }
+
+    private function runResetSteps(SymfonyStyle $io, OutputInterface $output, bool $loadFixtures, string $env): int
+    {
         $steps = [
             ['doctrine:database:create', ['--if-not-exists' => true]],
             ['doctrine:migrations:migrate', ['--no-interaction' => true, '--allow-no-migration' => true]],
@@ -247,31 +278,22 @@ final class DatabaseResetCommand extends Command
     }
 
     /**
-     * DROP DATABASE <target> WITH (FORCE) on a throwaway connection to the
-     * `postgres` maintenance database (a database cannot be dropped from a
-     * connection to itself). FORCE terminates lingering api/worker sessions
-     * atomically — no terminate-then-drop race.
+     * DROP DATABASE <target> WITH (FORCE) on the maintenance-DB connection
+     * (a database cannot be dropped from a connection to itself). FORCE
+     * terminates lingering api/worker sessions atomically — no
+     * terminate-then-drop race.
      */
-    private function dropDatabaseWithForce(): void
+    private function dropDatabaseWithForce(Connection $maintenance): void
     {
-        /** @var array{dbname?: string, url?: string} $params */
+        /** @var array{dbname?: string} $params */
         $params = $this->ownerConnection->getParams();
         $dbname = $params['dbname'] ?? '';
         if ('' === $dbname) {
             throw new RuntimeException('Cannot resolve the database name from the owner connection params.');
         }
 
-        $params['dbname'] = 'postgres';
-        // `url` (when present) would win over the overridden dbname.
-        unset($params['url']);
-
-        $maintenance = DriverManager::getConnection($params);
-        try {
-            $quoted = $maintenance->getDatabasePlatform()->quoteSingleIdentifier($dbname);
-            // tenant-safe: infrastructure (dev-only whole-database drop on the maintenance DB; no tenant-scoped rows are queried)
-            $maintenance->executeStatement(sprintf('DROP DATABASE IF EXISTS %s WITH (FORCE)', $quoted));
-        } finally {
-            $maintenance->close();
-        }
+        $quoted = $maintenance->getDatabasePlatform()->quoteSingleIdentifier($dbname);
+        // tenant-safe: infrastructure (dev-only whole-database drop on the maintenance DB; no tenant-scoped rows are queried)
+        $maintenance->executeStatement(sprintf('DROP DATABASE IF EXISTS %s WITH (FORCE)', $quoted));
     }
 }
