@@ -37,9 +37,11 @@ final class Rfc7807StorageOutageListenerTest extends TestCase
         $payload = json_decode((string) $response->getContent(), true);
         self::assertIsArray($payload);
         self::assertSame(503, $payload['status']);
+        $detail = $payload['detail'];
+        self::assertIsString($detail);
         self::assertStringNotContainsString(
             'secret/storage/key.csv',
-            (string) $payload['detail'],
+            $detail,
             'the Flysystem message embeds storage keys and must never surface',
         );
     }
