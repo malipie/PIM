@@ -49,7 +49,12 @@ framework:
                     multiplier: 2
                     max_delay: 300000
 
-            failed: 'doctrine://default?queue_name=failed'
+            # auto_setup=0 (GOLIVE #2177): the runtime role `pim_app` has no
+            # DDL rights since W1-1, so an auto-setup CREATE TABLE on a fresh
+            # install fails with "permission denied for schema public" and
+            # crashloops the worker. The table is owned by migrations now
+            # (Version20260704050000) — consistent with the env-driven DSNs.
+            failed: 'doctrine://default?queue_name=failed&auto_setup=0'
 
         buses:
             messenger.bus.default:
