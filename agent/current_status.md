@@ -3,6 +3,21 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-04 (TOR 2): GOLIVE Blok B wykonany lokalnie — security-heavy, 2 realne findingi naprawione
+- **Dyrektywa:** cały TOR 2 lokalnie (bez hostingu, zaakceptowane), nie przerywać. Baseline #2127 = `6201c7f`.
+- **✅ Zamknięte z proofami (harnessy w `scripts/security/` + `scripts/smoke/` + `scripts/chaos/`, raporty w `docs/security/` + `docs/audit/2026-07-handover/`):**
+  - **#2130** regresja 5 CRITICAL audytu 2026-06 → **5/5 PASS** (AUD-001 Mercure 401 / AUD-002 pim_app false/false + FORCE RLS 55 tabel / AUD-004 Meili filter-key 400 / AUD-005 tracked-secrets clean / AUD-007 token_dev_only env-gated).
+  - **#2134** izolacja tenantów, 7 powierzchni → **7/7 PASS** (REST read/write/collection, Meili search, Postgres RLS, asset binary, feed public URL — zero cross-tenant).
+  - **#2135** smoke krytycznych ścieżek → **11/11 PASS** (pełny CRUD produktu + auth/import/export/feedy/APIC/RBAC).
+  - **#2129 red-team → ZNALEZIONY+NAPRAWIONY realny FINDING HIGH** (PR #2220): bulk-actions gated tylko coarse `bulk_operations`, `delete` nie re-asertował `products.delete` → Marketing kasował produkty (live: 200, produkt 404). Fix: `PER_ACTION_PERMISSION` map + `PermissionCheckerInterface` przed dispatchem → 403. Test `BulkActionsPerActionPermissionApiTest`. Harness `red-team-rbac.sh` (14-pkt §5.3, provisioning Marketing przez invitation dev-token).
+  - **#2137** chaos dry-run → degradacja udokumentowana (Meili down→search 503 problem+json, Redis/Mercure→200, MinIO→upload 500 HTML), 2 luki → **#2221** (MinIO upload nie-RFC7807), **#2222** (brak alertów `up==0`). Restart-all czysty.
+  - **#2131-2133 deep audit** (3-agentowy fan-out taint + **adwersaryjna weryfikacja empiryczna**, PR #2226) → **ZNALEZIONY+NAPRAWIONY webhook SSRF** (`WebhookDeliveryClient` na plain HttpClient zamiast NoPrivateNetworkHttpClient; tenant admin mógł pivotować na 169.254.169.254/redis/minio). Live-proof: `test_webhook`→redis:6379 statusCode:0 po fixie. **2/5 „CONFIRMED" agentów OBALONE weryfikacją:** Meili addslashes = FALSE POSITIVE (empiryczny bypass→0 hits, #2225), SavedView cross-user = accepted MVP (#2224). BulkActions potwierdzony niezależnie przez 2 agenty (walidacja fixu #2129).
+- **✅ #2139 app-side mail** zweryfikowany przez Mailpit (invitation/reset docierają z poprawnym tematem/adresatem/treścią; `.env.dev` routuje `MAILER_DSN=smtp://mailpit:1025`). Deliverability SPF/DKIM = hosting.
+- **⛔ Blokery udokumentowane na ticketach:** **#2128** load (k6 niezainstalowany + `pim:load:seed 50k` nadpisuje demo katalog + endurance 2-4h; plan sam uznaje „p95 lokalnie = proxy") — substrat gotowy (#2124), do dedykowanego okna. **#2136** agent live LLM (`tenant_agent_configs`=0, brak klucza Anthropic BYOK) — bloker zewnętrzny (credential), pokrycie testami skryptowanego LLM istnieje.
+- **Pozostały Blok C (hosting-gated):** #2138 prod deploy+TLS (wybór hostingu), #2140 RODO/prawne, #2141 UAT IdoSell + soft launch (dostęp partnerów). Wykonalne lokalnie części #2140/#2141 (RODO hard-delete flow, IdoSell import smoke) — kandydaci na kolejną sesję.
+- **Nowe tickety follow-up:** #2221 (MinIO upload RFC7807), #2222 (alerty up==0), #2224 (SavedView per-user Faza 1), #2225 (Meili meiliLiteral consistency).
+- **Lekcja → memory `bulk-endpoint-permission-escalation`:** bulk/{actionType} gated jedną coarse permission omija per-action authz; sprawdzać per-actionType; provisioning restricted usera przez invitation dev-token.
+
 ## 2026-07-04 (późniejsza sesja): GOLIVE TOR 1 — naprawa findingów Bloku A (4/4 blokery dnia 1 CLOSED, nie-blokery w toku)
 - **Dyrektywa operatora:** wszystkie testy LOKALNIE (bez hostingu, zaakceptowane odstępstwo); po TOR 1 → TOR 2 bez przerw.
 - **✅ 4 blokery dnia 1 — wszystkie CLOSED z fresh-clone live-proofami** (wzorzec: izolowany klon `COMPOSE_PROJECT_NAME` + świeże wolumeny + WSZYSTKIE sekrety niedomyślne):
