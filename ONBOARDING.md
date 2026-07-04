@@ -24,6 +24,21 @@ docker compose exec -T api bin/console pim:db:reset --with-fixtures   # canonica
 
 Open `https://pim.localhost` (Caddy will produce a self-signed cert — accept it once). Login with `admin@demo.localhost` / `changeme`. Navigate to **Products** — the demo dataset seeded by `App\DataFixtures\AppFixtures` should be visible.
 
+### JWT keys
+
+Login tokens are signed with an RSA keypair in `apps/api/config/jwt/` (gitignored). **In dev/test the api container generates it automatically on first boot** (`lexik:jwt:generate-keypair --skip-if-exists` in the entrypoint), using whatever `JWT_PASSPHRASE` resolves to — you don't need to do anything. To use your own passphrase, set `JWT_PASSPHRASE=<value>` in `apps/api/.env.local` **before** the first boot.
+
+Manual generation (production, or running outside Docker — never auto-generated when `APP_ENV=prod`):
+
+```bash
+docker compose exec -T api bin/console lexik:jwt:generate-keypair
+```
+
+Troubleshooting — `POST /api/auth/login` returns 500 `An error occurred while trying to encode the JWT token`:
+
+- **Keys missing** (e.g. wiped manually): restart the api container (regenerates) or run the command above.
+- **Passphrase changed after the keys were generated**: `docker compose exec -T api bin/console lexik:jwt:check-config` will fail; regenerate with `lexik:jwt:generate-keypair --overwrite` (invalidates all issued tokens — everyone logs in again).
+
 Verify your environment with the same gates CI runs:
 
 ```bash

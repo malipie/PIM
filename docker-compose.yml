@@ -182,6 +182,12 @@ services:
       # can skip the dev seed guard (Playwright workflow drives migrations
       # itself, see apps/api/docker-entrypoint.sh).
       CI: ${CI:-}
+      # Dev/test-only JWT keypair auto-generation on boot (GOLIVE cold-start
+      # L4). Set ONLY here, not on the worker: both services share the
+      # ./apps/api bind mount, and two containers generating concurrently on
+      # first boot could interleave into a mismatched key pair. The worker
+      # never encodes JWTs, so it needs no keys of its own.
+      PIM_JWT_AUTOGEN: "1"
     expose:
       - "80"
     # Live-mount the source tree so iterating on PHP code does not require a

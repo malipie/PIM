@@ -58,6 +58,9 @@ pnpm install
 cp .env.example .env
 
 # 3. Wystartuj cały stack (build kontenerów przy pierwszym uruchomieniu trwa kilka minut)
+#    Przy pierwszym boocie kontener api sam generuje parę kluczy JWT
+#    (config/jwt/*.pem, gitignored) — bez tego login zwracałby 500.
+#    Szczegóły + troubleshooting: ONBOARDING.md sekcja "JWT keys".
 pnpm dev          # foreground, Ctrl+C zatrzymuje
 # albo:
 pnpm stack:up     # detached, działa w tle

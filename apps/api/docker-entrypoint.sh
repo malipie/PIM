@@ -53,6 +53,36 @@ if [ "${CI:-}" != "true" ] && [ "${APP_DEBUG:-}" = "0" ] \
     fi
 fi
 
+# Generate the JWT keypair on first boot when missing (dev/test only).
+#
+# A fresh clone has no config/jwt/*.pem (gitignored per the lexik bundle
+# recipe) and nothing in the onboarding path created them, so the very
+# first login on a new machine failed with a 500 ("An error occurred
+# while trying to encode the JWT token") — GOLIVE cold-start finding L4.
+# CI is unaffected (workflows generate keys themselves before boot) and
+# prod is skipped entirely: production keys are provisioned explicitly
+# with a real passphrase (secrets vault), never from an entrypoint hook.
+#
+# Gated on PIM_JWT_AUTOGEN, set by docker-compose ONLY on the api
+# service: the worker shares the same bind mount and entrypoint, and two
+# containers generating concurrently on first boot could interleave into
+# a mismatched pair. The worker never encodes JWTs, so it needs no keys.
+#
+# --skip-if-exists makes the step idempotent — existing keys are never
+# touched, so a restart cannot invalidate issued tokens. The follow-up
+# check-config is warn-only: it catches a passphrase changed AFTER the
+# keys were generated (keys load-fail) without blocking the boot.
+if [ "${CI:-}" != "true" ] && [ "${PIM_JWT_AUTOGEN:-}" = "1" ] \
+    && { [ "${APP_ENV:-dev}" = "dev" ] || [ "${APP_ENV:-dev}" = "test" ]; }; then
+    if [ -x /app/bin/console ]; then
+        echo "[entrypoint] Ensuring JWT keypair exists (lexik:jwt:generate-keypair --skip-if-exists)"
+        php /app/bin/console lexik:jwt:generate-keypair --skip-if-exists --no-interaction \
+            || echo "[entrypoint] WARN: JWT keypair generation failed; login will return 500 until keys exist. Run 'docker compose exec api bin/console lexik:jwt:generate-keypair' manually to diagnose."
+        php /app/bin/console lexik:jwt:check-config --no-interaction \
+            || echo "[entrypoint] WARN: JWT config check failed — likely JWT_PASSPHRASE no longer matches the existing keys. Regenerate with 'docker compose exec api bin/console lexik:jwt:generate-keypair --overwrite' (this invalidates all issued tokens)."
+    fi
+fi
+
 # Run the seed guard only on dev / test, and never in CI — Playwright's
 # workflow drives migrations + fixtures explicitly via `bin/console
 # doctrine:migrations:migrate` after the container is up, and the seed
