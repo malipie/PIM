@@ -62,7 +62,8 @@ import {
   useCatalogSearch,
 } from '@/features/catalog/search/use-catalog-search';
 import { unwrapAttributesIndexed } from '@/lib/attributes-indexed';
-import { dslToFlatConditions } from '@/lib/filters/filter-dsl';
+import { dslToFlatConditions, type FilterDsl } from '@/lib/filters/filter-dsl';
+import { readInitialFilterDsl } from '@/lib/filters/list-url-seed';
 import { dslToBase64 } from '@/lib/filters/url-serializer';
 import { useFilterDslState } from '@/lib/filters/use-filter-dsl-state';
 import { type SmartFilterPreset, useSmartPresets } from '@/lib/filters/use-smart-presets';
@@ -290,7 +291,12 @@ export function UniversalListPage({
   } = useSmartPresets({ withCounts: true, resource: objectTypeCode });
   const [activeSmartPresetId, setActiveSmartPresetId] = useState<string | null>(null);
   const [presetToDelete, setPresetToDelete] = useState<SmartFilterPreset | null>(null);
-  const [advancedPanelOpen, setAdvancedPanelOpen] = useState(false);
+  // DASH-01 (#2249) — dashboard drill-downs deep-link into this list with
+  // `filter[attr][op]=…` params; seed the panel state once from the URL.
+  const [initialUrlDsl] = useState<FilterDsl | null>(() =>
+    typeof window === 'undefined' ? null : readInitialFilterDsl(window.location.search),
+  );
+  const [advancedPanelOpen, setAdvancedPanelOpen] = useState(initialUrlDsl !== null);
   // EXR-10 — shared filter-DSL state (same hook the export wizard uses).
   const {
     conditions: panelConditions,
@@ -298,7 +304,7 @@ export function UniversalListPage({
     matchOperator,
     setMatchOperator,
     dsl: panelDsl,
-  } = useFilterDslState();
+  } = useFilterDslState(initialUrlDsl);
   const [showSaveAsPresetModal, setShowSaveAsPresetModal] = useState(false);
 
   const { searchFilters, rangeFilters } = useMemo(() => {
