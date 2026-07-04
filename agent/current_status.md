@@ -3,6 +3,19 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-04: Epik GOLIVE — ✅ BLOK A KOMPLETNY (8/8 ticketów #2119–#2126, wszystkie merged + closed z proofem)
+- **Plan:** `Project Plan/15-plan-testow-przedprodukcyjnych.md` (3 bloki, 23 tickety #2119–#2141, milestone GOLIVE). Blok A = testy lokalne równoległe-bezpieczne (docs/infra/audyt, bez code freeze). Raporty: **`docs/audit/2026-07-handover/`** (README = raport końcowy + 6 podraportów) + `docs/security/`.
+- **Zamknięte z live-proof:** #2119 cold-start (PR #2184) · #2124 load k6+seed (PR #2185) · #2125 fresh-install (PR #2187) · #2120 struktura+dług (PR #2194) · #2123 security docs (PR #2195) · #2122 restore drill (PR #2197) · #2121 licencje+raport (PR #2198) · #2126 i18n+przeglądarki (PR #2190).
+- **Werdykt handover: GOTOWY WARUNKOWO** — kod/architektura/testy/backup/licencje zdrowe; blokują TYLKO luki onboardingu dnia 1 (każda z ticketem). Licencje: zero GPL/AGPL/SSPL (PHP 150 prod: 144 MIT + 1 LGPL htmlpurifier; JS permisywne).
+- **3 blokery dnia pierwszego (cold-start, klasa „works on my machine" po splicie ról W1-1, niewidoczne w CI):** #2176 brak generacji JWT keypair → login 500 · #2177 `messenger_messages` poza migracjami → worker crashloop · #2181 `AWS_ASSETS_KEY` nie propaguje `MINIO_ROOT_*` → uploady 500. Plus #2178 komendy DB padają na `pim_app`.
+- **2 KRYTYCZNE bugi narzędzia DR wykryte+naprawione restore drillem (#2196):** PITR fizycznie NIE działał (`--target` ze spacją łamany przez `${ARR[*]}` join) + brak `--target-action=promote` (klaster zostawał read-only) + re-grant `pim_app`. Bez drillu wyszłoby dopiero w realnym DR. PITR precyzyjny, RTO ≈ 19s.
+- **Pozostałe findingi (tickety, nie-blokery):** #2186 detektor dryfu false-positive na `select` (dane OK) · #2188 48 braków kluczy EN i18n · #2189 literały PL poza t() · #2199 401 na /settings/users · #2179/#2180/#2182/#2183 cold-start docs · #2191/#2192/#2193 struktura/guardy.
+- **Reindex Meili od zera:** `--purge` obowiązkowy (bez niego sieroty: 646 docs vs 211 obiektów). Harness `scripts/fresh-install-verify.sh`.
+- **Load prep:** `scripts/load/` — 8 scenariuszy k6 (products/search/export/bulk + capped smoki login/import/feed) + `pim:load:seed` (kanoniczne object_values, N×M×L) + orkiestrator. Konsumowane przez Blok B #2128.
+- **Świadome odejścia:** WebKit console-clean niezweryfikowany (DNS pim.localhost bez /etc/hosts, sudo niedostępne — render OK); pełny PHPUnit lokalnie niewykonalny wg docs (CI-only); load p95 lokalnie = proxy (bezwzględny gate <300ms → Blok B na prod-podobnym HW).
+- **Następny krok:** Blok B (po code freeze — koniec DP+FE): baseline CI #2127, load 50k+endurance #2128, red-team #2129/#2130, deep audit #2131-2133, izolacja tenantów #2134, smoke #2135, agent live LLM #2136 (bloker: klucz Anthropic), chaos #2137. Blok C: prod deploy #2138 (bloker: hosting) + SMTP/RODO/UAT.
+- **Lekcje → `agent/lessons.md`** sekcje „Lessons z GOLIVE #2119/#2124/#2125/#2126" (izolacja stacka COMPOSE_PROJECT_NAME, klasa bugów po splicie ról, owner-connection dla CLI utrzymaniowych, K6_VUS native-override, rebuild --purge, cross-browser matryca).
+
 ## Gdzie jesteśmy
 - **Epik:** APIC — Uniwersalny Konfigurator API ([backlog](../Project%20Plan/feature-api-configurator-tickets.md), ADR-0022). Konsument `src/Integration/Generic/`.
 - **Backlog ticketów (source of truth speców):** `Project Plan/feature-api-configurator-tickets.md` (Issues #1756–#1803).
