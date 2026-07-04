@@ -3,6 +3,20 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-04 (sesja follow-up + load + agent live): GOLIVE — 5 ticketów zamkniętych, agent live smoke, 4 nowe findingi
+- **Dyrektywa:** wszystko lokalnie bez hostingu (zaakceptowane). W trakcie sesji **operator wprowadził klucz Anthropic BYOK** → odblokowany #2136.
+- **✅ Zamknięte z live-proofem (5):**
+  - **#2225** meiliLiteral (PR #2228) — kanoniczny escaper `MeiliFilterLiteral`, oba writery delegują. Smoke: injection-value w filtrze → 200/0 hits (jeden literał).
+  - **#2222** alerty up==0 (PR #2230) — blackbox exporter + grupa `pim-dependencies` (`DependencyDown`/`ApiDown`/`BlackboxProberDown`). Live: stop Meili → alert pending→firing(2m)→cleared.
+  - **#2221** MinIO outage→503 — **DWUCZĘŚCIOWY**: PR #2229 (listener FilesystemException→503) był NIEKOMPLETNY (live smoke: stop-minio → 30s hang → 500 HTML bo Guzzle bez timeoutu). Dokończony **PR #2232** (`connect_timeout:5s`+`timeout:20s` na S3 client). Live: stop-minio → 503 problem+json w 0.12s. **Lekcja: smoke wykrył niedorobiony merged fix — dlatego #2221 był OPEN.**
+  - **#2128** load session (PR #2235 raport `docs/perf/golive-load-session-2026-07.md`) — seed 50k (peak 71 MiB płaski) + reindex 50118 docs + k6 p95 + endurance 15min. p95@5VU: bulk 71/search 92/preflight 95 ms ✅, **GET /api/products 481 ms ❌ (algorytmiczne→#2234)**. Endurance pamięć płaska 40-90 MiB (brak wycieku). Purge→demo 118.
+- **✅ #2136 agent LIVE smoke (klucz BYOK operatora, model Opus):** headline AC **udowodnione** — realny tool call `aggregate_count`→„100 produktów", cost $0.066/run, cost-tracking działa. **Ticket OPEN** (approval-flow write czeka na #2237; limit-$20 nie symulowany na żywo — realny koszt).
+  - **KRYTYCZNY bug znaleziony+fix (PR #2236):** agent async loop routuje `AgentRunMessage`→transport `import` (worker), pierwsza ścieżka `IdempotencyMiddleware INSERT processed_messages` jako `pim_app` pod RLS → **dead-letter 42501 permission denied** (tabela zniknęła + brak grantu sprzed #2177 + self-heal CREATE jako pim_app niemożliwy w privilege-split). Migracja idempotentna CREATE IF NOT EXISTS + GRANT. Niewidoczne bez live agenta — **dokładnie po to jest #2136**.
+- **Nowe findingi (OPEN):** **#2231** reconcile OOM na 50k (`toIterable` buforuje result-set + per-obiekt findBy) · **#2233** worker trzyma stale S3 connection po recovery MinIO → 503 aż do restartu · **#2234** GET /api/products p95 481ms@5VU (serializacja listy) · **#2237** agent search po `sku` (niefilterowalny w Meili) → mylnie „degraded" zamiast błędu filtra, blokuje write-grounding.
+- **#2140 RODO** — pełny audyt as-is + rekomendacja podziału na issue (export=bezpieczny slice, erasure+dokumenty=decyzja operatora). OPEN partial.
+- **Pozostało lokalnie:** #2141 UAT IdoSell (demo czyste, procedura gotowa: structural groups→attrs→products, 7/60/1026). Blok C hosting-gated: #2138/#2139 (część)/#2140 (część).
+- **Lekcje → lessons.md:** agent transport=`import` (nie async/sync); `processed_messages` privilege-split (klasa #2177); S3 client bez timeoutu wisi do PHP max_execution; merged fix ≠ works (live smoke obowiązkowy); k6 20VU=kontencja lokalna vs 5VU=algorytm; polskie znaki w inline curl/python wywracają zsh → plik payloadu.
+
 ## 2026-07-04 (TOR 2): GOLIVE Blok B wykonany lokalnie — security-heavy, 2 realne findingi naprawione
 - **Dyrektywa:** cały TOR 2 lokalnie (bez hostingu, zaakceptowane), nie przerywać. Baseline #2127 = `6201c7f`.
 - **✅ Zamknięte z proofami (harnessy w `scripts/security/` + `scripts/smoke/` + `scripts/chaos/`, raporty w `docs/security/` + `docs/audit/2026-07-handover/`):**
