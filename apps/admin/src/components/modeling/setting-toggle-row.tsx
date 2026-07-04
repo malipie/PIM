@@ -1,4 +1,5 @@
 import { Lock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 
@@ -23,12 +24,15 @@ export function SettingToggleRow({
   onChange,
   locked = false,
 }: SettingToggleRowProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between">
       <div>
         <div className="flex items-center gap-2 text-[13.5px] font-medium tracking-tight">
           {label}
-          {locked ? <Lock aria-label="Zablokowane" className="size-3 text-zinc-500" /> : null}
+          {locked ? (
+            <Lock aria-label={t('modeling.built_in_lock.label')} className="size-3 text-zinc-500" />
+          ) : null}
         </div>
         <div className="mt-0.5 text-[11.5px] text-zinc-500">{description}</div>
       </div>

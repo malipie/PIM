@@ -180,7 +180,7 @@ export function CreateGroupInlineDialog({ open, onOpenChange, onCreated }: Props
               rows={2}
               value={descPl}
               onChange={(e) => setDescPl(e.target.value)}
-              placeholder="Krótki opis grupy."
+              placeholder={t('modeling.attributes.create_group_inline.description_placeholder')}
               className="mt-1.5"
             />
           </div>

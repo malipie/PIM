@@ -367,7 +367,7 @@ export function AdvancedFilterPanel({
                 <button
                   type="button"
                   onClick={() => removeCondition(idx)}
-                  aria-label="Usuń warunek"
+                  aria-label={t('products.advanced_filter.remove_condition')}
                   className="h-9 w-9 grid place-items-center text-zinc-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
                 >
                   <Trash2 className="size-4" />

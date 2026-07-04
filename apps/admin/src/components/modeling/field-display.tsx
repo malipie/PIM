@@ -1,5 +1,6 @@
 import { Lock, Pencil } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 
@@ -27,11 +28,14 @@ export function FieldDisplay({
   editable = false,
   onEdit,
 }: FieldDisplayProps) {
+  const { t } = useTranslation();
   return (
     <div>
       <div className="mb-1.5 flex items-center gap-1.5 text-[11.5px] font-medium text-zinc-500">
         <span>{label}</span>
-        {locked ? <Lock aria-label="Zablokowane" className="size-3 text-zinc-500" /> : null}
+        {locked ? (
+          <Lock aria-label={t('modeling.built_in_lock.label')} className="size-3 text-zinc-500" />
+        ) : null}
       </div>
       <div
         className={cn(
@@ -52,7 +56,7 @@ export function FieldDisplay({
           <button
             type="button"
             onClick={onEdit}
-            aria-label="Edytuj"
+            aria-label={t('modeling.field_display.edit')}
             className="text-zinc-300 transition hover:text-zinc-700"
           >
             <Pencil className="size-3.5" />
