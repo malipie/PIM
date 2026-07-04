@@ -87,6 +87,18 @@ export async function jsonFetch<T = unknown>(path: string, init: JsonRequestInit
 }
 
 async function fetchInternal<T>(path: string, init: InternalJsonRequestInit): Promise<T> {
+  if (!accessToken && refreshInFlight) {
+    // Auth bootstrap race (#2199): after a hard reload the in-memory token is
+    // empty while authProvider.check() is already refreshing it. An
+    // optimistic request fired now would go out without a Bearer, 401, and
+    // land in the console as noise even though the retry-after-refresh path
+    // heals it. Wait for the in-flight refresh instead of racing it.
+    await refreshInFlight.catch(() => {
+      // Refresh failed — proceed tokenless; the caller's 401/onError path
+      // owns the redirect to /login.
+    });
+  }
+
   const url = init.query ? appendQuery(path, init.query) : path;
   const headers = new Headers();
   headers.set('accept', init.accept ?? 'application/ld+json');
