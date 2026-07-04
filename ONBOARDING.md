@@ -14,12 +14,14 @@ pnpm stack:up                 # docker compose up -d (api + admin + caddy + post
 docker compose exec -T api bin/console pim:db:reset --with-fixtures   # canonical one-shot: drop+create+migrate+audit:schema:update+fixtures
 ```
 
-> The manual equivalent is **three** steps, not two — `audit:schema:update` is required: audit tables live outside the Doctrine migration pipeline, so without it any INSERT into an audited entity 500s with `relation "*_audit" does not exist`:
+> `pim:db:reset` re-runs itself on the owner connection (`DATABASE_URL_OWNER`) automatically — since the W1-1 role split the runtime role `pim_app` has no DDL/BYPASSRLS, so the raw sub-commands fail under it (#2178). The drop uses `DROP DATABASE … WITH (FORCE)`, so api/worker sessions are terminated atomically — no need to stop containers first.
+>
+> The manual equivalent is **three** steps, not two — `audit:schema:update` is required: audit tables live outside the Doctrine migration pipeline, so without it any INSERT into an audited entity 500s with `relation "*_audit" does not exist`. Two of them need the owner DSN swap (`migrations:migrate` has its own owner connection in config):
 >
 > ```bash
 > docker compose exec -T api bin/console doctrine:migrations:migrate --no-interaction
-> docker compose exec -T api bin/console audit:schema:update --force
-> docker compose exec -T api bin/console doctrine:fixtures:load --no-interaction
+> docker compose exec -T api sh -c 'DATABASE_URL="$DATABASE_URL_OWNER" bin/console audit:schema:update --force'
+> docker compose exec -T api sh -c 'DATABASE_URL="$DATABASE_URL_OWNER" bin/console doctrine:fixtures:load --no-interaction'
 > ```
 
 Open `https://pim.localhost` (Caddy will produce a self-signed cert — accept it once). Login with `admin@demo.localhost` / `changeme`. Navigate to **Products** — the demo dataset seeded by `App\DataFixtures\AppFixtures` should be visible.
