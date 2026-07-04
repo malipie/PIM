@@ -459,6 +459,34 @@ services:
       retries: 5
       start_period: 20s
 
+  # ─── Blackbox exporter (dependency availability probes) ───────────────────
+  #
+  # #2222 (chaos dry-run #2137). Probes each dependency's keyless health
+  # surface — Meili /health, MinIO /minio/health/live, Mercure /healthz over
+  # HTTP, Redis + Postgres over plain TCP connect — so Prometheus gets a
+  # `probe_success` series per dependency and the pim-dependencies alert
+  # group can page on outages the API otherwise degrades around silently.
+  # One prober instead of per-dependency exporters/auth-env keeps the
+  # cold-start surface flat (no master-key plumbing into prometheus.yml).
+  blackbox:
+    image: prom/blackbox-exporter:v0.25.0
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.25"
+    volumes:
+      - ./docker/prometheus/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    expose:
+      - "9115"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:9115/"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
 # Named volumes for monitoring state. Add to the prod overlay only — base
 # compose stays free of monitoring infrastructure (devs use Symfony's web
 # profiler instead of Prometheus locally).

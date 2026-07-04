@@ -37,6 +37,50 @@ scrape_configs:
           # the single-API-service scale.
           tier: web
 
+  # ─── Dependency availability (#2222) ──────────────────────────────────
+  #
+  # Chaos dry-run #2137: a Meili/MinIO/Redis/Mercure outage degraded the
+  # API gracefully but fired NO alert — none of those services were
+  # scraped. One blackbox exporter probes each dependency's keyless
+  # health surface (modules in blackbox.yml); `probe_success == 0` drives
+  # the pim-dependencies alert group. The `dependency` label carries a
+  # stable human name so alert annotations don't parse URLs.
+  - job_name: "dependencies-http"
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ["http://meilisearch:7700/health"]
+        labels: { dependency: meilisearch, tier: data }
+      - targets: ["http://minio:9000/minio/health/live"]
+        labels: { dependency: minio, tier: data }
+      - targets: ["http://mercure/healthz"]
+        labels: { dependency: mercure, tier: web }
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "blackbox:9115"
+
+  - job_name: "dependencies-tcp"
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets: ["redis:6379"]
+        labels: { dependency: redis, tier: data }
+      - targets: ["database:5432"]
+        labels: { dependency: postgres, tier: data }
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "blackbox:9115"
+
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]

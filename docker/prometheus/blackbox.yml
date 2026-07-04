@@ -1,0 +1,29 @@
+# Blackbox exporter probe modules (#2222).
+#
+# The chaos dry-run (#2137) showed a dependency outage (Meili / MinIO /
+# Redis / Mercure down) degrades the API gracefully but fires NO alert —
+# none of those services were scraped at all. Rather than one exporter per
+# dependency (redis_exporter, MinIO auth env, Meili experimental-metrics
+# flag + master-key plumbing into prometheus.yml), a single blackbox
+# exporter probes each dependency's UNAUTHENTICATED health surface:
+#
+#   http_2xx    — Meilisearch /health, MinIO /minio/health/live,
+#                 Mercure /healthz (all keyless by design)
+#   tcp_connect — Redis :6379 and Postgres :5432 (no native HTTP health)
+#
+# `probe_success == 0` is the alert signal (see alerts.yml,
+# group pim-dependencies). Rich native metrics per dependency stay a
+# follow-up — availability is what #2222 needs.
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      preferred_ip_protocol: ip4
+      valid_status_codes: []  # default: any 2xx
+      follow_redirects: true
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: ip4

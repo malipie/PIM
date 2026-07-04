@@ -64,3 +64,61 @@ groups:
             past 10 minutes. Check pg_stat_statements for the offender
             and the PgBouncer admin console (port 6432) for connection
             pool saturation.
+
+  # ─── Dependency availability (#2222, chaos dry-run #2137) ─────────────
+  #
+  # The API degrades gracefully when a dependency dies (search 503
+  # problem+json, storage 503) — which is exactly why the operator needs
+  # an alert: the outage is otherwise invisible until a user reports
+  # broken search/uploads. Probes come from the blackbox exporter
+  # (prometheus.yml jobs dependencies-http / dependencies-tcp).
+  - name: pim-dependencies
+    interval: 15s
+    rules:
+      # One rule covers every probed dependency; the `dependency` label
+      # (meilisearch / minio / mercure / redis / postgres) names the victim.
+      # 2m of failed probes = real outage, not a container restart blip.
+      - alert: DependencyDown
+        expr: probe_success == 0
+        for: 2m
+        labels:
+          severity: critical
+          runbook: docs/runbook/disaster-recovery.md
+        annotations:
+          summary: "Dependency {{ $labels.dependency }} is DOWN"
+          description: |
+            Blackbox probe against {{ $labels.instance }} has failed for
+            2 minutes. The API degrades (search/upload answer 503) but the
+            feature is dead for users. Check `docker compose ps` and the
+            container logs for {{ $labels.dependency }}; a restart heals
+            the common cases (see the MinIO degraded-state note in the
+            disaster-recovery runbook).
+
+      # The API itself was scraped from day one but had no up==0 alert
+      # either — a dead FrankenPHP container fired nothing.
+      - alert: ApiDown
+        expr: up{job="pim-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          runbook: docs/runbook/disaster-recovery.md
+        annotations:
+          summary: "PIM API is not answering Prometheus scrapes"
+          description: |
+            The pim-api scrape target has been down for 2 minutes. The
+            edge (Caddy) is likely serving 502s. Check the api container
+            health and logs.
+
+      # If the prober dies, every DependencyDown rule goes silent while
+      # looking healthy — alert on the watcher itself.
+      - alert: BlackboxProberDown
+        expr: up{job=~"dependencies-(http|tcp)"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Blackbox exporter is down — dependency alerting is blind"
+          description: |
+            Prometheus cannot scrape the blackbox exporter, so dependency
+            outages will NOT fire DependencyDown. Restart the blackbox
+            container to restore outage visibility.
