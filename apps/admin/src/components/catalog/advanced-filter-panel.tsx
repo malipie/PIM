@@ -40,6 +40,19 @@ const FIRST_PANEL_ATTR: PanelAttr = {
 };
 
 /**
+ * DASH-01 (#2249) — system list columns that are filterable in the search
+ * index (IndexSettingsTemplate) but are not Attribute entities, so the
+ * live `/api/attributes` fetch never returns them. They are unioned into
+ * the effective catalog below; without this a condition seeded on
+ * `completeness_pct` (dashboard deep-links) rendered with text operators
+ * once the live set replaced the static fallback.
+ */
+const SYSTEM_PANEL_ATTRS: ReadonlyArray<PanelAttr> = [
+  { code: 'completeness_pct', name: 'Completeness %', type: 'number', star: true },
+  { code: 'enabled', name: 'Aktywny', type: 'boolean', star: true },
+];
+
+/**
  * Loading/empty fallback catalog. Since #1354 the live filterable
  * attribute set (fetched below) is the source of truth for type-badge /
  * operator inference; this static list only fills the gap while that
@@ -49,8 +62,7 @@ const FIRST_PANEL_ATTR: PanelAttr = {
 const PANEL_ATTRS: ReadonlyArray<PanelAttr> = [
   FIRST_PANEL_ATTR,
   { code: 'category', name: 'Kategoria', type: 'relation', star: true },
-  { code: 'completeness_pct', name: 'Completeness %', type: 'number', star: true },
-  { code: 'enabled', name: 'Aktywny', type: 'boolean', star: true },
+  ...SYSTEM_PANEL_ATTRS,
   { code: 'price', name: 'Cena bazowa', type: 'metric', star: true },
   { code: 'stock', name: 'Stan magazynowy', type: 'number' },
   { code: 'main_image', name: 'Główne zdjęcie', type: 'asset' },
@@ -166,7 +178,12 @@ export function AdvancedFilterPanel({
     panelAttrs && panelAttrs.length > 0
       ? panelAttrs
       : liveFilterableAttrs && liveFilterableAttrs.length > 0
-        ? liveFilterableAttrs
+        ? [
+            ...liveFilterableAttrs,
+            ...SYSTEM_PANEL_ATTRS.filter(
+              (sys) => !liveFilterableAttrs.some((attr) => attr.code === sys.code),
+            ),
+          ]
         : PANEL_ATTRS;
   const firstPanelAttr = effectivePanelAttrs[0] ?? FIRST_PANEL_ATTR;
   // VIEW-22a (#553) — draft state. Panel edits go into draftConditions and
