@@ -83,6 +83,12 @@ jobs:
         working-directory: .
         run: bash scripts/lint-tracked-secrets.sh
 
+      # GOLIVE #2192 — PHP twin of the admin max-lines guard: baseline-frozen
+      # count of src/ files over 800 lines (currently 1: ImportRunHandler).
+      - name: API max-lines guard
+        working-directory: .
+        run: bash scripts/lint-api-max-lines.sh
+
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:

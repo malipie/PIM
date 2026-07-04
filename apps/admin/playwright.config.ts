@@ -46,6 +46,28 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     actionTimeout: 10_000,
+    // GOLIVE #2188 fallout — pin the UI language the whole suite asserts
+    // against. The i18next detector resolved English for Playwright's
+    // default profile, so the suite's Polish locators only passed while
+    // the EN catalogue had GAPS (fallbackLng='pl' served Polish strings
+    // anyway). Filling the missing EN keys flipped real strings
+    // ("Kategorie" → "Categories", "Zapisz" → "Save") and broke every
+    // spec that leaned on the fallback bug. localStorage `i18nextLng` is
+    // FIRST in the detector order (beats navigator), so seeding it via
+    // storageState makes the rendered language deterministic and future
+    // EN keys a non-event — the same trick view-13 / browser-matrix
+    // specs used per-file, promoted to the whole suite. `locale` keeps
+    // navigator.language consistent with it.
+    locale: 'pl-PL',
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: 'https://pim.localhost',
+          localStorage: [{ name: 'i18nextLng', value: 'pl' }],
+        },
+      ],
+    },
   },
 
   projects: [

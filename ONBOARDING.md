@@ -11,7 +11,7 @@ git clone https://github.com/malipie/PIM.git
 cd PIM
 pnpm install
 pnpm stack:up                 # docker compose up -d (api + admin + caddy + postgres + redis + meilisearch + minio + mercure)
-docker compose exec -T api bin/console pim:db:reset --with-fixtures   # canonical one-shot: drop+create+migrate+audit:schema:update+fixtures
+docker compose exec -T api bin/console pim:db:reset --with-fixtures --force   # canonical one-shot: drop+create+migrate+audit:schema:update+fixtures
 ```
 
 > `pim:db:reset` re-runs itself on the owner connection (`DATABASE_URL_OWNER`) automatically — since the W1-1 role split the runtime role `pim_app` has no DDL/BYPASSRLS, so the raw sub-commands fail under it (#2178). The drop uses `DROP DATABASE … WITH (FORCE)`, so api/worker sessions are terminated atomically — no need to stop containers first.
@@ -47,7 +47,7 @@ Verify your environment with the same gates CI runs:
 docker compose exec -T api composer phpstan
 docker compose exec -T api composer cs-check
 docker compose exec -T api composer deptrac
-docker compose exec -T api php bin/phpunit --testsuite=unit
+docker compose exec -T api php bin/phpunit --testsuite=unit   # kernel/Api suites: CI-only (see docs/testing/local-kernel-suites.md)
 pnpm --filter @pim/admin lint
 pnpm --filter @pim/admin typecheck
 pnpm --filter @pim/admin build
@@ -76,4 +76,4 @@ Read the architecture in this order:
 
 Then pick a BC, follow its `Domain/Application/Infrastructure/Contracts` ring, and add the use case. New aggregates extend `Shared\Domain\AggregateRoot` and emit events; subscribers live next to the BC that reacts. Cross-BC reads go through `<BC>\Contracts\Query\*` DTOs; cross-BC writes go through events.
 
-When in doubt: re-run the audit at `Zrodla/Zalecana_struktura_kodu/Audyt/AUDIT-CHECKLIST.md` and look at the latest report under `docs/audits/`.
+When in doubt: look at the latest audit report under `docs/audits/` and the domain reports in `docs/audit/` (the old `Zrodla/...` checklist path is gitignored and does not exist in a fresh clone).

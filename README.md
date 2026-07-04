@@ -2,7 +2,7 @@
 
 Agentic-first PIM platform. Konkurent PIMcore/Akeneo.
 
-**Status:** Sprint 0 zamknięty 2026-04-28 (gate decision GREEN, 13/13 ticketów). Aktualnie: MVP-Alpha — patrz [`agent/current_status.md`](agent/current_status.md).
+**Status:** aktualna sub-faza, epik i blokery — zawsze w [`agent/current_status.md`](agent/current_status.md) (ten plik celowo nie hardcoduje fazy, żeby nie dryfował).
 
 ## Stack (MVP)
 
@@ -17,7 +17,7 @@ PHP 8.4 + Symfony 7.4 LTS + API Platform 4 + FrankenPHP 2.x worker mode · Postg
 - **`CHANGELOG.md`** — release history per epic
 - **`Project Plan/01-architektura-pim.md`** — pełna architektura, ADR, model danych
 - **`Project Plan/02-plan-projektu-pim.md`** — fazy, milestones, backlog, ryzyka
-- **`docs/adr/`** — Architecture Decision Records (ADR-0000..0016)
+- **`docs/adr/`** — Architecture Decision Records (najnowszy numer = `ls docs/adr/`)
 - **`docs/runbook/restore.md`** — pgBackRest PITR walkthrough
 - **`docs/runbook/disaster-recovery.md`** — incident-response playbook (key rotation, breach forensics, async drift)
 - **`docs/multi-tenancy.md`** + **`docs/rbac.md`** — security model deep-dive
@@ -164,14 +164,27 @@ pnpm build        # build production wszystkich workspace'ów
 # PHP gates (w kontenerze api)
 docker compose exec api composer phpstan        # PHPStan max
 docker compose exec api composer cs-check       # PHP-CS-Fixer (dry-run)
-docker compose exec -e APP_ENV=test api php bin/phpunit
+docker compose exec -e APP_ENV=test api php bin/phpunit --testsuite=unit
 ```
+
+> **PHPUnit lokalnie = TYLKO `--testsuite=unit`** (przechodzi na świeżym klonie).
+> Suity kernel/Api wymagają test-env (klucze JWT + `.env.test.local` + baza
+> testowa) i pełny run ginie na limicie pamięci 256M — lokalna procedura dla
+> kernel-suitów: [`docs/testing/local-kernel-suites.md`](docs/testing/local-kernel-suites.md);
+> default = CI (#2183).
 
 CI: GitHub Actions na PR + push do main — `quality-php.yml`, `quality-frontend.yml` (Biome / typecheck / Vite build / **Playwright E2E**), `audit.yml` (composer + pnpm audit).
 
 ## Running E2E tests (Playwright)
 
-E2E używa Chromium przeciwko full stackowi (`https://pim.localhost`). Przed pierwszym uruchomieniem:
+E2E używa Chromium przeciwko full stackowi (`https://pim.localhost`).
+
+> **macOS też wymaga wpisu w `/etc/hosts`** (`127.0.0.1 pim.localhost`), mimo że
+> przeglądarka rozwiązuje `*.localhost` sama (RFC 6761): helpery `apiLogin` /
+> `page.request` działają w **Node**, który tego nie robi — bez wpisu ~80/122
+> speców pada środowiskowo na `getaddrinfo ENOTFOUND pim.localhost` (#2182).
+
+Przed pierwszym uruchomieniem:
 
 ```bash
 pnpm stack:up                                       # Caddy + Postgres + API + admin Vite
@@ -187,6 +200,20 @@ pnpm --filter @pim/admin e2e:ui       # tryb interaktywny (debug)
 ```
 
 Artefakty failure (screenshot / video / trace) lądują w `apps/admin/test-results/`. Reportowy HTML w `apps/admin/playwright-report/`. CI uploads obie ścieżki przez `actions/upload-artifact` przy failure.
+
+## Troubleshooting (dzień pierwszy)
+
+Znane quirki środowiska dev — symptom → heal (#2179; źródło: `agent/lessons.md`):
+
+| Symptom | Przyczyna | Heal |
+|---|---|---|
+| `/api/*` zwraca **HTTP 200 z HTML** `Fatal error: … getXxxService.php: No such file` (np. login), znika menu po zalogowaniu | Korupcja dev-cache FrankenPHP — `var/cache/dev` przebudowany pod działającym workerem (zdarza się też na świeżym klonie przy pierwszym boocie) | `docker compose exec api rm -rf /app/var/cache/dev && docker compose exec api php bin/console cache:warmup && docker compose restart api worker` |
+| Uploady padają 500 `SlowDownWrite` / `inconsistent drive` | MinIO w stanie degraded | `docker compose restart minio` — sprawdź storage ZANIM obwinisz kod |
+| Login utyka / `429 Too Many Requests` po serii prób (curl/Playwright) | Rate-limiter `auth_login` 5/IP/15min (dev override 50) wyczerpany skumulowanymi próbami | `docker compose exec api php bin/console cache:pool:clear cache.rate_limiter` (suita E2E robi to sama w global-setup) |
+| Toast „Nieprawidłowy e-mail lub hasło" na świeżej bazie | Baza pusta (po `down -v` / reset) — a NIE złe hasło | odczekaj boot api: entrypoint auto-seeduje (`pim:dev:ensure-seeded`); log `docker compose logs api \| grep seed` |
+| `database "pim" is being accessed by other users` przy operacjach na bazie | Sesje trzymają api ORAZ worker (FrankenPHP + konsument Messengera) | `pim:db:reset` radzi sobie sam (`DROP … WITH (FORCE)`); dla innych operacji: `docker compose stop api worker` na czas zabiegu |
+
+Uwaga do pierwszego symptomu: **HTTP 200 ≠ sukces** — smoke-testy muszą asertować kształt odpowiedzi (JSON z `token`), nie sam status.
 
 ## Stack components
 

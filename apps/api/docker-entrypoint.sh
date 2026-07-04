@@ -47,6 +47,14 @@ fi
 if [ "${CI:-}" != "true" ] && [ "${APP_DEBUG:-}" = "0" ] \
     && { [ "${APP_ENV:-dev}" = "dev" ] || [ "${APP_ENV:-dev}" = "test" ]; }; then
     if [ -x /app/bin/console ]; then
+        # GOLIVE #2178 — a pim:db:reset FORCE drop kills this worker's DB
+        # session, which restarts the container and lands us right here while
+        # the reset CLI is still running. cache:clear on the SHARED /app/var
+        # volume would delete the compiled DI container out from under it
+        # (getXxxService.php "Failed to open stream" on the reset's final
+        # steps). Wait for the reset's advisory lock to clear first.
+        php /app/bin/console pim:dev:await-lifecycle-lock --no-interaction \
+            || echo "[entrypoint] WARN: lifecycle-lock wait failed; continuing."
         echo "[entrypoint] Rebuilding DI container (APP_DEBUG=0 skips freshness checks; ensures new handlers register)"
         php /app/bin/console cache:clear --no-interaction \
             || echo "[entrypoint] WARN: cache:clear failed; worker will start on the existing (possibly stale) container."

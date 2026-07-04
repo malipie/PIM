@@ -59,6 +59,13 @@ jobs:
       - name: Admin max-lines guard
         run: bash scripts/lint-admin-max-lines.sh
 
+      # GOLIVE #2188 — fallbackLng='pl' masks missing EN keys at runtime, so
+      # pl↔en parity is enforced by script (plural-aware: Polish _few/_many
+      # vs English _one/_other are not gaps). Pure python3 over two JSON
+      # files — no Node/pnpm needed, runs with the other cheap guards.
+      - name: i18n key-parity guard (pl ↔ en)
+        run: bash scripts/lint-i18n-parity.sh
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10.33.2
