@@ -192,6 +192,31 @@ final class SearchEndpointsApiTest extends CatalogApiTestCase
         self::assertGreaterThanOrEqual(2, $body['totalHits'] ?? 0);
     }
 
+    /**
+     * #2225 — filter VALUE injection stays neutralised by the canonical
+     * escaper ({@see \App\Shared\Infrastructure\Meilisearch\MeiliFilterLiteral}).
+     *
+     * The payload smuggles `" OR enabled = "true` inside the value of a
+     * whitelisted key. If the value escaping ever regressed, the quote would
+     * terminate the literal and the `OR` clause would match every enabled
+     * product (the seeded ones) → totalHits >= 1. With correct escaping the
+     * whole payload is ONE literal that matches nothing → 200 with 0 hits,
+     * never an expression error and never a broadened result set.
+     */
+    #[Test]
+    public function searchNeutralisesFilterValueInjectionPayload(): void
+    {
+        $this->seedProduct('VAL-INJ-1', enabled: true);
+        $this->forceReindex(ObjectKind::Product);
+
+        $client = $this->authenticatedClient();
+        $payload = rawurlencode('zzz" OR enabled = "true');
+        $body = $client->request('GET', '/api/search/products?filter%5Benabled%5D='.$payload)->toArray();
+
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame(0, $body['totalHits'] ?? -1, 'value payload must stay a single literal, not broaden the result set');
+    }
+
     #[Test]
     public function searchObjectsScopedToObjectTypeId(): void
     {

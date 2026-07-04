@@ -8,6 +8,7 @@ use App\Catalog\Domain\ObjectKind;
 use App\Identity\Application\CurrentTenantProvider;
 use App\Search\Infrastructure\MeilisearchClientFactory;
 use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Meilisearch\MeiliFilterLiteral;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -102,14 +103,14 @@ final readonly class CatalogSearchService
             if (\is_array($value)) {
                 $orParts = [];
                 foreach ($value as $v) {
-                    $orParts[] = \sprintf('%s = "%s"', $key, addslashes((string) $v));
+                    $orParts[] = \sprintf('%s = %s', $key, MeiliFilterLiteral::quote((string) $v));
                 }
                 if ([] !== $orParts) {
                     $extraFilters[] = '('.implode(' OR ', $orParts).')';
                 }
                 continue;
             }
-            $extraFilters[] = \sprintf('%s = "%s"', $key, addslashes((string) $value));
+            $extraFilters[] = \sprintf('%s = %s', $key, MeiliFilterLiteral::quote((string) $value));
         }
         foreach ($rangeFilters as $key => $range) {
             if (isset($range['gte'])) {
