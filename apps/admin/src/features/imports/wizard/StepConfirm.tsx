@@ -141,23 +141,35 @@ export function StepConfirmPlaceholder({ wizard }: StepConfirmProps): React.Reac
       </header>
 
       <Card className="space-y-2 p-4 text-sm">
-        <SummaryRow label="Plik" value={state.file?.name ?? '—'} />
+        <SummaryRow label={t('imports.wizard.confirm.file')} value={state.file?.name ?? '—'} />
         <SummaryRow label="Encoding" value={state.encoding} />
         <SummaryRow label="Delimiter" value={state.delimiter} />
         {structural ? (
           <SummaryRow
-            label="Typ"
-            value={state.entityType === 'attribute_groups' ? 'Grupy atrybutów' : 'Atrybuty'}
+            label={t('imports.wizard.confirm.type')}
+            value={
+              state.entityType === 'attribute_groups'
+                ? t('imports.wizard.confirm.type_attribute_groups')
+                : t('imports.wizard.confirm.type_attributes')
+            }
           />
         ) : (
           <>
             <SummaryRow label="Locale" value={state.locale ?? 'auto'} />
-            <SummaryRow label="Mapowanie" value={`${Object.keys(state.mapping).length} kolumn`} />
-            <SummaryRow label="Zdjęcia" value={state.imageSource} />
+            <SummaryRow
+              label={t('imports.wizard.confirm.mapping')}
+              value={t('imports.wizard.confirm.mapping_columns', {
+                count: Object.keys(state.mapping).length,
+              })}
+            />
+            <SummaryRow label={t('imports.wizard.confirm.images')} value={state.imageSource} />
             {state.validation !== null && (
               <SummaryRow
-                label="Do importu"
-                value={`${state.validation.successCount} OK (+ ${state.validation.errorCount} pominiętych)`}
+                label={t('imports.wizard.confirm.to_import')}
+                value={t('imports.wizard.confirm.to_import_value', {
+                  ok: state.validation.successCount,
+                  skipped: state.validation.errorCount,
+                })}
               />
             )}
           </>

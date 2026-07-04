@@ -1101,6 +1101,10 @@
       "confirm_submit": "Delete attribute",
       "success": "Attribute deleted.",
       "error_in_use": "Cannot delete an attribute that is in use. Detach or migrate it first."
+    },
+    "new": {
+      "help_placeholder_pl": "PL · short description for the team",
+      "help_placeholder_en": "EN · short description for the team"
     }
   },
   "attribute_groups": {
@@ -1808,6 +1812,9 @@
         "subtitle": "Category assignment determines the inherited form fields.",
         "title": "Categories"
       }
+    },
+    "advanced_filter": {
+      "remove_condition": "Remove condition"
     },
     "view_mode": {
       "aria": "View mode",
@@ -2694,6 +2701,9 @@
         "blocked": "This migration path is not supported in MVP.",
         "force_required": "This migration is destructive. Tick Force to confirm.",
         "error_generic": "Could not run migration. Check your input or retry."
+      },
+      "create_group_inline": {
+        "description_placeholder": "Short group description."
       }
     },
     "attribute_groups": {
@@ -2740,6 +2750,9 @@
       "empty": "No effective groups for this combination.",
       "error": "Could not load effective groups.",
       "not_found": "Category or ObjectType not found."
+    },
+    "field_display": {
+      "edit": "Edit"
     }
   },
   "integrations": {
@@ -3117,7 +3130,19 @@
       "next": "Next",
       "back": "Back",
       "cancel": "Cancel",
-      "run": "Run import"
+      "run": "Run import",
+      "confirm": {
+        "file": "File",
+        "type": "Type",
+        "type_attribute_groups": "Attribute groups",
+        "type_attributes": "Attributes",
+        "mapping": "Mapping",
+        "mapping_columns_one": "{{count}} column",
+        "mapping_columns_other": "{{count}} columns",
+        "images": "Images",
+        "to_import": "To import",
+        "to_import_value": "{{ok}} OK (+ {{skipped}} skipped)"
+      }
     },
     "upload": {
       "drop_csv": "Drop CSV / Excel file or pick one",

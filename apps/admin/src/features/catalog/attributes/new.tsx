@@ -341,13 +341,13 @@ export function AttributeCreatePage() {
                     rows={2}
                     value={values.helpPl}
                     onChange={(e) => setValues({ ...values, helpPl: e.target.value })}
-                    placeholder="PL · krótki opis dla zespołu"
+                    placeholder={t('attributes.new.help_placeholder_pl')}
                   />
                   <Textarea
                     rows={2}
                     value={values.helpEn}
                     onChange={(e) => setValues({ ...values, helpEn: e.target.value })}
-                    placeholder="EN · short description for the team"
+                    placeholder={t('attributes.new.help_placeholder_en')}
                   />
                 </div>
               </div>

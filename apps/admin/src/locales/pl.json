@@ -1111,6 +1111,10 @@
       "confirm_submit": "Usuń atrybut",
       "success": "Atrybut został usunięty.",
       "error_in_use": "Nie można usunąć atrybutu, który jest w użyciu. Odepnij go lub zmigruj."
+    },
+    "new": {
+      "help_placeholder_pl": "PL · krótki opis dla zespołu",
+      "help_placeholder_en": "EN · short description for the team"
     }
   },
   "attribute_groups": {
@@ -1825,6 +1829,9 @@
         "copy_to_others_aria": "Kopiuj wartość {{label}} do innych wariantów",
         "copy_to_others.success": "Skopiowano do {{count}} wariantów"
       }
+    },
+    "advanced_filter": {
+      "remove_condition": "Usuń warunek"
     }
   },
   "api_configurator": {
@@ -2706,6 +2713,9 @@
         "blocked": "Ta ścieżka migracji nie jest wspierana w MVP.",
         "force_required": "Ta migracja jest destruktywna. Zaznacz Wymuś żeby potwierdzić.",
         "error_generic": "Nie udało się uruchomić migracji. Sprawdź input lub spróbuj ponownie."
+      },
+      "create_group_inline": {
+        "description_placeholder": "Krótki opis grupy."
       }
     },
     "attribute_groups": {
@@ -2752,6 +2762,9 @@
       "empty": "Brak efektywnych grup dla tej kombinacji.",
       "error": "Nie udało się pobrać efektywnych grup.",
       "not_found": "Nie znaleziono kategorii lub typu obiektu."
+    },
+    "field_display": {
+      "edit": "Edytuj"
     }
   },
   "integrations": {
@@ -3130,7 +3143,20 @@
       "next": "Dalej",
       "back": "Wstecz",
       "cancel": "Anuluj",
-      "run": "Uruchom import"
+      "run": "Uruchom import",
+      "confirm": {
+        "file": "Plik",
+        "type": "Typ",
+        "type_attribute_groups": "Grupy atrybutów",
+        "type_attributes": "Atrybuty",
+        "mapping": "Mapowanie",
+        "mapping_columns_one": "{{count}} kolumna",
+        "mapping_columns_few": "{{count}} kolumny",
+        "mapping_columns_many": "{{count}} kolumn",
+        "images": "Zdjęcia",
+        "to_import": "Do importu",
+        "to_import_value": "{{ok}} OK (+ {{skipped}} pominiętych)"
+      }
     },
     "upload": {
       "drop_csv": "Przeciągnij plik CSV/Excel lub wybierz",
