@@ -14,6 +14,7 @@ use App\Agent\Application\Tool\ToolRegistry;
 use App\Agent\Domain\Entity\AgentMessage;
 use App\Agent\Domain\Entity\AgentRun;
 use App\Agent\Infrastructure\Anthropic\AgentModelSelector;
+use App\Identity\Contracts\Byok\ByokConfigReaderInterface;
 use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
 use Throwable;
@@ -47,6 +48,7 @@ final readonly class AgentLoopRunner
         private AgentModelSelector $models,
         private AgentSystemPromptBuilder $prompts,
         private UsageCostCalculator $costs,
+        private ByokConfigReaderInterface $tenantConfig,
         private EntityManagerInterface $entityManager,
         private \Symfony\Component\Messenger\MessageBusInterface $eventBus,
         private int $maxToolCallsPerRun,
@@ -60,10 +62,16 @@ final readonly class AgentLoopRunner
         $context = new AgentToolContext($userId, $tenant, $run->getContext());
 
         $tools = $this->registry->toAnthropicToolDefs($userId);
-        $model = $this->registry->hasKind($userId, ToolKind::Schema)
+        // A per-tenant model override (Settings -> AI) pins every tool
+        // kind to one model; absent it, schema-ops get the Opus tier and
+        // everything else the Sonnet tier (P0-06).
+        $override = $this->tenantConfig->modelOverride($tenant);
+        $model = $override ?? ($this->registry->hasKind($userId, ToolKind::Schema)
             ? $this->models->schemaModel()
-            : $this->models->defaultModel();
+            : $this->models->defaultModel());
         $run->setModel($model);
+
+        $promptCaching = $this->tenantConfig->isPromptCachingEnabled($tenant);
 
         $system = $this->prompts->build($run);
         // AGENT-P4-01 (#1968) — a re-dispatched run (next user turn after
@@ -93,11 +101,17 @@ final readonly class AgentLoopRunner
                     return;
                 }
 
-                $response = $this->llm->create($tenant, $model, $system, $messages, $tools);
+                $response = $this->llm->create($tenant, $model, $system, $messages, $tools, $promptCaching);
                 $run->addUsage(
                     $response->inputTokens,
                     $response->outputTokens,
-                    $this->costs->costUsd($model, $response->inputTokens, $response->outputTokens),
+                    $this->costs->costUsd(
+                        $model,
+                        $response->inputTokens,
+                        $response->outputTokens,
+                        $response->cacheReadTokens,
+                        $response->cacheCreationTokens,
+                    ),
                 );
                 $this->persistMessage($run, AgentMessage::ROLE_ASSISTANT, $response->contentBlocks);
                 $messages[] = ['role' => 'assistant', 'content' => $response->contentBlocks];

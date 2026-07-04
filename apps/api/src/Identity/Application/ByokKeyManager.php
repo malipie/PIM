@@ -130,4 +130,43 @@ final readonly class ByokKeyManager implements ByokConfigReaderInterface, ByokKe
 
         return null !== $config && $config->isEnabled();
     }
+
+    public function modelOverride(Tenant $tenant): ?string
+    {
+        return $this->configs->findForTenant($tenant)?->getModel();
+    }
+
+    public function isPromptCachingEnabled(Tenant $tenant): bool
+    {
+        // Default to true when unconfigured — caching is the sensible
+        // default and matches the entity/column default.
+        return $this->configs->findForTenant($tenant)?->isPromptCachingEnabled() ?? true;
+    }
+
+    /**
+     * Per-tenant model override (`null` = platform default). Requires a
+     * configured key — a model choice without an agent makes no sense.
+     */
+    public function setModel(Tenant $tenant, ?string $model): void
+    {
+        $config = $this->configs->findForTenant($tenant);
+        if (null === $config) {
+            throw new LogicException('Configure the Anthropic key before choosing a model.');
+        }
+        $config->setModel($model);
+        $this->configs->save($config);
+    }
+
+    /**
+     * Prompt-caching toggle. Requires a configured key.
+     */
+    public function setPromptCaching(Tenant $tenant, bool $enabled): void
+    {
+        $config = $this->configs->findForTenant($tenant);
+        if (null === $config) {
+            throw new LogicException('Configure the Anthropic key before toggling prompt caching.');
+        }
+        $config->setPromptCachingEnabled($enabled);
+        $this->configs->save($config);
+    }
 }

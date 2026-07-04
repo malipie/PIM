@@ -19,7 +19,7 @@ use App\Shared\Domain\Tenant;
  */
 final readonly class CannedAgentLlmClient implements AgentLlmClientInterface
 {
-    public function create(Tenant $tenant, string $model, string $system, array $messages, array $tools): AgentLlmResponse
+    public function create(Tenant $tenant, string $model, string $system, array $messages, array $tools, bool $promptCaching = true): AgentLlmResponse
     {
         return new AgentLlmResponse(
             stopReason: AgentLlmResponse::STOP_END_TURN,
