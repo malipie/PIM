@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\Filter;
 
+use App\Shared\Infrastructure\Meilisearch\MeiliFilterLiteral;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Throwable;
@@ -575,7 +576,7 @@ final class FilterDslResolver
             return $value ? 'true' : 'false';
         }
         if (\is_string($value)) {
-            return '"'.str_replace(['\\', '"'], ['\\\\', '\\"'], $value).'"';
+            return MeiliFilterLiteral::quote($value);
         }
         throw new RuntimeException('Unsupported Meilisearch literal type.');
     }
