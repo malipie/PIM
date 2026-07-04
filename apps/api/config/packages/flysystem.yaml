@@ -22,6 +22,21 @@ services:
               credentials:
                   key: '%env(AWS_ASSETS_KEY)%'
                   secret: '%env(AWS_ASSETS_SECRET)%'
+              # #2221 — bound every S3 op so a dead object store fails FAST
+              # with an exception instead of hanging until PHP's
+              # max_execution_time (30s) kills the worker with a fatal HTML
+              # 500. The chaos dry-run (#2137) stopped MinIO and parse-preview
+              # hung in Guzzle's curl handler for 30s: no FilesystemException
+              # was ever raised, so the RFC 7807 storage-outage listener never
+              # got a chance to map it to 503. `connect_timeout` bounds
+              # connection establishment (a stopped container never answers),
+              # `timeout` bounds the whole request; either breach surfaces as
+              # an AWS exception the Flysystem adapter wraps in
+              # UnableToWriteFile → the listener returns 503 problem+json.
+              # Overridable per-env; defaults stay under the 30s PHP ceiling.
+              http:
+                  connect_timeout: '%env(int:AWS_ASSETS_CONNECT_TIMEOUT)%'
+                  timeout: '%env(int:AWS_ASSETS_REQUEST_TIMEOUT)%'
 
 flysystem:
     storages:
