@@ -251,6 +251,11 @@ services:
       # artifact the prod worker (APP_DEBUG=0) never pays. Pin it off here so
       # local bulk runs profile like prod (flat O(chunk) memory).
       APP_DEBUG: "0"
+      # GOLIVE #2179 — role-scoped cache dir (see src/Kernel.php::getCacheDir).
+      # The worker's boot-time cache:clear used to wipe the api's DEBUG
+      # container from the shared var/cache/dev, corrupting live requests
+      # (HTTP 200 + HTML fatal). Own tree = each role clears only itself.
+      APP_CACHE_DIR: /app/var/cache-worker
       APP_SECRET: ${APP_SECRET:-ChangeMeBeforeDeploy}
       # AUD-002 (W1-1) — same NON-owner, NOBYPASSRLS runtime role as the api.
       # The worker sets app.current_tenant at session scope via
