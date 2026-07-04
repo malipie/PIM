@@ -556,6 +556,15 @@ final class FilterDslResolver
 
     private function meiliAttrPath(string $attr): string
     {
+        // #2237 — `sku` is the UI/agent alias for the natural key; the
+        // Meili document stores it as `code` (the physical column, mirroring
+        // COLUMN_MAP `sku => co.code` on the SQL path). Without this the
+        // agent's grounding filter `sku = "…"` hit a non-existent Meili field
+        // and the search degraded — misread as a backend outage.
+        if ('sku' === $attr) {
+            return 'code';
+        }
+
         if (str_contains($attr, '.')) {
             [$base, $locale] = explode('.', $attr, 2);
             $this->safeIdent($base);

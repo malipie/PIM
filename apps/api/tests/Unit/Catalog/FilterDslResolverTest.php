@@ -131,6 +131,21 @@ final class FilterDslResolverTest extends TestCase
         self::assertStringContainsString('IS NULL', $sql);
     }
 
+    /**
+     * #2237 — the Meili document stores the natural key as `code`, so the
+     * `sku` DSL alias must compile to a `code` filter (mirroring COLUMN_MAP
+     * `sku => co.code` on the SQL path). Before this, `sku = "…"` hit a
+     * non-existent Meili field and the agent's grounding search degraded,
+     * misread as a backend outage.
+     */
+    public function testToMeilisearchFilterMapsSkuAliasToCode(): void
+    {
+        $filter = $this->resolver->toMeilisearchFilter(['attr' => 'sku', 'op' => '=', 'value' => 'DEMO-100']);
+
+        self::assertSame('code = "DEMO-100"', $filter);
+        self::assertStringNotContainsString('sku', $filter);
+    }
+
     public function testToCountSqlEmitsLocaleScopedJsonPath(): void
     {
         $sql = $this->resolver->toCountSql([
