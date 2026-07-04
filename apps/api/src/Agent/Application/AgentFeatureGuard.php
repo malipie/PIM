@@ -34,17 +34,39 @@ final readonly class AgentFeatureGuard
      */
     public function assertEnabled(Tenant $tenant): void
     {
-        if (!$this->agentEnabled) {
+        $reason = $this->unavailabilityReason($tenant);
+
+        if ('feature_disabled' === $reason) {
             throw AgentUnavailableException::featureDisabled();
         }
 
-        if (!$this->keyResolver->hasActiveKey($tenant)) {
+        if ('missing_byok_key' === $reason) {
             throw AgentUnavailableException::missingByokKey();
         }
     }
 
     public function isEnabled(Tenant $tenant): bool
     {
-        return $this->agentEnabled && $this->keyResolver->hasActiveKey($tenant);
+        return null === $this->unavailabilityReason($tenant);
+    }
+
+    /**
+     * #2246 — non-throwing variant for the capabilities discovery
+     * endpoint, which reports unavailability as data (200 + reason)
+     * instead of a 403 problem document.
+     *
+     * @return 'feature_disabled'|'missing_byok_key'|null
+     */
+    public function unavailabilityReason(Tenant $tenant): ?string
+    {
+        if (!$this->agentEnabled) {
+            return 'feature_disabled';
+        }
+
+        if (!$this->keyResolver->hasActiveKey($tenant)) {
+            return 'missing_byok_key';
+        }
+
+        return null;
     }
 }

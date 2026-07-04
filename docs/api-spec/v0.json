@@ -9879,6 +9879,32 @@
                 "x-cortex-permission": "platform.tenants.manage"
             }
         },
+        "/api/agent/capabilities": {
+            "get": {
+                "operationId": "api_agent_capabilities_get",
+                "tags": [
+                    "agent"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api agent capabilities",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": false
+            }
+        },
         "/api/agent/cmd-k": {
             "post": {
                 "operationId": "api_agent_cmd_k_post",

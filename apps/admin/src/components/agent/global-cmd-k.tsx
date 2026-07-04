@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router';
 
 import { startAgentRun } from '@/features/agent/api';
 import { OPEN_AGENT_CHAT_EVENT } from '@/features/agent/chat/AgentChatSheet';
+import { useAgentQuickActions } from '@/features/agent/hooks/useAgentQuickActions';
 import { SETTINGS_NAV_GROUPS } from '@/layout/settings-nav-data';
 import { AGENT_ENABLED } from '@/lib/features';
 import { httpErrorDetail } from '@/lib/http';
@@ -20,13 +21,6 @@ interface NavEntry {
   route: string;
   group: string;
 }
-
-const AGENT_SUGGESTIONS = [
-  'Dodaj atrybut',
-  'Generuj opisy SEO',
-  'Bulk update kategorii',
-  'Tłumaczenia PL→DE',
-];
 
 /**
  * AGENT-P6-02 (#1975) — start a REAL agent run from the palette and
@@ -51,8 +45,10 @@ async function askAgent(
  * effective menu + settings sub-pages, fuzzy-filtered, keyboard-driven.
  * The agent section is REAL (AGENT-P6-02): the typed query starts an
  * agent run over the P4-01 API carrying the current pathname as view
- * context and hands off to the chat sheet; static suggestions prefill
- * the input. Behind the AGENT_ENABLED build flag.
+ * context and hands off to the chat sheet; quick-action suggestions come
+ * from GET /api/agent/capabilities (#2246 — same registry-derived source
+ * as the dashboard hero) and prefill the input. Behind the AGENT_ENABLED
+ * build flag.
  *
  * On the universal list routes (`/products`, `/objects/:slug`) the
  * list-scoped CmdKPalette (VIEW-19, bulk intents) owns the mod+k
@@ -71,6 +67,8 @@ export function GlobalCmdK() {
   const [agentBusy, setAgentBusy] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Fetch lazily on first open; cached (5 min) across the session.
+  const { actions: agentSuggestions } = useAgentQuickActions(open);
 
   const submitToAgent = async (intent: string): Promise<void> => {
     const text = intent.trim();
@@ -270,23 +268,25 @@ export function GlobalCmdK() {
                   </span>
                 </button>
               )}
-              <ul>
-                {AGENT_SUGGESTIONS.map((suggestion) => (
-                  <li key={suggestion}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuery(suggestion);
-                        inputRef.current?.focus();
-                      }}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-zinc-700 hover:bg-zinc-100"
-                    >
-                      <Sparkles className="size-3.5 shrink-0 text-zinc-400" aria-hidden />
-                      <span className="flex-1 truncate">{suggestion}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {agentSuggestions.length > 0 && (
+                <ul>
+                  {agentSuggestions.map((action) => (
+                    <li key={action.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuery(action.prompt);
+                          inputRef.current?.focus();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-zinc-700 hover:bg-zinc-100"
+                      >
+                        <Sparkles className="size-3.5 shrink-0 text-zinc-400" aria-hidden />
+                        <span className="flex-1 truncate">{action.label}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {agentError !== null && (
                 <p
                   className="mx-2 mt-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-900"

@@ -20,7 +20,7 @@ use const JSON_UNESCAPED_UNICODE;
  * CreateAttributeCommand. Deleting schema is deliberately NOT in the
  * tool surface (MVP hook - risky blast radius).
  */
-final readonly class CreateUpdateAttributeTool implements AgentToolInterface
+final readonly class CreateUpdateAttributeTool implements AgentToolInterface, ProvidesQuickActionInterface
 {
     /** @see CreateAttributesFromSchemaTool::VALID_TYPES for the duplication rationale */
     private const array VALID_TYPES = [
@@ -74,6 +74,19 @@ final readonly class CreateUpdateAttributeTool implements AgentToolInterface
     public function kind(): ToolKind
     {
         return ToolKind::Schema;
+    }
+
+    public function quickAction(): AgentQuickAction
+    {
+        return new AgentQuickAction(
+            id: $this->name(),
+            label: ['pl' => 'Dodaj atrybut', 'en' => 'Add attribute'],
+            prompt: [
+                'pl' => 'Dodaj atrybut [nazwa] typu [typ] do grupy [grupa]',
+                'en' => 'Add attribute [name] of type [type] to group [group]',
+            ],
+            priority: 10,
+        );
     }
 
     public function execute(array $arguments, AgentToolContext $context): array

@@ -962,19 +962,14 @@
       "title_accent": "What do you want to change today?"
     },
     "agent": {
-      "label": "Agent · Claude Sonnet 4.5",
+      "label": "AI Agent",
       "prompt_example": "create a Google Shopping XML feed from the Pneumatics category",
       "prompt_aria": "Agent command",
       "press": "press",
       "ask": "Ask the agent",
-      "accepted_this_week": "{{count}} accepted changes this week",
-      "actions": {
-        "add_attribute": "Add attribute",
-        "seo_descriptions": "Generate SEO descriptions",
-        "bulk_categories": "Bulk category update",
-        "translations": "PL→DE translations",
-        "feed_export": "Export XML feed"
-      }
+      "disabled_byok": "The agent needs an API key (BYOK) to be configured.",
+      "disabled": "The agent is not available on this account.",
+      "configure_ai": "Go to Settings → AI"
     },
     "kpi": {
       "products": {

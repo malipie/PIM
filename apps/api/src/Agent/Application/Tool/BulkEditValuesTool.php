@@ -16,7 +16,7 @@ use Symfony\Component\Uid\Uuid;
  * `pending_change_batch_id` (ADR-0024 c: plan == diff; the commit is
  * P3-02, post-accept, through the real bulk-path).
  */
-final readonly class BulkEditValuesTool implements AgentToolInterface
+final readonly class BulkEditValuesTool implements AgentToolInterface, ProvidesQuickActionInterface
 {
     use ResolvesSelectionScope;
 
@@ -84,6 +84,19 @@ final readonly class BulkEditValuesTool implements AgentToolInterface
     public function kind(): ToolKind
     {
         return ToolKind::Write;
+    }
+
+    public function quickAction(): AgentQuickAction
+    {
+        return new AgentQuickAction(
+            id: $this->name(),
+            label: ['pl' => 'Masowa edycja wartości', 'en' => 'Bulk edit values'],
+            prompt: [
+                'pl' => 'Ustaw atrybut [kod] na [wartość] dla [filtr]',
+                'en' => 'Set attribute [code] to [value] for [filter]',
+            ],
+            priority: 50,
+        );
     }
 
     public function execute(array $arguments, AgentToolContext $context): array

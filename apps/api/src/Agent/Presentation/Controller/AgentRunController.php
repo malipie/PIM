@@ -80,7 +80,7 @@ final readonly class AgentRunController
         $surfaceRaw = $body['surface'] ?? AgentRunSurface::Chat->value;
         $surface = \is_string($surfaceRaw) ? AgentRunSurface::tryFrom($surfaceRaw) : null;
         if (!$surface instanceof AgentRunSurface) {
-            throw new BadRequestHttpException('surface must be one of: chat, cmdk.');
+            throw new BadRequestHttpException('surface must be one of: chat, cmdk, dashboard.');
         }
 
         /** @var array<string, mixed> $context */

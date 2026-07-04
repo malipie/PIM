@@ -13,7 +13,7 @@ use App\Catalog\Contracts\Query\CompletenessReportPort;
  * over the existing completeness scoring; filling the gaps is the
  * write tool's job (P3-01) and always goes through approval.
  */
-final readonly class CompletenessReportTool implements AgentToolInterface
+final readonly class CompletenessReportTool implements AgentToolInterface, ProvidesQuickActionInterface
 {
     public function __construct(
         private CompletenessReportPort $reports,
@@ -57,6 +57,19 @@ final readonly class CompletenessReportTool implements AgentToolInterface
     public function kind(): ToolKind
     {
         return ToolKind::Read;
+    }
+
+    public function quickAction(): AgentQuickAction
+    {
+        return new AgentQuickAction(
+            id: $this->name(),
+            label: ['pl' => 'Raport kompletności', 'en' => 'Completeness report'],
+            prompt: [
+                'pl' => 'Pokaż raport kompletności produktów',
+                'en' => 'Show the product completeness report',
+            ],
+            priority: 40,
+        );
     }
 
     public function execute(array $arguments, AgentToolContext $context): array
