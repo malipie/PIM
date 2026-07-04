@@ -421,6 +421,21 @@ services:
         arguments:
             $httpClient: '@generic.ssrf_safe_http_client'
 
+    # GOLIVE #2131-2133 (deep audit) — webhook delivery POSTs to a
+    # tenant-configured ApiProfile.webhookUrl. Without the SSRF wrapper a
+    # tenant admin could point it at 169.254.169.254 (cloud metadata) or an
+    # internal service (redis:6379, minio:9000) and use PIM as an SSRF pivot.
+    # Same NoPrivateNetworkHttpClient wrapper as imports/generic: per-redirect
+    # peer-IP validation, closing the DNS-rebinding TOCTOU gap.
+    webhook.ssrf_safe_http_client:
+        class: Symfony\Component\HttpClient\NoPrivateNetworkHttpClient
+        arguments:
+            - '@http_client'
+
+    App\ApiConfigurator\Application\WebhookDeliveryClient:
+        arguments:
+            $http: '@webhook.ssrf_safe_http_client'
+
     # APIC-P1-09 — backoff policy needs the real blocking sleeper.
     App\Integration\Generic\Application\Sleeper:
         alias: App\Integration\Generic\Infrastructure\Http\RealSleeper
