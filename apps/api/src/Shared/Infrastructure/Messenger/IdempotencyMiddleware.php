@@ -39,9 +39,17 @@ use Symfony\Component\Uid\Uuid;
  * `42P01` (undefined table) and dead-letter the whole queue. The middleware
  * self-heals: on the first `TableNotFoundException` it creates the table on
  * demand (idempotent `CREATE TABLE IF NOT EXISTS`, matching the migration
- * DDL) and retries — so delivery never depends on migrate-before-worker
- * ordering. The create is attempted once per worker process (a static flag
- * keeps the steady-state path a single INSERT).
+ * DDL) and retries. The create is attempted once per worker process (a
+ * static flag keeps the steady-state path a single INSERT).
+ *
+ * NOTE (#2136) — the self-heal only works where the runtime connection can
+ * issue DDL. Under the W1-1 privilege split the runtime role `pim_app` has
+ * NO DDL, so the on-demand `CREATE TABLE` raises `42501` (permission denied
+ * for schema public) rather than succeeding. On such a deploy the table +
+ * grant are the OWNER's responsibility — migration Version20260704120000
+ * (idempotent `CREATE ... IF NOT EXISTS` + `GRANT ... TO pim_app`) is the
+ * source of truth; the self-heal is only a fallback for single-role
+ * sandboxes (CI PHPUnit, throwaway) where the runtime role also owns DDL.
  */
 final class IdempotencyMiddleware implements MiddlewareInterface
 {
