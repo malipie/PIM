@@ -18,14 +18,35 @@ test('NUI-03 — global palette navigates, agent section is live', async ({ page
     page.getByRole('button', { name: /zapytaj agenta|ask the agent/i }).first(),
   ).toBeVisible();
 
+  // Suggestions come from the tool registry via GET /api/agent/capabilities
+  // (#2246) — stub it so the assertion is deterministic regardless of the
+  // stack's BYOK-key state.
+  await page.route('**/api/agent/capabilities', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        enabled: true,
+        reason: null,
+        actions: [
+          {
+            id: 'create_update_attribute',
+            label: { pl: 'Dodaj atrybut', en: 'Add attribute' },
+            prompt: { pl: 'Dodaj atrybut [nazwa]', en: 'Add attribute [name]' },
+          },
+        ],
+      }),
+    }),
+  );
+
   // Open via keyboard.
   await page.keyboard.press('ControlOrMeta+k');
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
 
-  // Agent section renders live suggestions — the MOCK badge is gone
-  // since the palette talks to the real agent API (AGENT-P6-02).
-  await expect(dialog.getByText('Generuj opisy SEO')).toBeVisible();
+  // Agent section renders registry-derived suggestions — the MOCK badge is
+  // gone since the palette talks to the real agent API (AGENT-P6-02).
+  await expect(dialog.getByText(/Dodaj atrybut|Add attribute/)).toBeVisible();
   await expect(dialog.getByText('MOCK', { exact: true })).toHaveCount(0);
 
   // Type to filter and navigate to settings users.
