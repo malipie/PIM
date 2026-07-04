@@ -25,14 +25,24 @@ final readonly class SdkAgentLlmClient implements AgentLlmClientInterface
     ) {
     }
 
-    public function create(Tenant $tenant, string $model, string $system, array $messages, array $tools): AgentLlmResponse
+    public function create(Tenant $tenant, string $model, string $system, array $messages, array $tools, bool $promptCaching = true): AgentLlmResponse
     {
         $client = $this->clientFactory->forTenant($tenant);
+
+        // Prompt caching (ephemeral): a single breakpoint on the system
+        // block caches the whole stable prefix — the SDK renders tools
+        // before system, so tools + system are cached together (docs:
+        // render order tools -> system -> messages). The volatile
+        // transcript stays after the breakpoint. Passing system as a
+        // text block (not a bare string) is what carries the marker.
+        $systemArg = $promptCaching
+            ? [['type' => 'text', 'text' => $system, 'cache_control' => ['type' => 'ephemeral']]]
+            : $system;
 
         $message = $client->messages->create(
             model: $model,
             maxTokens: self::MAX_TOKENS,
-            system: $system,
+            system: $systemArg,
             // Wire-shape arrays; the SDK normalizes them (camelCase keys).
             // @phpstan-ignore argument.type
             messages: $messages,
@@ -54,6 +64,8 @@ final readonly class SdkAgentLlmClient implements AgentLlmClientInterface
             contentBlocks: $blocks,
             inputTokens: $message->usage->inputTokens,
             outputTokens: $message->usage->outputTokens,
+            cacheReadTokens: $message->usage->cacheReadInputTokens ?? 0,
+            cacheCreationTokens: $message->usage->cacheCreationInputTokens ?? 0,
         );
     }
 }

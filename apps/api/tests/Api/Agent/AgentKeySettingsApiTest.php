@@ -119,6 +119,56 @@ final class AgentKeySettingsApiTest extends ApiTestCase
     }
 
     #[Test]
+    public function modelOverrideAndPromptCachingPatch(): void
+    {
+        $client = $this->authenticatedClient();
+
+        // Defaults before any config row exists: no override, caching on.
+        $status = $client->request('GET', '/api/settings/agent-key')->toArray(false);
+        self::assertNull($status['model']);
+        self::assertTrue($status['prompt_caching_enabled']);
+        self::assertIsArray($status['selectable_models']);
+        self::assertContains('claude-haiku-4-5', $status['selectable_models']);
+
+        // A settings change requires a configured key.
+        $client->request('PUT', '/api/settings/agent-key', [
+            'json' => ['api_key' => 'sk-ant-api03-config-secret-123456'],
+        ]);
+
+        // Pin the model to Haiku (the cheap testing pick).
+        $patch = $client->request('PATCH', '/api/settings/agent-key', [
+            'json' => ['model' => 'claude-haiku-4-5'],
+            'headers' => ['content-type' => 'application/merge-patch+json'],
+        ]);
+        self::assertSame(200, $patch->getStatusCode());
+        self::assertSame('claude-haiku-4-5', $patch->toArray(false)['model']);
+
+        // Turn prompt caching off.
+        $client->request('PATCH', '/api/settings/agent-key', [
+            'json' => ['prompt_caching_enabled' => false],
+            'headers' => ['content-type' => 'application/merge-patch+json'],
+        ]);
+
+        $status = $client->request('GET', '/api/settings/agent-key')->toArray(false);
+        self::assertSame('claude-haiku-4-5', $status['model']);
+        self::assertFalse($status['prompt_caching_enabled']);
+
+        // An unknown model id is rejected.
+        $bad = $client->request('PATCH', '/api/settings/agent-key', [
+            'json' => ['model' => 'gpt-4'],
+            'headers' => ['content-type' => 'application/merge-patch+json'],
+        ]);
+        self::assertSame(400, $bad->getStatusCode());
+
+        // Clearing the override (null) returns to automatic selection.
+        $client->request('PATCH', '/api/settings/agent-key', [
+            'json' => ['model' => null],
+            'headers' => ['content-type' => 'application/merge-patch+json'],
+        ]);
+        self::assertNull($client->request('GET', '/api/settings/agent-key')->toArray(false)['model']);
+    }
+
+    #[Test]
     public function anonymousIsRejected(): void
     {
         $response = static::createClient()->request('GET', '/api/settings/agent-key');

@@ -65,7 +65,10 @@ export function AgentChatSheet() {
   const scrollRef = useRef<HTMLDivElement>(null);
   // AGENT-P6-07 (#1980) — live phases over SSE; polling stays as the
   // fallback whenever the stream is not connected.
-  const { connected: sseConnected, lastEvent } = useAgentRunStream(open ? runId : null);
+  // SSE drives the live phase label; the status transition itself is
+  // guaranteed by polling (see the effect below), so `connected` is not
+  // consulted here.
+  const { lastEvent } = useAgentRunStream(open ? runId : null);
 
   const refresh = useCallback(async (id: string) => {
     try {
@@ -93,13 +96,17 @@ export function AgentChatSheet() {
     return () => window.removeEventListener(OPEN_AGENT_CHAT_EVENT, onOpenEvent);
   }, [refresh]);
 
-  // Poll while the loop is busy server-side (planning/committing) -
-  // ONLY as the fallback when the SSE stream is down (P6-07).
+  // Poll while the loop is busy server-side (planning/committing).
+  // Runs REGARDLESS of the SSE stream: with a synchronous loop the run
+  // can reach awaiting_input before the stream even connects, so the
+  // terminal `status` event is missed and the UI would hang on
+  // "Planuję…" forever if polling deferred to SSE. SSE still drives the
+  // live phase label; polling guarantees the status transition lands.
   useEffect(() => {
-    if (!open || runId === null || run === null || !isRunBusy(run.status) || sseConnected) return;
+    if (!open || runId === null || run === null || !isRunBusy(run.status)) return;
     const timer = window.setInterval(() => void refresh(runId), 2500);
     return () => window.clearInterval(timer);
-  }, [open, runId, run, refresh, sseConnected]);
+  }, [open, runId, run, refresh]);
 
   // SSE events: a status transition re-reads the run (fresh transcript);
   // a progress tick just updates the live phase label.

@@ -115,9 +115,28 @@ final class ModelSelectionTest extends KernelTestCase
         $selector = new AgentModelSelector('claude-sonnet-test', 'claude-opus-test');
 
         $llm = new class implements AgentLlmClientInterface {
-            public function create(Tenant $tenant, string $model, string $system, array $messages, array $tools): AgentLlmResponse
+            public function create(Tenant $tenant, string $model, string $system, array $messages, array $tools, bool $promptCaching = true): AgentLlmResponse
             {
                 return new AgentLlmResponse('end_turn', [['type' => 'text', 'text' => 'ok']], 10, 5);
+            }
+        };
+
+        // No per-tenant override / caching-off: exercises the default
+        // kind-based model selection this test asserts.
+        $tenantConfig = new class implements \App\Identity\Contracts\Byok\ByokConfigReaderInterface {
+            public function isProactiveScanEnabled(Tenant $tenant): bool
+            {
+                return false;
+            }
+
+            public function modelOverride(Tenant $tenant): ?string
+            {
+                return null;
+            }
+
+            public function isPromptCachingEnabled(Tenant $tenant): bool
+            {
+                return true;
             }
         };
 
@@ -129,6 +148,7 @@ final class ModelSelectionTest extends KernelTestCase
             models: $selector,
             prompts: new AgentSystemPromptBuilder(),
             costs: new UsageCostCalculator($selector, 3.0, 15.0, 5.0, 25.0),
+            tenantConfig: $tenantConfig,
             entityManager: $em,
             eventBus: new class implements \Symfony\Component\Messenger\MessageBusInterface {
                 public function dispatch(object $message, array $stamps = []): \Symfony\Component\Messenger\Envelope

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Loader2, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, MessageSquare, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -8,10 +8,13 @@ import {
   type AgentRunDetail,
   type AgentRunStatus,
   type AgentRunSummary,
+  cancelAgentRun,
   getAgentRun,
+  isRunTerminal,
   listAgentRuns,
   rollbackAgentRun,
 } from '@/features/agent/api';
+import { OPEN_AGENT_CHAT_EVENT } from '@/features/agent/chat/AgentChatSheet';
 import { httpErrorDetail } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -84,6 +87,22 @@ export function AgentHistoryPage() {
       await reload();
     } catch (error) {
       // P5-04 boundary: a schema-op with data refuses with reasons.
+      setRollbackError(httpErrorDetail(error) ?? String(error));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // A non-terminal run (awaiting_input left unanswered, a stuck plan)
+  // blocks starting a new one ("1 active run per user"). Cancelling it
+  // here is the escape hatch so the user isn't wedged.
+  const cancel = async (run: AgentRunSummary) => {
+    setBusyId(run.id);
+    setRollbackError(null);
+    try {
+      await cancelAgentRun(run.id);
+      await reload();
+    } catch (error) {
       setRollbackError(httpErrorDetail(error) ?? String(error));
     } finally {
       setBusyId(null);
@@ -173,6 +192,33 @@ export function AgentHistoryPage() {
                   {' · '}
                   {new Date(run.started_at).toLocaleString()}
                 </span>
+                {run.status === 'awaiting_input' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      window.dispatchEvent(
+                        new CustomEvent(OPEN_AGENT_CHAT_EVENT, { detail: { runId: run.id } }),
+                      )
+                    }
+                    data-testid="agent-history-continue"
+                  >
+                    <MessageSquare className="mr-1 size-3.5" aria-hidden />
+                    {t('agent.history.continue', { defaultValue: 'Kontynuuj w czacie' })}
+                  </Button>
+                )}
+                {!isRunTerminal(run.status) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busyId === run.id}
+                    onClick={() => void cancel(run)}
+                    data-testid="agent-history-cancel"
+                  >
+                    <X className="mr-1 size-3.5" aria-hidden />
+                    {t('agent.history.cancel', { defaultValue: 'Anuluj run' })}
+                  </Button>
+                )}
                 {run.status === 'done' && (
                   <Button
                     variant="outline"
@@ -216,6 +262,36 @@ export function AgentHistoryPage() {
                           })}
                         </span>
                       </div>
+                      {detail.messages.length > 0 && (
+                        <div className="space-y-1.5" data-testid="agent-history-transcript">
+                          {detail.messages.map((message, index) => {
+                            const text = message.content
+                              .map((block) => ('text' in block ? block.text : ''))
+                              .join('')
+                              .trim();
+                            if (text === '') return null;
+                            return (
+                              <div
+                                // biome-ignore lint/suspicious/noArrayIndexKey: transcript is append-only and static per run
+                                key={index}
+                                className={cn(
+                                  'rounded-lg px-3 py-2 text-[13px]',
+                                  message.role === 'user'
+                                    ? 'bg-zinc-100 text-zinc-800'
+                                    : 'bg-purple-50 text-purple-900',
+                                )}
+                              >
+                                <span className="mb-0.5 block text-[10.5px] font-semibold uppercase tracking-wide opacity-60">
+                                  {message.role === 'user'
+                                    ? t('agent.history.you', { defaultValue: 'Ty' })
+                                    : t('agent.history.agent', { defaultValue: 'Agent' })}
+                                </span>
+                                <span className="whitespace-pre-wrap">{text}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                       {detail.tool_calls.length === 0 ? (
                         <p className="text-zinc-500">
                           {t('agent.history.no_tools', {
