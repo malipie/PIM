@@ -68,7 +68,9 @@ test('APIC #1883 — connection card links to detail + delete with confirm', asy
 
   await page.goto('/integrations/api-configurator/connections');
 
-  const cardLink = page.getByRole('link', { name: /Open connection IdoSell EU/i });
+  const cardLink = page.getByRole('link', {
+    name: /(open connection|otwórz połączenie) IdoSell EU/i,
+  });
   await expect(cardLink).toBeVisible();
 
   // a11y on the hub with a rendered card.
@@ -83,10 +85,12 @@ test('APIC #1883 — connection card links to detail + delete with confirm', asy
   await expect(page).toHaveURL(/\/connections$/);
 
   // 2) Delete → confirm dialog → DELETE fired → card gone.
-  await page.getByRole('button', { name: /Delete connection IdoSell EU/i }).click();
+  await page
+    .getByRole('button', { name: /(delete connection|usuń połączenie) IdoSell EU/i })
+    .click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: /^Delete connection$/ }).click();
+  await dialog.getByRole('button', { name: /^(Delete connection|Usuń połączenie)$/ }).click();
 
   await expect.poll(() => deleteRequests.length).toBeGreaterThan(0);
   expect(deleteRequests[0]).toMatch(/\/api\/connections\/conn-1$/);

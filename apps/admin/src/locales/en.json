@@ -1399,6 +1399,25 @@
     },
     "actions": {
       "view": "View"
+    },
+    "picker": {
+      "empty": "No results.",
+      "error_generic": "Saving failed",
+      "no_primary_warning": "Mark a primary category (⭐) to save.",
+      "save": "Save",
+      "saving": "Saving…",
+      "search_placeholder": "Search categories…",
+      "selected_count": "Selected: {{count}}",
+      "title": "Select categories"
+    },
+    "products_card": {
+      "disabled": "disabled",
+      "empty": "No products in this category.",
+      "empty_hint": "Open a product and assign it to this category on its \"Categories\" tab.",
+      "enabled": "enabled",
+      "is_primary": "Primary category",
+      "page_indicator": "Page {{page}} of {{total}}",
+      "title": "Products in this category"
     }
   },
   "object_types": {
@@ -1688,7 +1707,8 @@
         "multimedia": "Media",
         "relations": "Relations",
         "history": "History",
-        "variants": "Variants"
+        "variants": "Variants",
+        "categories": "Categories"
       },
       "locale": {
         "label": "Language",
@@ -1780,10 +1800,26 @@
         "copy_to_others": "Copy to other variants · Source: {{provenance}}",
         "copy_to_others_aria": "Copy {{label}} to other variants",
         "copy_to_others.success": "Copied to {{count}} variants"
+      },
+      "categories": {
+        "add_button": "+ Assign categories",
+        "detach": "Detach category",
+        "edit_button": "+ Edit categories",
+        "empty": "No categories assigned",
+        "empty_hint": "Assign a category to activate inherited form fields.",
+        "is_primary": "Primary category",
+        "set_primary": "Set as primary",
+        "subtitle": "Category assignment determines the inherited form fields.",
+        "title": "Categories"
       }
     },
     "advanced_filter": {
       "remove_condition": "Remove condition"
+    },
+    "view_mode": {
+      "aria": "View mode",
+      "excel": "Excel",
+      "grid": "Cards"
     }
   },
   "api_configurator": {
@@ -2902,7 +2938,8 @@
         "columns_count_one": "{{count}} column",
         "locale": "Locale",
         "last_used": "last used: {{date}}",
-        "never_used": "never used"
+        "never_used": "never used",
+        "columns_count_other": "{{count}} columns"
       },
       "list": {
         "col_name": "Name · code",

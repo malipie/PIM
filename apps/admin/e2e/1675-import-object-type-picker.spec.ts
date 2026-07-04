@@ -43,5 +43,5 @@ test('#1678 — import wizard step 1 is the data-kind tile screen', async ({ pag
   await expect(page.getByText(/wgraj plik|upload a file/i).first()).toBeVisible({
     timeout: 20_000,
   });
-  await expect(page.getByText(/co importujesz|what are you importing/i)).toHaveCount(0);
+  await expect(page.getByText(/co importujesz\?|what are you importing\?/i)).toHaveCount(0);
 });

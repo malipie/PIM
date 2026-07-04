@@ -59,7 +59,7 @@ test('APIC #1887 — Test action shows a result toast', async ({ page }) => {
 
   await page.goto('/integrations/api-configurator/connections/conn-1');
 
-  const testButton = page.getByRole('button', { name: /^Test$/ });
+  const testButton = page.getByRole('button', { name: /^(Test|Testuj)$/ });
   await expect(testButton).toBeVisible();
 
   const a11y = await new AxeBuilder({ page }).analyze();
@@ -68,5 +68,5 @@ test('APIC #1887 — Test action shows a result toast', async ({ page }) => {
   await testButton.click();
 
   // The probe result surfaces as a toast (the fix — no longer silent).
-  await expect(page.getByText(/Connection works \(HTTP 200\)/i)).toBeVisible();
+  await expect(page.getByText(/(Connection works|Połączenie działa) \(HTTP 200\)/i)).toBeVisible();
 });

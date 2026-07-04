@@ -2920,3 +2920,25 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 
 ### Patterns to Avoid
 - **`fallbackLng='pl'` maskuje brakujące klucze EN** — 48 kluczy w pl.json bez odpowiednika w en.json niewidoczne w runtime (user EN dostaje polski string). Parytet trzeba sprawdzać skryptem (diff key-setów), nie wzrokowo; kandydat na guard CI (#2188).
+
+## Lessons z GOLIVE TOR 1 (2026-07-04, naprawa findingów Bloku A — blokery dnia 1 + nie-blokery)
+
+### Patterns to Follow
+- **Weryfikuj blokery dnia 1 świeżym klonem w PEŁNEJ izolacji** (`COMPOSE_PROJECT_NAME=<inny>`, świeże wolumeny, WSZYSTKIE sekrety niedomyślne — także MinIO): dopiero taki setup wykrył łańcuch trzech wtórnych bugów za #2178 (wyścig reset↔ensure-seeded, potem reset↔cache:clear workera), niewidocznych na dev stacku.
+- **Lifecycle bazy = advisory lock cluster-wide na maintenance-DB** (`MaintenanceConnectionFactory::LIFECYCLE_LOCK_KEY`): FORCE drop zabija konsumenta workera → restart → entrypoint ensure-seeded widzi pustą bazę W TRAKCIE resetu i chainuje własny reset. Lock trzymany przez CAŁY przebieg resetu; ensure-seeded czeka + re-checkuje na świeżej sesji; entrypoint workera czeka (`pim:dev:await-lifecycle-lock`) PRZED cache:clear. Advisory locki przeżywają drop bazy aplikacyjnej (są per-cluster).
+- **`DROP DATABASE … WITH (FORCE)`** (PG13+) na jednorazowym połączeniu do db `postgres` zamiast tańca terminate→drop — FrankenPHP/worker reconnectują w ~1s, wyścig terminate przegrywa; FORCE zrywa sesje atomowo. Po dropie `close()` na service-connections (default+owner): sesja zabita przed dropem wybucha dopiero przy REUŻYCIU („terminating connection due to administrator command" na chainowanym kroku).
+- **Role-scoped cache dir** (`APP_CACHE_DIR`, Kernel::getCacheDir): api (debug=1) i worker (debug=0) kompilują RÓŻNE kontenery DI do wspólnego `var/cache/dev`; boot-owy `cache:clear` workera wycinał debug-kontener spod serwującego api = źródło korupcji „HTTP 200 + HTML fatal getXxxService.php". Worker na `/app/var/cache-worker` = klasa ubita dla scenariuszy worker-boot/reset.
+- **Porównania slotów JSONB: normalizuj kolejność kluczy.** Postgres jsonb kanonicalizuje klucze przy zapisie (długość→bajty), a PHP strict `!==` na tablicach jest kolejność-wrażliwy: `option_code`(11) sortuje się PO `provenance`(10) → wieczny false-mismatch detektora dryfu dla select/multiselect (`{value}`(5) przechodził przypadkiem). Fix: rekurencyjny ksort obu stron przed porównaniem (kolejność LIST zachowana — w multiselect znacząca). Poprawka wcześniejszej lekcji z #2125: kompozycja slotu była już jednolita po b7c87828 — winne było PORÓWNANIE.
+- **Auth bootstrap FE: żądania CZEKAJĄ na in-flight refresh** (`fetchInternal` awaituje `refreshInFlight` przy pustym tokenie) — optymistyczne `GET /api/auth/me` ścigało się z refreshem po hard reloadzie i logowało 401 do konsoli mimo że retry healował dane.
+- **Parytet i18n pl↔en musi być plural-aware**: polskie `_few`/`_many` to NIE luki gdy EN pokrywa bazę `_one`+`_other` (i odwrotnie: `one+few+many` kompletne dla PL). Z 48 „braków" tylko 29 było realnych. Guard: `scripts/lint-i18n-parity.sh` w quality-frontend.
+
+### Patterns to Avoid
+- **NIGDY nie merguj PR-a bez sprawdzenia WSZYSTKICH checków** — incydent #2208: merge z 1 fail (Playwright) uznanym w pośpiechu za komplet passów → czerwony main. Fail nie był flakiem: uzupełnienie kluczy EN ZMIENIŁO stringi UI dla en-US profilu Playwrighta („Kategorie"→„Categories", „Zapisz"→„Save") i wywróciło specy, które przechodziły tylko dzięki luce fallbackLng. Naprawa: pin języka suite'u przez config-level `storageState` z `i18nextLng=pl` (PR #2212) — localStorage jest PIERWSZY w kolejności detektora; sam `locale: 'pl-PL'` NIE wystarczył (detektor cache'ował 'en' zanim navigator zagrał).
+- **Uzupełnianie tłumaczeń EN to zmiana BEHAWIORALNA dla testów** — każdy przyszły PR dodający klucze EN bez pinu języka może flipnąć lokatory; po #2212 klasa zamknięta, ale lekcja zostaje: specy nie mogą polegać na fallbacku brakujących kluczy.
+- **PHPStan flake „Ignored error pattern … was not matched"** po zmianach w testach = brudny result-cache; `vendor/bin/phpstan clear-result-cache` przed diagnozowaniem „regresji".
+- **phpstan-symfony wymaga debug-container.xml** — po wyczyszczeniu `var/cache/dev` przez inny proces run pada na `Container … does not exist`; heal: `cache:warmup` (nie clear).
+- **„Deterministyczny fail" z 2 prób bywa flakiem** — 1932-feed-delivery-preview: pass/pass/FAIL/pass w 4 runach (klasa axe-vs-animacja z #2119); zanim rozjedziesz CI-vs-lokalnie, zrób ≥4 runy.
+
+### Env quirks
+- **Autoload classmap w kontenerze nie zna NOWYCH klas** dopisanych na bind-mount — `composer dump-autoload` w kontenerze; a skompilowane kontenery DI rejestrują komendy konsoli w compile-time, więc nowa komenda w entrypoincie ma jajko-kurę pierwszego bootu (po merge nie występuje — każdy build ma klasę od początku).
+- **Świeży klon współistnieje z dev stackiem bez Caddy** — porty hosta trzyma tylko Caddy; `docker compose up -d api worker database redis` dev stacka działa równolegle z izolowanym klonem (bramki PHP w kontenerze bez pełnego stacka).
