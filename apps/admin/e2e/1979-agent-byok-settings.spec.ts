@@ -17,6 +17,14 @@ test('BYOK settings set, rotate-visible-prefix and disable on the live API', asy
   await expect(page.getByTestId('agent-settings')).toBeVisible();
   await expect(page.getByTestId('agent-key-state')).toBeVisible();
 
+  // Right-column shortcuts into the agent inbox / run history
+  // (those routes have no sidebar entry, so this is the way in).
+  await expect(page.getByTestId('agent-shortcut-inbox')).toHaveAttribute('href', '/agent/inbox');
+  await expect(page.getByTestId('agent-shortcut-history')).toHaveAttribute(
+    'href',
+    '/agent/history',
+  );
+
   const a11y = await new AxeBuilder({ page }).include('[data-testid="agent-settings"]').analyze();
   expect(a11y.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual(
     [],
