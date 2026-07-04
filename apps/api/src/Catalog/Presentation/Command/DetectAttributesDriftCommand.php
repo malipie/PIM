@@ -320,7 +320,7 @@ final class DetectAttributesDriftCommand extends Command
                 $orphaned[] = $code;
                 continue;
             }
-            if ($canon[$code] !== $cachedValue) {
+            if ($this->normalised($canon[$code]) !== $this->normalised($cachedValue)) {
                 $mismatched[] = $code;
             }
         }
@@ -337,6 +337,38 @@ final class DetectAttributesDriftCommand extends Command
         sort($mismatched);
 
         return ['orphaned' => $orphaned, 'missing' => $missing, 'mismatched' => $mismatched];
+    }
+
+    /**
+     * Recursively sorts associative keys so the comparison ignores key order
+     * (list 0..n order is preserved — element order in multiselects is
+     * meaningful).
+     *
+     * GOLIVE #2186 — Postgres jsonb canonicalises object keys on write
+     * (length, then bytes), while globalSlot() appends `provenance` after the
+     * value envelope. For envelopes whose key sorts AFTER "provenance"
+     * (`option_code` = 11 chars vs 10) the two orders diverge, and the strict
+     * `!==` reported an eternal false mismatch: select/multiselect values
+     * never converged no matter how many times --reconcile rewrote the cache
+     * (the rewrite itself round-trips through jsonb and reorders again).
+     * Text-style `{value}` envelopes sorted BEFORE "provenance" by accident,
+     * which is why only select-type attributes were affected.
+     */
+    private function normalised(mixed $value): mixed
+    {
+        if (!\is_array($value)) {
+            return $value;
+        }
+
+        $out = [];
+        foreach ($value as $key => $item) {
+            $out[$key] = $this->normalised($item);
+        }
+        if (!array_is_list($out)) {
+            ksort($out);
+        }
+
+        return $out;
     }
 
     /**
