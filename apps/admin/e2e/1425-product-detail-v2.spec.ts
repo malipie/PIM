@@ -48,6 +48,6 @@ test('NUI-06 — product detail renders the v2 design surface', async ({ page })
   await expect(page.getByText(/manual|import|agent|integration/i).first()).toBeVisible();
 
   // Right rail: effective model + variants cards.
-  await expect(page.getByText(/effective model|model efektywny/i)).toBeVisible();
+  await expect(page.getByText(/effective model|efektywny model|model efektywny/i)).toBeVisible();
   await expect(page.getByText(/variants|warianty/i).first()).toBeVisible();
 });

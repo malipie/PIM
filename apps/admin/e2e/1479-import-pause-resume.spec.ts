@@ -17,7 +17,13 @@ test('IMP2-2.3 — session view exposes pause/cancel controls for an in-flight i
   await page.goto('/integrations/imports/sessions');
 
   // Prefer a non-terminal session from the history table.
-  const liveBadge = page.getByText(/w toku|running|wstrzyman|paused|oczekuj|pending/i).first();
+  // Scope to table rows: the PL sessions page renders static "W toku"
+  // (KPI card + live-section heading) that would false-positive a
+  // page-wide text match and defeat the skip guard.
+  const liveBadge = page
+    .getByRole('row')
+    .getByText(/w toku|running|wstrzyman|paused|oczekuj|pending/i)
+    .first();
   const hasLive = await liveBadge
     .waitFor({ state: 'visible', timeout: 8_000 })
     .then(() => true)
