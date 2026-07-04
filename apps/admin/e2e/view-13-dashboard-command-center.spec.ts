@@ -107,16 +107,35 @@ test('VIEW-13 — command center renders all five sections with mock values', as
   await expect(page.getByRole('button', { name: 'Eksport feed XML', exact: true })).toBeVisible();
   await expect(page.getByText(/zaakceptowanych zmian w tym tygodniu/)).toHaveCount(0);
 
-  // 3. KPI band — the four pinned tiles with exact mock values.
-  // ("10 984" also renders inside the health card, hence .first()).
-  await expect(page.getByText('12 847', { exact: true })).toBeVisible();
-  await expect(page.getByText('10 984', { exact: true }).first()).toBeVisible();
+  // 3. KPI band — products & publish-ready are LIVE since DASH-02 (#2251):
+  // structural assertions + drill-down hrefs instead of mock literals. The
+  // avg-completeness ("87%") and alerts tiles stay on mock values until
+  // their backends land (DASH-06 / DASH-10).
+  const main = page.locator('main');
+  const productsTile = main.getByRole('link', { name: /łącznie w katalogu/ });
+  await expect(productsTile).toBeVisible();
+  await expect(productsTile).toHaveAttribute('href', '/products');
+  await expect(productsTile.locator('.num').first()).toHaveText(/^[\d\s ]+$/);
+  const readyTile = main.getByRole('link', { name: /Gotowe do publikacji/ });
+  await expect(readyTile).toHaveAttribute('href', /completeness_pct/);
+  await expect(readyTile.locator('.num').first()).toHaveText(/^[\d\s ]+$/);
   await expect(page.getByText('87%', { exact: true })).toBeVisible();
+  // Live tiles render the honest no-trend line (no fabricated deltas).
+  await expect(page.getByText('brak trendu', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('24h · brak trendu')).toBeVisible();
+  await expect(main.getByRole('link', { name: /Otwarte alerty/ })).toHaveAttribute(
+    'href',
+    '#action-center',
+  );
 
-  // 4. Catalog health — ring caption, bucket legend, worst-first channels.
+  // 4. Catalog health — live ring + ready line, clickable bucket legend,
+  // worst-first channels (still mock until DASH-03/06). The weekly-trend
+  // badge must NOT render on live data (no aggregate yet — DASH-05).
   await expect(page.getByRole('heading', { name: 'Kompletność katalogu' })).toBeVisible();
   await expect(page.getByText('gotowe do publikacji', { exact: true })).toBeVisible();
+  await expect(page.getByText(/SKU ≥ 80%/)).toBeVisible();
+  await expect(page.getByText(/pkt \/ tydz\./)).toHaveCount(0);
+  expect(await page.getByRole('link', { name: /Pokaż produkty o kompletności/ }).count()).toBe(5);
   await expect(page.getByText('Kompletność wg kanału')).toBeVisible();
   await expect(page.getByText('Google Shopping', { exact: true })).toBeVisible();
   await expect(page.getByText('Comarch ERP XL', { exact: true })).toBeVisible();
@@ -151,6 +170,13 @@ test('VIEW-13 — command center renders all five sections with mock values', as
     (text) => !/Failed to load resource|EventSource|mercure/i.test(text),
   );
   expect(realErrors).toEqual([]);
+
+  // Drill-down smoke (last — it navigates away): the publish-ready tile
+  // lands on the products list with the completeness filter pre-seeded
+  // (#2249 URL seeding).
+  await readyTile.click();
+  await expect(page).toHaveURL(/\/products\?filter/);
+  await expect(page.getByRole('region', { name: 'Filtr zaawansowany' })).toBeVisible();
 });
 
 test('VIEW-13 — dashboard passes the axe-core WCAG A/AA scan', async ({ page }) => {

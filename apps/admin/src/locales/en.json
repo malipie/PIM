@@ -989,7 +989,8 @@
         "hint": "needs intervention"
       },
       "period_30d": "30 days",
-      "no_trend": "24h · no trend"
+      "no_trend": "24h · no trend",
+      "no_trend_generic": "no trend yet"
     },
     "health": {
       "eyebrow": "Data health",
@@ -998,7 +999,8 @@
       "ring_caption": "ready to publish",
       "ring_aria": "{{percent}}% of products ready to publish",
       "channels_header": "Completeness by channel",
-      "channels_sort": "sort: worst first"
+      "channels_sort": "sort: worst first",
+      "bucket_link_aria": "Show products with {{bucket}} completeness"
     },
     "activity": {
       "eyebrow": "Catalog activity",

@@ -65,9 +65,12 @@ export function ActionCenter() {
   const headingId = useId();
 
   return (
+    // id — anchor target for the KPI alerts tile drill-down (DASH-02 #2251);
+    // scroll-mt keeps the heading below the sticky topbar after the jump.
     <section
+      id="action-center"
       aria-labelledby={headingId}
-      className="rounded-2xl border border-line bg-surface p-6 soft-shadow"
+      className="scroll-mt-24 rounded-2xl border border-line bg-surface p-6 soft-shadow"
     >
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div>

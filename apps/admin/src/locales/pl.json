@@ -999,7 +999,8 @@
         "hint": "wymaga interwencji"
       },
       "period_30d": "30 dni",
-      "no_trend": "24h · brak trendu"
+      "no_trend": "24h · brak trendu",
+      "no_trend_generic": "brak trendu"
     },
     "health": {
       "eyebrow": "Zdrowie danych",
@@ -1008,7 +1009,8 @@
       "ring_caption": "gotowe do publikacji",
       "ring_aria": "{{percent}}% produktów gotowych do publikacji",
       "channels_header": "Kompletność wg kanału",
-      "channels_sort": "sort: najgorszy pierwszy"
+      "channels_sort": "sort: najgorszy pierwszy",
+      "bucket_link_aria": "Pokaż produkty o kompletności {{bucket}}"
     },
     "activity": {
       "eyebrow": "Aktywność katalogu",
