@@ -176,6 +176,12 @@ services:
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-!ChangeMercureKeyAtLeast256BitsLong!}
       MEILI_URL: http://meilisearch:7700
       MEILI_KEY: ${MEILI_MASTER_KEY:-masterKeyPleaseChangeMe}
+      # GOLIVE #2181 (cold-start L10) — S3 credentials follow MINIO_ROOT_* like
+      # minio-init and pgBackRest already do. apps/api/.env hardcodes the
+      # minioadmin defaults, so changing the MinIO passwords per README used to
+      # break every upload (InvalidAccessKeyId) — compose env wins over .env.
+      AWS_ASSETS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_ASSETS_SECRET: ${MINIO_ROOT_PASSWORD:-minioadmin}
       TRUSTED_PROXIES: 127.0.0.1,REMOTE_ADDR
       TRUSTED_HOSTS: '^pim\.localhost$$|^localhost$$|^api$$'
       # CI sentinel — propagated from GitHub Actions so docker-entrypoint.sh
@@ -256,6 +262,12 @@ services:
       MERCURE_TOPIC_BASE: ${MERCURE_TOPIC_BASE:-https://pim.localhost}
       MEILI_URL: http://meilisearch:7700
       MEILI_KEY: ${MEILI_MASTER_KEY:-masterKeyPleaseChangeMe}
+      # GOLIVE #2181 (cold-start L10) — S3 credentials follow MINIO_ROOT_* like
+      # minio-init and pgBackRest already do. apps/api/.env hardcodes the
+      # minioadmin defaults, so changing the MinIO passwords per README used to
+      # break every upload (InvalidAccessKeyId) — compose env wins over .env.
+      AWS_ASSETS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_ASSETS_SECRET: ${MINIO_ROOT_PASSWORD:-minioadmin}
     volumes:
       - ./apps/api:/app
       - api_var:/app/var
