@@ -174,7 +174,9 @@ final class ParsePreviewApiTest extends CatalogApiTestCase
 
             self::assertResponseStatusCodeSame(503);
             self::assertResponseHeaderSame('content-type', 'application/problem+json');
-            $body = $this->decodeJson($client->getResponse()?->getContent());
+            // getContent() throws on a 5xx in the HttpClient test transport;
+            // pass throw=false to read the problem+json body on the 503.
+            $body = $this->decodeJson($client->getResponse()?->getContent(false));
 
             self::assertSame(503, $body['status']);
             self::assertSame('Service Unavailable', $body['title']);

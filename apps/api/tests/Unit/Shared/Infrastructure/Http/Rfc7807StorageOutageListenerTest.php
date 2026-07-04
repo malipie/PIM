@@ -27,7 +27,7 @@ final class Rfc7807StorageOutageListenerTest extends TestCase
     {
         $event = $this->eventFor(Request::create('/api/import-sessions/parse-preview', 'POST'));
 
-        (new Rfc7807ExceptionListener())->onException($event);
+        new Rfc7807ExceptionListener()->onException($event);
 
         $response = $event->getResponse();
         self::assertNotNull($response, 'the listener must claim the exception before HTML rendering');
@@ -51,7 +51,7 @@ final class Rfc7807StorageOutageListenerTest extends TestCase
     {
         $event = $this->eventFor(Request::create('/admin/some-page', 'GET'));
 
-        (new Rfc7807ExceptionListener())->onException($event);
+        new Rfc7807ExceptionListener()->onException($event);
 
         self::assertNull($event->getResponse(), 'non-/api paths keep Symfony error handling (HTML profiler in dev)');
     }
@@ -63,7 +63,7 @@ final class Rfc7807StorageOutageListenerTest extends TestCase
         $request->attributes->set('_api_resource_class', 'App\\Catalog\\Domain\\Entity\\Attribute');
         $event = $this->eventFor($request);
 
-        (new Rfc7807ExceptionListener())->onException($event);
+        new Rfc7807ExceptionListener()->onException($event);
 
         self::assertNull($event->getResponse(), 'API Platform routes keep their native error pipeline');
     }
