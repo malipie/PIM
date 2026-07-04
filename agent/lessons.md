@@ -2960,3 +2960,13 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 - **k6 lokalnie: 20 VU = kontencja CPU, nie latencja endpointu.** Wszystko na jednym Macu (DB+api+Meili+k6) → przy 20 VU p95 skacze 3-4×. Uruchamiać TAKŻE 5 VU (realistyczny single-tenant) żeby oddzielić kontencję od algorytmu: endpoint który spada <100ms@5VU = kontencja, który zostaje wysoko = algorytmiczny (GET /api/products 481ms@5VU = realny finding, reszta kontencja).
 - **`docker exec` bez `-i` nie czyta stdin** (heredoc SQL → cicho nic). Zawsze `docker exec -i` dla `psql <<SQL`.
 - **`pim:catalog:detect-attributes-drift --reconcile` OOM na 50k** (`toIterable` buforuje pełny result-set client-side + per-obiekt findBy 1.7M zapytań) — odpalać z `php -d memory_limit=1024M` (workaround do fixu #2231). Seeder sam jest płaski (71 MiB), reindex Meili OK.
+
+## Lessons z #2246 (żywy bloczek agenta na dashboardzie, PR #2247)
+
+### Patterns to Follow (nowe)
+- **Stub `page.route` PRZED pierwszym fetch'em danego queryKey, nie przed asercją.** 1422-global-cmdk padł 2× w CI: hero na dashboardzie fetchuje `/api/agent/capabilities` przy mount (react-query, staleTime 5 min), stub rejestrowany PO `goto('/dashboard')` nigdy nie został trafiony — paleta czytała z cache prawdziwą (BYOK-less, pustą) odpowiedź. Reguła: gdy wiele komponentów dzieli queryKey, stub przed PIERWSZYM `goto` strony która go dotyka. Objaw-sygnatura: spec zielony lokalnie na stacku z BYOK, czerwony w CI bez klucza.
+- **Snapshot OpenAPI regenerować z FINALNEGO stanu kodu** — atrybut `#[NoPermissionRequired]` dodany po wcześniejszym exporcie zmienia spec (`x-cortex-permission: false` z CustomRouteOpenApiFactory) → drift gate czerwony mimo „świeżego" snapshotu. Regen po ostatniej zmianie kontrolerów, nie w połowie pracy.
+- **Discovery endpoint z powodami degradacji: permission PRZED feature-guardem.** `GET /api/agent/capabilities` zwraca 200 `{enabled,reason}` zamiast 403 (łagodna degradacja hero), ale kolejność powodów ma skutek bezpieczeństwa: user bez `agent.bulk_actions` dostaje `no_permission` i NIE pozna stanu klucza BYOK tenanta (parytet z 403 endpointów runów, które tną na `#[RequiresPermission]` przed guardem).
+
+### Toolchain quirks (nowe)
+- **`gh pr merge --delete-branch` w workflow z git worktree przełącza WORKTREE na `main`** (gh robi lokalny cleanup brancha) → `git checkout main` w głównym drzewie pada na `'main' is already checked out at <worktree>`. Kolejność sprzątania: `git worktree remove` NAJPIERW, potem checkout main w głównym drzewie. Bonus: dirty pliki innej pracy w głównym drzewie blokują checkout nawet gdy content == target (git porównuje z HEAD, nie z targetem) → `git stash push -u -m "label"` z opisową etykietą.
