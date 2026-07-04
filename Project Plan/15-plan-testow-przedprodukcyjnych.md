@@ -1,7 +1,8 @@
 # Plan testów przedprodukcyjnych PIM (epik GOLIVE)
 
 **Typ dokumentu:** Plan finalnych testów + backlog ticketów przed go-live
-**Status:** Aktywny — utworzony 2026-07-03
+**Status:** Aktywny — utworzony 2026-07-03 · **Blok A + B KOMPLETNE lokalnie (2026-07-04), Blok C hosting-gated. Issues: 30 zamkniętych / 9 otwartych.**
+**➡️ Raport końcowy epiku:** [`docs/audit/2026-07-handover/GOLIVE-epic-report.md`](../docs/audit/2026-07-handover/GOLIVE-epic-report.md) — werdykt go-live, rejestr findingów, status wszystkich ticketów.
 **Label GitHub:** `epik-GOLIVE` · **Milestone:** GOLIVE — testy przedprodukcyjne
 **Powiązane:** [`14-rbac-tickets-phase-7.md`](14-rbac-tickets-phase-7.md) (red-team), [`06-sprint-0-findings.md`](06-sprint-0-findings.md) (świadome odejścia), [`docs/audit/2026-06/`](../docs/audit/2026-06/) (audyt półroczny)
 
