@@ -209,6 +209,16 @@ parameters:
               - type: directory
                 value: 'src/ApiConfigurator/.*'
 
+        # ─── Dashboard (ADR-0026, DASH-04 #2255) ───────────────────────
+        # Thin read-only aggregate context for the admin dashboard. Reads
+        # other BCs via their Contracts seams; tables without a seam are
+        # read with raw tenant-scoped DBAL SQL (policy in ADR-0026), so no
+        # *_Internals dependency is allowed here.
+        - name: Dashboard
+          collectors:
+              - type: directory
+                value: 'src/Dashboard/.*'
+
         # ─── Vendor (third-party + PHP-internal classes) ───────────────
         # AUD-053 (W3-1): every dependency from a first-party class onto a
         # framework/library/PHP-internal class (Symfony, Doctrine, API
@@ -297,6 +307,17 @@ parameters:
         # AUD-053 (W3-1): `Vendor` appears in every ruleset below so that
         # framework / library / PHP-internal edges resolve to an allowed
         # layer instead of inflating the Uncovered count.
+
+        # ADR-0026 (DASH-04 #2255) — read-only dashboard aggregates. Only
+        # Contracts seams + Shared; cross-BC data without a seam is read
+        # via raw tenant-scoped SQL, never via *_Internals classes.
+        Dashboard:
+            - Catalog_Contracts
+            - Channel_Contracts
+            - Identity_Contracts
+            - Shared
+            - Vendor
+
         Catalog_Internals:
             - Catalog_Contracts
             - Asset_Contracts
