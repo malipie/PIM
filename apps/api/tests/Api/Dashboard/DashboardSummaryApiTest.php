@@ -71,6 +71,41 @@ final class DashboardSummaryApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function snapshotsAtTheHorizonsUnlockHonestDeltas(): void
+    {
+        $tenant = $this->demoTenant();
+        $this->seedProducts($tenant, [
+            ['sku' => 'P-100', 'pct' => 100, 'per_channel' => []],
+            ['sku' => 'P-060', 'pct' => 60, 'per_channel' => []],
+            ['sku' => 'P-030', 'pct' => 30, 'per_channel' => []],
+        ]);
+
+        // DASH-05: snapshots exactly at the 30d and 7d horizons.
+        $this->em()->getConnection()->executeStatement(
+            'INSERT INTO dashboard_snapshots '
+            .'(id, tenant_id, snapshot_date, products_total, publish_ready_count, avg_completeness_pct, per_channel, created_at) VALUES '
+            ."(:id30, :tenant, CURRENT_DATE - 30, 2, 0, 40, '{}', NOW()), "
+            ."(:id7, :tenant, CURRENT_DATE - 7, 3, 1, 55, '{}', NOW())",
+            [
+                'id30' => '01980000-0000-7000-8000-000000000030',
+                'id7' => '01980000-0000-7000-8000-000000000007',
+                'tenant' => $tenant->getId()->toRfc4122(),
+            ],
+        );
+
+        $response = $this->authenticatedClient()->request('GET', '/api/dashboard/summary');
+
+        self::assertResponseIsSuccessful();
+        $body = $response->toArray();
+        // Current: ready=1, avg=63. Horizon 30d: ready 0, avg 40; 7d: avg 55.
+        self::assertSame(['count' => 1, 'pct' => 33, 'delta30d' => 1], $body['publishReady']);
+        self::assertSame(
+            ['pct' => 63, 'delta30d' => 23, 'weeklyDeltaPoints' => 8],
+            $body['avgCompleteness'],
+        );
+    }
+
+    #[Test]
     public function emptyCatalogYieldsZeroesNotDivisionErrors(): void
     {
         $response = $this->authenticatedClient()->request('GET', '/api/dashboard/summary');

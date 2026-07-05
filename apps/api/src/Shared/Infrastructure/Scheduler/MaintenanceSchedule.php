@@ -47,6 +47,8 @@ final class MaintenanceSchedule implements ScheduleProviderInterface
             RecurringMessage::cron('0 3 * * *', new RunMaintenanceCommand('pim:tenants:purge-deleted')),
             // Abandoned staged-upload TTL sweep (IMP2-2.2) — 03:30 UTC daily.
             RecurringMessage::cron('30 3 * * *', new RunMaintenanceCommand('pim:import:purge-staged')),
+            // Dashboard KPI snapshot per tenant (DASH-05 #2257) — 03:45 UTC daily.
+            RecurringMessage::cron('45 3 * * *', new RunMaintenanceCommand('pim:dashboard:snapshot')),
         );
     }
 }

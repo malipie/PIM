@@ -52,12 +52,13 @@ final class MaintenanceScheduleTest extends KernelTestCase
         self::assertSame(
             [
                 'pim:audit:cleanup',
+                'pim:dashboard:snapshot',
                 'pim:exports:cleanup',
                 'pim:import:purge-staged',
                 'pim:tenants:purge-deleted',
             ],
             $commands,
-            'The maintenance schedule must drive all four retention/offboarding commands.',
+            'The maintenance schedule must drive every retention/offboarding/snapshot command.',
         );
     }
 }

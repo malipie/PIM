@@ -162,6 +162,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Backup/Infrastructure/Doctrine/Orm/Mapping'
                 prefix: 'App\Backup\Domain\Entity'
                 alias: Backup
+            Dashboard:
+                type: xml
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Dashboard/Infrastructure/Doctrine/Orm/Mapping'
+                prefix: 'App\Dashboard\Domain\Entity'
+                alias: Dashboard
         controller_resolver:
             auto_mapping: false
 
