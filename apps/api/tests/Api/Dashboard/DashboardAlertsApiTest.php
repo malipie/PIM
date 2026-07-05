@@ -103,8 +103,12 @@ final class DashboardAlertsApiTest extends CatalogApiTestCase
             }
             $params = $item['params'] ?? null;
             if (\is_array($params)) {
-                /* @var array<string, mixed> $params */
-                return $params;
+                $typed = [];
+                foreach ($params as $key => $value) {
+                    $typed[(string) $key] = $value;
+                }
+
+                return $typed;
             }
         }
         self::fail(\sprintf('No alert of type "%s" in the feed.', $type));
