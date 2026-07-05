@@ -2,9 +2,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
-import { CATALOG_HEALTH } from '../mocks';
-import type { DashboardCompleteness } from '../use-dashboard-completeness';
-import { formatInt, useDashboardSummary } from '../use-dashboard-summary';
+import { type DashboardSummaryDto, formatInt, useDashboardSummary } from '../use-dashboard-summary';
 
 interface BucketVm {
   label: string;
@@ -15,6 +13,14 @@ interface BucketVm {
   href: string;
 }
 
+interface ChannelVm {
+  code: string;
+  name: string;
+  percent: number;
+  count: string;
+  color: string;
+}
+
 interface HealthVm {
   readyPercent: number;
   readyCount: string;
@@ -22,14 +28,14 @@ interface HealthVm {
   /** null = no weekly aggregate yet → the trend badge is not rendered. */
   weeklyDeltaPoints: number | null;
   buckets: BucketVm[];
+  channels: ChannelVm[];
 }
 
 const filterHref = (expr: string): string => `/products?${expr}`;
 
 /**
  * DASH-02 (#2251) — the five distribution buckets in mock order, each with
- * its drill-down filter. Counts come from either the live cumulative
- * aggregate or the mock.
+ * its drill-down filter. Counts come from the live cumulative aggregate.
  */
 const BUCKET_DEFS: ReadonlyArray<Omit<BucketVm, 'count'>> = [
   {
@@ -59,41 +65,50 @@ const BUCKET_DEFS: ReadonlyArray<Omit<BucketVm, 'count'>> = [
   },
 ];
 
+/** Channel bar palette, assigned worst-first (index order from the API). */
+const CHANNEL_COLORS = ['#3b82f6', '#f97316', '#22c55e', '#15803d', '#8b5cf6', '#0ea5e9'];
+
 /** Cumulative "at least N%" counts → disjoint bucket counts, mock order. */
-function disjointCounts(live: DashboardCompleteness): number[] {
-  const at = (gte: number): number => live.buckets.find((b) => b.gte === gte)?.count ?? 0;
+function disjointCounts(summary: DashboardSummaryDto): number[] {
+  const at = (gte: number): number =>
+    summary.buckets.find((bucket) => bucket.gte === gte)?.count ?? 0;
+  const total = summary.products.total;
   return [
     at(100),
     Math.max(0, at(80) - at(100)),
     Math.max(0, at(50) - at(80)),
     Math.max(0, at(25) - at(50)),
-    Math.max(0, live.total - at(25)),
+    Math.max(0, total - at(25)),
   ];
 }
 
-function buildVm(live: DashboardCompleteness | null): HealthVm {
-  if (live === null) {
-    // Endpoint degraded → approved mock values, per-widget (brief §8.3).
+function buildVm(summary: DashboardSummaryDto | null): HealthVm {
+  if (summary === null) {
+    // Endpoint degraded with no cached data (brief §8.3) — honest empty
+    // shell, never resurrected mock numbers.
     return {
-      readyPercent: CATALOG_HEALTH.readyPercent,
-      readyCount: CATALOG_HEALTH.readyCount,
-      totalLine: CATALOG_HEALTH.totalLine,
-      weeklyDeltaPoints: CATALOG_HEALTH.weeklyDeltaPoints,
-      buckets: BUCKET_DEFS.map((def, i) => ({
-        ...def,
-        count: CATALOG_HEALTH.buckets[i]?.count ?? 0,
-      })),
+      readyPercent: 0,
+      readyCount: '—',
+      totalLine: '',
+      weeklyDeltaPoints: null,
+      buckets: BUCKET_DEFS.map((def) => ({ ...def, count: 0 })),
+      channels: [],
     };
   }
-  const counts = disjointCounts(live);
+  const counts = disjointCounts(summary);
   return {
-    readyPercent: live.publishReadyPct,
-    readyCount: formatInt(live.publishReady),
-    totalLine: `/ ${formatInt(live.total)} SKU ≥ 80%`,
-    // No weekly aggregate exists yet (DASH-05 snapshots) — hide the badge
-    // instead of decorating live data with the mock trend.
-    weeklyDeltaPoints: null,
+    readyPercent: summary.publishReady.pct,
+    readyCount: formatInt(summary.publishReady.count),
+    totalLine: `/ ${formatInt(summary.products.total)} SKU ≥ 80%`,
+    weeklyDeltaPoints: summary.avgCompleteness.weeklyDeltaPoints,
     buckets: BUCKET_DEFS.map((def, i) => ({ ...def, count: counts[i] ?? 0 })),
+    channels: summary.channels.map((channel, i) => ({
+      code: channel.code,
+      name: channel.name,
+      percent: channel.avgPct,
+      count: formatInt(channel.readyCount),
+      color: CHANNEL_COLORS[i % CHANNEL_COLORS.length] ?? '#3b82f6',
+    })),
   };
 }
 
@@ -175,20 +190,20 @@ function ReadyRing({ percent, buckets }: { percent: number; buckets: BucketVm[] 
 }
 
 /**
- * VIEW-13 (#2143) / DASH-02 (#2251) — "Zdrowie danych / Kompletność
- * katalogu" card. Ring, ready count and the distribution buckets are live
- * (completeness aggregate via the summary façade) and degrade to the
- * approved mock per widget; every bucket legend row drills down to the
- * products list with the matching filter. Per-channel completeness stays
- * mock until its aggregate endpoint lands (DASH-03/DASH-06); the weekly
- * trend badge renders only when trend data exists (mock path) — never a
- * fabricated trend on live data.
+ * VIEW-13 (#2143) / DASH-06 (#2259) — "Zdrowie danych / Kompletność
+ * katalogu" card, fully driven by GET /api/dashboard/summary: live ring,
+ * ready count, distribution buckets (each legend row drills down to the
+ * pre-filtered products list) and the per-channel aggregate (worst-first
+ * from the API; a channel row drills down to the global sub-threshold
+ * filter — the per-channel list filter is an explicitly deferred ticket).
+ * The weekly trend badge renders only when the snapshot horizon exists
+ * (DASH-05) — never a fabricated trend.
  */
 export function CatalogHealthCard() {
   const { t } = useTranslation();
   const headingId = useId();
-  const { completeness } = useDashboardSummary();
-  const vm = buildVm(completeness);
+  const { summary } = useDashboardSummary();
+  const vm = buildVm(summary);
   const total = vm.buckets.reduce((sum, bucket) => sum + bucket.count, 0);
 
   return (
@@ -254,7 +269,6 @@ export function CatalogHealthCard() {
                     aria-hidden
                   />
                   <span className="num text-ink-2">{bucket.label}</span>
-                  {/* Mock renders raw digits (4210) — no grouping below 5 digits. */}
                   <span className="num ml-auto font-medium text-ink">{bucket.count}</span>
                 </Link>
               </li>
@@ -272,30 +286,50 @@ export function CatalogHealthCard() {
             {t('dashboard.health.channels_sort', { defaultValue: 'sort: najgorszy pierwszy' })}
           </span>
         </div>
-        <ul className="mt-4 space-y-3.5">
-          {CATALOG_HEALTH.channels.map((channel) => (
-            <li key={channel.name} className="flex items-center gap-4">
-              <span className="w-32 shrink-0 truncate text-[13.5px] text-ink sm:w-36">
-                {channel.name}
-              </span>
-              <span
-                className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-2"
-                aria-hidden
-              >
-                <span
-                  className="block h-full rounded-full"
-                  style={{ width: `${channel.percent}%`, backgroundColor: channel.color }}
-                />
-              </span>
-              <span className="num w-10 shrink-0 text-right text-[13.5px] font-semibold text-ink">
-                {channel.percent}%
-              </span>
-              <span className="num w-14 shrink-0 text-right text-[12.5px] text-ink-2">
-                {channel.count}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {vm.channels.length === 0 ? (
+          <p className="mt-4 text-[13px] text-ink-2">
+            {t('dashboard.health.channels_empty', {
+              defaultValue:
+                'Brak kanałów z danymi kompletności — skonfiguruj wymagania kanałowe w modelowaniu.',
+            })}
+          </p>
+        ) : (
+          <ul className="mt-4 space-y-3.5">
+            {vm.channels.map((channel) => (
+              <li key={channel.code}>
+                <Link
+                  to={filterHref(
+                    'filter[completeness_pct][op]=lt&filter[completeness_pct][value]=80',
+                  )}
+                  className="flex items-center gap-4 rounded hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                  aria-label={t('dashboard.health.channel_link_aria', {
+                    defaultValue: 'Pokaż produkty poniżej progu publikacji (kanał {{channel}})',
+                    channel: channel.name,
+                  })}
+                >
+                  <span className="w-32 shrink-0 truncate text-[13.5px] text-ink sm:w-36">
+                    {channel.name}
+                  </span>
+                  <span
+                    className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-2"
+                    aria-hidden
+                  >
+                    <span
+                      className="block h-full rounded-full"
+                      style={{ width: `${channel.percent}%`, backgroundColor: channel.color }}
+                    />
+                  </span>
+                  <span className="num w-10 shrink-0 text-right text-[13.5px] font-semibold text-ink">
+                    {channel.percent}%
+                  </span>
+                  <span className="num w-14 shrink-0 text-right text-[12.5px] text-ink-2">
+                    {channel.count}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

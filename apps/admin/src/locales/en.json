@@ -1000,6 +1000,8 @@
       "ring_aria": "{{percent}}% of products ready to publish",
       "channels_header": "Completeness by channel",
       "channels_sort": "sort: worst first",
+      "channels_empty": "No channels with completeness data — configure channel requirements in modeling.",
+      "channel_link_aria": "Show products below the publish threshold (channel {{channel}})",
       "bucket_link_aria": "Show products with {{bucket}} completeness"
     },
     "activity": {
