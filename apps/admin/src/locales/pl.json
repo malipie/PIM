@@ -1025,6 +1025,9 @@
       "avg_per_day": "średnio {{count}} zmian / dzień",
       "chart_aria": "Wykres dziennych zmian w katalogu — dodane i zmodyfikowane produkty",
       "most_edited": "Najczęściej edytowane",
+      "most_edited_empty": "Brak edycji produktów w tym okresie.",
+      "axis_days_ago": "{{count}} dni temu",
+      "axis_today": "dziś",
       "full_list": "Pełna lista",
       "edits_suffix": "edycji"
     },

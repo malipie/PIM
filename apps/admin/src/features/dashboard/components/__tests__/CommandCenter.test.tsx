@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { DashboardActivityDto, DashboardTopEditedDto } from '../../use-dashboard-activity';
 import type { DashboardSummary, DashboardSummaryDto } from '../../use-dashboard-summary';
 
 /**
@@ -25,11 +27,33 @@ vi.mock('../../use-dashboard-summary', async (importOriginal) => {
   };
 });
 
+const activityState: {
+  activity: DashboardActivityDto | null;
+  topEdited: DashboardTopEditedDto | null;
+} = { activity: null, topEdited: null };
+
+vi.mock('../../use-dashboard-activity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../use-dashboard-activity')>();
+  return {
+    ...actual,
+    useDashboardActivity: () =>
+      ({ data: activityState.activity }) as unknown as ReturnType<
+        typeof actual.useDashboardActivity
+      >,
+    useDashboardTopEdited: () =>
+      ({ data: activityState.topEdited }) as unknown as ReturnType<
+        typeof actual.useDashboardTopEdited
+      >,
+  };
+});
+
 import { ActionCenter } from '../ActionCenter';
 import { CatalogHealthCard } from '../CatalogHealthCard';
 import { KpiBand } from '../KpiBand';
+import { TeamActivityCard } from '../TeamActivityCard';
 
-const renderWithRouter = (node: ReactNode) => render(<MemoryRouter>{node}</MemoryRouter>);
+const renderWithRouter = (node: ReactNode, initialEntries: string[] = ['/dashboard']) =>
+  render(<MemoryRouter initialEntries={initialEntries}>{node}</MemoryRouter>);
 
 const LIVE_SUMMARY: DashboardSummaryDto = {
   products: { total: 194, delta30d: 12 },
@@ -50,6 +74,8 @@ const LIVE_SUMMARY: DashboardSummaryDto = {
 
 beforeEach(() => {
   state.summary = null;
+  activityState.activity = null;
+  activityState.topEdited = null;
 });
 
 describe('KpiBand', () => {
@@ -146,6 +172,61 @@ describe('CatalogHealthCard', () => {
       'href',
       expect.stringContaining('filter[completeness_pct][op]=lt'),
     );
+  });
+});
+
+describe('TeamActivityCard', () => {
+  const LIVE_ACTIVITY: DashboardActivityDto = {
+    range: '7d',
+    series: [
+      { date: '2026-07-01', added: 2, modified: 5 },
+      { date: '2026-07-02', added: 0, modified: 1 },
+    ],
+    addedTotal: 2,
+    modifiedTotal: 6,
+    avgPerDay: 1,
+  };
+
+  it('degrades to "—" totals, a flat chart and the honest empty ranking', () => {
+    renderWithRouter(<TeamActivityCard />);
+    expect(screen.getAllByText('—')).toHaveLength(2);
+    expect(screen.getByText('Brak edycji produktów w tym okresie.')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Wykres dziennych zmian/ })).toBeInTheDocument();
+  });
+
+  it('reads the range from the URL and marks the toggle as pressed', () => {
+    activityState.activity = LIVE_ACTIVITY;
+    renderWithRouter(<TeamActivityCard />, ['/dashboard?range=7d']);
+    expect(screen.getByRole('button', { name: '7 dni' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('6')).toBeInTheDocument();
+    expect(screen.getByText(/średnio 1 zmian \/ dzień/)).toBeInTheDocument();
+    expect(screen.getByText('6 dni temu')).toBeInTheDocument();
+    expect(screen.getByText('dziś')).toBeInTheDocument();
+  });
+
+  it('persists a toggle click in the URL (aria-pressed follows)', async () => {
+    const user = userEvent.setup();
+    renderWithRouter(<TeamActivityCard />);
+    expect(screen.getByRole('button', { name: '30 dni' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: '90 dni' }));
+    expect(screen.getByRole('button', { name: '90 dni' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('89 dni temu')).toBeInTheDocument();
+  });
+
+  it('renders every most-edited row as a product-page link', () => {
+    activityState.topEdited = {
+      items: [
+        { id: 'p-1', name: 'Czujnik', sku: 'TOP-1', completenessPct: 96, edits: 47 },
+        { id: 'p-2', name: 'Zawór', sku: 'TOP-2', completenessPct: 72, edits: 34 },
+      ],
+    };
+    renderWithRouter(<TeamActivityCard />);
+    const rows = screen.getAllByRole('link', { name: /edycji/ });
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveAttribute('href', '/products/p-1');
+    expect(screen.getByText('Czujnik')).toBeInTheDocument();
+    expect(screen.queryByText('Brak edycji produktów w tym okresie.')).not.toBeInTheDocument();
   });
 });
 

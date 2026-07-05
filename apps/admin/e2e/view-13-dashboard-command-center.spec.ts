@@ -148,14 +148,24 @@ test('VIEW-13 — command center renders all five sections with mock values', as
   const channelsEmpty = page.getByText(/Brak kanałów z danymi kompletności/);
   expect((await channelRows.count()) > 0 || (await channelsEmpty.count()) === 1).toBe(true);
 
-  // 5. Team activity — range toggle is interactive (cosmetic state only).
+  // 5. Team activity — live since DASH-08: the range toggle persists in
+  // the URL and reloads the series from the API; the ranking renders live
+  // rows or the honest empty state (fresh stacks carry no product edits).
   await expect(page.getByRole('heading', { name: 'Tempo pracy zespołu' })).toBeVisible();
   const range7 = page.getByRole('button', { name: '7 dni' });
   await expect(range7).toHaveAttribute('aria-pressed', 'false');
+  const activityReload = page.waitForResponse(
+    (res) => res.url().includes('/api/dashboard/activity') && res.url().includes('range=7d'),
+    { timeout: 15_000 },
+  );
   await range7.click();
   await expect(range7).toHaveAttribute('aria-pressed', 'true');
+  await expect(page).toHaveURL(/range=7d/);
+  expect((await activityReload).status()).toBe(200);
   await expect(page.getByText('Najczęściej edytowane')).toBeVisible();
-  await expect(page.getByText('Czujnik indukcyjny Festo IS-50 PNP M12')).toBeVisible();
+  const topRows = main.getByRole('link', { name: /edycji/ });
+  const topEmpty = page.getByText('Brak edycji produktów w tym okresie.');
+  expect((await topRows.count()) > 0 || (await topEmpty.count()) === 1).toBe(true);
 
   // 6. Action center — counters and all five mock items.
   await expect(page.getByRole('heading', { name: 'Centrum akcji' })).toBeVisible();
