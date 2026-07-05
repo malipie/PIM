@@ -12,6 +12,9 @@
             <index name="idx_audit_logs_user" columns="user_id"/>
             <index name="idx_audit_logs_resource" columns="resource_type,resource_id"/>
             <index name="idx_audit_logs_created_at" columns="created_at"/>
+            <!-- DASH-07 (#2261) — dashboard activity aggregates filter by
+                 tenant + created_at window before narrowing on route. -->
+            <index name="idx_audit_logs_tenant_created" columns="tenant_id,created_at"/>
         </indexes>
 
         <id name="id" type="uuid" column="id">
