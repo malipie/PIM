@@ -12872,6 +12872,32 @@
                 "x-cortex-permission": "settings.integrations.manage"
             }
         },
+        "/api/dashboard/activity": {
+            "get": {
+                "operationId": "api_dashboard_activity_get",
+                "tags": [
+                    "dashboard"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api dashboard activity",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "products.view"
+            }
+        },
         "/api/dashboard/summary": {
             "get": {
                 "operationId": "api_dashboard_summary_get",
@@ -12887,6 +12913,32 @@
                     }
                 },
                 "summary": "Api dashboard summary",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "products.view"
+            }
+        },
+        "/api/dashboard/top-edited": {
+            "get": {
+                "operationId": "api_dashboard_top_edited_get",
+                "tags": [
+                    "dashboard"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api dashboard top edited",
                 "description": "Custom controller route.",
                 "parameters": [],
                 "security": [
