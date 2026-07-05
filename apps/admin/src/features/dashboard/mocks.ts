@@ -7,107 +7,13 @@
  * mechanical; the backend backlog lives in
  * Project Plan/UI/Wdrozenie_grafiki/dashboard-do-oprogramowania.md.
  *
- * Wired live so far (mock removed): KPI band + catalog health via
- * GET /api/dashboard/summary (DASH-02/06). Still mock below: team
- * activity (DASH-07/08) and the action center (DASH-09/10).
+ * Wired live so far (mock removed): KPI band + catalog health
+ * (GET /api/dashboard/summary, DASH-02/06) and team activity
+ * (GET /api/dashboard/activity + /top-edited, DASH-07/08). Still mock
+ * below: the action center (DASH-09/10).
  *
  * Do not import this module outside features/dashboard/.
  */
-
-// ---------------------------------------------------------------------------
-// Team activity (chart + most edited)
-// ---------------------------------------------------------------------------
-
-export type ActivityRange = '7d' | '30d' | '90d';
-
-export interface ActivityPoint {
-  added: number;
-  modified: number;
-}
-
-/**
- * Deterministic pseudo-noise series — literal enough to stay pixel-stable
- * between renders, jagged enough to read as real team activity.
- */
-const buildSeries = (length: number): ActivityPoint[] =>
-  Array.from({ length }, (_, i) => {
-    const weekend = i % 7 === 5 || i % 7 === 6;
-    const drift = i / (length - 1);
-    return {
-      added: weekend ? 14 + (i % 4) : 24 + ((i * 5) % 11) + Math.round(drift * 10),
-      modified: weekend ? 26 + (i % 5) : 40 + ((i * 7) % 15) + Math.round(drift * 16),
-    };
-  });
-
-export const TEAM_ACTIVITY = {
-  addedTotal: '1 354',
-  modifiedTotal: '2 141',
-  avgPerDay: 117,
-  series: {
-    '7d': buildSeries(7),
-    '30d': buildSeries(30),
-    '90d': buildSeries(90),
-  } satisfies Record<ActivityRange, ActivityPoint[]>,
-  /** X-axis captions per range: [left, middle, right]. */
-  axis: {
-    '7d': ['6 dni temu', '3 dni temu', 'dziś'],
-    '30d': ['29 dni temu', '14 dni temu', 'dziś'],
-    '90d': ['89 dni temu', '45 dni temu', 'dziś'],
-  } satisfies Record<ActivityRange, [string, string, string]>,
-};
-
-export interface MostEditedProduct {
-  name: string;
-  sku: string;
-  category: string;
-  completeness: number;
-  edits: number;
-}
-
-export const MOST_EDITED: MostEditedProduct[] = [
-  {
-    name: 'Czujnik indukcyjny Festo IS-50 PNP M12',
-    sku: 'FES-PNZ-IS50',
-    category: 'Czujniki',
-    completeness: 96,
-    edits: 47,
-  },
-  {
-    name: 'Rura zaciskowa DN50 stal nierdzewna 316L',
-    sku: 'KLI-RZP-DN50',
-    category: 'Hydraulika',
-    completeness: 88,
-    edits: 41,
-  },
-  {
-    name: 'Wkrętarka akumulatorowa Bosch GSR 18V-90',
-    sku: 'BSC-WKR-18V',
-    category: 'Elektronarzędzia',
-    completeness: 100,
-    edits: 38,
-  },
-  {
-    name: 'Zawór elektromagnetyczny SMC 24V solenoid',
-    sku: 'SMC-ZWR-24V',
-    category: 'Pneumatyka',
-    completeness: 72,
-    edits: 34,
-  },
-  {
-    name: 'Plecak fotograficzny Wandrd PRVKE Pro 31L',
-    sku: 'WAR-PLE-PRO',
-    category: 'Akcesoria',
-    completeness: 94,
-    edits: 29,
-  },
-  {
-    name: 'Złącze M12 Murr 4-pin IP67 ekranowane',
-    sku: 'MKP-TWR-IP67',
-    category: 'Złącza',
-    completeness: 67,
-    edits: 22,
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Action center

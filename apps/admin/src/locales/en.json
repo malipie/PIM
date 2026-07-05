@@ -1015,6 +1015,9 @@
       "avg_per_day": "avg {{count}} changes / day",
       "chart_aria": "Daily catalog changes chart — added and modified products",
       "most_edited": "Most edited",
+      "most_edited_empty": "No product edits in this period.",
+      "axis_days_ago": "{{count}} days ago",
+      "axis_today": "today",
       "full_list": "Full list",
       "edits_suffix": "edits"
     },
