@@ -7,6 +7,7 @@ namespace App\Dashboard\Application\Query;
 use App\Catalog\Contracts\Query\ChannelCompletenessPort;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
 
@@ -16,10 +17,11 @@ use LogicException;
  * completeness thresholds, avg, 30-day created delta) plus the per-channel
  * aggregate from the Catalog Contracts port.
  *
- * Completeness deltas (`delta30d`, `weeklyDeltaPoints`) stay null until the
- * daily snapshots land (DASH-05); `openAlerts` stays null until the alert
- * aggregator lands (DASH-09). The FE renders "no trend" for nulls — never
- * a fabricated arrow (NUI-02).
+ * DASH-05 (#2257) — completeness deltas come from `dashboard_snapshots`
+ * (daily job): current value minus the snapshot at the 30d/7d horizon.
+ * No snapshot at the horizon ⇒ null ⇒ the FE renders "no trend" — never
+ * a fabricated arrow (NUI-02). `openAlerts` stays null until the alert
+ * aggregator lands (DASH-09).
  */
 final readonly class DashboardSummaryQuery
 {
@@ -37,14 +39,12 @@ final readonly class DashboardSummaryQuery
     }
 
     /**
-     * @return array<string, mixed>
+     * The raw aggregates for the current tenant — shared by the summary
+     * response and the daily snapshot command.
      */
-    public function summary(): array
+    public function aggregates(): DashboardAggregates
     {
-        $tenant = $this->tenantContext->get();
-        if (!$tenant instanceof Tenant) {
-            throw new LogicException('Cannot build the dashboard summary without a current tenant.');
-        }
+        $tenant = $this->currentTenant();
 
         $filters = [];
         foreach (self::THRESHOLDS as $threshold) {
@@ -66,20 +66,42 @@ final readonly class DashboardSummaryQuery
             ['tenant' => $tenant->getId()->toRfc4122()],
         );
 
-        $total = $this->intOf($row['total'] ?? 0);
-        $ready = $this->intOf($row['gte_'.self::READY_THRESHOLD] ?? 0);
-        $avgRaw = $row['avg_pct'] ?? 0;
-
         $buckets = [];
         foreach (self::THRESHOLDS as $threshold) {
-            $buckets[] = [
-                'gte' => $threshold,
-                'count' => $this->intOf($row['gte_'.$threshold] ?? 0),
-            ];
+            $buckets[$threshold] = $this->intOf($row['gte_'.$threshold] ?? 0);
+        }
+        $avgRaw = $row['avg_pct'] ?? 0;
+
+        return new DashboardAggregates(
+            productsTotal: $this->intOf($row['total'] ?? 0),
+            createdLast30d: $this->intOf($row['created_30d'] ?? 0),
+            publishReadyCount: $buckets[self::READY_THRESHOLD],
+            avgCompletenessPct: (int) round(\is_numeric($avgRaw) ? (float) $avgRaw : 0.0),
+            cumulativeBuckets: $buckets,
+            channels: $this->channelCompleteness->perChannel(self::READY_THRESHOLD),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function summary(): array
+    {
+        $tenant = $this->currentTenant();
+        $aggregates = $this->aggregates();
+        $horizons = $this->snapshotHorizons($tenant);
+
+        $ready30 = $horizons[30]['publish_ready_count'] ?? null;
+        $avg30 = $horizons[30]['avg_completeness_pct'] ?? null;
+        $avg7 = $horizons[7]['avg_completeness_pct'] ?? null;
+
+        $buckets = [];
+        foreach ($aggregates->cumulativeBuckets as $threshold => $count) {
+            $buckets[] = ['gte' => $threshold, 'count' => $count];
         }
 
         $channels = [];
-        foreach ($this->channelCompleteness->perChannel(self::READY_THRESHOLD) as $channel) {
+        foreach ($aggregates->channels as $channel) {
             $channels[] = [
                 'code' => $channel->channelCode,
                 'name' => $channel->channelName,
@@ -90,23 +112,77 @@ final readonly class DashboardSummaryQuery
 
         return [
             'products' => [
-                'total' => $total,
-                'delta30d' => $this->intOf($row['created_30d'] ?? 0),
+                'total' => $aggregates->productsTotal,
+                'delta30d' => $aggregates->createdLast30d,
             ],
             'publishReady' => [
-                'count' => $ready,
-                'pct' => $total > 0 ? (int) round($ready / $total * 100) : 0,
-                'delta30d' => null,
+                'count' => $aggregates->publishReadyCount,
+                'pct' => $aggregates->publishReadyPct(),
+                'delta30d' => null === $ready30 ? null : $aggregates->publishReadyCount - $ready30,
             ],
             'avgCompleteness' => [
-                'pct' => (int) round(\is_numeric($avgRaw) ? (float) $avgRaw : 0.0),
-                'delta30d' => null,
-                'weeklyDeltaPoints' => null,
+                'pct' => $aggregates->avgCompletenessPct,
+                'delta30d' => null === $avg30 ? null : $aggregates->avgCompletenessPct - $avg30,
+                'weeklyDeltaPoints' => null === $avg7 ? null : $aggregates->avgCompletenessPct - $avg7,
             ],
             'buckets' => $buckets,
             'channels' => $channels,
             'openAlerts' => null,
         ];
+    }
+
+    /**
+     * Snapshot rows at exactly the 30d and 7d horizons, keyed by horizon.
+     * A missed cron day simply yields no delta for that horizon — honest
+     * nulls over approximated windows.
+     *
+     * @return array<int, array{publish_ready_count: int, avg_completeness_pct: int}>
+     */
+    private function snapshotHorizons(Tenant $tenant): array
+    {
+        // tenant-safe: explicit tenant_id predicate (see aggregates()).
+        $rows = $this->entityManager->getConnection()->fetchAllAssociative(
+            'SELECT snapshot_date, publish_ready_count, avg_completeness_pct '
+            .'FROM dashboard_snapshots '
+            .'WHERE tenant_id = :tenant '
+            .'AND snapshot_date IN (CURRENT_DATE - 30, CURRENT_DATE - 7)',
+            ['tenant' => $tenant->getId()->toRfc4122()],
+        );
+
+        $horizon30 = $this->dateString('-30 days');
+        $horizon7 = $this->dateString('-7 days');
+
+        $byHorizon = [];
+        foreach ($rows as $row) {
+            $date = \is_string($row['snapshot_date'] ?? null) ? $row['snapshot_date'] : '';
+            $values = [
+                'publish_ready_count' => $this->intOf($row['publish_ready_count'] ?? 0),
+                'avg_completeness_pct' => $this->intOf($row['avg_completeness_pct'] ?? 0),
+            ];
+            if ($date === $horizon30) {
+                $byHorizon[30] = $values;
+            }
+            if ($date === $horizon7) {
+                $byHorizon[7] = $values;
+            }
+        }
+
+        return $byHorizon;
+    }
+
+    private function currentTenant(): Tenant
+    {
+        $tenant = $this->tenantContext->get();
+        if (!$tenant instanceof Tenant) {
+            throw new LogicException('Cannot build the dashboard summary without a current tenant.');
+        }
+
+        return $tenant;
+    }
+
+    private function dateString(string $modifier): string
+    {
+        return new DateTimeImmutable('today')->modify($modifier)->format('Y-m-d');
     }
 
     private function intOf(mixed $value): int
