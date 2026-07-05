@@ -7,72 +7,12 @@
  * mechanical; the backend backlog lives in
  * Project Plan/UI/Wdrozenie_grafiki/dashboard-do-oprogramowania.md.
  *
+ * Wired live so far (mock removed): KPI band + catalog health via
+ * GET /api/dashboard/summary (DASH-02/06). Still mock below: team
+ * activity (DASH-07/08) and the action center (DASH-09/10).
+ *
  * Do not import this module outside features/dashboard/.
  */
-
-// ---------------------------------------------------------------------------
-// KPI band
-// ---------------------------------------------------------------------------
-
-export type KpiKey = 'products' | 'publish_ready' | 'avg_completeness' | 'open_alerts';
-
-export interface KpiTile {
-  key: KpiKey;
-  /** Pre-formatted display value (keeps the mock's exact spacing). */
-  value: string;
-  /** Signed delta text (e.g. "+184", "+3 pkt"); null = no trend available. */
-  delta: string | null;
-}
-
-export const KPI_TILES: KpiTile[] = [
-  { key: 'products', value: '12 847', delta: '+184' },
-  { key: 'publish_ready', value: '10 984', delta: '+312' },
-  { key: 'avg_completeness', value: '87%', delta: '+3 pkt' },
-  // No history aggregate for alerts — the tile renders "24h · brak trendu"
-  // instead of a fake arrow (NUI-02 rule: never fabricate a trend).
-  { key: 'open_alerts', value: '5', delta: null },
-];
-
-// ---------------------------------------------------------------------------
-// Catalog health (completeness)
-// ---------------------------------------------------------------------------
-
-export interface CompletenessBucketSlice {
-  /** Range label rendered verbatim in the legend (numeric, not translated). */
-  label: string;
-  count: number;
-  /** Decorative segment color (bar + legend dot + ring). */
-  color: string;
-}
-
-export interface ChannelCompleteness {
-  name: string;
-  percent: number;
-  count: string;
-  /** Decorative bar color. */
-  color: string;
-}
-
-export const CATALOG_HEALTH = {
-  readyPercent: 85,
-  readyCount: '10 984',
-  totalLine: '/ 12 847 SKU ≥ 80%',
-  weeklyDeltaPoints: 3,
-  buckets: [
-    { label: '100%', count: 4_210, color: '#15803d' },
-    { label: '80–99%', count: 6_774, color: '#22c55e' },
-    { label: '50–79%', count: 1_118, color: '#f97316' },
-    { label: '25–49%', count: 598, color: '#ef4444' },
-    { label: '< 25%', count: 147, color: '#cbd5e1' },
-  ] satisfies CompletenessBucketSlice[],
-  /** Sorted worst-first, matching the "sort: najgorszy pierwszy" caption. */
-  channels: [
-    { name: 'Google Shopping', percent: 76, count: '9764', color: '#3b82f6' },
-    { name: 'BaseLinker', percent: 81, count: '10 405', color: '#f97316' },
-    { name: 'Shopify', percent: 94, count: '11 842', color: '#22c55e' },
-    { name: 'Comarch ERP XL', percent: 99, count: '12 718', color: '#15803d' },
-  ] satisfies ChannelCompleteness[],
-};
 
 // ---------------------------------------------------------------------------
 // Team activity (chart + most edited)

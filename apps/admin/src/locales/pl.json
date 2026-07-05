@@ -1010,6 +1010,8 @@
       "ring_aria": "{{percent}}% produktów gotowych do publikacji",
       "channels_header": "Kompletność wg kanału",
       "channels_sort": "sort: najgorszy pierwszy",
+      "channels_empty": "Brak kanałów z danymi kompletności — skonfiguruj wymagania kanałowe w modelowaniu.",
+      "channel_link_aria": "Pokaż produkty poniżej progu publikacji (kanał {{channel}})",
       "bucket_link_aria": "Pokaż produkty o kompletności {{bucket}}"
     },
     "activity": {

@@ -3,25 +3,25 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DashboardSummary } from '../../use-dashboard-summary';
+import type { DashboardSummary, DashboardSummaryDto } from '../../use-dashboard-summary';
 
 /**
- * DASH-02 (#2251) — the summary façade is mocked so each case pins one
- * path: degraded (null → approved mock values per widget) or live
- * (values from the aggregate). formatInt stays real (re-exported from
- * the actual module).
+ * DASH-06 (#2259) — the summary façade is mocked so each case pins one
+ * path: degraded (null → honest "—" shells, no resurrected mock numbers)
+ * or live (values straight from the endpoint DTO). formatInt/formatDelta
+ * stay real (re-exported from the actual module).
  */
-const summaryState: DashboardSummary = {
-  productsTotal: null,
-  completeness: null,
-  isLoading: false,
-};
+const state: { summary: DashboardSummaryDto | null } = { summary: null };
 
 vi.mock('../../use-dashboard-summary', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../use-dashboard-summary')>();
   return {
     ...actual,
-    useDashboardSummary: (): DashboardSummary => ({ ...summaryState }),
+    useDashboardSummary: (): DashboardSummary => ({
+      summary: state.summary,
+      isLoading: false,
+      refetch: () => {},
+    }),
   };
 });
 
@@ -31,44 +31,50 @@ import { KpiBand } from '../KpiBand';
 
 const renderWithRouter = (node: ReactNode) => render(<MemoryRouter>{node}</MemoryRouter>);
 
-const LIVE_COMPLETENESS = {
-  total: 194,
-  publishReady: 120,
-  publishReadyPct: 62,
+const LIVE_SUMMARY: DashboardSummaryDto = {
+  products: { total: 194, delta30d: 12 },
+  publishReady: { count: 120, pct: 62, delta30d: null },
+  avgCompleteness: { pct: 71, delta30d: -3, weeklyDeltaPoints: 2 },
   buckets: [
     { gte: 25, count: 180 },
     { gte: 50, count: 170 },
     { gte: 80, count: 120 },
     { gte: 100, count: 40 },
   ],
+  channels: [
+    { code: 'google', name: 'Google Shopping', avgPct: 58, readyCount: 96 },
+    { code: 'allegro', name: 'Allegro', avgPct: 92, readyCount: 180 },
+  ],
+  openAlerts: null,
 };
 
 beforeEach(() => {
-  summaryState.productsTotal = null;
-  summaryState.completeness = null;
-  summaryState.isLoading = false;
+  state.summary = null;
 });
 
 describe('KpiBand', () => {
-  it('degrades to the approved mock values when the aggregates are unavailable', () => {
+  it('renders honest "—" shells when the endpoint is degraded (no mock numbers)', () => {
     renderWithRouter(<KpiBand />);
-    expect(screen.getByText('12 847')).toBeInTheDocument();
-    expect(screen.getByText('10 984')).toBeInTheDocument();
-    expect(screen.getByText('87%')).toBeInTheDocument();
-    expect(screen.getByText('Gotowe do publikacji')).toBeInTheDocument();
+    expect(screen.getAllByText('—')).toHaveLength(4);
+    expect(screen.queryByText('12 847')).not.toBeInTheDocument();
+    expect(screen.getAllByText('brak trendu')).toHaveLength(3);
+    expect(screen.getByText('24h · brak trendu')).toBeInTheDocument();
   });
 
-  it('renders live counts with "brak trendu" instead of the mock deltas', () => {
-    summaryState.productsTotal = 194;
-    summaryState.completeness = LIVE_COMPLETENESS;
+  it('renders live values with real product delta and honest nulls elsewhere', () => {
+    state.summary = LIVE_SUMMARY;
     renderWithRouter(<KpiBand />);
     expect(screen.getByText('194')).toBeInTheDocument();
     expect(screen.getByText('120')).toBeInTheDocument();
-    // Live tiles never fabricate a trend (NUI-02); only the still-mock
-    // avg-completeness tile keeps its approved delta.
-    expect(screen.getAllByText('brak trendu')).toHaveLength(2);
-    expect(screen.queryAllByText(/^\+(184|312)$/)).toHaveLength(0);
-    expect(screen.getByText('+3 pkt')).toBeInTheDocument();
+    expect(screen.getByText('71%')).toBeInTheDocument();
+    // products delta is live (+12); avg delta is negative (−3); the
+    // publish-ready delta has no snapshot horizon yet → "brak trendu".
+    expect(screen.getByText('+12')).toBeInTheDocument();
+    expect(screen.getByText('−3')).toBeInTheDocument();
+    expect(screen.getAllByText('brak trendu')).toHaveLength(1);
+    // openAlerts is null until DASH-09 → the alerts tile shows "—".
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('24h · brak trendu')).toBeInTheDocument();
   });
 
   it('renders every tile as a drill-down link (brief §5-C)', () => {
@@ -91,11 +97,6 @@ describe('KpiBand', () => {
     );
   });
 
-  it('renders "24h · brak trendu" on the alerts tile instead of a fake delta', () => {
-    renderWithRouter(<KpiBand />);
-    expect(screen.getByText('24h · brak trendu')).toBeInTheDocument();
-  });
-
   it('does not render any MOCK badge (operator decision)', () => {
     renderWithRouter(<KpiBand />);
     expect(screen.queryByText('MOCK')).not.toBeInTheDocument();
@@ -103,50 +104,45 @@ describe('KpiBand', () => {
 });
 
 describe('CatalogHealthCard', () => {
-  it('degrades to mock ring, legend and channels when the aggregate is unavailable', () => {
-    renderWithRouter(<CatalogHealthCard />);
-    expect(screen.getByText('85%')).toBeInTheDocument();
-    expect(screen.getByText('gotowe do publikacji')).toBeInTheDocument();
-    expect(screen.getByText('4210')).toBeInTheDocument();
-    expect(screen.getByText('80–99%')).toBeInTheDocument();
-    // Mock path carries the approved weekly-trend badge.
-    expect(screen.getByText(/pkt \/ tydz\./)).toBeInTheDocument();
-    expect(screen.getByText('Kompletność wg kanału')).toBeInTheDocument();
-    const channels = ['Google Shopping', 'BaseLinker', 'Shopify', 'Comarch ERP XL'];
-    for (const channel of channels) {
-      expect(screen.getByText(channel)).toBeInTheDocument();
-    }
-    expect(screen.queryByText('MOCK')).not.toBeInTheDocument();
-  });
-
-  it('renders the live aggregate: disjoint buckets, ready count, no fabricated trend badge', () => {
-    summaryState.completeness = LIVE_COMPLETENESS;
+  it('renders the live aggregate: ring, disjoint buckets, weekly badge, channels', () => {
+    state.summary = LIVE_SUMMARY;
     renderWithRouter(<CatalogHealthCard />);
     expect(screen.getByText('62%')).toBeInTheDocument();
     expect(screen.getByText('120')).toBeInTheDocument();
     expect(screen.getByText(/194 SKU ≥ 80%/)).toBeInTheDocument();
     // Cumulative [25:180, 50:170, 80:120, 100:40] over 194 total →
     // disjoint [40, 80, 50, 10, 14].
-    const legend = ['40', '80', '50', '10', '14'];
-    for (const count of legend) {
+    for (const count of ['40', '80', '50', '10', '14']) {
       expect(screen.getAllByText(count).length).toBeGreaterThan(0);
     }
-    expect(screen.queryByText(/pkt \/ tydz\./)).not.toBeInTheDocument();
+    // weeklyDeltaPoints=2 → the badge renders.
+    expect(screen.getByText(/pkt \/ tydz\./)).toBeInTheDocument();
+    // Channels straight from the DTO, worst-first order preserved.
+    expect(screen.getByText('Google Shopping')).toBeInTheDocument();
+    expect(screen.getByText('Allegro')).toBeInTheDocument();
+    expect(screen.getByText('58%')).toBeInTheDocument();
   });
 
-  it('drills down from every bucket legend row to the filtered products list', () => {
+  it('degrades to an honest shell: no badge, empty channels state, zero buckets', () => {
+    renderWithRouter(<CatalogHealthCard />);
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.queryByText(/pkt \/ tydz\./)).not.toBeInTheDocument();
+    expect(screen.getByText(/Brak kanałów z danymi kompletności/)).toBeInTheDocument();
+    expect(screen.queryByText('4210')).not.toBeInTheDocument();
+  });
+
+  it('drills down from every bucket legend row and channel row', () => {
+    state.summary = LIVE_SUMMARY;
     renderWithRouter(<CatalogHealthCard />);
     const bucketLinks = screen.getAllByRole('link', { name: /Pokaż produkty o kompletności/ });
     expect(bucketLinks).toHaveLength(5);
-    expect(bucketLinks[0]).toHaveAttribute(
-      'href',
-      expect.stringContaining('filter[completeness_pct][op]=gte'),
-    );
     expect(bucketLinks[1]).toHaveAttribute(
       'href',
       expect.stringContaining('filter[completeness_pct][op]=between'),
     );
-    expect(bucketLinks[4]).toHaveAttribute(
+    const channelLinks = screen.getAllByRole('link', { name: /Pokaż produkty poniżej progu/ });
+    expect(channelLinks).toHaveLength(2);
+    expect(channelLinks[0]).toHaveAttribute(
       'href',
       expect.stringContaining('filter[completeness_pct][op]=lt'),
     );

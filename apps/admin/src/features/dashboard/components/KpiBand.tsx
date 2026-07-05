@@ -1,10 +1,11 @@
-import { ArrowRight, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowRight, ArrowUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
-import { KPI_TILES, type KpiKey } from '../mocks';
-import { formatInt, useDashboardSummary } from '../use-dashboard-summary';
+import { formatDelta, formatInt, useDashboardSummary } from '../use-dashboard-summary';
+
+export type KpiKey = 'products' | 'publish_ready' | 'avg_completeness' | 'open_alerts';
 
 const TILE_COPY: Record<KpiKey, { label: string; hint: string }> = {
   products: { label: 'Produkty', hint: 'łącznie w katalogu' },
@@ -28,52 +29,55 @@ const TILE_HREF: Record<KpiKey, string> = {
 interface TileVm {
   key: KpiKey;
   value: string;
-  /** Signed delta text; null = no trend data (never fabricate one). */
-  delta: string | null;
+  /** Signed delta (null = no trend data — never fabricate one). */
+  delta: number | null;
   /** Copy for the null-delta line (alerts tile keeps its "24h" flavour). */
   noTrendLabel: string;
 }
 
 /**
- * VIEW-13 (#2143) / DASH-02 (#2251) — KPI band. Products and
- * publish-ready values are live (existing count hooks via the summary
- * façade) and degrade to the approved mock values per widget; their
- * deltas render as "brak trendu" until the daily snapshot aggregates
- * exist (DASH-05) — NUI-02 rule: never fabricate a trend. The
- * avg-completeness and alerts tiles stay on mock values until their
- * backends land (DASH-06 / DASH-10).
+ * DASH-06 (#2259) — all four tiles read GET /api/dashboard/summary.
+ * Products carry a real created-in-30d delta from day one; the
+ * publish-ready and avg-completeness deltas come from the daily
+ * snapshots (DASH-05) and stay "brak trendu" until the horizon exists.
+ * The alerts tile shows "—" until the alert aggregator lands (DASH-09).
+ * Endpoint degraded with no cache ⇒ honest "—" values (brief §8.3),
+ * never resurrected mock numbers.
  */
 export function KpiBand() {
   const { t } = useTranslation();
-  const { productsTotal, completeness } = useDashboardSummary();
+  const { summary } = useDashboardSummary();
 
   const noTrendGeneric = t('dashboard.kpi.no_trend_generic', { defaultValue: 'brak trendu' });
   const noTrendAlerts = t('dashboard.kpi.no_trend', { defaultValue: '24h · brak trendu' });
 
-  const tiles: TileVm[] = KPI_TILES.map((mock) => {
-    switch (mock.key) {
-      case 'products':
-        return productsTotal === null
-          ? { ...mock, noTrendLabel: noTrendGeneric }
-          : {
-              key: mock.key,
-              value: formatInt(productsTotal),
-              delta: null,
-              noTrendLabel: noTrendGeneric,
-            };
-      case 'publish_ready':
-        return completeness === null
-          ? { ...mock, noTrendLabel: noTrendGeneric }
-          : {
-              key: mock.key,
-              value: formatInt(completeness.publishReady),
-              delta: null,
-              noTrendLabel: noTrendGeneric,
-            };
-      default:
-        return { ...mock, noTrendLabel: noTrendAlerts };
-    }
-  });
+  const tiles: TileVm[] = [
+    {
+      key: 'products',
+      value: summary === null ? '—' : formatInt(summary.products.total),
+      delta: summary?.products.delta30d ?? null,
+      noTrendLabel: noTrendGeneric,
+    },
+    {
+      key: 'publish_ready',
+      value: summary === null ? '—' : formatInt(summary.publishReady.count),
+      delta: summary?.publishReady.delta30d ?? null,
+      noTrendLabel: noTrendGeneric,
+    },
+    {
+      key: 'avg_completeness',
+      value: summary === null ? '—' : `${summary.avgCompleteness.pct}%`,
+      delta: summary?.avgCompleteness.delta30d ?? null,
+      noTrendLabel: noTrendGeneric,
+    },
+    {
+      key: 'open_alerts',
+      value:
+        summary === null || summary.openAlerts === null ? '—' : formatInt(summary.openAlerts.count),
+      delta: null,
+      noTrendLabel: noTrendAlerts,
+    },
+  ];
 
   const tileClass =
     'flex flex-col rounded-2xl border border-line bg-surface p-5 soft-shadow transition-shadow hover:soft-shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink';
@@ -93,9 +97,19 @@ export function KpiBand() {
           <span className="mt-2.5 flex items-center gap-1 text-[13px]">
             {tile.delta !== null ? (
               <>
-                <span className="num inline-flex items-center gap-0.5 font-semibold text-emerald-700">
-                  <ArrowUp className="size-3.5" aria-hidden />
-                  {tile.delta}
+                <span
+                  className={
+                    tile.delta < 0
+                      ? 'num inline-flex items-center gap-0.5 font-semibold text-accent-rose'
+                      : 'num inline-flex items-center gap-0.5 font-semibold text-emerald-700'
+                  }
+                >
+                  {tile.delta < 0 ? (
+                    <ArrowDown className="size-3.5" aria-hidden />
+                  ) : (
+                    <ArrowUp className="size-3.5" aria-hidden />
+                  )}
+                  {formatDelta(tile.delta)}
                 </span>
                 <span className="text-ink-2">
                   · {t('dashboard.kpi.period_30d', { defaultValue: '30 dni' })}
