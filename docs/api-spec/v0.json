@@ -12898,6 +12898,71 @@
                 "x-cortex-permission": "products.view"
             }
         },
+        "/api/dashboard/alerts": {
+            "get": {
+                "operationId": "api_dashboard_alerts_get",
+                "tags": [
+                    "dashboard"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api dashboard alerts",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "products.view"
+            }
+        },
+        "/api/dashboard/alerts/{fingerprint}/ack": {
+            "post": {
+                "operationId": "api_dashboard_alerts_fingerprint_ack_post",
+                "tags": [
+                    "dashboard"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api dashboard alerts fingerprint ack",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "fingerprint",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "products.view"
+            }
+        },
         "/api/dashboard/summary": {
             "get": {
                 "operationId": "api_dashboard_summary_get",

@@ -10,6 +10,7 @@ use App\Shared\Domain\Tenant;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * DASH-04 (#2255, ADR-0026) — the dashboard KPI + completeness aggregate:
@@ -35,6 +36,7 @@ final readonly class DashboardSummaryQuery
         private EntityManagerInterface $entityManager,
         private TenantContext $tenantContext,
         private ChannelCompletenessPort $channelCompleteness,
+        private AlertFeedAggregator $alerts,
     ) {
     }
 
@@ -85,7 +87,7 @@ final readonly class DashboardSummaryQuery
     /**
      * @return array<string, mixed>
      */
-    public function summary(): array
+    public function summary(Uuid $userId): array
     {
         $tenant = $this->currentTenant();
         $aggregates = $this->aggregates();
@@ -127,7 +129,8 @@ final readonly class DashboardSummaryQuery
             ],
             'buckets' => $buckets,
             'channels' => $channels,
-            'openAlerts' => null,
+            // DASH-09 — unread alerts in the last 24h, per-user RBAC view.
+            'openAlerts' => ['count' => $this->alerts->openCount($userId)],
         ];
     }
 

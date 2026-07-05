@@ -67,7 +67,8 @@ final class DashboardSummaryApiTest extends CatalogApiTestCase
             [['code' => 'shopify', 'name' => 'Shopify', 'avgPct' => 70, 'readyCount' => 1]],
             $body['channels'],
         );
-        self::assertNull($body['openAlerts']);
+        // DASH-09 — live open-alert count (nothing seeded here → 0).
+        self::assertSame(['count' => 0], $body['openAlerts']);
     }
 
     #[Test]
