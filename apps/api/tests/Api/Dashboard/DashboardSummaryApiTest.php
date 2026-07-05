@@ -1,0 +1,182 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Api\Dashboard;
+
+use App\Catalog\Domain\Entity\CatalogObject;
+use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
+use App\Channel\Domain\Entity\Channel;
+use App\Identity\Domain\Entity\User;
+use App\Shared\Application\TenantContext;
+use App\Shared\Domain\Tenant;
+use App\Tests\Api\Catalog\CatalogApiTestCase;
+use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+
+/**
+ * DASH-04 (#2255, ADR-0026) — GET /api/dashboard/summary aggregates the
+ * REAL objects table against Postgres: totals, cumulative completeness
+ * buckets, publish-ready share, avg, the created-in-30d delta and the
+ * per-channel aggregate; permission-gated and tenant-isolated.
+ */
+final class DashboardSummaryApiTest extends CatalogApiTestCase
+{
+    #[Test]
+    public function summaryAggregatesKpisBucketsAndChannels(): void
+    {
+        $tenant = $this->demoTenant();
+        $this->seedProducts($tenant, [
+            ['sku' => 'P-100', 'pct' => 100, 'per_channel' => ['shopify' => 100]],
+            ['sku' => 'P-060', 'pct' => 60, 'per_channel' => ['shopify' => 40]],
+            ['sku' => 'P-030', 'pct' => 30, 'per_channel' => []],
+        ]);
+        $this->em()->persist(new Channel('shopify', 'Shopify'));
+        $this->em()->flush();
+
+        // Backdate one product beyond the 30-day window — the products
+        // delta must count only the two recent ones.
+        $this->em()->getConnection()->executeStatement(
+            "UPDATE objects SET created_at = NOW() - INTERVAL '40 days' WHERE code = 'P-030'",
+        );
+        $this->em()->clear();
+
+        $response = $this->authenticatedClient()->request('GET', '/api/dashboard/summary');
+
+        self::assertResponseIsSuccessful();
+        $body = $response->toArray();
+
+        self::assertSame(['total' => 3, 'delta30d' => 2], $body['products']);
+        self::assertSame(['count' => 1, 'pct' => 33, 'delta30d' => null], $body['publishReady']);
+        self::assertSame(
+            ['pct' => 63, 'delta30d' => null, 'weeklyDeltaPoints' => null],
+            $body['avgCompleteness'],
+            '(100+60+30)/3 rounded',
+        );
+        self::assertSame(
+            [
+                ['gte' => 25, 'count' => 3],
+                ['gte' => 50, 'count' => 2],
+                ['gte' => 80, 'count' => 1],
+                ['gte' => 100, 'count' => 1],
+            ],
+            $body['buckets'],
+        );
+        self::assertSame(
+            [['code' => 'shopify', 'name' => 'Shopify', 'avgPct' => 70, 'readyCount' => 1]],
+            $body['channels'],
+        );
+        self::assertNull($body['openAlerts']);
+    }
+
+    #[Test]
+    public function emptyCatalogYieldsZeroesNotDivisionErrors(): void
+    {
+        $response = $this->authenticatedClient()->request('GET', '/api/dashboard/summary');
+
+        self::assertResponseIsSuccessful();
+        $body = $response->toArray();
+        self::assertSame(['total' => 0, 'delta30d' => 0], $body['products']);
+        self::assertSame(['count' => 0, 'pct' => 0, 'delta30d' => null], $body['publishReady']);
+        self::assertSame([], $body['channels']);
+    }
+
+    #[Test]
+    public function anonymousRequestIsRejected(): void
+    {
+        static::createClient()->request('GET', '/api/dashboard/summary');
+
+        self::assertResponseStatusCodeSame(401);
+    }
+
+    #[Test]
+    public function userWithoutProductsViewIsForbidden(): void
+    {
+        $tenant = $this->demoTenant();
+        $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
+        $stub = new User($tenant, 'norole@demo.localhost', '', ['ROLE_USER']);
+        $noRole = new User(
+            $tenant,
+            'norole@demo.localhost',
+            $hasher->hashPassword($stub, 'changeme'),
+            ['ROLE_USER'],
+        );
+        $this->em()->persist($noRole);
+        $this->em()->flush();
+
+        $this->authenticatedClient('norole@demo.localhost')->request('GET', '/api/dashboard/summary');
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    #[Test]
+    public function foreignTenantObjectsNeverLeakIntoTheNumbers(): void
+    {
+        $tenant = $this->demoTenant();
+        $this->seedProducts($tenant, [['sku' => 'MINE-1', 'pct' => 100, 'per_channel' => []]]);
+        $this->em()->flush();
+
+        $beta = new Tenant('beta', 'Beta Tenant');
+        $this->em()->persist($beta);
+        $this->em()->flush();
+        self::getContainer()->get(\App\Catalog\Application\BuiltInObjectTypeSeeder::class)->seed($beta);
+        $this->seedProducts($beta, [
+            ['sku' => 'BETA-1', 'pct' => 0, 'per_channel' => []],
+            ['sku' => 'BETA-2', 'pct' => 0, 'per_channel' => []],
+        ]);
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $response = $this->authenticatedClient()->request('GET', '/api/dashboard/summary');
+
+        self::assertResponseIsSuccessful();
+        $body = $response->toArray();
+        self::assertSame(3, $this->demoTenantAgnosticTotal(), 'sanity: both tenants hold objects');
+        self::assertSame(['total' => 1, 'delta30d' => 1], $body['products']);
+        self::assertSame(
+            ['pct' => 100, 'delta30d' => null, 'weeklyDeltaPoints' => null],
+            $body['avgCompleteness'],
+            'foreign tenant zeros must not drag the average',
+        );
+    }
+
+    private function demoTenant(): Tenant
+    {
+        $tenant = $this->em()->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
+        \assert($tenant instanceof Tenant);
+
+        return $tenant;
+    }
+
+    /**
+     * @param list<array{sku: string, pct: int, per_channel: array<string, int>}> $products
+     */
+    private function seedProducts(Tenant $tenant, array $products): void
+    {
+        self::getContainer()->get(TenantContext::class)->set($tenant);
+        $type = self::getContainer()->get(ObjectTypeRepositoryInterface::class)
+            ->findBuiltInByKind(ObjectKind::Product, $tenant);
+        \assert(null !== $type);
+
+        foreach ($products as $spec) {
+            $object = new CatalogObject($type, $spec['sku']);
+            $completeness = ['global' => $spec['pct']];
+            if ([] !== $spec['per_channel']) {
+                $completeness['per_channel'] = $spec['per_channel'];
+            }
+            $object->recordCompleteness($completeness);
+            $this->em()->persist($object);
+        }
+        $this->em()->flush();
+    }
+
+    private function demoTenantAgnosticTotal(): int
+    {
+        $count = $this->em()->getConnection()->fetchOne(
+            "SELECT COUNT(*) FROM objects WHERE kind = 'product'",
+        );
+
+        return (int) (\is_scalar($count) ? $count : 0);
+    }
+}

@@ -12872,6 +12872,32 @@
                 "x-cortex-permission": "settings.integrations.manage"
             }
         },
+        "/api/dashboard/summary": {
+            "get": {
+                "operationId": "api_dashboard_summary_get",
+                "tags": [
+                    "dashboard"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api dashboard summary",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "products.view"
+            }
+        },
         "/api/exports/columns": {
             "get": {
                 "operationId": "api_exports_columns_get",
