@@ -1,4 +1,4 @@
-import { Check, Download, ExternalLink, Link2, Trash2, X } from 'lucide-react';
+import { Download, ExternalLink, Link2, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -13,9 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MockBadge } from '@/components/ui/mock-badge';
 import { toast } from '@/components/ui/toast';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +23,6 @@ interface AssetDrawerProps {
   asset: AssetMeta | null;
   onClose: () => void;
   onDeleted: () => void;
-  onEdit: (asset: AssetMeta) => void;
 }
 
 /**
@@ -35,7 +32,7 @@ interface AssetDrawerProps {
  * related-products section is skipped entirely — no reverse index yet
  * (backlog: Project Plan/UI/Retrofit_v2/multimedia-do-oprogramowania.md).
  */
-export function AssetDrawer({ asset, onClose, onDeleted, onEdit }: AssetDrawerProps) {
+export function AssetDrawer({ asset, onClose, onDeleted }: AssetDrawerProps) {
   const { t } = useTranslation();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -140,34 +137,6 @@ export function AssetDrawer({ asset, onClose, onDeleted, onEdit }: AssetDrawerPr
                 {t('assets.detail.download')}
               </a>
             ) : null}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="relative flex-1">
-                  <button
-                    type="button"
-                    disabled
-                    className="flex h-9 w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl bg-orange-200/60 text-[12.5px] font-bold text-orange-900/60"
-                  >
-                    <Check className="size-3.5" />
-                    {t('assets.drawer.approve', { defaultValue: 'Zatwierdź' })}
-                  </button>
-                  <MockBadge variant="corner" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {t('assets.drawer.approve_mock', {
-                  defaultValue: 'MOCK — workflow zatwierdzania wymaga backendu (backlog NUI-08)',
-                })}
-              </TooltipContent>
-            </Tooltip>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl"
-              onClick={() => onEdit(asset)}
-            >
-              {t('assets.detail.edit')}
-            </Button>
             <GatedButton
               permission="asset.delete"
               variant="outline"
