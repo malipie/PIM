@@ -62,6 +62,42 @@ final class AttributesCrudApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function collectionReturnsEveryAttributeBeyondTheLegacy200Cap(): void
+    {
+        // #2277 — the admin list fetches with pagination off; a 200 page
+        // cap silently hid attributes past the 200th (CLAUDE.md target is
+        // "200+ atrybutów"). Seed past the cap and assert the collection
+        // returns them all, not a truncated 200.
+        $em = $this->em();
+        $tenant = $em->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
+        \assert($tenant instanceof Tenant);
+        self::getContainer()->get(TenantContext::class)->set($tenant);
+
+        for ($i = 0; $i < 205; ++$i) {
+            $em->persist(new Attribute(
+                \sprintf('cap_attr_%04d', $i),
+                ['en' => 'Cap '.$i],
+                AttributeType::Text,
+            ));
+        }
+        $em->flush();
+
+        $response = $this->authenticatedClient()->request('GET', '/api/attributes');
+        self::assertSame(200, $response->getStatusCode());
+        $payload = $response->toArray();
+        $total = $payload['totalItems'] ?? $payload['hydra:totalItems'] ?? 0;
+        $members = $payload['member'] ?? $payload['hydra:member'] ?? [];
+        self::assertIsInt($total);
+        self::assertIsArray($members);
+        self::assertGreaterThan(200, $total, 'fixture must exceed the old cap');
+        self::assertCount(
+            $total,
+            $members,
+            'the collection must return every attribute, not truncate at 200',
+        );
+    }
+
+    #[Test]
     public function postRejectsNonSnakeCaseCode(): void
     {
         $client = $this->authenticatedClient();

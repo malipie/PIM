@@ -28,9 +28,20 @@
         </filters>
 
         <operations>
+            <!--
+                #2277: the admin attributes list (list.tsx) fetches with
+                pagination off and searches/filters client-side, like the
+                rest of the admin's entity lists. The default page size is
+                therefore the effective ceiling on how many attributes the
+                UI can see. 200 silently truncated tenants past that count
+                (CLAUDE.md target is "200+ atrybutów"), hiding newly created
+                attributes. Raised to 1000 headroom for the bounded
+                attribute domain; true server-side pagination is the
+                follow-up if counts ever reach thousands.
+            -->
             <operation class="ApiPlatform\Metadata\GetCollection"
                        uriTemplate="/attributes{._format}"
-                       paginationItemsPerPage="200"
+                       paginationItemsPerPage="1000"
                        security="is_granted('READ', 'App\\Catalog\\Domain\\Entity\\Attribute')"/>
             <operation class="ApiPlatform\Metadata\Get"
                        uriTemplate="/attributes/{id}{._format}"

@@ -103,7 +103,10 @@ export function AttributesListPage() {
     description: group.code,
   }));
 
-  const attributes = result.data;
+  // #2277 — newest first: attribute ids are UUIDv7 (time-ordered), so a
+  // descending id sort puts a just-created attribute at the top of the
+  // library instead of the tail, where it was easy to miss.
+  const attributes = [...result.data].sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
   const isLoading = listQuery.isLoading;
   const usage = useAttributeUsage(attributes);
   const optionCounts = useOptionCounts(attributes);
