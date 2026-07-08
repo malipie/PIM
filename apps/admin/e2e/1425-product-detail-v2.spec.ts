@@ -31,8 +31,8 @@ test('NUI-06 — product detail renders the v2 design surface', async ({ page })
   await page.waitForURL(/\/products\/[0-9a-f-]{8,}/, { timeout: 15_000 });
 
   // Header: breadcrumb back-link, action buttons, completeness ring (%).
+  // #2317 — the mock "Podgląd" button was removed; only real actions remain.
   await expect(page.getByRole('link', { name: /produkty|products/i }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: /podgląd|preview/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /duplikuj|duplicate/i })).toBeVisible();
   await expect(page.getByText(/^\d+%$/).first()).toBeVisible();
 
@@ -40,8 +40,8 @@ test('NUI-06 — product detail renders the v2 design surface', async ({ page })
   await expect(page.getByRole('button', { name: /język|language/i }).first()).toBeVisible();
 
   // Tabs with counts render (attribute groups as tabs + special tabs).
+  // #2317 — the mock "Historia" tab was removed.
   await expect(page.getByText(/media|multimedia/i).first()).toBeVisible();
-  await expect(page.getByText(/historia|history/i).first()).toBeVisible();
 
   // Attribute group card: fill counter + provenance badge on rows.
   await expect(page.getByText(/\d+ \/ \d+|filled/i).first()).toBeVisible();
