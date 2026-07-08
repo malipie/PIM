@@ -147,6 +147,11 @@ final readonly class BulkCatalogObjectIndexer
             'path' => $object->getPath(),
             'attributesIndexed' => $attributesIndexed,
             'completeness' => $object->getCompleteness(),
+            // Keep in lockstep with CatalogObjectIndexer::toDocument — the
+            // reserved filterable `completeness_pct` powers the dashboard
+            // drill-downs and the Red preset; the bulk reindex path must
+            // emit it too or a full rebuild silently drops the field.
+            'completeness_pct' => $object->getCompletenessPct(),
             'createdAt' => $object->getCreatedAt()->getTimestamp(),
             'updatedAt' => $object->getUpdatedAt()->getTimestamp(),
         ];

@@ -213,6 +213,12 @@ final readonly class CatalogObjectIndexer
             'path' => $object->getPath(),
             'attributesIndexed' => $attributesIndexed,
             'completeness' => $object->getCompleteness(),
+            // `completeness_pct` is a reserved filterable attribute
+            // (IndexSettingsTemplate) that powers the dashboard drill-downs
+            // (`completeness_pct >= 80`) and the Red preset. Emit the
+            // denormalised smallint column so those filters actually match —
+            // the `completeness` JSONB blob above is not filterable in Meili.
+            'completeness_pct' => $object->getCompletenessPct(),
             'createdAt' => $object->getCreatedAt()->getTimestamp(),
             'updatedAt' => $object->getUpdatedAt()->getTimestamp(),
         ];
