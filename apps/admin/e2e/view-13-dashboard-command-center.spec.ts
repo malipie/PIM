@@ -167,16 +167,15 @@ test('VIEW-13 — command center renders all five sections with mock values', as
   const topEmpty = page.getByText('Brak edycji produktów w tym okresie.');
   expect((await topRows.count()) > 0 || (await topEmpty.count()) === 1).toBe(true);
 
-  // 6. Action center — counters and all five mock items.
+  // 6. Action center — live since DASH-10: real alerts from
+  // GET /api/dashboard/alerts (live rows with per-type CTAs + ack) or the
+  // positive "Wszystko działa ✓" empty state. The header renders either
+  // way (section never hidden, brief §5-B).
   await expect(page.getByRole('heading', { name: 'Centrum akcji' })).toBeVisible();
-  await expect(page.getByText('5 spraw')).toBeVisible();
-  await expect(page.getByText('2 krytyczne')).toBeVisible();
-  await expect(page.getByText('3 ostrzeżenia')).toBeVisible();
-  await expect(page.getByText(/Mtodo Marketplace/)).toBeVisible();
-  await expect(page.getByText(/pim-catalog-0630\.xlsx/)).toBeVisible();
-  await expect(page.getByText(/Hurtownia Stalko/)).toBeVisible();
-  await expect(page.getByText(/Stal-Met/)).toBeVisible();
-  expect(await page.getByText('oznacz jako przeczytane').count()).toBe(5);
+  await expect(page.getByText(/\d+ spraw/)).toBeVisible();
+  const alertAcks = page.getByText('oznacz jako przeczytane');
+  const allClear = page.getByText('Wszystko działa ✓');
+  expect((await alertAcks.count()) > 0 || (await allClear.count()) === 1).toBe(true);
 
   // Operator decisions: zero MOCK badges in the dashboard content (the
   // sidebar agent-search badge is out of scope), no audit pill in the topbar.

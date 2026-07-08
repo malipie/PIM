@@ -1040,7 +1040,30 @@
       "show_all": "Pokaż wszystkie ( {{count}} )",
       "mark_read": "oznacz jako przeczytane",
       "severity_critical": "Krytyczny",
-      "severity_warning": "Ostrzeżenie"
+      "severity_warning": "Ostrzeżenie",
+      "empty_ok": "Wszystko działa ✓",
+      "ack_failed": "Nie udało się oznaczyć alertu.",
+      "types": {
+        "sync_run": "Synchronizacja „{{sourceName}}” nieudana — {{failedCount}} rekordów odrzuconych",
+        "import_session": "Import „{{sourceName}}” zakończony częściowo — {{errorCount}} wierszy z błędami",
+        "feed_run": "Feed „{{sourceName}}” — regeneracja przerwana ({{reason}})",
+        "webhook": "Webhook „{{eventType}}” → {{sourceName}}: {{deliveries}} dostaw w dead-letter (HTTP {{httpStatus}})",
+        "completeness_drop": "{{sourceName}}: kompletność spadła do {{avgPct}}% — poniżej progu publikacji ({{threshold}}%)"
+      },
+      "sources": {
+        "sync_run": "Konfigurator API",
+        "import_session": "Importy",
+        "feed_run": "Feedy XML",
+        "webhook": "Integracje · webhooki",
+        "completeness_drop": "Zdrowie danych"
+      },
+      "cta": {
+        "view_log": "Zobacz log",
+        "download_report": "Pobierz raport błędów",
+        "open_feed": "Otwórz feed",
+        "show_products": "Pokaż produkty",
+        "open_log": "Otwórz log"
+      }
     }
   },
   "attributes": {

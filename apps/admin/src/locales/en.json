@@ -1030,7 +1030,30 @@
       "show_all": "Show all ( {{count}} )",
       "mark_read": "mark as read",
       "severity_critical": "Critical",
-      "severity_warning": "Warning"
+      "severity_warning": "Warning",
+      "empty_ok": "Everything is running ✓",
+      "ack_failed": "Could not acknowledge the alert.",
+      "types": {
+        "sync_run": "Sync „{{sourceName}}” failed — {{failedCount}} records rejected",
+        "import_session": "Import „{{sourceName}}” finished partially — {{errorCount}} rows with errors",
+        "feed_run": "Feed „{{sourceName}}” — regeneration interrupted ({{reason}})",
+        "webhook": "Webhook „{{eventType}}” → {{sourceName}}: {{deliveries}} deliveries dead-lettered (HTTP {{httpStatus}})",
+        "completeness_drop": "{{sourceName}}: completeness dropped to {{avgPct}}% — below publish threshold ({{threshold}}%)"
+      },
+      "sources": {
+        "sync_run": "API Configurator",
+        "import_session": "Imports",
+        "feed_run": "XML Feeds",
+        "webhook": "Integrations · webhooks",
+        "completeness_drop": "Data health"
+      },
+      "cta": {
+        "view_log": "View log",
+        "download_report": "Download error report",
+        "open_feed": "Open feed",
+        "show_products": "Show products",
+        "open_log": "Open log"
+      }
     }
   },
   "attributes": {

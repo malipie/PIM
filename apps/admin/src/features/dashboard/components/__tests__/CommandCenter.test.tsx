@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DashboardActivityDto, DashboardTopEditedDto } from '../../use-dashboard-activity';
+import type { DashboardAlertsDto } from '../../use-dashboard-alerts';
 import type { DashboardSummary, DashboardSummaryDto } from '../../use-dashboard-summary';
 
 /**
@@ -47,6 +48,20 @@ vi.mock('../../use-dashboard-activity', async (importOriginal) => {
   };
 });
 
+const alertsState: { alerts: DashboardAlertsDto | null } = { alerts: null };
+const ackMock = vi.fn();
+
+vi.mock('../../use-dashboard-alerts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../use-dashboard-alerts')>();
+  return {
+    ...actual,
+    useDashboardAlerts: () =>
+      ({ data: alertsState.alerts }) as unknown as ReturnType<typeof actual.useDashboardAlerts>,
+    useAckAlert: () =>
+      ({ mutate: ackMock, isPending: false }) as unknown as ReturnType<typeof actual.useAckAlert>,
+  };
+});
+
 import { ActionCenter } from '../ActionCenter';
 import { CatalogHealthCard } from '../CatalogHealthCard';
 import { KpiBand } from '../KpiBand';
@@ -76,6 +91,8 @@ beforeEach(() => {
   state.summary = null;
   activityState.activity = null;
   activityState.topEdited = null;
+  alertsState.alerts = null;
+  ackMock.mockClear();
 });
 
 describe('KpiBand', () => {
@@ -231,21 +248,80 @@ describe('TeamActivityCard', () => {
 });
 
 describe('ActionCenter', () => {
-  it('renders counters and all five mock items with CTAs', () => {
-    render(<ActionCenter />);
+  const LIVE_ALERTS: DashboardAlertsDto = {
+    total: 2,
+    critical: 1,
+    warnings: 1,
+    allCount: 5,
+    items: [
+      {
+        fingerprint: 'import_session:abc',
+        type: 'import_session',
+        severity: 'critical',
+        occurredAt: '2026-07-04 12:49:33',
+        params: { sourceName: 'pim-catalog.xlsx', errorCount: 132, status: 'partial' },
+        context: { sessionId: 'sess-1' },
+      },
+      {
+        fingerprint: 'completeness_drop:allegro:2026-07-05',
+        type: 'completeness_drop',
+        severity: 'warning',
+        occurredAt: '2026-07-05',
+        params: { sourceName: 'Allegro', avgPct: 76, previousPct: 82, threshold: 80 },
+        context: { channelCode: 'allegro' },
+      },
+    ],
+  };
+
+  it('composes titles from params and maps each type to its CTA', () => {
+    alertsState.alerts = LIVE_ALERTS;
+    renderWithRouter(<ActionCenter />);
     expect(screen.getByText('Centrum akcji')).toBeInTheDocument();
-    expect(screen.getByText('5 spraw')).toBeInTheDocument();
-    expect(screen.getByText('2 krytyczne')).toBeInTheDocument();
-    expect(screen.getByText('3 ostrzeżenia')).toBeInTheDocument();
-    expect(screen.getAllByText('oznacz jako przeczytane')).toHaveLength(5);
-    expect(screen.getAllByText('Krytyczny')).toHaveLength(2);
-    expect(screen.getAllByText('Ostrzeżenie')).toHaveLength(3);
-    expect(screen.getByRole('button', { name: 'Pobierz raport błędów' })).toBeInTheDocument();
-    expect(screen.queryByText('MOCK')).not.toBeInTheDocument();
+    expect(screen.getByText('2 spraw')).toBeInTheDocument();
+    expect(screen.getByText('1 krytyczne')).toBeInTheDocument();
+    // Title built from structured params (BE returns fields, not strings).
+    expect(
+      screen.getByText(/Import „pim-catalog\.xlsx” zakończony częściowo — 132 wierszy/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Allegro: kompletność spadła do 76% — poniżej progu publikacji \(80%\)/),
+    ).toBeInTheDocument();
+    // Per-type CTA hrefs.
+    expect(screen.getByRole('link', { name: 'Pobierz raport błędów' })).toHaveAttribute(
+      'href',
+      '/integrations/imports/sess-1',
+    );
+    expect(screen.getByRole('link', { name: 'Pokaż produkty' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('filter[completeness_pct][op]=lt'),
+    );
+  });
+
+  it('shows "Pokaż wszystkie" only when the feed is capped', () => {
+    alertsState.alerts = LIVE_ALERTS; // allCount 5 > 2 rendered
+    renderWithRouter(<ActionCenter />);
+    expect(screen.getByRole('button', { name: /Pokaż wszystkie/ })).toBeInTheDocument();
+  });
+
+  it('acks optimistically on "oznacz jako przeczytane" click', async () => {
+    const user = userEvent.setup();
+    alertsState.alerts = LIVE_ALERTS;
+    renderWithRouter(<ActionCenter />);
+    const [firstAck] = screen.getAllByText('oznacz jako przeczytane');
+    await user.click(firstAck as HTMLElement);
+    expect(ackMock).toHaveBeenCalledWith('import_session:abc', expect.anything());
+  });
+
+  it('renders the positive empty state when the feed is clear', () => {
+    alertsState.alerts = { total: 0, critical: 0, warnings: 0, allCount: 0, items: [] };
+    renderWithRouter(<ActionCenter />);
+    expect(screen.getByText('Wszystko działa ✓')).toBeInTheDocument();
+    expect(screen.getByText('0 spraw')).toBeInTheDocument();
+    expect(screen.queryByText(/Pokaż wszystkie/)).not.toBeInTheDocument();
   });
 
   it('carries the anchor id the KPI alerts tile jumps to', () => {
-    const { container } = render(<ActionCenter />);
+    const { container } = renderWithRouter(<ActionCenter />);
     expect(container.querySelector('section#action-center')).not.toBeNull();
   });
 });
