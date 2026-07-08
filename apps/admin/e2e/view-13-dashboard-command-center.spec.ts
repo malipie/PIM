@@ -6,13 +6,15 @@ import { loginAsAdmin } from './helpers/auth';
 /**
  * VIEW-13 (#2143) — dashboard "command center" redesign.
  *
- * Asserts the pixel-perfect layout renders end-to-end: greeting + dark agent
- * hero (LIVE since #2246 — chips come from /api/agent/capabilities, stubbed
- * here for determinism), the four pinned KPI tiles, catalog health card
- * (ring + buckets + per-channel completeness), team activity card (range
- * toggle + most edited) and the full-width action center. Also locks in the
- * operator decisions: no MOCK badges anywhere on the page and no audit-log
- * pill in the topbar.
+ * Asserts the layout renders end-to-end against LIVE data (epic DASH,
+ * #2249–#2274): greeting + dark agent hero (chips from
+ * /api/agent/capabilities, stubbed here for determinism), the four KPI
+ * tiles + catalog health (GET /api/dashboard/summary), team activity
+ * (range toggle → /activity + /top-edited) and the action center
+ * (/alerts). Assertions are structural (numbers/hrefs/empty states), not
+ * pinned mock literals, so they hold as the demo catalog changes. Also
+ * locks in the operator decisions: no MOCK badges anywhere on the page
+ * and no audit-log pill in the topbar.
  */
 
 const CAPABILITIES_STUB = {
@@ -73,7 +75,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('VIEW-13 — command center renders all five sections with mock values', async ({ page }) => {
+test('VIEW-13 — command center renders all five sections with live data', async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') {
@@ -182,7 +184,7 @@ test('VIEW-13 — command center renders all five sections with mock values', as
   await expect(page.locator('main').getByText('MOCK', { exact: true })).toHaveCount(0);
   await expect(page.getByText(/Audit log/)).toHaveCount(0);
 
-  // No red console errors (network noise excluded — static mock page).
+  // No red console errors (network noise excluded — live-data page).
   const realErrors = consoleErrors.filter(
     (text) => !/Failed to load resource|EventSource|mercure/i.test(text),
   );
