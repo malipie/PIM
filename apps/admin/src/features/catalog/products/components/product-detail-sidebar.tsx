@@ -1,9 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
-import { AgentSuggestionsCard } from './agent-suggestions-card';
 import { CategorySelectorCard } from './category-selector-card';
 import { EffectiveModelCard } from './effective-model-card';
-import { SyncStatusCard } from './sync-status-card';
 import type { GroupMeta, ProductDetailMode } from './types';
 import { VariantsListCard } from './variants-list-card';
 
@@ -33,7 +31,6 @@ export interface ProductDetailSidebarProps {
 export function ProductDetailSidebar({
   mode,
   id,
-  kind,
   objectTypeId,
   objectTypeName,
   isCategorizable,
@@ -69,7 +66,6 @@ export function ProductDetailSidebar({
       ) : null}
       {mode === 'edit' && id !== '' ? (
         <>
-          {kind === 'product' ? <SyncStatusCard productId={id} /> : null}
           {hasVariantsCapability ? (
             <VariantsListCard
               masterProductId={id}
@@ -79,7 +75,6 @@ export function ProductDetailSidebar({
             />
           ) : null}
           <EffectiveModelCard groups={groups} objectTypeName={objectTypeName ?? 'Product'} />
-          {kind === 'product' ? <AgentSuggestionsCard /> : null}
         </>
       ) : null}
     </aside>

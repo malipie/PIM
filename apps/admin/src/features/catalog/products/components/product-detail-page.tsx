@@ -229,9 +229,8 @@ export function ProductDetailPage({
     // groups keep their own dedicated tabs.
     const attributesTab: TabKey[] = stackedGroups.length > 0 ? ['attributes' as const] : [];
     // #1348/#1351 unification — categories/variants follow the
-    // ObjectType capability flags; history is a product-only stub.
+    // ObjectType capability flags.
     const categories: TabKey[] = isCategorizable ? ['categories' as const] : [];
-    const history: TabKey[] = kind === 'product' ? ['history' as const] : [];
     const variants: TabKey[] = hasVariantsCapability ? ['variants' as const] : [];
     return [
       ...attributesTab,
@@ -239,7 +238,6 @@ export function ProductDetailPage({
       ...ensureRelations,
       ...multimedia,
       ...categories,
-      ...history,
       ...variants,
     ];
   }, [
@@ -250,7 +248,6 @@ export function ProductDetailPage({
     hasMultimediaCapability,
     isCategorizable,
     hasVariantsCapability,
-    kind,
   ]);
 
   // Keep activeTab valid as group set changes (e.g. groups data arrives
