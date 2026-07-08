@@ -9,7 +9,7 @@
 
 Ten plik to **single source of truth** backlogu. GitHub Issues są lustrem (skondensowane body + link tutaj). Tracking faktyczny w Issues + milestone'ach.
 
-**26 ticketów, ~235–320h.** Katalogi PDF to warstwa „szablon HTML + branding + mapowanie pól + renderer + delivery" **NAD** istniejącym silnikiem Export (reuse `ExportBuilder`) i wzorcem `Export/Feed` (delivery). Nowego kodu domenowego realnie niewiele: port `PdfRenderer` + 2 adaptery + silnik szablonu Twig + `CatalogProfile`/`CatalogRun` + delivery (kalka Feed) + seedy szablonów. Reszta to spięcie istniejących silników — poprawki w Export/Feed propagują się do katalogów.
+**27 ticketów, ~245–335h.** Katalogi PDF to warstwa „szablon HTML + branding + mapowanie pól + renderer + delivery" **NAD** istniejącym silnikiem Export (reuse `ExportBuilder`) i wzorcem `Export/Feed` (delivery). Nowego kodu domenowego realnie niewiele: port `PdfRenderer` + 2 adaptery + silnik szablonu Twig + `CatalogProfile`/`CatalogRun` + delivery (kalka Feed) + seedy szablonów. Reszta to spięcie istniejących silników — poprawki w Export/Feed propagują się do katalogów.
 
 ---
 
