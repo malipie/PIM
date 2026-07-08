@@ -41,6 +41,12 @@ interface Props {
   onToggle?: (id: string) => void;
   primaryId?: string | null;
   onPrimaryChange?: (id: string) => void;
+  /**
+   * #2313 — hide the ⭐ primary-category column in multi-select. The bulk
+   * category action (add/remove/move) has no "primary" concept, so the
+   * picker is checkbox-only.
+   */
+  hidePrimary?: boolean;
 }
 
 /**
@@ -66,6 +72,7 @@ export function CategoryTree({
   onToggle: onToggleSelection,
   primaryId,
   onPrimaryChange,
+  hidePrimary = false,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(() => initialExpanded ?? new Set());
 
@@ -94,6 +101,7 @@ export function CategoryTree({
           onToggleSelection={onToggleSelection}
           primaryId={primaryId ?? null}
           onPrimaryChange={onPrimaryChange}
+          hidePrimary={hidePrimary}
         />
       ))}
     </ul>
@@ -112,6 +120,7 @@ function CategoryTreeRow({
   onToggleSelection,
   primaryId,
   onPrimaryChange,
+  hidePrimary,
 }: {
   node: CategoryTreeNode;
   selectedId?: string;
@@ -124,6 +133,7 @@ function CategoryTreeRow({
   onToggleSelection?: (id: string) => void;
   primaryId: string | null;
   onPrimaryChange?: (id: string) => void;
+  hidePrimary: boolean;
 }) {
   const hasChildren = node.children.length > 0;
   const isExpanded = expanded.has(node.id);
@@ -237,7 +247,7 @@ function CategoryTreeRow({
             </span>
           ) : null}
         </button>
-        {isMulti ? (
+        {isMulti && !hidePrimary ? (
           <button
             type="button"
             disabled={!isChecked}
@@ -283,6 +293,7 @@ function CategoryTreeRow({
               onToggleSelection={onToggleSelection}
               primaryId={primaryId}
               onPrimaryChange={onPrimaryChange}
+              hidePrimary={hidePrimary}
             />
           ))}
         </ul>
