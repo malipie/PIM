@@ -91,6 +91,53 @@ final class SearchEndpointsApiTest extends CatalogApiTestCase
         }
     }
 
+    /**
+     * #2310 — the dashboard completeness drill-downs deep-link to
+     * `/products?filter[completeness_pct][op]=gte&value=80`, which the list
+     * compiles into a Meili `completeness_pct >= 80` filter. That returned 0
+     * because the indexer never emitted `completeness_pct` onto the document
+     * (only the non-filterable `completeness` JSONB blob), so the reserved
+     * filterable attribute matched nothing. Assert the field is now indexed
+     * and the range filter actually partitions the catalog.
+     */
+    #[Test]
+    public function searchHonoursCompletenessRangeFilter(): void
+    {
+        $this->seedProduct('COMPLETE-90', completenessPct: 90);
+        $this->seedProduct('COMPLETE-95', completenessPct: 95);
+        $this->seedProduct('INCOMPLETE-20', completenessPct: 20);
+        $this->forceReindex(ObjectKind::Product);
+
+        // The FE serialises the dashboard's `op=gte` shorthand into the
+        // canonical DSL operator `>=` before base64-encoding the blob into
+        // `?q=`; mirror that exact shape here.
+        $blob = base64_encode(json_encode(
+            ['attr' => 'completeness_pct', 'op' => '>=', 'value' => 80],
+            JSON_THROW_ON_ERROR,
+        ));
+
+        $client = $this->authenticatedClient();
+        $body = $client->request('GET', '/api/search/products?q='.$blob)->toArray();
+
+        self::assertGreaterThanOrEqual(2, $body['totalHits'] ?? 0, 'both >= 80 products must match');
+
+        $hits = $body['hits'] ?? [];
+        \assert(\is_array($hits));
+        $codes = [];
+        foreach ($hits as $hit) {
+            \assert(\is_array($hit));
+            $codes[] = $hit['code'] ?? null;
+            // The reserved filterable attribute must ride on the document
+            // itself, not just the settings whitelist.
+            self::assertArrayHasKey('completeness_pct', $hit);
+            self::assertGreaterThanOrEqual(80, $hit['completeness_pct']);
+        }
+
+        self::assertContains('COMPLETE-90', $codes);
+        self::assertContains('COMPLETE-95', $codes);
+        self::assertNotContains('INCOMPLETE-20', $codes, 'a 20% product must fall outside the >= 80 window');
+    }
+
     #[Test]
     public function unauthenticatedSearchReturns401(): void
     {
@@ -351,7 +398,7 @@ final class SearchEndpointsApiTest extends CatalogApiTestCase
     /**
      * @param array<string, scalar> $attributes
      */
-    private function seedProduct(string $code, array $attributes = [], bool $enabled = true): void
+    private function seedProduct(string $code, array $attributes = [], bool $enabled = true, ?int $completenessPct = null): void
     {
         $tenant = $this->em()->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
         \assert($tenant instanceof Tenant);
@@ -374,6 +421,9 @@ final class SearchEndpointsApiTest extends CatalogApiTestCase
                 $wrapped[$key] = $value;
             }
             $object->updateAttributeIndex($wrapped);
+        }
+        if (null !== $completenessPct) {
+            $object->recordCompleteness(['global' => $completenessPct]);
         }
         $repo->save($object);
     }
