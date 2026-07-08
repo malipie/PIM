@@ -101,6 +101,9 @@ export function ProductDetailPage({
   // "Zapisz i wróć do listy" action saves + returns to the list.
   const isEditing = true;
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+  // #2318 — "Anuluj" returns to the list without saving; if there are unsaved
+  // edits it asks for confirmation first.
+  const [showCancelConfirm, setShowCancelConfirm] = useState<boolean>(false);
 
   // #891 create-mode category selection. POST `/api/products` carries
   // this so the product + assignments land atomically — the previous
@@ -381,7 +384,14 @@ export function ProductDetailPage({
         locales={locales}
         channels={channels}
         onSave={(returnToList) => void handleSave(returnToList)}
-        onCancel={cancelEdit}
+        onCancel={() => {
+          // #2318 — guard unsaved edits before leaving to the list.
+          if (Object.keys(dirtyFields).length > 0) {
+            setShowCancelConfirm(true);
+          } else {
+            cancelEdit();
+          }
+        }}
         onRequestDelete={() => setShowDeleteConfirm(true)}
         onFieldChange={setFieldValue}
         onSelectTab={setActiveTab}
@@ -485,6 +495,36 @@ export function ProductDetailPage({
               {isDeleting
                 ? t('products.detail.delete.deleting', { defaultValue: 'Usuwanie…' })
                 : t('products.detail.delete.confirm_submit', { defaultValue: 'Usuń produkt' })}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+        <DialogContent>
+          <div className="space-y-2">
+            <DialogTitle>
+              {t('products.detail.cancel.confirm_title', { defaultValue: 'Anulować zmiany?' })}
+            </DialogTitle>
+            <DialogDescription>
+              {t('products.detail.cancel.confirm_body', {
+                defaultValue:
+                  'Masz niezapisane zmiany. Czy na pewno chcesz anulować i wrócić do listy bez zapisu?',
+              })}
+            </DialogDescription>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setShowCancelConfirm(false)}>
+              {t('products.detail.cancel.keep_editing', { defaultValue: 'Wróć do edycji' })}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setShowCancelConfirm(false);
+                cancelEdit();
+              }}
+            >
+              {t('products.detail.cancel.discard', { defaultValue: 'Anuluj bez zapisu' })}
             </Button>
           </div>
         </DialogContent>
