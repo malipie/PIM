@@ -126,16 +126,12 @@ const PRODUCT_FACETS = ['enabled', 'status', 'brand'];
 const DEFAULT_EXCEL_COLUMNS: ExcelColumn<ExcelObjectRow>[] = [
   { key: 'sku', label: 'Kod', type: 'text', width: 160, readOnly: true },
   { key: 'name', label: 'Nazwa', type: 'text', width: 280 },
-  { key: 'enabled', label: 'Aktywny', type: 'boolean', width: 100 },
-  { key: 'status', label: 'Status', type: 'text', width: 100, readOnly: true },
   { key: 'completenessPct', label: 'Kompletność', type: 'number', width: 110, readOnly: true },
 ];
 
 const PRODUCT_EXCEL_COLUMNS: ExcelColumn<ExcelObjectRow>[] = [
   { key: 'sku', label: 'SKU', type: 'text', width: 160, readOnly: true },
   { key: 'name', label: 'Nazwa', type: 'text', width: 280 },
-  { key: 'enabled', label: 'Aktywny', type: 'boolean', width: 100 },
-  { key: 'status', label: 'Status', type: 'text', width: 100, readOnly: true },
   { key: 'completenessPct', label: 'Kompletność', type: 'number', width: 110, readOnly: true },
   { key: 'variantAxis', label: 'Wariant', type: 'text', width: 120, readOnly: true },
 ];
@@ -412,12 +408,47 @@ export function UniversalListPage({
     }
   };
 
-  const baseRows = useMemo<ProductsGridRow[]>(() => {
+  const rawBaseRows = useMemo<ProductsGridRow[]>(() => {
     if (isSearchActive) {
       return (searchResult?.hits ?? []).map(searchHitToRow);
     }
     return products.map(catalogObjectToRow);
   }, [isSearchActive, products, searchResult]);
+
+  // #2319 — Excel-edit optimistic overlay. Without it a committed cell flashes
+  // the pre-edit value for ~0.5 s: onCommit fires, the grid stops editing and
+  // re-reads the (still stale) row until the async refetch lands. The overlay
+  // keeps the just-committed value visible; each entry self-clears once the
+  // refetched row carries it (or on a failed commit that never reconciles the
+  // parent restores by re-issuing the edit).
+  const [optimisticEdits, setOptimisticEdits] = useState<Map<string, Partial<ProductsGridRow>>>(
+    () => new Map(),
+  );
+
+  useEffect(() => {
+    setOptimisticEdits((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Map(prev);
+      for (const [id, edit] of prev) {
+        const row = rawBaseRows.find((r) => r.id === id);
+        if (
+          row &&
+          Object.entries(edit).every(([key, value]) => row[key as keyof ProductsGridRow] === value)
+        ) {
+          next.delete(id);
+        }
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [rawBaseRows]);
+
+  const baseRows = useMemo<ProductsGridRow[]>(() => {
+    if (optimisticEdits.size === 0) return rawBaseRows;
+    return rawBaseRows.map((row) => {
+      const edit = optimisticEdits.get(row.id);
+      return edit ? { ...row, ...edit } : row;
+    });
+  }, [rawBaseRows, optimisticEdits]);
 
   const filteredRows = useMemo<ProductsGridRow[]>(() => {
     if (showSelectedOnly && selected.size > 0) {
@@ -546,6 +577,14 @@ export function UniversalListPage({
     colKey: string,
     value: unknown,
   ): Promise<void> => {
+    // Show the new value instantly (overlay); it self-clears once the refetch
+    // lands with the persisted value. On error we drop the overlay so the cell
+    // falls back to the server truth.
+    setOptimisticEdits((prev) => {
+      const next = new Map(prev);
+      next.set(row.id, { ...next.get(row.id), [colKey]: value });
+      return next;
+    });
     try {
       if (colKey === 'enabled') {
         await jsonFetch(`/api/objects/${row.id}`, {
@@ -564,6 +603,12 @@ export function UniversalListPage({
       }
       refetch();
     } catch (err) {
+      setOptimisticEdits((prev) => {
+        if (!prev.has(row.id)) return prev;
+        const next = new Map(prev);
+        next.delete(row.id);
+        return next;
+      });
       toast.error(err instanceof Error ? err.message : 'unknown');
     }
   };
