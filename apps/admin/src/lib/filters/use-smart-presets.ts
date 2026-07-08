@@ -82,9 +82,11 @@ export function useSmartPresets({
     }
   };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `load` is
+  // recreated every render; the effect intentionally re-runs only when the
+  // scope (withCounts / resource) changes, not on every render.
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [withCounts, resource]);
 
   const create: UseSmartPresetsResult['create'] = async (input) => {
