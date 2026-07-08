@@ -82,9 +82,7 @@ export function useSmartPresets({
     }
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `load` is
-  // recreated every render; the effect intentionally re-runs only when the
-  // scope (withCounts / resource) changes, not on every render.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional — load re-runs only on scope (withCounts/resource) change
   useEffect(() => {
     void load();
   }, [withCounts, resource]);
