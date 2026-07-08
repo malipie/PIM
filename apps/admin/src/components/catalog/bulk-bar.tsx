@@ -1,5 +1,4 @@
 import { Copy, Download, FolderTree, MoreHorizontal, Pencil, Sparkles, Trash2 } from 'lucide-react';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PermissionGate } from '@/components/identity';
@@ -10,17 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/components/ui/toast';
-import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
-
-interface BulkEditJobResponse {
-  id: string;
-  status: string;
-  total: number;
-  processed: number;
-  errors_count: number;
-  first_errors: Array<{ objectId: string; message: string }>;
-}
 
 interface BulkBarProps {
   selectedIds: string[];
@@ -51,7 +40,6 @@ interface BulkBarProps {
 export function BulkBar({
   selectedIds,
   onClear,
-  onApplied,
   onOpenWizard,
   onOpenCategoryModal,
   onOpenDeleteModal,
@@ -60,7 +48,6 @@ export function BulkBar({
   onOpenExportModal,
 }: BulkBarProps) {
   const { t } = useTranslation();
-  const [isPending, setIsPending] = useState(false);
 
   if (selectedIds.length === 0) return null;
 
@@ -71,37 +58,6 @@ export function BulkBar({
         defaultValue: 'W przygotowaniu — {{followUp}}',
       }),
     );
-  };
-
-  const runToggleEnabled = async (enabled: boolean): Promise<void> => {
-    setIsPending(true);
-    try {
-      const job = await jsonFetch<BulkEditJobResponse>('/api/products/bulk-edit', {
-        method: 'POST',
-        body: { operation: 'toggle_enabled', product_ids: selectedIds, payload: { enabled } },
-      });
-      if (job.errors_count === 0) {
-        toast.success(
-          t('products.bulk.toggle_done', {
-            count: job.processed,
-            defaultValue: 'Zaktualizowano {{count}} produktów',
-          }),
-        );
-        onApplied();
-      } else {
-        toast.error(
-          t('products.bulk.toggle_partial', {
-            errors: job.errors_count,
-            processed: job.processed,
-            defaultValue: 'Zaktualizowano {{processed}}, błędów: {{errors}}',
-          }),
-        );
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'unknown');
-    } finally {
-      setIsPending(false);
-    }
   };
 
   // RBAC-P6-005 (#717) — bulk action surface is gated behind
@@ -168,27 +124,12 @@ export function BulkBar({
               <button
                 type="button"
                 aria-label={t('products.bulk.more_actions', { defaultValue: 'Więcej akcji' })}
-                disabled={isPending}
                 className="text-white/70 hover:text-white inline-flex items-center justify-center size-7 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-50"
               >
                 <MoreHorizontal className="size-4" aria-hidden="true" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onSelect={() => {
-                  void runToggleEnabled(true);
-                }}
-              >
-                {t('products.bulk.enable', { defaultValue: 'Włącz' })}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  void runToggleEnabled(false);
-                }}
-              >
-                {t('products.bulk.disable', { defaultValue: 'Wyłącz' })}
-              </DropdownMenuItem>
               {onOpenDuplicateModal ? (
                 <DropdownMenuItem
                   onSelect={() => {

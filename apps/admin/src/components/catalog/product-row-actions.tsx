@@ -1,4 +1,4 @@
-import { Copy, History, MoreVertical, PencilLine, Power, PowerOff, Trash2 } from 'lucide-react';
+import { Copy, History, MoreVertical, PencilLine, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -33,26 +33,15 @@ interface AuditEntry {
  */
 export function ProductRowActions({
   productId,
-  enabled,
   onChanged,
 }: {
   productId: string;
-  enabled: boolean;
   onChanged: () => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
-
-  const toggleEnabled = async (): Promise<void> => {
-    await jsonFetch(`/api/products/${productId}`, {
-      method: 'PATCH',
-      body: { enabled: !enabled },
-      contentType: 'application/merge-patch+json',
-    });
-    onChanged();
-  };
 
   const handleDelete = async (): Promise<void> => {
     if (
@@ -93,20 +82,6 @@ export function ProductRowActions({
           <DropdownMenuItem onSelect={() => setShowDuplicate(true)}>
             <Copy className="mr-2 size-4" />
             {t('products.actions.duplicate', { defaultValue: 'Duplicate' })}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => void toggleEnabled()}>
-            {enabled ? (
-              <>
-                <PowerOff className="mr-2 size-4" />
-                {t('products.actions.disable', { defaultValue: 'Disable' })}
-              </>
-            ) : (
-              <>
-                <Power className="mr-2 size-4" />
-                {t('products.actions.enable', { defaultValue: 'Enable' })}
-              </>
-            )}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setShowAudit(true)}>
