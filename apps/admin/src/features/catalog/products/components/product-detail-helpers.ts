@@ -8,13 +8,7 @@ import type { AttributeMeta, CatalogObjectDto, GroupMeta } from './types';
  * thin consumer; the heavy interplay stays in the page + the data hook.
  */
 
-export const SPECIAL_TABS = [
-  'attributes',
-  'multimedia',
-  'categories',
-  'history',
-  'variants',
-] as const;
+export const SPECIAL_TABS = ['attributes', 'multimedia', 'categories', 'variants'] as const;
 export type SpecialTabKey = (typeof SPECIAL_TABS)[number];
 export type TabKey = SpecialTabKey | string;
 
@@ -37,7 +31,6 @@ const SPECIAL_TAB_DEFAULT_LABELS: Record<SpecialTabKey, string> = {
   attributes: 'Atrybuty',
   multimedia: 'Multimedia',
   categories: 'Kategorie',
-  history: 'Historia',
   variants: 'Warianty',
 };
 
@@ -73,7 +66,6 @@ export function tabBadge(
     return stackedGroups.length === 0 ? null : stackedGroups.length;
   }
   if (tab === 'categories') return null;
-  if (tab === 'history') return null;
   if (tab === 'variants') {
     const count = (product?.attributesIndexed as { variantsCount?: number } | undefined)
       ?.variantsCount;

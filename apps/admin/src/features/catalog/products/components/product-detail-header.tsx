@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils';
 import { CompletenessRing } from './completeness-ring';
 import { DuplicateButton } from './duplicate-button';
 import { LocaleChannelToolbar } from './locale-channel-toolbar';
-import { PreviewButton } from './preview-button';
 import { type TabKey, tabBadge, tabLabel } from './product-detail-helpers';
 import type {
   CatalogObjectDto,
@@ -134,8 +133,7 @@ export function ProductDetailHeader({
             ) : null}
           </div>
           <div className="ml-auto flex items-center gap-2">
-            {/* Preview / duplicate hit product-only endpoints. */}
-            {kind === 'product' ? <PreviewButton disabled={mode === 'create'} /> : null}
+            {/* Duplicate hits a product-only endpoint. */}
             {kind === 'product' && mode === 'edit' && id !== '' ? (
               <DuplicateButton productId={id} />
             ) : null}
