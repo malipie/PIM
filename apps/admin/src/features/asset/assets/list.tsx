@@ -315,28 +315,49 @@ export function AssetsListPage() {
         </div>
       </div>
 
-      {/* Folder tiles */}
+      {/* Folders — tiles in grid view, rows in list view (#2320) */}
       {showFolderTiles ? (
         <div>
           <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
             {t('assets.folders_label', { defaultValue: 'Foldery' })}
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {folders.map((folder) => (
+          {view === 'grid' ? (
+            <div className="flex flex-wrap gap-1.5">
+              {folders.map((folder) => (
+                <FolderTile
+                  key={folder.code}
+                  name={folder.displayName}
+                  count={folder.assetCount}
+                  onOpen={() => enterFolder(folder.code)}
+                />
+              ))}
               <FolderTile
-                key={folder.code}
-                name={folder.displayName}
-                count={folder.assetCount}
-                onOpen={() => enterFolder(folder.code)}
+                name={t('assets.folder.unassigned', { defaultValue: 'Bez przypisania' })}
+                count={null}
+                warning
+                onOpen={() => enterFolder('root')}
               />
-            ))}
-            <FolderTile
-              name={t('assets.folder.unassigned', { defaultValue: 'Bez przypisania' })}
-              count={null}
-              warning
-              onOpen={() => enterFolder('root')}
-            />
-          </div>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm">
+              <div className="divide-y divide-zinc-50">
+                {folders.map((folder) => (
+                  <FolderRow
+                    key={folder.code}
+                    name={folder.displayName}
+                    count={folder.assetCount}
+                    onOpen={() => enterFolder(folder.code)}
+                  />
+                ))}
+                <FolderRow
+                  name={t('assets.folder.unassigned', { defaultValue: 'Bez przypisania' })}
+                  count={null}
+                  warning
+                  onOpen={() => enterFolder('root')}
+                />
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -555,7 +576,15 @@ function FolderTile({ name, count, warning = false, onOpen }: FolderTileProps) {
   return (
     <button
       type="button"
-      onClick={onOpen}
+      // #2320 — open on double-click (Windows Explorer behaviour); a single
+      // click no longer navigates. Keyboard users still open with Enter/Space.
+      onDoubleClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
       title={name}
       className="group flex w-[128px] flex-col items-center gap-1 rounded-2xl border border-transparent px-2 pb-2.5 pt-3.5 transition hover:border-zinc-200 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
     >
@@ -575,6 +604,40 @@ function FolderTile({ name, count, warning = false, onOpen }: FolderTileProps) {
           ? t('assets.folder.count_short', { defaultValue: '{{count}} elem.', count })
           : ' '}
       </div>
+    </button>
+  );
+}
+
+function FolderRow({ name, count, warning = false, onOpen }: FolderTileProps) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      // #2320 — same double-click-to-open semantics as the folder tile.
+      onDoubleClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      title={name}
+      className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-zinc-50/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
+    >
+      <span className="grid h-9 w-9 place-items-center">
+        <FolderGlyph size={28} />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-zinc-800">{name}</span>
+      {warning ? (
+        <span className="grid h-[18px] w-[18px] place-items-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+          !
+        </span>
+      ) : null}
+      <span className="num text-[11px] text-zinc-500">
+        {count !== null
+          ? t('assets.folder.count_short', { defaultValue: '{{count}} elem.', count })
+          : ''}
+      </span>
     </button>
   );
 }
