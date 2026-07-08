@@ -192,7 +192,7 @@ export function BulkWizard({ open, selectedIds, onClose, onApplied }: BulkWizard
             </div>
           </div>
           <div className="ml-auto inline-flex items-center gap-1">
-            {(['Wybór akcji', 'Konfiguracja', 'Preview diff'] as const).map((label, i) => {
+            {(['Wybór akcji', 'Konfiguracja', 'Podgląd zmian'] as const).map((label, i) => {
               const stepNo = (i + 1) as 1 | 2 | 3;
               const active = stepNo === step;
               const done = stepNo < step;
