@@ -2989,3 +2989,17 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 
 ### Toolchain quirks (nowe)
 - **`gh pr merge --delete-branch` w workflow z git worktree przełącza WORKTREE na `main`** (gh robi lokalny cleanup brancha) → `git checkout main` w głównym drzewie pada na `'main' is already checked out at <worktree>`. Kolejność sprzątania: `git worktree remove` NAJPIERW, potem checkout main w głównym drzewie. Bonus: dirty pliki innej pracy w głównym drzewie blokują checkout nawet gdy content == target (git porównuje z HEAD, nie z targetem) → `git stash push -u -m "label"` z opisową etykietą.
+
+## Lessons z #2277/#2279 (bug-fixy po teście bloczka agenta)
+
+### Patterns to Follow (nowe)
+- **Diagnozuj „X nie zadziałało" przez wszystkie warstwy zanim uznasz to za bug feature'u.** #2246: „agent nie dodał atrybutu" — a dodał (baza: run done+commit, atrybut istnieje; API go zwraca). Realny bug był GDZIE INDZIEJ (lista UI ucinała >200, atrybut niepodpięty). Sekwencja: baza (czy encja powstała?) → API (czy endpoint ją zwraca?) → UI (czy renderuje?). Dwa różne bugi w dwóch bounded context → dwa PR-y, nie jeden.
+- **Lista admina z `pagination:{mode:'off'}` = domyślny `paginationItemsPerPage` jest EFEKTYWNYM sufitem widoczności.** 44 listy w apce używają mode:off i polegają, że domyślny page size ≥ liczba encji. Pierwsza encja przekraczająca swój cap (atrybuty: 289 > 200) cicho gubi ogon, bez kontrolki paginacji by do niego dojść. Fix spójny z konwencją: podnieść cap encji (nie przepisywać na server-side pagination — to niespójne z resztą i większe ryzyko). Sort po `id` desc (UUIDv7 = time-ordered) daje „najnowsze pierwsze" bez zmian API.
+
+### Patterns to Avoid (nowe)
+- **Playwright e2e testuje ZAWSZE live-stack z main tree, nie z twojego worktree.** Spec na niezmergowaną zmianę FE w worktree FALUJE (dev server serwuje `/dev/PIM/apps/admin`, nie worktree). Walidacja lokalna: skopiuj zmieniony plik do main tree (Vite HMR) → odpal spec → `git checkout <plik>` przywróć. Albo licz na CI (buduje branch). Ta sama pułapka co live-smoke w #2246.
+
+### Toolchain quirks (nowe)
+- **`paginationItemsPerPage` (AP4 XML) NIE trafia do OpenAPI snapshotu** — zmiana cap 200→1000 nie ruszyła `docs/api-spec/v0.json` (to runtime pagination default, nie schema). Nie ma bramki spec-drift dla tej zmiany.
+- **PHPStan „Ignored error pattern … was not matched in reported errors" przy `analyse <podzbiór-plików>`** = artefakt analizy podzbioru (baseline dotyczy plików spoza zestawu), NIE realny błąd. Potwierdź pełnym `phpstan analyse` (jak CI) zanim zaczniesz „naprawiać".
+- **Rzut `(mixed) → (string|int)` pada na PHPStan max** w testach czytających `array<string,mixed>` z `execute()`/`toArray()`. Wyciągnij do zmiennej + `assertIsString`/`assertIsInt`/`assertIsArray` (narrowing), nie `(string) $x`.
