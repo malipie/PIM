@@ -120,8 +120,8 @@ interface ListResponse {
 
 type ExcelObjectRow = ProductsGridRow & Record<string, unknown>;
 
-const DEFAULT_FACETS = ['enabled', 'status'];
-const PRODUCT_FACETS = ['enabled', 'status', 'brand'];
+const DEFAULT_FACETS = ['status'];
+const PRODUCT_FACETS = ['status', 'brand'];
 
 const DEFAULT_EXCEL_COLUMNS: ExcelColumn<ExcelObjectRow>[] = [
   { key: 'sku', label: 'Kod', type: 'text', width: 160, readOnly: true },
@@ -560,18 +560,6 @@ export function UniversalListPage({
     if (mode === 'tree' || mode === 'flat') setVariantsMode(mode);
   };
 
-  const handleToggleEnabled = (id: string, next: boolean): void => {
-    void jsonFetch(`/api/objects/${id}`, {
-      method: 'PATCH',
-      body: { enabled: next },
-      contentType: 'application/merge-patch+json',
-    })
-      .then(() => refetch())
-      .catch((err: unknown) => {
-        toast.error(err instanceof Error ? err.message : 'unknown');
-      });
-  };
-
   const handleExcelCommit = async (
     row: ProductsGridRow,
     colKey: string,
@@ -944,7 +932,6 @@ export function UniversalListPage({
           expandedMasters={expandedMasters}
           onToggleExpand={toggleExpand}
           variantsByMasterCount={variantsByMasterCount}
-          onToggleEnabled={handleToggleEnabled}
           onChangedRow={refetch}
           isLoading={isLoading}
           alwaysShowChevronOnMasters={hasVariants && variantsMode === 'tree' && !isSearchActive}

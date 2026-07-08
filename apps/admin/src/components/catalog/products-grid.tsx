@@ -30,7 +30,6 @@ interface ProductsGridProps {
   expandedMasters: Set<string>;
   onToggleExpand: (id: string) => void;
   variantsByMasterCount: Map<string, number>;
-  onToggleEnabled: (id: string, next: boolean) => void;
   onChangedRow: () => void;
   isLoading: boolean;
   /**
@@ -50,8 +49,7 @@ interface ProductsGridProps {
   detailPathFor?: (id: string) => string;
 }
 
-const GRID_TPL =
-  '44px 52px 150px minmax(260px,1.6fr) minmax(160px,1fr) 170px 150px 120px 70px 44px';
+const GRID_TPL = '44px 52px 150px minmax(260px,1.6fr) minmax(160px,1fr) 170px 150px 120px 44px';
 
 const COL_KEYS = [
   'sel',
@@ -62,7 +60,6 @@ const COL_KEYS = [
   'compl',
   'channels',
   'price',
-  'enabled',
   'more',
 ] as const;
 
@@ -92,7 +89,6 @@ export function ProductsGrid({
   expandedMasters,
   onToggleExpand,
   variantsByMasterCount,
-  onToggleEnabled,
   onChangedRow,
   isLoading,
   alwaysShowChevronOnMasters = false,
@@ -155,7 +151,6 @@ export function ProductsGrid({
               onToggleExpand={onToggleExpand}
               variantsCount={variantsByMasterCount.get(row.id) ?? 0}
               forceExpandable={alwaysShowChevronOnMasters && row.parentId === null}
-              onToggleEnabled={onToggleEnabled}
               onChangedRow={onChangedRow}
               detailPathFor={detailPathFor}
             />
@@ -184,8 +179,6 @@ function defaultLabelFor(key: (typeof COL_KEYS)[number]): string {
       return 'Kanały';
     case 'price':
       return 'Cena';
-    case 'enabled':
-      return 'Aktywny';
   }
 }
 
@@ -201,7 +194,6 @@ interface RowViewProps {
   onToggleExpand: (id: string) => void;
   variantsCount: number;
   forceExpandable?: boolean;
-  onToggleEnabled: (id: string, next: boolean) => void;
   onChangedRow: () => void;
   detailPathFor: (id: string) => string;
 }
@@ -214,7 +206,6 @@ function ProductsGridRowView({
   onToggleExpand,
   variantsCount,
   forceExpandable = false,
-  onToggleEnabled,
   onChangedRow,
   detailPathFor,
 }: RowViewProps) {
@@ -364,41 +355,8 @@ function ProductsGridRowView({
         )}
       </div>
 
-      <div className="px-3 py-2">
-        {variant ? (
-          <span className="inline-block size-5" />
-        ) : (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={row.enabled}
-            aria-label={t('products.row.toggle_enabled_aria', {
-              sku: row.sku,
-              defaultValue: 'Przełącz aktywność produktu {{sku}}',
-            })}
-            onClick={() => {
-              onToggleEnabled(row.id, !row.enabled);
-            }}
-            className={cn(
-              'inline-flex items-center h-5 w-9 rounded-full p-0.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900',
-              row.enabled ? 'bg-emerald-500' : 'bg-zinc-200',
-            )}
-          >
-            <span
-              className={cn(
-                'h-4 w-4 bg-white rounded-full shadow transition',
-                row.enabled && 'translate-x-4',
-              )}
-              aria-hidden="true"
-            />
-          </button>
-        )}
-      </div>
-
       <div className="px-3 py-2 text-zinc-500 hover:text-zinc-900 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-        {variant ? null : (
-          <ProductRowActions productId={row.id} enabled={row.enabled} onChanged={onChangedRow} />
-        )}
+        {variant ? null : <ProductRowActions productId={row.id} onChanged={onChangedRow} />}
       </div>
     </div>
   );
