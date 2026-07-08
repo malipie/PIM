@@ -44,6 +44,7 @@ final readonly class CreateUpdateAttributeTool implements AgentToolInterface, Pr
         return 'Propose creating or updating a SINGLE attribute (upsert by code: an existing code is updated, a new one created). '
             .'Nothing changes until a human approves. Valid types: '.implode(', ', self::VALID_TYPES).'. '
             .'type is required when creating; omit it when only updating labels/flags of an existing attribute. '
+            .'An attribute created without groups is a LIBRARY entry only - it will not appear on any product until the user attaches it to a group or object type in Modeling, so always tell the user this when you create an unattached attribute. '
             .'Deleting attributes is not available - tell the user to do that in the modeling UI.';
     }
 
@@ -147,11 +148,23 @@ final readonly class CreateUpdateAttributeTool implements AgentToolInterface, Pr
             ),
         ]);
 
+        // #2279 — a group-less attribute commits fine but stays a library
+        // entry with no object-type link, so it never surfaces on products
+        // and is easy to mistake for "nothing happened". Make the model
+        // spell out the follow-up when the user didn't attach it anywhere.
+        $note = 'Schema proposal awaits human approval in the inbox. Nothing is changed yet.';
+        if ([] === $groupCodes) {
+            $note .= ' IMPORTANT: no group was given, so once approved this attribute is created in the LIBRARY only'
+                .' - it will NOT appear on any product until the user attaches it to a group or object type in Modeling.'
+                .' Tell the user this explicitly and, if they meant to use it on products, offer to attach it.';
+        }
+
         return [
             'pending_change_batch_id' => $batchId->toRfc4122(),
             'affected_count' => 1,
             'code' => $code,
-            'note' => 'Schema proposal awaits human approval in the inbox. Nothing is changed yet.',
+            'attached_to_groups' => [] !== $groupCodes,
+            'note' => $note,
         ];
     }
 
