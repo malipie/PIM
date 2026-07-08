@@ -6,13 +6,15 @@ import { KpiBand } from './components/KpiBand';
 import { TeamActivityCard } from './components/TeamActivityCard';
 
 /**
- * Dashboard "command center" (VIEW-13 #2143) — pixel-perfect static mock of
- * the approved redesign: greeting → dark agent hero → KPI band →
- * [catalog health | team activity] → action center.
+ * Dashboard "command center" (VIEW-13 #2143) — the approved redesign:
+ * greeting → dark agent hero → KPI band → [catalog health | team
+ * activity] → action center.
  *
- * Every value on this page is static mock data (see ./mocks.ts) — the
- * per-widget backends land later via
- * Project Plan/UI/Wdrozenie_grafiki/dashboard-do-oprogramowania.md.
+ * Every widget is wired to live data (epic DASH, #2249–#2274): KPI +
+ * catalog health via GET /api/dashboard/summary, team activity via
+ * /activity + /top-edited, the action center via /alerts. The agent hero
+ * runs its own loop (#2246). Each widget degrades per-widget to an honest
+ * "—"/empty state on endpoint failure and never fabricates a trend.
  * Per operator decision (2026-07-03) the page carries NO mock badges or
  * banners — it must look exactly like the approved design.
  */
