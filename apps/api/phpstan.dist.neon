@@ -139,6 +139,7 @@ parameters:
               - src/Identity/Domain/Entity/TenantAgentConfig.php
               - src/Catalog/Domain/Entity/MenuConfiguration.php
               - src/Dashboard/Domain/Entity/DashboardSnapshot.php
+              - src/Dashboard/Domain/Entity/DashboardAlertAck.php
               # Import/Domain entities extend AggregateRoot — their
               # doctrine.associationType emission is the flaky one the
               # `reportUnmatched: false` above guards against (see comment).

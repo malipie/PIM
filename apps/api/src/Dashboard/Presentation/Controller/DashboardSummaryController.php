@@ -33,10 +33,11 @@ final class DashboardSummaryController
     #[RequiresPermission(module: 'products', action: 'view')]
     public function __invoke(): JsonResponse
     {
-        if (null === $this->currentUser->userId() || null === $this->currentUser->tenant()) {
+        $userId = $this->currentUser->userId();
+        if (null === $userId || null === $this->currentUser->tenant()) {
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
         }
 
-        return new JsonResponse($this->query->summary(), Response::HTTP_OK);
+        return new JsonResponse($this->query->summary($userId), Response::HTTP_OK);
     }
 }
