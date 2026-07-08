@@ -273,10 +273,12 @@ export function useProductDetailForm({
   };
 
   const cancelEdit = (): void => {
-    // #1351 — no read-only mode anymore; "Anuluj" just discards unsaved
-    // edits and restores the persisted values.
+    // #2318 — "Anuluj" discards any unsaved edits and returns to the list
+    // without saving. The unsaved-changes confirmation is enforced by the
+    // caller (product-detail-page) before this runs, so here we just drop the
+    // dirty buffer and navigate back.
     setDirtyFields({});
-    void productQuery.refetch();
+    navigate(backHref);
   };
 
   const handleDelete = async (onDone: () => void): Promise<void> => {
