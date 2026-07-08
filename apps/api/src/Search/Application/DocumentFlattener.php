@@ -16,14 +16,14 @@ namespace App\Search\Application;
  * the natural filterable scalar per shape and emits it next to the
  * envelope. Keys colliding with reserved doc fields (`id`, `code`,
  * `kind`, `tenantId`, `status`, `enabled`, `parentId`, `path`,
- * `attributesIndexed`, `completeness`, `createdAt`, `updatedAt`) are
- * dropped to avoid overwriting indexer-owned metadata.
+ * `attributesIndexed`, `completeness`, `completeness_pct`, `createdAt`,
+ * `updatedAt`) are dropped to avoid overwriting indexer-owned metadata.
  */
 final class DocumentFlattener
 {
     private const array RESERVED_KEYS = [
         'id', 'code', 'kind', 'tenantId', 'objectTypeId', 'status', 'enabled',
-        'parentId', 'path', 'attributesIndexed', 'completeness',
+        'parentId', 'path', 'attributesIndexed', 'completeness', 'completeness_pct',
         'createdAt', 'updatedAt',
     ];
 
