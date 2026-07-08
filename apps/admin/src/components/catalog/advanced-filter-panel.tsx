@@ -4,12 +4,13 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AttributePicker } from '@/components/catalog/attribute-picker';
+import { BulkValueInput } from '@/components/catalog/bulk-wizard/bulk-value-input';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   CORE_OPERATORS,
   FILTER_OPERATORS_BY_TYPE,
   type FilterCondition,
+  type FilterConditionValue,
   type FilterOperator,
 } from '@/lib/filters/filter-dsl';
 import { jsonFetch } from '@/lib/http';
@@ -276,7 +277,20 @@ export function AdvancedFilterPanel({
             const attrMeta =
               effectivePanelAttrs.find((a) => a.code === cond.attr) ?? firstPanelAttr;
             const ops = FILTER_OPERATORS_BY_TYPE[attrMeta.type] ?? CORE_OPERATORS;
-            const isEmpty = cond.op === 'IS EMPTY' || cond.op === 'IS NOT EMPTY';
+            // #2311 — the value control's shape follows the attribute type,
+            // not a bare text box. Operators that encode the value in the
+            // operator itself (empty checks, boolean truthiness) take no
+            // value input; `IN`/`NOT IN` collect several option codes, so the
+            // control switches to the multiselect variant regardless of the
+            // attribute's own single/multi flavour.
+            const noValueOp =
+              cond.op === 'IS EMPTY' ||
+              cond.op === 'IS NOT EMPTY' ||
+              cond.op === '= TRUE' ||
+              cond.op === '= FALSE';
+            const isEmpty = noValueOp;
+            const valueInputType =
+              cond.op === 'IN' || cond.op === 'NOT IN' ? 'multiselect' : attrMeta.type;
 
             return (
               // Index-based key is acceptable here: the editor mutates
@@ -339,45 +353,24 @@ export function AdvancedFilterPanel({
                 </select>
 
                 {!isEmpty && (
-                  <Input
-                    inputMode={
-                      attrMeta.type === 'number' || attrMeta.type === 'metric'
-                        ? 'decimal'
-                        : undefined
-                    }
-                    value={
-                      typeof cond.value === 'string' || typeof cond.value === 'number'
-                        ? String(cond.value)
-                        : Array.isArray(cond.value)
-                          ? cond.value.join(', ')
-                          : ''
-                    }
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      // Always keep the verbatim string in draft state.
-                      // `commitAndApply` is responsible for converting
-                      // numeric strings (including the Polish comma
-                      // decimal `101,99`) to numbers — keeping the
-                      // intermediate value as a string avoids the
-                      // round-trip `Number(...) -> String(...)` that
-                      // strips a trailing separator while the operator
-                      // is still typing.
-                      const next: string | string[] =
-                        cond.op === 'IN' || cond.op === 'NOT IN'
-                          ? raw
-                              .split(',')
-                              .map((s) => s.trim())
-                              .filter(Boolean)
-                          : raw;
-                      updateCondition(idx, { value: next });
-                    }}
-                    placeholder={
-                      attrMeta.type === 'number' || attrMeta.type === 'metric'
-                        ? 'np. 101,99'
-                        : 'wpisz wartość'
-                    }
-                    className="h-9 flex-1 text-[12.5px]"
-                  />
+                  <div className="flex-1">
+                    <BulkValueInput
+                      attrCode={cond.attr}
+                      attrType={valueInputType}
+                      value={cond.value}
+                      // BulkValueInput is generic (`unknown`) but only ever
+                      // emits string | number | boolean | string[] per the
+                      // attribute type — all valid FilterConditionValue.
+                      onChange={(next) =>
+                        updateCondition(idx, { value: next as FilterConditionValue })
+                      }
+                      placeholder={
+                        attrMeta.type === 'number' || attrMeta.type === 'metric'
+                          ? 'np. 101,99'
+                          : 'wpisz wartość'
+                      }
+                    />
+                  </div>
                 )}
                 {isEmpty && <div className="flex-1" />}
 
