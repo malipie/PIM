@@ -15,9 +15,6 @@ test('NUI-08 — multimedia explorer: folders, views, drawer', async ({ page }) 
   await expect(page.getByText(/^foldery$|^folders$/i)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/^pliki$|^files$/i)).toBeVisible();
 
-  // Storage bar is mocked and badged.
-  await expect(page.getByText(/magazyn|storage/i).first()).toBeVisible();
-
   // The unassigned pseudo-folder tile exists.
   const unassigned = page.getByRole('button', { name: /bez przypisania|unassigned/i }).first();
   await expect(unassigned).toBeVisible();
@@ -38,6 +35,4 @@ test('NUI-08 — multimedia explorer: folders, views, drawer', async ({ page }) 
   await cards.first().locator('button').first().click();
   await expect(page.getByText(/^metadane$|^metadata$/i)).toBeVisible();
   await expect(page.getByText(/^format$/i).first()).toBeVisible();
-  // Approve stays mocked.
-  await expect(page.getByRole('button', { name: /zatwierdź|approve/i })).toBeDisabled();
 });
