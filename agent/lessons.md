@@ -2,6 +2,25 @@
 
 > Plik startowy zasiany twardymi wytycznymi z `Project Plan/01-architektura-pim.md`. Po każdej korekcie operatora lub odkrytym wzorcu (sukces ALBO porażka) — dopisz wpis. Czytaj przed każdą sesją.
 
+## Lessons z epiku DASH (2026-07-05…08, uinteraktywnienie dashboardu, #2249–#2275)
+
+### Patterns to Follow
+- **Nowy read-only kontekst zamiast rozdmuchiwania `Shared`.** Agregaty dashboardu przecinają Catalog/Import/Export/Integration/ApiConfigurator/Identity, a `Shared` jest leafem w Deptrac. Rozwiązanie (ADR-0026): cienki kontekst `src/Dashboard` z rulesetem `{Catalog,Channel,Identity}_Contracts + Shared`; dane BC bez seamu Contracts czytane raw DBAL-em z jawnym `tenant_id` (precedens `SqlCompletenessReport`; RLS backstop). Deptrac pilnuje zależności klasowych, nie tabel — read-model wolno czytać cudze tabele, nie wolno importować `*_Internals`.
+- **Wspólny DTO agregatów dla endpointu i joba, żeby matematyka się nie rozjechała.** `DashboardSummaryQuery::aggregates()` zwraca `DashboardAggregates`; konsumuje go i endpoint (buduje JSON) i komenda snapshotu (`pim:dashboard:snapshot` UPSERT). Jedno źródło liczb.
+- **Uczciwy null zamiast fabrykowanego trendu.** Delty kompletności = `bieżąca − snapshot(horyzont)` RÓWNO na `CURRENT_DATE-30/-7`; brak snapshotu ⇒ `null` ⇒ FE renderuje „brak trendu". Pominięty dzień crona = null dla tego horyzontu, nie przybliżone okno (reguła NUI-02 rozciągnięta na cały dashboard: nigdy nie zmyślaj trendu).
+
+### Patterns to Avoid
+- **Inline `/** @var array<...> $x */` w teście PADA na CI mimo zieleni lokalnie** — pre-commit `php-cs-fixer` degraduje docblock `/**` do zwykłego `/*` (bo to nie deklaracja), a PHPStan ignoruje zwykłe komentarze → „should return array<string, mixed> but returns array<mixed, mixed>". Złapało PR #2266 (PHP static + removability czerwone po zielonym commicie). Fix: **jawne rzutowanie** zamiast adnotacji — pętla `foreach ($params as $k=>$v) $typed[(string)$k]=$v;` przeżywa formatter. Nie polegaj na inline `@var` w kodzie, który przechodzi przez cs-fixer.
+- **`updateAttributeIndex()` na encji jest nadpisywany przez synchroniczny listener na `flush`** (rebuild `attributes_indexed` z ObjectValues). Seedowanie nazwy produktu w teście przez encję nie działa — wpisuj `attributes_indexed` raw SQL-em PO `flush` (`UPDATE objects SET attributes_indexed = :json WHERE id = :id`).
+
+### Package Quirks / Toolchain
+- **Nowa trasa custom `#[Route]` wymaga restartu `pim-api-1` PO merge do main** — FrankenPHP worker trzyma router w pamięci; po `git checkout main && pull` z nową trasą stack odpowiada 404 aż do `cache:clear` + `docker restart pim-api-1` + warmup. To nie regresja kodu (mylące: kod jest w working tree, ale worker go nie widzi).
+- **`apps/api/config/reference.php` regeneruje się przy `cache:clear`** (przestawka komentarzy `// Default:` w Mercure config) — artefakt, nie celowa zmiana; `git checkout -- apps/api/config/reference.php` przed stage.
+
+### Decyzje świadome
+- **Alert = agregator on-the-fly, nie encja** (ADR-0026, decyzja operatora). 4 tabele statusowe (`integration_sync_runs`/`import_sessions`/`feed_runs`/`api_webhook_deliveries`) + detektor spadku ze snapshotów, LEFT-filter po `dashboard_alert_acks` (fingerprint deterministyczny), okno czasowe zamiast TTL. Powód: encja wymagałaby seamów zdarzeniowych w 4 BC (dziś ich nie ma) i dublowałaby stan źródłowy. Trade-off: read-model zna nazwy cudzych tabel (akceptowane — testy kernelowe łapią drift schematu).
+- **Kafel „Otwarte alerty" liczy okno 24h, feed 7d/30d** — celowa niespójność: kafel to „co się psuje TERAZ", feed to przegląd. Realny import IdoSell sprzed 4 dni → `openAlerts.count=0`, ale widoczny w feedzie 7d. To nie bug.
+
 ## Lessons z #1673 + #1678 (2026-06-20, bug-fixy: walidacja group-required + kafelki importu)
 
 ### Patterns to Follow
