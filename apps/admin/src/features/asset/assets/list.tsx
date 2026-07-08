@@ -12,7 +12,6 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { MockBadge } from '@/components/ui/mock-badge';
 import { usePageActions } from '@/layout/page-actions-context';
 import type { DuplicateAssetError, UploadAssetResult } from '@/lib/asset-upload';
 import { jsonFetch } from '@/lib/http';
@@ -21,7 +20,6 @@ import { cn } from '@/lib/utils';
 import { AssetBulkActionsBar } from './AssetBulkActionsBar';
 import { AssetDrawer } from './AssetDrawer';
 import { AssetDuplicateDialog } from './AssetDuplicateDialog';
-import { AssetEditDialog } from './AssetEditDialog';
 import { AssetUploadModal } from './AssetUploadModal';
 import { type AssetEntry, type AssetMeta, AssetThumb, toAssetMeta } from './asset-meta';
 
@@ -73,7 +71,6 @@ export function AssetsListPage() {
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
   const [folders, setFolders] = useState<FolderEntry[]>([]);
   const [drawerAsset, setDrawerAsset] = useState<AssetMeta | null>(null);
-  const [editAsset, setEditAsset] = useState<AssetMeta | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
 
   const setSearchSoon = useDebouncedCallback((value: string) => setDebouncedSearch(value), 300);
@@ -301,18 +298,6 @@ export function AssetsListPage() {
             </span>
           </>
         ) : null}
-        <div className="ml-auto flex items-center gap-2.5 text-[11.5px] text-zinc-500">
-          <MockBadge
-            tooltip={t('assets.storage_mock_tooltip', {
-              defaultValue: 'MOCK — endpoint zajętości magazynu wymaga backendu (backlog NUI-08)',
-            })}
-          />
-          <span className="font-medium">{t('assets.storage', { defaultValue: 'Magazyn' })}</span>
-          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-zinc-200/80">
-            <div className="h-full rounded-full bg-orange-500" style={{ width: '28%' }} />
-          </div>
-          <span className="num text-zinc-700">142 / 500 GB</span>
-        </div>
       </div>
 
       {/* Folder tiles */}
@@ -441,25 +426,7 @@ export function AssetsListPage() {
         onClearSelection={() => setSelected(new Set())}
       />
 
-      <AssetDrawer
-        asset={drawerAsset}
-        onClose={() => setDrawerAsset(null)}
-        onDeleted={refresh}
-        onEdit={(asset) => setEditAsset(asset)}
-      />
-
-      <AssetEditDialog
-        asset={editAsset !== null ? { id: editAsset.id, code: editAsset.code, tags: [] } : null}
-        open={editAsset !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditAsset(null);
-        }}
-        onSaved={() => {
-          setEditAsset(null);
-          setDrawerAsset(null);
-          refresh();
-        }}
-      />
+      <AssetDrawer asset={drawerAsset} onClose={() => setDrawerAsset(null)} onDeleted={refresh} />
 
       <AssetUploadModal
         open={uploadOpen}

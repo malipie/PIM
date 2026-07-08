@@ -1,4 +1,4 @@
-import { Check, Download, Link2, Trash2, X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { jsonFetch } from '@/lib/http';
 
 export interface AssetBulkActionsBarProps {
@@ -61,26 +60,6 @@ export function AssetBulkActionsBar({
     }
   };
 
-  const mockTooltip = t('assets.bulk.mock_tooltip', {
-    defaultValue: 'MOCK — akcja wymaga backendu (backlog NUI-08)',
-  });
-
-  const mockAction = (label: string, Icon: typeof Download) => (
-    <Tooltip key={label}>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          disabled
-          className="flex h-8 cursor-not-allowed items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium text-white/40"
-        >
-          <Icon className="size-3.5" />
-          {label}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top">{mockTooltip}</TooltipContent>
-    </Tooltip>
-  );
-
   return (
     <>
       <div
@@ -94,9 +73,6 @@ export function AssetBulkActionsBar({
             : t('assets.bulk.selected_other', { count: selectedIds.length })}
         </span>
         <span className="h-5 w-px bg-white/20" aria-hidden />
-        {mockAction(t('assets.bulk.download', { defaultValue: 'Pobierz' }), Download)}
-        {mockAction(t('assets.bulk.assign', { defaultValue: 'Przypisz' }), Link2)}
-        {mockAction(t('assets.bulk.approve', { defaultValue: 'Zatwierdź' }), Check)}
         <GatedButton
           permission="asset.delete"
           variant="ghost"
