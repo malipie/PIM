@@ -6,13 +6,17 @@ import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 /**
- * VIEW-25b (#556) — value input adapter dla BulkWizard.
+ * VIEW-25b (#556) — typed value input adapter.
  *
- * Renderuje odpowiedni picker zależnie od typu atrybutu:
+ * Współdzielony między BulkWizard (akcje zbiorcze) a AdvancedFilterPanel
+ * (#2311 — filtr zaawansowany honoruje typ atrybutu). Renderuje odpowiedni
+ * picker zależnie od typu atrybutu:
  *  - `text` → standardowy <Input>
- *  - `number` / `metric` → <Input type=number>
+ *  - `number` / `metric` → <Input inputMode=decimal>
  *  - `date` → <Input type=date>
+ *  - `datetime` → <Input type=datetime-local>
  *  - `boolean` → toggle Tak/Nie
+ *  - `color` → <input type=color> + hex <Input>
  *  - `select` → dropdown z `/api/attributes/{code}/options`
  *  - `multiselect` → chips picker z tej samej listy options
  *  - typ undefined → fallback do `text`
@@ -131,6 +135,38 @@ export function BulkValueInput({
         onChange={(e) => onChange(e.target.value)}
         className="font-mono"
       />
+    );
+  }
+
+  if (attrType === 'datetime') {
+    return (
+      <Input
+        type="datetime-local"
+        value={typeof value === 'string' ? value : ''}
+        onChange={(e) => onChange(e.target.value)}
+        className="font-mono"
+      />
+    );
+  }
+
+  if (attrType === 'color') {
+    const colorValue = typeof value === 'string' && value !== '' ? value : '#000000';
+    return (
+      <div className="inline-flex items-center gap-2">
+        <input
+          type="color"
+          aria-label={t('bulk_value.color_picker', { defaultValue: 'Wybierz kolor' })}
+          value={colorValue}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-9 w-12 cursor-pointer rounded-lg border border-zinc-200 bg-white p-1"
+        />
+        <Input
+          value={typeof value === 'string' ? value : ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#RRGGBB"
+          className="font-mono w-28"
+        />
+      </div>
     );
   }
 

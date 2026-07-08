@@ -1,10 +1,12 @@
 import { FolderTree, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { buildCategoryTree, CategoryTree } from '@/components/modeling/category-tree';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
+import { unwrapAttributesIndexed } from '@/lib/attributes-indexed';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +37,17 @@ interface CategoryRow {
   id: string;
   code: string;
   path?: string | null;
+  attributesIndexed?: Record<string, unknown>;
+}
+
+function categoryName(row: CategoryRow): string {
+  const name = unwrapAttributesIndexed(row.attributesIndexed).name;
+  if (typeof name === 'string' && name.trim() !== '') return name;
+  if (typeof name === 'object' && name !== null) {
+    const map = name as Record<string, string>;
+    return map.pl ?? map.en ?? Object.values(map)[0] ?? row.code;
+  }
+  return row.code;
 }
 
 interface CategoriesListResponse {
@@ -81,10 +94,15 @@ export function BulkCategoryModal({ selectedIds, onClose, onApplied }: CategoryM
       : options.filter((opt) => {
           const needle = search.trim().toLowerCase();
           return (
+            categoryName(opt).toLowerCase().includes(needle) ||
             opt.code.toLowerCase().includes(needle) ||
             (opt.path ?? '').toLowerCase().includes(needle)
           );
         });
+
+  // #2313 — render categories as the same name-labelled tree the operator
+  // sees when editing categories, instead of a flat list of codes.
+  const tree = useMemo(() => buildCategoryTree(filteredOptions), [filteredOptions]);
 
   const togglePick = (id: string): void => {
     setPickedIds((prev) => {
@@ -200,32 +218,20 @@ export function BulkCategoryModal({ selectedIds, onClose, onApplied }: CategoryM
             })}
           />
 
-          <div className="rounded-2xl border border-zinc-200 max-h-[260px] overflow-y-auto">
-            {filteredOptions.length === 0 ? (
+          <div className="rounded-2xl border border-zinc-200 max-h-[260px] overflow-y-auto p-2">
+            {tree.length === 0 ? (
               <div className="px-3 py-2 text-[12px] text-zinc-500">
                 {t('products.bulk_category.empty', { defaultValue: 'Brak kategorii do pokazania' })}
               </div>
             ) : (
-              filteredOptions.map((opt) => {
-                const picked = pickedIds.has(opt.id);
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => togglePick(opt.id)}
-                    className={cn(
-                      'w-full flex items-center justify-between px-3 py-2 text-[12.5px] text-left border-b border-zinc-50 last:border-b-0',
-                      picked ? 'bg-emerald-50/60' : 'hover:bg-zinc-50',
-                    )}
-                  >
-                    <span className="font-mono text-[11.5px] text-zinc-500">{opt.code}</span>
-                    <span className="flex-1 px-3 truncate">{opt.path ?? opt.code}</span>
-                    {picked ? (
-                      <span className="text-emerald-700 text-[11.5px] font-semibold">✓</span>
-                    ) : null}
-                  </button>
-                );
-              })
+              <CategoryTree
+                nodes={tree}
+                mode="multi-select"
+                selectedIds={pickedIds}
+                onToggle={togglePick}
+                onSelect={togglePick}
+                hidePrimary
+              />
             )}
           </div>
 

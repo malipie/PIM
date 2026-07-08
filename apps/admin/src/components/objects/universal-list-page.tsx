@@ -93,11 +93,6 @@ const BulkDeleteConfirmModal = lazy(() =>
     default: m.BulkDeleteConfirmModal,
   })),
 );
-const BulkPublishModal = lazy(() =>
-  import('@/components/catalog/bulk-actions/publish-modal').then((m) => ({
-    default: m.BulkPublishModal,
-  })),
-);
 const BulkWizard = lazy(() =>
   import('@/components/catalog/bulk-wizard/bulk-wizard').then((m) => ({ default: m.BulkWizard })),
 );
@@ -250,7 +245,6 @@ export function UniversalListPage({
   const [crossPageLoading, setCrossPageLoading] = useState(false);
   const [bulkWizardOpen, setBulkWizardOpen] = useState(false);
   const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
-  const [bulkPublishOpen, setBulkPublishOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDuplicateOpen, setBulkDuplicateOpen] = useState(false);
   const [cmdKOpen, setCmdKOpen] = useState(false);
@@ -933,7 +927,6 @@ export function UniversalListPage({
         onApplied={onBulkApplied}
         onOpenWizard={() => setBulkWizardOpen(true)}
         onOpenCategoryModal={isCategorizable ? () => setBulkCategoryOpen(true) : undefined}
-        onOpenPublishModal={isProduct ? () => setBulkPublishOpen(true) : undefined}
         onOpenDeleteModal={() => setBulkDeleteOpen(true)}
         onOpenDuplicateModal={isProduct ? () => setBulkDuplicateOpen(true) : undefined}
         onOpenCmdK={() => setCmdKOpen(true)}
@@ -961,19 +954,6 @@ export function UniversalListPage({
           <BulkCategoryModal
             selectedIds={Array.from(selected)}
             onClose={() => setBulkCategoryOpen(false)}
-            onApplied={(result) => {
-              setLastBulkSession(result);
-              setSelected(new Set());
-              setShowSelectedOnly(false);
-              refetch();
-            }}
-          />
-        ) : null}
-
-        {bulkPublishOpen ? (
-          <BulkPublishModal
-            selectedIds={Array.from(selected)}
-            onClose={() => setBulkPublishOpen(false)}
             onApplied={(result) => {
               setLastBulkSession(result);
               setSelected(new Set());

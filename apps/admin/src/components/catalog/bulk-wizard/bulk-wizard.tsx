@@ -54,8 +54,7 @@ type BulkMode =
   | 'clear_attribute'
   | 'append_value'
   | 'remove_value'
-  | 'increment_numeric'
-  | 'multi_attribute_edit';
+  | 'increment_numeric';
 
 const MODE_LABELS: Record<BulkMode, string> = {
   set_attribute: 'Ustaw wartość',
@@ -63,18 +62,7 @@ const MODE_LABELS: Record<BulkMode, string> = {
   append_value: 'Dodaj do listy',
   remove_value: 'Usuń z listy',
   increment_numeric: 'Operacja arytm.',
-  multi_attribute_edit: 'Multi-atrybut',
 };
-
-interface MultiEdit {
-  id: string;
-  attr: string;
-  op: 'set' | 'clear';
-  value: string;
-}
-
-let multiEditCounter = 0;
-const nextEditId = (): string => `edit-${++multiEditCounter}`;
 
 export function BulkWizard({ open, selectedIds, onClose, onApplied }: BulkWizardProps) {
   const { t } = useTranslation();
@@ -88,26 +76,12 @@ export function BulkWizard({ open, selectedIds, onClose, onApplied }: BulkWizard
   const [newValue, setNewValue] = useState<unknown>('');
   const [operator, setOperator] = useState<'+' | '-' | '*' | '/' | '%'>('*');
   const [operand, setOperand] = useState('1.10');
-  const [edits, setEdits] = useState<MultiEdit[]>([
-    { id: nextEditId(), attr: '', op: 'set', value: '' },
-  ]);
   const [preview, setPreview] = useState<BulkActionPreview | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   if (!open) return null;
 
   const buildPayload = (): Record<string, unknown> => {
-    if (mode === 'multi_attribute_edit') {
-      return {
-        edits: edits
-          .filter((e) => e.attr.trim() !== '')
-          .map((e) => ({
-            attr: e.attr.trim(),
-            op: e.op,
-            ...(e.op === 'set' ? { value: e.value } : {}),
-          })),
-      };
-    }
     if (mode === 'increment_numeric') {
       return { attr: attrCode.trim(), operator, operand: Number(operand) };
     }
@@ -119,9 +93,6 @@ export function BulkWizard({ open, selectedIds, onClose, onApplied }: BulkWizard
 
   const canAdvance = (() => {
     if (step !== 1) return true;
-    if (mode === 'multi_attribute_edit') {
-      return edits.some((e) => e.attr.trim() !== '');
-    }
     if (mode === 'clear_attribute') {
       return attrCode.trim() !== '';
     }
@@ -288,24 +259,22 @@ export function BulkWizard({ open, selectedIds, onClose, onApplied }: BulkWizard
                   ))}
                 </div>
               </div>
-              {mode !== 'multi_attribute_edit' && (
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider font-semibold text-zinc-500 mb-2">
-                    {t('products.bulk_wizard.attr_label', { defaultValue: 'Atrybut' })}
-                  </div>
-                  <AttributePicker
-                    value={attrCode}
-                    onChange={(picked) => {
-                      setAttrCode(picked?.code ?? '');
-                      setAttrType(picked?.type);
-                      // reset value when typ atrybutu zmienia się żeby
-                      // stara wartość (np. string) nie wpadła w bool/select input.
-                      setNewValue(picked?.type === 'multiselect' ? [] : '');
-                    }}
-                    allowedTypes={mode === 'increment_numeric' ? ['number', 'metric'] : undefined}
-                  />
+              <div>
+                <div className="text-[11px] uppercase tracking-wider font-semibold text-zinc-500 mb-2">
+                  {t('products.bulk_wizard.attr_label', { defaultValue: 'Atrybut' })}
                 </div>
-              )}
+                <AttributePicker
+                  value={attrCode}
+                  onChange={(picked) => {
+                    setAttrCode(picked?.code ?? '');
+                    setAttrType(picked?.type);
+                    // reset value when typ atrybutu zmienia się żeby
+                    // stara wartość (np. string) nie wpadła w bool/select input.
+                    setNewValue(picked?.type === 'multiselect' ? [] : '');
+                  }}
+                  allowedTypes={mode === 'increment_numeric' ? ['number', 'metric'] : undefined}
+                />
+              </div>
               {(mode === 'set_attribute' || mode === 'append_value' || mode === 'remove_value') && (
                 <div>
                   <div className="text-[11px] uppercase tracking-wider font-semibold text-zinc-500 mb-2">
@@ -364,81 +333,6 @@ export function BulkWizard({ open, selectedIds, onClose, onApplied }: BulkWizard
                       className="mt-2 font-mono"
                     />
                   </div>
-                </div>
-              )}
-              {mode === 'multi_attribute_edit' && (
-                <div className="space-y-3">
-                  <div className="text-[11px] uppercase tracking-wider font-semibold text-zinc-500">
-                    {t('products.bulk_wizard.multi_label', {
-                      defaultValue: 'Lista edycji (attr · op · value)',
-                    })}
-                  </div>
-                  {edits.map((edit) => (
-                    <div key={edit.id} className="flex gap-2 items-center">
-                      <Input
-                        value={edit.attr}
-                        onChange={(e) =>
-                          setEdits((arr) =>
-                            arr.map((row) =>
-                              row.id === edit.id ? { ...row, attr: e.target.value } : row,
-                            ),
-                          )
-                        }
-                        placeholder="attr code"
-                        className="flex-1"
-                      />
-                      <select
-                        value={edit.op}
-                        onChange={(e) =>
-                          setEdits((arr) =>
-                            arr.map((row) =>
-                              row.id === edit.id
-                                ? { ...row, op: e.target.value as 'set' | 'clear' }
-                                : row,
-                            ),
-                          )
-                        }
-                        className="h-9 w-24 rounded-lg border border-zinc-200 px-2 text-[13px]"
-                      >
-                        <option value="set">set</option>
-                        <option value="clear">clear</option>
-                      </select>
-                      {edit.op === 'set' && (
-                        <Input
-                          value={edit.value}
-                          onChange={(e) =>
-                            setEdits((arr) =>
-                              arr.map((row) =>
-                                row.id === edit.id ? { ...row, value: e.target.value } : row,
-                              ),
-                            )
-                          }
-                          placeholder="value"
-                          className="flex-1"
-                        />
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setEdits((arr) => arr.filter((row) => row.id !== edit.id))}
-                        className="h-9 w-9 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-                        aria-label="Remove edit row"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEdits((arr) => [
-                        ...arr,
-                        { id: nextEditId(), attr: '', op: 'set', value: '' },
-                      ])
-                    }
-                    className="h-8 px-3 rounded-lg border border-dashed border-zinc-300 text-[12px] font-medium text-zinc-600 hover:bg-zinc-50"
-                  >
-                    + Dodaj atrybut
-                  </button>
                 </div>
               )}
             </div>
