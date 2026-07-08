@@ -18,14 +18,18 @@ describe('BulkValueInput typed controls', () => {
   });
 
   it('renders a datetime-local picker for a datetime attribute', () => {
-    render(<BulkValueInput attrCode="updated_at" attrType="datetime" value="" onChange={vi.fn()} />);
+    render(
+      <BulkValueInput attrCode="updated_at" attrType="datetime" value="" onChange={vi.fn()} />,
+    );
     const input = document.querySelector('input[type="datetime-local"]');
     expect(input).not.toBeNull();
   });
 
   it('renders a colour picker plus hex field for a color attribute', () => {
     const onChange = vi.fn();
-    render(<BulkValueInput attrCode="swatch" attrType="color" value="#ff0000" onChange={onChange} />);
+    render(
+      <BulkValueInput attrCode="swatch" attrType="color" value="#ff0000" onChange={onChange} />,
+    );
     const colorInput = document.querySelector('input[type="color"]');
     expect(colorInput).not.toBeNull();
     fireEvent.change(colorInput as HTMLInputElement, { target: { value: '#00ff00' } });
@@ -34,7 +38,9 @@ describe('BulkValueInput typed controls', () => {
 
   it('renders a Tak/Nie toggle for a boolean attribute and emits a boolean', () => {
     const onChange = vi.fn();
-    render(<BulkValueInput attrCode="in_stock" attrType="boolean" value={false} onChange={onChange} />);
+    render(
+      <BulkValueInput attrCode="in_stock" attrType="boolean" value={false} onChange={onChange} />,
+    );
     fireEvent.click(screen.getByText('Tak'));
     expect(onChange).toHaveBeenCalledWith(true);
   });
