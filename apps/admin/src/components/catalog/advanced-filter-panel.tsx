@@ -102,6 +102,37 @@ function toFilterType(attrType: string | undefined): keyof typeof FILTER_OPERATO
   return (attrType !== undefined ? FILTER_TYPE_BY_ATTR_TYPE[attrType] : undefined) ?? 'text';
 }
 
+/**
+ * #2312 — Polish labels for the comparison operators. The select used to
+ * render the raw canonical tokens (`after`, `IS EMPTY`, `contains`…), which
+ * were English. Comparison symbols (`=`, `!=`, `<`, `>=`) are universal and
+ * stay as-is; only the word operators are translated.
+ */
+const OPERATOR_I18N: Record<string, { key: string; pl: string }> = {
+  between: { key: 'op_between', pl: 'pomiędzy' },
+  'IS EMPTY': { key: 'op_is_empty', pl: 'puste' },
+  'IS NOT EMPTY': { key: 'op_is_not_empty', pl: 'niepuste' },
+  'starts with': { key: 'op_starts_with', pl: 'zaczyna się od' },
+  'ends with': { key: 'op_ends_with', pl: 'kończy się na' },
+  contains: { key: 'op_contains', pl: 'zawiera' },
+  'not contains': { key: 'op_not_contains', pl: 'nie zawiera' },
+  IN: { key: 'op_in', pl: 'jest jednym z' },
+  'NOT IN': { key: 'op_not_in', pl: 'nie jest żadnym z' },
+  after: { key: 'op_after', pl: 'po' },
+  before: { key: 'op_before', pl: 'przed' },
+  '= TRUE': { key: 'op_is_true', pl: '= Tak' },
+  '= FALSE': { key: 'op_is_false', pl: '= Nie' },
+};
+
+function operatorLabel(
+  op: string,
+  t: (key: string, options?: { defaultValue?: string }) => string,
+): string {
+  const entry = OPERATOR_I18N[op];
+  if (entry === undefined) return op;
+  return t(`products.advanced_filter.${entry.key}`, { defaultValue: entry.pl });
+}
+
 interface AttributeApiRow {
   id: string;
   code: string;
@@ -347,7 +378,7 @@ export function AdvancedFilterPanel({
                 >
                   {ops.map((o) => (
                     <option key={o} value={o}>
-                      {o}
+                      {operatorLabel(o, t)}
                     </option>
                   ))}
                 </select>
