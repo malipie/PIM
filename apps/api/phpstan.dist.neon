@@ -167,6 +167,10 @@ parameters:
               - src/Export/Feed/Domain/Entity/FeedRun.php
               - src/Export/Feed/Domain/Entity/FeedRunLog.php
               - src/Export/Feed/Domain/Entity/FeedPullStat.php
+              # Export/Catalog (ADR-0027, epic CPDF) — same `?Tenant` write
+              # window as the Feed group above (assigned by the listener).
+              - src/Export/Catalog/Domain/Entity/CatalogProfile.php
+              - src/Export/Catalog/Domain/Entity/CatalogRun.php
               - src/Backup/Domain/Entity/Backup.php
               - src/Channel/Domain/Entity/TenantLocale.php
               - src/Channel/Domain/Entity/ChannelPublicationProfile.php
