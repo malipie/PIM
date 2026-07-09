@@ -195,6 +195,10 @@ const ProductShowPage = lazyPage(
   'ProductShowPage',
 );
 const CatalogsPdfPage = lazyPage(() => import('@/features/catalogs-pdf'), 'CatalogsPdfPage');
+const CatalogWizardPage = lazyPage(
+  () => import('@/features/catalogs-pdf/wizard/CatalogWizardPage'),
+  'CatalogWizardPage',
+);
 const ChannelCreatePage = lazyPage(
   () => import('@/features/channel/channels/create'),
   'ChannelCreatePage',
@@ -568,6 +572,7 @@ function App() {
                   <Route path="/assets" element={<AssetsListPage />} />
                   <Route path="/assets/:id" element={<AssetShowPage />} />
                   <Route path="/catalogs-pdf" element={<CatalogsPdfPage />} />
+                  <Route path="/catalogs-pdf/new" element={<CatalogWizardPage />} />
                   {/* AUD-076 (W3-5.5) — gate the whole settings tree with the
                     same permission set the sidebar uses to show the entry
                     (MENU_PERMISSIONS.settings). A user with no settings

@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 
 import { PillTabs } from '@/components/ui-v2/pill-tabs';
 import { usePageActions } from '@/layout/page-actions-context';
@@ -26,6 +26,7 @@ function parseTab(value: string | null): CatalogsPdfTab {
  */
 export function CatalogsPdfPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<CatalogsPdfTab>(() =>
     parseTab(searchParams.get('tab')),
@@ -47,19 +48,10 @@ export function CatalogsPdfPage() {
     [setSearchParams],
   );
 
-  // TODO(CPDF-P5-02): open the create-catalog wizard. Until it ships, the CTA
-  // deep-links into the (still empty) catalogs tab so the flow is discoverable.
+  // CPDF-P5-02 — open the full-page create-catalog wizard.
   const openNewCatalog = useCallback(() => {
-    changeTab('catalogs');
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        params.set('tab', 'new');
-        return params;
-      },
-      { replace: true },
-    );
-  }, [changeTab, setSearchParams]);
+    void navigate('/catalogs-pdf/new');
+  }, [navigate]);
 
   usePageActions(
     useMemo(
