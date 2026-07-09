@@ -352,10 +352,14 @@ services:
     App\Export\Feed\Presentation\Controller\FeedRegenerateController:
         arguments:
             $topicBase: '%env(MERCURE_TOPIC_BASE)%'
-    # CPDF-P3-01 — catalog regeneration progress topic
+    # CPDF-P3-01/P3-03 — catalog regeneration progress topic
     # (tenant/{tid}/catalogs/{id}/runs); built from the same public origin the
-    # SPA subscribes on so the tenant-scoped subscribe claim matches.
+    # SPA subscribes on so the tenant-scoped subscribe claim matches. The manual
+    # "Generuj teraz" endpoint returns the same topic as `mercure_topic`.
     App\Export\Catalog\Application\Async\CatalogProgressPublisher:
+        arguments:
+            $topicBase: '%env(MERCURE_TOPIC_BASE)%'
+    App\Export\Catalog\Presentation\Controller\CatalogRegenerateController:
         arguments:
             $topicBase: '%env(MERCURE_TOPIC_BASE)%'
     # AUD-001 (#1573) — Catalog + permission publishers and the cookie
