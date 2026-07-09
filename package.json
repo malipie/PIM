@@ -44,7 +44,7 @@
     "@commitlint/config-conventional": "^21.2.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
-    "turbo": "^2.10.2"
+    "turbo": "^2.10.3"
   },
   "pnpm": {
     "overrides": {
