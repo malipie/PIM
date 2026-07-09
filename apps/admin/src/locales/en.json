@@ -942,7 +942,23 @@
   "catalogs_pdf": {
     "page_title": "PDF Catalogs",
     "placeholder_title": "Coming soon",
-    "placeholder_description": "PDF catalog generation is in the backlog. Scope will be defined in a separate ticket."
+    "placeholder_description": "PDF catalog generation is in the backlog. Scope will be defined in a separate ticket.",
+    "tabs_aria": "PDF catalog sections",
+    "tab_catalogs": "Catalogs",
+    "tab_templates": "Templates",
+    "new_cta": "New catalog",
+    "catalogs_empty_title": "No catalogs yet",
+    "catalogs_empty_description": "No PDF catalog has been created yet. Start with a new catalog based on the template of your choice.",
+    "catalogs_count": "Catalogs: {{count}}",
+    "templates_title": "Available templates",
+    "templates_description": "The \"Product sheet\" archetype is ready in the MVP. Further layouts arrive in module M6.",
+    "template_sheet_name": "Product sheet (sheet)",
+    "template_sheet_description": "One product per page — a full sheet with attributes and assets.",
+    "template_grid_name": "Catalog (grid)",
+    "template_grid_description": "A grid of multiple products per page — catalog layout.",
+    "template_pricelist_name": "Price list (pricelist)",
+    "template_pricelist_description": "A tabular price list with per-channel prices.",
+    "template_available": "Available"
   },
   "topbar": {
     "workspace": "Workspace",

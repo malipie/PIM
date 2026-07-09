@@ -952,7 +952,23 @@
   "catalogs_pdf": {
     "page_title": "Katalogi PDF",
     "placeholder_title": "W przygotowaniu",
-    "placeholder_description": "Generowanie katalogów PDF jest na liście backlogu. Scope ustalimy w osobnym tickecie."
+    "placeholder_description": "Generowanie katalogów PDF jest na liście backlogu. Scope ustalimy w osobnym tickecie.",
+    "tabs_aria": "Sekcje katalogów PDF",
+    "tab_catalogs": "Katalogi",
+    "tab_templates": "Szablony",
+    "new_cta": "Nowy katalog",
+    "catalogs_empty_title": "Brak katalogów",
+    "catalogs_empty_description": "Nie utworzono jeszcze żadnego katalogu PDF. Zacznij od nowego katalogu opartego o wybrany szablon.",
+    "catalogs_count": "Katalogów: {{count}}",
+    "templates_title": "Dostępne szablony",
+    "templates_description": "Archetyp „Karta produktu” jest gotowy w MVP. Kolejne układy dochodzą w module M6.",
+    "template_sheet_name": "Karta produktu (sheet)",
+    "template_sheet_description": "Jeden produkt na stronę — pełna karta z atrybutami i zasobami.",
+    "template_grid_name": "Katalog (grid)",
+    "template_grid_description": "Siatka wielu produktów na stronie — układ katalogowy.",
+    "template_pricelist_name": "Cennik (pricelist)",
+    "template_pricelist_description": "Tabelaryczny cennik z cenami per kanał.",
+    "template_available": "Dostępny"
   },
   "topbar": {
     "workspace": "Workspace",
