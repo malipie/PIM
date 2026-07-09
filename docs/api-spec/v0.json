@@ -11879,6 +11879,97 @@
                 "x-cortex-permission": "products.bulk_operations"
             }
         },
+        "/api/catalog-runs": {
+            "get": {
+                "operationId": "api_catalog_runs_get",
+                "tags": [
+                    "catalog-runs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalog runs",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
+            }
+        },
+        "/api/catalog-runs/kpi": {
+            "get": {
+                "operationId": "api_catalog_runs_kpi_get",
+                "tags": [
+                    "catalog-runs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalog runs kpi",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
+            }
+        },
+        "/api/catalog-runs/{id}/cancel": {
+            "post": {
+                "operationId": "api_catalog_runs_id_cancel_post",
+                "tags": [
+                    "catalog-runs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalog runs id cancel",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "integration.admin"
+            }
+        },
         "/api/catalogs": {
             "get": {
                 "operationId": "api_catalogs_get",
@@ -12091,6 +12182,84 @@
                 ],
                 "x-pim-source": "custom-route",
                 "x-cortex-permission": "integration.admin"
+            }
+        },
+        "/api/catalogs/{id}/generate": {
+            "post": {
+                "operationId": "api_catalogs_id_generate_post",
+                "tags": [
+                    "catalogs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalogs id generate",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "integration.admin"
+            }
+        },
+        "/api/catalogs/{id}/runs": {
+            "get": {
+                "operationId": "api_catalogs_id_runs_get",
+                "tags": [
+                    "catalogs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalogs id runs",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
             }
         },
         "/api/catalogs/{id}/token": {
