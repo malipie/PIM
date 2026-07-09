@@ -663,6 +663,14 @@ parameters:
             - App\Catalog\Domain\Entity\ObjectType
             - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
             - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
+        # CPDF-P2-02 — catalog PDF values adapter, same Export-core → Catalog\Domain
+        # reach as the feed values adapter above (reuses ExportBuilder + id resolution).
+        App\Export\Application\Catalog\ExportBuilderCatalogValues:
+            - App\Catalog\Application\Filter\FilterDslResolver
+            - App\Catalog\Domain\Entity\CatalogObject
+            - App\Catalog\Domain\Entity\ObjectType
+            - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
+            - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
         # APIC-P3-06 — outbound-sync reader reuses the Export ValueSerializer +
         # iterates catalog objects; same Export → Catalog\Domain reach as the
         # serializer/runner above (the implementation is Catalog-data-bound).
