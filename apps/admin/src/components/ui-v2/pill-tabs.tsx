@@ -49,7 +49,7 @@ export function PillTabs({ items, activeId, onChange, ariaLabel, className }: Pi
             className={cn(
               'focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[13px] font-medium transition',
               active && 'bg-zinc-900 text-white',
-              !active && !item.disabled && 'text-zinc-500 hover:bg-zinc-100 hover:text-ink',
+              !active && !item.disabled && 'text-zinc-600 hover:bg-zinc-100 hover:text-ink',
               item.disabled && 'cursor-not-allowed text-zinc-300',
             )}
           >
