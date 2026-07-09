@@ -482,6 +482,13 @@ services:
         arguments:
             $secret: '%env(APP_SECRET)%'
 
+    # CPDF-P3-02 — catalog PDF URL token HMAC. Keyed with the app secret so the
+    # stored token_hash cannot be forged without the server key; the plaintext
+    # token is shown once at mint/rotate and never persisted.
+    App\Export\Catalog\Application\Delivery\CatalogTokenService:
+        arguments:
+            $secret: '%env(APP_SECRET)%'
+
     # XMLF-P3-06 [SEC] — the pull URL carries the feed credential in the path,
     # and the framework logs request paths (RouterListener route_parameters,
     # ErrorListener "No route found for …"). Decorating the single `logger`

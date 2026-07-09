@@ -145,6 +145,14 @@ framework:
             policy: 'sliding_window'
             limit: 120
             interval: '1 hour'
+        # CPDF-P3-02 [SEC] — public catalog PDF URL pulls, keyed per catalog (one
+        # active token per catalog, so per-catalog == per-token). The endpoint only
+        # ever streams the cached PDF (the real anti-DoS), so this limiter guards
+        # MinIO read bandwidth, not CPU. Same 120/h budget as feed_pull.
+        catalog_pull:
+            policy: 'sliding_window'
+            limit: 120
+            interval: '1 hour'
 
 when@test:
     framework:
@@ -156,6 +164,12 @@ when@test:
         # feed and every test mints a fresh feed, so tests never interfere.
         rate_limiter:
             feed_pull:
+                policy: 'sliding_window'
+                limit: 5
+                interval: '1 hour'
+            # Keep the catalog-pull 429 path testable — buckets are keyed per
+            # catalog and every test mints a fresh catalog, so tests never interfere.
+            catalog_pull:
                 policy: 'sliding_window'
                 limit: 5
                 interval: '1 hour'
