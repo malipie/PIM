@@ -1,5 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Check, Download, FileText, Link2, RefreshCw, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/toast';
 import { StatusPill } from '@/components/ui-v2/status-pill';
@@ -8,12 +9,16 @@ import { cn } from '@/lib/utils';
 
 import {
   absoluteUrl,
+  CATALOG_KPI_QUERY_KEY,
+  CATALOGS_QUERY_KEY,
   type CatalogProfileRow,
   catalogStatusVariant,
   useDeleteCatalog,
   useMintCatalogToken,
   useRegenerateCatalog,
 } from '../api/catalogs';
+import { useCatalogRunsStream } from '../api/runs-stream';
+import { CatalogRunProgress, isTerminalRunEvent } from './CatalogRunProgress';
 
 const TEMPLATE_ICON_TONES: Record<string, string> = {
   sheet: 'bg-sky-50 text-sky-600',
@@ -31,10 +36,34 @@ const TEMPLATE_ICON_TONES: Record<string, string> = {
 export function CatalogCard({ catalog }: { catalog: CatalogProfileRow }) {
   const { t } = useTranslation();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const regenerate = useRegenerateCatalog();
   const mintToken = useMintCatalogToken();
   const remove = useDeleteCatalog();
   const [copied, setCopied] = useState(false);
+
+  // Gate the EventSource: `null` until the user starts a regeneration, so idle
+  // hub cards never open a socket. Cleared when the run reaches a terminal
+  // status (or on mint/HTTP fallback via the REST refresh below).
+  const [runActive, setRunActive] = useState(false);
+  const stream = useCatalogRunsStream(runActive ? catalog.id : null);
+  const lastEvent = stream.lastEvent;
+
+  useEffect(() => {
+    if (!runActive || lastEvent === null) {
+      return;
+    }
+    if (isTerminalRunEvent(lastEvent)) {
+      // Terminal status — the catalog card + KPI aggregates are stale now.
+      setRunActive(false);
+      void queryClient.invalidateQueries({ queryKey: CATALOGS_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: CATALOG_KPI_QUERY_KEY });
+    }
+  }, [runActive, lastEvent, queryClient]);
+
+  // The regenerate mutation already refreshes the list on settle (fallback when
+  // there is no EventSource / the hub errors); the live line is enrichment.
+  const showProgress = runActive && !isTerminalRunEvent(lastEvent);
 
   const iconTone =
     catalog.status === 'error'
@@ -45,7 +74,10 @@ export function CatalogCard({ catalog }: { catalog: CatalogProfileRow }) {
 
   function onRegenerate(): void {
     regenerate.mutate(catalog.id, {
-      onSuccess: () => toast.success(t('catalogs_pdf.card.regenerate_started')),
+      onSuccess: () => {
+        setRunActive(true);
+        toast.success(t('catalogs_pdf.card.regenerate_started'));
+      },
       onError: (error) =>
         toast.error(httpErrorDetail(error) ?? t('catalogs_pdf.card.action_error')),
     });
@@ -137,6 +169,8 @@ export function CatalogCard({ catalog }: { catalog: CatalogProfileRow }) {
           </span>
         )}
       </div>
+
+      {(regenerate.isPending || showProgress) && <CatalogRunProgress lastEvent={lastEvent} />}
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3">
         <button

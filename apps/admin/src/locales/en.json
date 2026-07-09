@@ -993,7 +993,9 @@
       "regenerate_started": "Regeneration started",
       "delete_confirm": "Delete catalog “{{name}}”? This cannot be undone.",
       "delete_success": "Catalog deleted",
-      "action_error": "Could not complete the action. Please try again."
+      "action_error": "Could not complete the action. Please try again.",
+      "progress_generating": "Generating…",
+      "progress_percent": "{{pct}}%"
     },
     "wizard": {
       "title": "New PDF catalog",
@@ -1063,7 +1065,8 @@
       "summary_filter_all": "All products",
       "summary_filter_set": "Filter active",
       "summary_mappings": "Mapped fields",
-      "error_no_object_type": "Could not resolve the \"product\" object type. Refresh the page and try again."
+      "error_no_object_type": "Could not resolve the \"product\" object type. Refresh the page and try again.",
+      "preview_auto_refreshing": "Refreshing…"
     }
   },
   "topbar": {
