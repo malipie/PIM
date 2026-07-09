@@ -17,7 +17,7 @@ use Closure;
 use Twig\Environment;
 
 /**
- * Orchestrates one catalog regeneration for the `sheet` archetype (ADR-0027,
+ * Orchestrates one catalog regeneration for the shipped archetypes (ADR-0027,
  * CPDF-P2-03): resolves the profile's template, streams the memory-bounded
  * product value maps ({@see CatalogProductValues}), applies the field mappings
  * ({@see CatalogItemMapper}), sanitises rich-text slots ({@see HtmlValueSanitizer}),
@@ -53,7 +53,7 @@ final class CatalogRenderService
      */
     public function render(CatalogProfile $profile, string $targetPath, ?Closure $onChunk = null): CatalogRenderResult
     {
-        // grid / pricelist raise TemplateNotAvailableException until M6 — propagate.
+        // grid raises TemplateNotAvailableException until CPDF-P6-02 — propagate.
         $template = $this->templates->get($profile->getTemplateKind());
         $mappings = CatalogFieldMapping::listFromArray($profile->getFieldMappings());
         $scope = $this->scope($profile, $mappings);

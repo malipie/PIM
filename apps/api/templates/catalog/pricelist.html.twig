@@ -1,0 +1,133 @@
+{#
+  Catalog PDF — "pricelist" archetype (ADR-0027, CPDF-P6-01): one compact,
+  multi-page price table (SKU / name / price / availability). Rendered to HTML
+  here, then to PDF by the Dompdf-backed PdfRenderer.
+
+  Dompdf-safe CSS only (CSS 2.1 subset, same rules as sheet.html.twig):
+  - the repeating column header uses `<thead>` + `display: table-header-group`,
+    which Dompdf re-emits at the top of every page a table spans;
+  - the branded page header and the page footer use `position: fixed`, which
+    Dompdf repeats on every page; the page number comes from the CSS 2.1
+    `counter(page)` in generated content (supported by Dompdf);
+  - brand colours are interpolated straight into the <style> block, NOT via
+    CSS custom properties (Dompdf does not resolve `var(--x)` reliably).
+
+  The template receives exactly two variables:
+    - branding: map (company_name?, logo?, color?)
+    - products: list of maps keyed by slot name (sku/name/price/availability)
+
+  strict_variables is ON in the test env, so every variable access is guarded
+  with `|default(...)` or `is defined`.
+#}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page {
+            margin: 96px 40px 64px 40px;
+        }
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            color: #111827;
+            margin: 0;
+            font-size: 12px;
+        }
+        .page-header {
+            position: fixed;
+            top: -72px;
+            left: 0;
+            right: 0;
+            height: 48px;
+            border-bottom: 3px solid {{ branding.color|default('#1d4ed8') }};
+            padding-bottom: 8px;
+        }
+        .page-header .company {
+            font-size: 18px;
+            font-weight: bold;
+            color: {{ branding.color|default('#1d4ed8') }};
+        }
+        .page-header .logo {
+            max-height: 40px;
+            margin-right: 12px;
+        }
+        .page-footer {
+            position: fixed;
+            bottom: -48px;
+            left: 0;
+            right: 0;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 6px;
+            font-size: 10px;
+            color: #9ca3af;
+        }
+        .page-footer .pagenum:before {
+            content: counter(page);
+        }
+        .pricelist {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .pricelist thead {
+            display: table-header-group;
+        }
+        .pricelist th {
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #ffffff;
+            background-color: {{ branding.color|default('#1d4ed8') }};
+            padding: 6px 8px;
+        }
+        .pricelist td {
+            border-bottom: 1px solid #e5e7eb;
+            padding: 5px 8px;
+        }
+        .pricelist tr {
+            page-break-inside: avoid;
+        }
+        .pricelist td.price {
+            font-weight: bold;
+            color: {{ branding.color|default('#1d4ed8') }};
+            white-space: nowrap;
+        }
+        .pricelist td.sku {
+            color: #6b7280;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        {% if branding.logo is defined and branding.logo %}
+            <img class="logo" src="{{ branding.logo }}" alt="">
+        {% endif %}
+        <span class="company">{{ branding.company_name|default('') }}</span>
+    </div>
+
+    <div class="page-footer">
+        {{ branding.company_name|default('') }} &mdash; <span class="pagenum"></span>
+    </div>
+
+    <table class="pricelist">
+        <thead>
+            <tr>
+                <th>SKU</th>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Availability</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+                <tr>
+                    <td class="sku">{{ product.sku|default('') }}</td>
+                    <td>{{ product.name|default('') }}</td>
+                    <td class="price">{{ product.price|default('') }}</td>
+                    <td>{{ product.availability|default('') }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

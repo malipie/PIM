@@ -117,7 +117,7 @@ final class CatalogPreviewController
         try {
             $result = $this->preview->preview($kind, $branding, $fieldMappings, $scope, $limit);
         } catch (TemplateNotAvailableException $error) {
-            // grid / pricelist archetypes are not renderable yet (M6).
+            // the grid archetype is not renderable yet (CPDF-P6-02).
             throw new HttpException(Response::HTTP_UNPROCESSABLE_ENTITY, $error->getMessage(), $error);
         }
 

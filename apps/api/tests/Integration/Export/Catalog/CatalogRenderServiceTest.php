@@ -67,6 +67,42 @@ final class CatalogRenderServiceTest extends KernelTestCase
     }
 
     #[Test]
+    public function rendersPricelistCatalogToMultipagePdf(): void
+    {
+        // ~60 rows do not fit one A4 page — the table must paginate (CPDF-P6-01).
+        [, $typeId] = $this->seedObjects(60, 'plain');
+
+        $service = $this->service();
+        $profile = new CatalogProfile(
+            'pricelist-cat',
+            'Pricelist',
+            CatalogTemplateKind::Pricelist,
+            $typeId,
+            branding: ['color' => '#0ea5e9', 'company_name' => 'ACME'],
+            fieldMappings: [
+                ['slot' => 'sku', 'source' => ['kind' => 'attribute', 'ref' => 'sku']],
+                ['slot' => 'name', 'source' => ['kind' => 'attribute', 'ref' => 'name']],
+                // The seed schema has no price/availability attributes — static
+                // sources exercise the same mapper path.
+                ['slot' => 'price', 'source' => ['kind' => 'static', 'value' => '199,00 zł']],
+                ['slot' => 'availability', 'source' => ['kind' => 'static', 'value' => 'in stock']],
+            ],
+        );
+
+        $target = tempnam(sys_get_temp_dir(), 'cpdf-');
+        self::assertNotFalse($target);
+        $result = $service->render($profile, $target);
+
+        self::assertSame(60, $result->itemCount, 'every seeded product becomes one table row');
+        self::assertGreaterThan(1, $result->pageCount, 'a 60-row price table spans multiple pages');
+
+        $pdf = (string) file_get_contents($target);
+        self::assertStringStartsWith('%PDF-', $pdf, 'the render produced a valid PDF file');
+
+        @unlink($target);
+    }
+
+    #[Test]
     public function renderSurvivesMaliciousDescriptionValue(): void
     {
         [, $typeId] = $this->seedObjects(1, '<script>alert(1)</script>');
