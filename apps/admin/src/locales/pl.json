@@ -1003,7 +1003,9 @@
       "regenerate_started": "Regeneracja uruchomiona",
       "delete_confirm": "Usunąć katalog „{{name}}”? Tej operacji nie można cofnąć.",
       "delete_success": "Katalog usunięty",
-      "action_error": "Nie udało się wykonać akcji. Spróbuj ponownie."
+      "action_error": "Nie udało się wykonać akcji. Spróbuj ponownie.",
+      "progress_generating": "Generowanie…",
+      "progress_percent": "{{pct}}%"
     },
     "wizard": {
       "title": "Nowy katalog PDF",
@@ -1073,7 +1075,8 @@
       "summary_filter_all": "Wszystkie produkty",
       "summary_filter_set": "Filtr aktywny",
       "summary_mappings": "Zmapowane pola",
-      "error_no_object_type": "Nie udało się ustalić typu obiektu „produkt”. Odśwież stronę i spróbuj ponownie."
+      "error_no_object_type": "Nie udało się ustalić typu obiektu „produkt”. Odśwież stronę i spróbuj ponownie.",
+      "preview_auto_refreshing": "Odświeżanie…"
     }
   },
   "topbar": {
