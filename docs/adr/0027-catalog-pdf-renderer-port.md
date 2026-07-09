@@ -60,6 +60,10 @@ Rozstrzygnięcia (decyzje z planu §2/§6/§12):
 - **Generowanie na żądanie (bez cache)** — odrzucony: DoS na workera przy pobraniach z publicznego URL, tym bardziej że render PDF jest droższy niż strumień XML feedu.
 - **Autoryzacja kluczem tenanta** — odrzucony: klucz tenanta ma szerszy zakres; token dokumentu musi być read-only, per-dokument, rewokowalny bez wpływu na inne integracje.
 
+## RBAC — powierzchnia gejtowana (CPDF-P1-03/P3-*/P4-02)
+
+Endpointy katalogów **reużywają istniejące uprawnienia PRD** zamiast wprowadzać dedykowany moduł `catalogs_pdf` (plan §6.8 zakładał nowy moduł — świadomie odrzucone): odczyty (`list`/`get`/`preview`/monitor/KPI/historia) na `#[RequiresPermission(module: 'exports', action: 'view_all')]`, zapisy i akcje (`create`/`patch`/`delete`/`generate`/`bulk-generate`/`token`/`cancel`) na `#[RequiresPermission(module: 'integration', action: 'admin')]` — dokładnie jak siostrzany `Export/Feed`. Katalogi PDF żyją w rodzinie Export (`src/Export/Catalog/`), więc gejtowanie pod `exports`/`integration` jest spójne semantycznie i **nie tworzy nowej powierzchni RBAC** (nowy kod uprawnień dotyka `PrdRoleTemplates`/fixtures/FE/testów — klasa zmian, przed którą przestrzega re-audit RBAC). Publiczny pull to jedyny `#[NoPermissionRequired]` (token = credential). `RequiresPermissionAnnotationRule` (PHPStan) egzekwuje atrybut na każdej trasie; `CatalogApiLockdownTest` dowodzi runtime (401 na całej powierzchni poza pull → 404). Dedykowany moduł `catalogs_pdf` można dodać później jeśli operator zechce granularnej separacji — menu-gate FE (P5-05) gejtuje wtedy spójnie na `exports.view_all`.
+
 ## Links
 
 - Plan: `Project Plan/UI/feature-catalogs-pdf.md` §2 (decyzje), §6 (architektura), §7 (IN/OUT), §12 (mini-ADR szkic)
