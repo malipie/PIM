@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                                      https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="App\Export\Catalog\Domain\Entity\CatalogRun"
+            table="catalog_runs">
+
+        <indexes>
+            <index name="catalog_runs_profile_idx" columns="catalog_profile_id,started_at"/>
+        </indexes>
+
+        <id name="id" type="uuid" column="id">
+            <generator strategy="NONE"/>
+        </id>
+
+        <many-to-one field="tenant" target-entity="App\Shared\Domain\Tenant">
+            <join-column name="tenant_id" referenced-column-name="id" nullable="false" on-delete="RESTRICT"/>
+        </many-to-one>
+
+        <field name="catalogProfileId" type="uuid" column="catalog_profile_id"/>
+        <field name="trigger" type="string" length="16"/>
+        <field name="status" type="string" length="16"/>
+
+        <field name="pageCount" type="integer" column="page_count" nullable="true"/>
+        <field name="byteSize" type="bigint" column="byte_size" nullable="true"/>
+        <field name="itemCount" type="integer" column="item_count" nullable="true"/>
+        <field name="durationMs" type="integer" column="duration_ms" nullable="true"/>
+        <field name="errorMessage" type="text" column="error_message" nullable="true"/>
+
+        <field name="startedAt" type="datetime_immutable" column="started_at" nullable="true"/>
+        <field name="completedAt" type="datetime_immutable" column="completed_at" nullable="true"/>
+
+    </entity>
+
+</doctrine-mapping>
