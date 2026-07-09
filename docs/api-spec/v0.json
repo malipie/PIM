@@ -12020,6 +12020,32 @@
                 "x-cortex-permission": "integration.admin"
             }
         },
+        "/api/catalogs/bulk-generate": {
+            "post": {
+                "operationId": "api_catalogs_bulk_generate_post",
+                "tags": [
+                    "catalogs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalogs bulk generate",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "integration.admin"
+            }
+        },
         "/api/catalogs/pull/{tenantId}/{token}.pdf": {
             "get": {
                 "operationId": "api_catalogs_pull_tenantid_token_pdf_get",
