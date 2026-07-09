@@ -959,6 +959,42 @@
     "template_pricelist_name": "Price list (pricelist)",
     "template_pricelist_description": "A tabular price list with per-channel prices.",
     "template_available": "Available",
+    "hub_title": "Catalogs",
+    "hub_subtitle": "{{count}} catalogs",
+    "kpi": {
+      "regenerations": "Regenerations 24h",
+      "regenerations_hint": "Runs in the last day",
+      "errors": "Errors 24h",
+      "errors_hint": "Failed runs",
+      "pages": "Pages published",
+      "pages_hint": "Current cache state",
+      "items": "Items 24h",
+      "items_hint": "Rendered entries"
+    },
+    "status": {
+      "active": "Active",
+      "paused": "Paused",
+      "error": "Error"
+    },
+    "template_kind": {
+      "sheet": "Sheet",
+      "grid": "Grid",
+      "pricelist": "Pricelist"
+    },
+    "card": {
+      "download": "Download",
+      "regenerate": "Regenerate",
+      "share": "Share",
+      "share_copied": "Copied",
+      "delete": "Delete",
+      "has_token": "Public link",
+      "cache_line": "Generated {{date}} · {{count}} pages",
+      "cache_none": "Not generated",
+      "regenerate_started": "Regeneration started",
+      "delete_confirm": "Delete catalog “{{name}}”? This cannot be undone.",
+      "delete_success": "Catalog deleted",
+      "action_error": "Could not complete the action. Please try again."
+    },
     "wizard": {
       "title": "New PDF catalog",
       "lead": "Build and generate a catalog in six steps: scope, archetype, branding, field mapping, preview, generate.",

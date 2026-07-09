@@ -969,6 +969,42 @@
     "template_pricelist_name": "Cennik (pricelist)",
     "template_pricelist_description": "Tabelaryczny cennik z cenami per kanał.",
     "template_available": "Dostępny",
+    "hub_title": "Katalogi",
+    "hub_subtitle": "{{count}} katalogów",
+    "kpi": {
+      "regenerations": "Regeneracje 24h",
+      "regenerations_hint": "Uruchomienia z ostatniej doby",
+      "errors": "Błędy 24h",
+      "errors_hint": "Nieudane uruchomienia",
+      "pages": "Strony opublikowane",
+      "pages_hint": "Aktualny stan cache",
+      "items": "Produkty 24h",
+      "items_hint": "Wyrenderowane pozycje"
+    },
+    "status": {
+      "active": "Aktywny",
+      "paused": "Wstrzymany",
+      "error": "Błąd"
+    },
+    "template_kind": {
+      "sheet": "Karta",
+      "grid": "Siatka",
+      "pricelist": "Cennik"
+    },
+    "card": {
+      "download": "Pobierz",
+      "regenerate": "Regeneruj",
+      "share": "Udostępnij",
+      "share_copied": "Skopiowano",
+      "delete": "Usuń",
+      "has_token": "Link publiczny",
+      "cache_line": "Wygenerowano {{date}} · {{count}} stron",
+      "cache_none": "Nie wygenerowano",
+      "regenerate_started": "Regeneracja uruchomiona",
+      "delete_confirm": "Usunąć katalog „{{name}}”? Tej operacji nie można cofnąć.",
+      "delete_success": "Katalog usunięty",
+      "action_error": "Nie udało się wykonać akcji. Spróbuj ponownie."
+    },
     "wizard": {
       "title": "Nowy katalog PDF",
       "lead": "Zbuduj i wygeneruj katalog w sześciu krokach: zakres, archetyp, branding, mapowanie pól, podgląd, generowanie.",
