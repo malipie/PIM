@@ -571,8 +571,28 @@ function App() {
                   />
                   <Route path="/assets" element={<AssetsListPage />} />
                   <Route path="/assets/:id" element={<AssetShowPage />} />
-                  <Route path="/catalogs-pdf" element={<CatalogsPdfPage />} />
-                  <Route path="/catalogs-pdf/new" element={<CatalogWizardPage />} />
+                  {/* CPDF-P5-05 (#2303) — gate the Catalog PDF area behind the
+                    reused exports read permission (ADR-0027, no dedicated
+                    catalogs_pdf module). A user without exports scope who
+                    deep-links here lands on Forbidden403Page instead of the
+                    shell; per-action writes stay gated by their own BE checks
+                    (integration.admin). Mirrors MENU_PERMISSIONS.catalogs_pdf. */}
+                  <Route
+                    path="/catalogs-pdf"
+                    element={
+                      <PermissionRoute anyOf={['exports.view_own', 'exports.view_all']}>
+                        <CatalogsPdfPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/catalogs-pdf/new"
+                    element={
+                      <PermissionRoute anyOf={['exports.view_own', 'exports.view_all']}>
+                        <CatalogWizardPage />
+                      </PermissionRoute>
+                    }
+                  />
                   {/* AUD-076 (W3-5.5) — gate the whole settings tree with the
                     same permission set the sidebar uses to show the entry
                     (MENU_PERMISSIONS.settings). A user with no settings

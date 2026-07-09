@@ -83,7 +83,7 @@ const FALLBACK_ITEMS: EffectiveMenuItem[] = [
     icon: 'FileText',
     route: '/catalogs-pdf',
     comingSoon: false,
-    protected: false,
+    protected: true,
   },
   {
     id: 'system:multimedia',

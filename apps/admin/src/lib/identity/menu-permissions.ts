@@ -26,6 +26,10 @@ export const MENU_PERMISSIONS: Readonly<Record<string, readonly string[]>> = {
   categories: ['categories.view'],
   multimedia: ['multimedia.view'],
 
+  // Catalog PDF (web-to-print) — reuses the exports read permission (ADR-0027,
+  // no dedicated catalogs_pdf module); own scope is enough to show the entry.
+  catalogs_pdf: ['exports.view_own', 'exports.view_all'],
+
   // Modeling (per PRD §3.2 macierz — Modeler / Owner / Admin)
   modeling: ['modeling.view'],
 
