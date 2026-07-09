@@ -114,6 +114,12 @@ security:
         # magic-link routes). The controller only streams the cached artifact —
         # it never generates — so PUBLIC_ACCESS here cannot trigger heavy work.
         - { path: '^/api/feeds/pull/[0-9a-fA-F-]{36}/[A-Za-z0-9_-]+\.xml$', roles: PUBLIC_ACCESS }
+        # CPDF-P3-02 — public catalog PDF URL handed to partners/print shops. No
+        # session: the 192-bit token in the path IS the credential and the
+        # tenantId scopes RLS before the lookup (same "token IS the auth factor"
+        # model as the feed pull above). The controller only streams the cached
+        # PDF — it never generates — so PUBLIC_ACCESS here cannot trigger heavy work.
+        - { path: '^/api/catalogs/pull/[0-9a-fA-F-]{36}/[A-Za-z0-9_-]+\.pdf$', roles: PUBLIC_ACCESS }
         # `IS_AUTHENTICATED_FULLY` covers BOTH a logged-in user (ROLE_USER
         # + tenant context) and an API key principal (ROLE_API_KEY). The
         # voter chain enforces row-level access on top.

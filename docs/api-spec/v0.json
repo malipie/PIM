@@ -11929,6 +11929,57 @@
                 "x-cortex-permission": "integration.admin"
             }
         },
+        "/api/catalogs/pull/{tenantId}/{token}.pdf": {
+            "get": {
+                "operationId": "api_catalogs_pull_tenantid_token_pdf_get",
+                "tags": [
+                    "catalogs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalogs pull tenantId token pdf",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "tenantId",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    },
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": false
+            }
+        },
         "/api/catalogs/{id}": {
             "get": {
                 "operationId": "api_catalogs_id_get",
@@ -12018,6 +12069,82 @@
                     }
                 },
                 "summary": "Api catalogs id",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "integration.admin"
+            }
+        },
+        "/api/catalogs/{id}/token": {
+            "post": {
+                "operationId": "api_catalogs_id_token_post",
+                "tags": [
+                    "catalogs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalogs id token",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "integration.admin"
+            },
+            "delete": {
+                "operationId": "api_catalogs_id_token_delete",
+                "tags": [
+                    "catalogs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalogs id token",
                 "description": "Custom controller route.",
                 "parameters": [
                     {
