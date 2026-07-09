@@ -352,6 +352,12 @@ services:
     App\Export\Feed\Presentation\Controller\FeedRegenerateController:
         arguments:
             $topicBase: '%env(MERCURE_TOPIC_BASE)%'
+    # CPDF-P3-01 — catalog regeneration progress topic
+    # (tenant/{tid}/catalogs/{id}/runs); built from the same public origin the
+    # SPA subscribes on so the tenant-scoped subscribe claim matches.
+    App\Export\Catalog\Application\Async\CatalogProgressPublisher:
+        arguments:
+            $topicBase: '%env(MERCURE_TOPIC_BASE)%'
     # AUD-001 (#1573) — Catalog + permission publishers and the cookie
     # mint endpoint must build topics from the same public origin the SPA
     # subscribes on, so the tenant-scoped subscribe claim matches the
