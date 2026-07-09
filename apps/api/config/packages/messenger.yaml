@@ -178,6 +178,13 @@ framework:
             # tenant context on the worker before the handler loads the run.
             App\Export\Feed\Domain\Message\RunFeedMessage: import
 
+            # CPDF-P3-01 — async PDF catalog generation. Same import/export
+            # worker split as RunFeedMessage: a catalog renders to the cache
+            # out-of-band (GenerateCatalogHandler) with progress over Mercure.
+            # TenantAwareMessage so the rebinding + RLS-GUC middleware restore
+            # tenant context on the worker before the handler loads the run.
+            App\Export\Catalog\Domain\Message\RunCatalogMessage: import
+
             # APIC-P4-05 — producer webhook delivery. Async so the originating
             # write never blocks on a slow integrator; the `async` retry strategy
             # (5×, exponential) backs off failures and dead-letters to `failed`.

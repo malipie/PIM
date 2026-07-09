@@ -82,6 +82,17 @@ final class MercureSubscribeTopics
     }
 
     /**
+     * Live regeneration progress of one PDF catalog (CPDF-P3-01) — every run of
+     * the catalog publishes progress + status here; the monitor screen
+     * subscribes per catalog, so a new run appears on the already-open detail
+     * view.
+     */
+    public static function catalogRuns(Uuid $tenantId, string $base, string $catalogId): string
+    {
+        return self::tenantPrefix($tenantId, $base).'/catalogs/'.$catalogId.'/runs';
+    }
+
+    /**
      * Live phases of one agent run (AGENT-P1-05 #1957): planning /
      * tool-call / materializing / awaiting_approval / committing / done
      * / error / rolled_back — the chat panel + inbox subscribe per run.
@@ -133,6 +144,8 @@ final class MercureSubscribeTopics
             $prefix.'/exports/{id}',
             // Feed regeneration progress (XMLF-P4-02, per-feed run stream).
             $prefix.'/feeds/{id}/runs',
+            // Catalog regeneration progress (CPDF-P3-01, per-catalog run stream).
+            $prefix.'/catalogs/{id}/runs',
             // Agent run phases + per-user history refresh (AGENT-P1-05).
             $prefix.'/agent-runs/{id}',
             $prefix.'/agent-runs/user/{id}',
