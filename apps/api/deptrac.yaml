@@ -253,11 +253,12 @@ parameters:
           collectors:
               - type: directory
                 value: 'src/Import/Contracts/.*'
-        # ─── Export core + Feed sub-area (ADR-0023, epik XMLF) ─────────
-        # Feed (src/Export/Feed) is a sub-area of the Export BC: it may reach
-        # the whole Export core (ExportBuilder reuse) and the Export_Contracts
-        # seam, but talks to other BCs (Channel/Catalog/Asset) only through
-        # their *_Contracts. Core Export must NOT reach Feed.
+        # ─── Export core + Feed / Catalog sub-areas (ADR-0023 XMLF, ADR-0027 CPDF) ─
+        # Feed (src/Export/Feed) and Catalog (src/Export/Catalog) are sub-areas of
+        # the Export BC: each may reach the whole Export core (ExportBuilder reuse)
+        # and the Export_Contracts seam (e.g. the PdfRenderer port), but talks to
+        # other BCs (Channel/Catalog/Asset) only through their *_Contracts. Core
+        # Export must NOT reach Feed or Catalog.
         - name: Export
           collectors:
               - type: bool
@@ -267,6 +268,8 @@ parameters:
                 must_not:
                     - type: directory
                       value: 'src/Export/Feed/.*'
+                    - type: directory
+                      value: 'src/Export/Catalog/.*'
                     - type: directory
                       value: 'src/Export/Contracts/.*'
         - name: Export_Contracts
@@ -287,6 +290,20 @@ parameters:
           collectors:
               - type: directory
                 value: 'src/Export/Feed/Contracts/.*'
+        - name: Export_Catalog_Internals
+          collectors:
+              - type: directory
+                value: 'src/Export/Catalog/Domain/.*'
+              - type: directory
+                value: 'src/Export/Catalog/Application/.*'
+              - type: directory
+                value: 'src/Export/Catalog/Infrastructure/.*'
+              - type: directory
+                value: 'src/Export/Catalog/Presentation/.*'
+        - name: Export_Catalog_Contracts
+          collectors:
+              - type: directory
+                value: 'src/Export/Catalog/Contracts/.*'
 
         # ─── Tooling — fixtures, benchmarks, foundry stories, PHPStan rules ───
         - name: Tooling
@@ -390,6 +407,19 @@ parameters:
             - Shared
             - Vendor
         Export_Feed_Contracts:
+            - Shared
+            - Vendor
+        Export_Catalog_Internals:
+            - Export
+            - Export_Contracts
+            - Export_Catalog_Contracts
+            - Catalog_Contracts
+            - Channel_Contracts
+            - Asset_Contracts
+            - Identity_Contracts
+            - Shared
+            - Vendor
+        Export_Catalog_Contracts:
             - Shared
             - Vendor
 
