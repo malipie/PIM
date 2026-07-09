@@ -12046,6 +12046,32 @@
                 "x-cortex-permission": "integration.admin"
             }
         },
+        "/api/catalogs/preview": {
+            "post": {
+                "operationId": "api_catalogs_preview_post",
+                "tags": [
+                    "catalogs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalogs preview",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
+            }
+        },
         "/api/catalogs/pull/{tenantId}/{token}.pdf": {
             "get": {
                 "operationId": "api_catalogs_pull_tenantid_token_pdf_get",
@@ -12247,6 +12273,45 @@
                 ],
                 "x-pim-source": "custom-route",
                 "x-cortex-permission": "integration.admin"
+            }
+        },
+        "/api/catalogs/{id}/preview": {
+            "get": {
+                "operationId": "api_catalogs_id_preview_get",
+                "tags": [
+                    "catalogs"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api catalogs id preview",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "exports.view_all"
             }
         },
         "/api/catalogs/{id}/runs": {
