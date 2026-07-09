@@ -156,6 +156,12 @@ class CatalogProfile extends AggregateRoot implements TenantScoped
         return CatalogTemplateKind::from($this->templateKind);
     }
 
+    public function changeTemplateKind(CatalogTemplateKind $templateKind): void
+    {
+        $this->templateKind = $templateKind->value;
+        $this->touch();
+    }
+
     public function getObjectTypeId(): Uuid
     {
         return $this->objectTypeId;
