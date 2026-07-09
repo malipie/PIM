@@ -1,0 +1,144 @@
+{#
+  Catalog PDF — "sheet" archetype (ADR-0027, CPDF-P2-01): one branded product
+  data sheet per page. Rendered to HTML here, then to PDF by the Dompdf-backed
+  PdfRenderer (CPDF-P2-03).
+
+  Dompdf-safe CSS only: CSS 2.1 subset — no flexbox, no grid, no CSS custom
+  properties (Dompdf does not resolve `var(--x)` reliably). Brand colours are
+  injected by interpolating Twig values straight into the <style> block below,
+  NOT via `var()`.
+
+  The template receives exactly two variables:
+    - branding: map (company_name?, logo?, color?)
+    - products: list of maps keyed by slot name (title/sku/image/description/price/specs)
+
+  strict_variables is ON in the test env, so every variable access is guarded
+  with `|default(...)` or `is defined`.
+#}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            color: #111827;
+            margin: 0;
+        }
+        .sheet {
+            padding: 32px;
+            page-break-after: always;
+        }
+        .sheet-last {
+            page-break-after: auto;
+        }
+        .sheet-header {
+            border-bottom: 3px solid {{ branding.color|default('#1d4ed8') }};
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+        .sheet-header .company {
+            font-size: 18px;
+            font-weight: bold;
+            color: {{ branding.color|default('#1d4ed8') }};
+        }
+        .sheet-header .logo {
+            max-height: 48px;
+        }
+        .product-image {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .product-image img {
+            max-width: 100%;
+            max-height: 340px;
+        }
+        .product-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0 0 6px 0;
+        }
+        .product-sku {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 12px;
+        }
+        .product-price {
+            font-size: 20px;
+            font-weight: bold;
+            color: {{ branding.color|default('#1d4ed8') }};
+            margin-bottom: 16px;
+        }
+        .product-description {
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .specs {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .specs td {
+            border-bottom: 1px solid #e5e7eb;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+        .specs td.spec-label {
+            font-weight: bold;
+            width: 40%;
+            color: #374151;
+        }
+        .sheet-footer {
+            border-top: 1px solid #e5e7eb;
+            margin-top: 24px;
+            padding-top: 8px;
+            font-size: 11px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+    {% for product in products %}
+        <div class="sheet{% if loop.last %} sheet-last{% endif %}">
+            <div class="sheet-header">
+                {% if branding.logo is defined and branding.logo %}
+                    <img class="logo" src="{{ branding.logo }}" alt="">
+                {% endif %}
+                <span class="company">{{ branding.company_name|default('') }}</span>
+            </div>
+
+            {% if product.image is defined and product.image %}
+                <div class="product-image">
+                    <img src="{{ product.image }}" alt="">
+                </div>
+            {% endif %}
+
+            <h1 class="product-title">{{ product.title|default('') }}</h1>
+            <div class="product-sku">{{ product.sku|default('') }}</div>
+
+            {% if product.price is defined and product.price %}
+                <div class="product-price">{{ product.price }}</div>
+            {% endif %}
+
+            {% if product.description is defined and product.description %}
+                {# Already sanitised upstream by HtmlValueSanitizer — safe to print raw. #}
+                <div class="product-description">{{ product.description|raw }}</div>
+            {% endif %}
+
+            {% if product.specs is defined and product.specs %}
+                <table class="specs">
+                    {% for row in product.specs %}
+                        <tr>
+                            <td class="spec-label">{{ row.label|default('') }}</td>
+                            <td class="spec-value">{{ row.value|default('') }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% endif %}
+
+            <div class="sheet-footer">
+                {{ branding.company_name|default('') }} &mdash; {{ loop.index }} / {{ loop.length }}
+            </div>
+        </div>
+    {% endfor %}
+</body>
+</html>
