@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Catalog;
 
+use App\Catalog\Application\ObjectValueLocaleOverlay;
+use App\Catalog\Application\Query\ObjectFactsReader;
 use App\Catalog\Contracts\Query\ObjectFactsPort;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
@@ -11,6 +13,7 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectValue;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\ObjectValueRepositoryInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
@@ -127,7 +130,15 @@ final class ObjectFactsReaderTest extends KernelTestCase
 
     private function port(): ObjectFactsPort
     {
-        return self::getContainer()->get(ObjectFactsPort::class);
+        // Constructed directly: the port's runtime consumer arrives with
+        // the first content tool (AICG-P3-02), so until then the compiled
+        // container inlines/removes the service (same caveat as the agent
+        // run repository in AgentEntitiesTest).
+        return new ObjectFactsReader(
+            $this->em(),
+            self::getContainer()->get(ObjectValueLocaleOverlay::class),
+            self::getContainer()->get(ObjectValueRepositoryInterface::class),
+        );
     }
 
     private function em(): EntityManagerInterface
