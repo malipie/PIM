@@ -8,6 +8,8 @@ use App\Catalog\Application\AttributesIndexedRebuilder;
 use App\Catalog\Application\BulkContext;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\ObjectKind;
+use App\Shared\Domain\Repository\TenantRepositoryInterface;
+use App\Shared\Infrastructure\Console\TenantConsoleBinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -38,6 +40,8 @@ final class RecalculateCompletenessCommand extends Command
         private readonly EntityManagerInterface $em,
         private readonly AttributesIndexedRebuilder $rebuilder,
         private readonly BulkContext $bulkContext,
+        private readonly TenantRepositoryInterface $tenants,
+        private readonly TenantConsoleBinder $tenantBinder,
     ) {
         parent::__construct();
     }
@@ -75,6 +79,17 @@ final class RecalculateCompletenessCommand extends Command
 
             return Command::INVALID;
         }
+
+        // #2466 — the RLS policies on `objects` read the `app.current_tenant`
+        // GUC, which console commands never set; without binding, the query
+        // below sees zero rows and the backfill silently no-ops.
+        $tenant = $this->tenants->findByCode($tenantCode);
+        if (null === $tenant) {
+            $io->error(\sprintf('Tenant "%s" not found.', $tenantCode));
+
+            return Command::INVALID;
+        }
+        $this->tenantBinder->bind($tenant);
 
         /** @var string $kindOption */
         $kindOption = $input->getOption('kind');
@@ -135,6 +150,7 @@ final class RecalculateCompletenessCommand extends Command
             }
         } finally {
             $this->bulkContext->setBulk(false);
+            $this->tenantBinder->release();
         }
 
         $io->success(\sprintf('Done. %d row(s) updated.', $totalChanged));
