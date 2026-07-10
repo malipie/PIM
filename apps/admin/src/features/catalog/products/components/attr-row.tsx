@@ -1,4 +1,4 @@
-import { Copy, CornerDownRight, Link2, Lock } from 'lucide-react';
+import { Copy, CornerDownRight, Link2, Lock, Sparkles } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RelationCreateField } from '@/components/objects/relation-create-field';
@@ -40,6 +40,19 @@ export interface AttrRowProps {
   provenance: Provenance;
   /** AGENT-P6-05 (#1978) — agent run id for the badge tooltip. */
   provenanceSource?: string | null;
+  /**
+   * AICG-P5-02 (#2340) — content-generation audit for the badge tooltip:
+   * the attribute codes the copy was generated from + the recipe id
+   * (provenance_meta.source_attributes / recipe_id, jsonb-schemas §5).
+   */
+  provenanceSourceAttributes?: string[] | null;
+  provenanceRecipeId?: string | null;
+  /**
+   * AICG-P5-01 (#2339) — when present, an "Ask AI" affordance renders in
+   * the RHS slot (next to the provenance badge). The page supplies it
+   * only for editable text-family attributes.
+   */
+  onAskAI?: () => void;
   locale: ProductLocale;
   isEditing: boolean;
   isLocked: boolean;
@@ -105,6 +118,9 @@ export function AttrRow({
   value,
   provenance,
   provenanceSource,
+  provenanceSourceAttributes = null,
+  provenanceRecipeId = null,
+  onAskAI,
   locale,
   isEditing,
   isLocked,
@@ -444,6 +460,23 @@ export function AttrRow({
       </div>
 
       <div className="flex items-center gap-1 pt-1.5">
+        {onAskAI !== undefined && (
+          <button
+            type="button"
+            onClick={onAskAI}
+            title={t('aicg.ask_title', {
+              defaultValue: 'Zapytaj AI — wygeneruj treść z atrybutów produktu',
+            })}
+            aria-label={t('aicg.ask_aria', {
+              defaultValue: 'Wygeneruj treść pola {{label}} z atrybutów produktu',
+              label,
+            })}
+            data-testid={`ask-ai-${attribute.code}`}
+            className="rounded-md p-1.5 text-purple-500 transition-colors hover:bg-purple-100 hover:text-purple-700"
+          >
+            <Sparkles className="size-3.5" aria-hidden />
+          </button>
+        )}
         {onCopyToOthers !== undefined ? (
           <button
             type="button"
@@ -461,7 +494,12 @@ export function AttrRow({
             <Copy className="size-3.5" aria-hidden />
           </button>
         ) : (
-          <ProvenanceBadge provenance={provenance} source={provenanceSource ?? undefined} />
+          <ProvenanceBadge
+            provenance={provenance}
+            source={provenanceSource ?? undefined}
+            sourceAttributes={provenanceSourceAttributes ?? undefined}
+            recipeId={provenanceRecipeId ?? undefined}
+          />
         )}
       </div>
     </div>
