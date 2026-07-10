@@ -3,6 +3,14 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-10: ✅ RUNDA UAT CAŁOŚCIOWA (testy-calosci pt 1) — 12+2 ticketów, obie rundy smoke domknięte
+- **Co:** uwagi operatora z `docs/Tests/calosciowe - od 8072026/testy-calosci - pt 1.docx` rozpisane na 12 issues (#2310–#2321), wszystkie zaimplementowane maratonem (branch→PR→CI→squash→smoke) i CLOSED. Druga runda smoke operatora → 2 follow-upy, oba wdrożone: **#2466** (RLS GUC w komendach konsolowych — `TenantConsoleBinder`, `pim:search:reindex --tenant`/all-tenants; backfill Meili wykonany, kafle kompletności Pulpitu zwracają wyniki) i **domknięcie #2314** (relacje w akcjach bulk: `BulkRelationApplier` przez `ObjectRelationService` we wszystkich 4 akcjach + rollback; FE `BulkValueInput` → `RelationCreateField`).
+- **Highlighty techniczne:** #2310 = brak `completeness_pct` na dokumentach Meili (dwie zduplikowane `toDocument` w indexerach); #2466 = RLS + brak GUC `app.current_tenant` w CLI (`pim_app` widzi 0 wierszy — HTTP/worker mają listener/middleware, konsola nie miała nic).
+- **Naprawy infra po drodze:** broken main przez biome 2.5.2 (eslint-disable niehonorowany + wielolinijkowy `biome-ignore` = suppressions/unused) — 2 PR-y fix; aktualizacje speców Playwright asertujących usunięte mocki (Podgląd/Historia, magazyn/Zatwierdź).
+- **Merged PR-y rundy:** #2322 (docs), #2348–#2360 (fixy UAT + biome), #2467, #2468.
+- **Następny krok:** smoke UI operatora (kafle Pulpitu + bulk relacja picker); poprawki wracają jako bug-fix tickety.
+- **Blokery:** brak.
+
 ## 2026-07-10: Epik AICG W TOKU — Generowanie treści AI (opisy + SEO), marathon #2325–#2346
 - **Sub-faza / epik:** AICG (22 tickety, M0–M6, milestone'y #59–#65, label `epik-AICG`). Backlog SoT: `Project Plan/feature-aicg-tickets.md`; plan: `Project Plan/UI/feature-ai-content-generation.md` (decyzje A–E zatwierdzone 2026-07-08). Tryb: marathon przez cały epik, jeden ticket = jeden PR.
 - **✅ AICG-P0-01 #2325 (PR #2443):** ADR przyjęty jako **ADR-0030** (nie 0028 z backlogu — 0028 zarezerwował równolegle GRID, 0029 WFL; wolny numer = pliki ∪ rezerwacje backlogowe). `docs/adr/0030-ai-content-generation-tools.md`: toole treści `kind=Write` w istniejącym ToolRegistry, wyjątek „agent-native" (silnik=LLM), ContentRecipe+BrandVoiceProfile w `src/Agent/` (removability), grounding kontraktowany + `insufficient_grounding`, zero auto-zapisu, SEO w przepisie nie schemacie, defaultModel+BYOK. Backlog + issue przenumerowane.

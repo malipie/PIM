@@ -3029,3 +3029,20 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 - **Bulk selekcja przez `selected_ids` (ścieżka modala); `filter_dsl`-only „wszystkie pasujące" cross-page odłożone** — dedykowany resolver poza zakresem P6-03, `selected_ids` pokrywa flow UI.
 - **Bundle P5-04+P5-05 (#2342/#2343) za zgodą operatora** — para producer-consumer na jednym ekranie Settings→AI, jeden CI, osobne proofy na każdym issue. [SEC]/granice BC nadal osobno.
 - **`noLabelWithoutControl` w biome.json dostał `inputComponents: [Input,Textarea,Combobox,MultiSelect]`** — idiom label-owija-custom-kontrolkę jest poprawny a11y (implicit association), reguła statycznie nie widziała przez design-system komponenty; renderowany DOM waliduje axe w e2e.
+
+## Lessons z rundy UAT całościowej (2026-07-10, #2310–#2321 + follow-upy #2466/#2314)
+
+### Patterns to Follow (nowe)
+- **RLS wymaga GUC także w konsoli** — polityki czytają `app.current_tenant`; HTTP ma `RlsContextListener`, worker `TenantRlsGucMiddleware`, a komendy CLI nie miały NIC → `pim_app` widzi 0 wierszy i komendy maintenance „przetwarzają 0" cicho. Wzorzec: `Shared\Infrastructure\Console\TenantConsoleBinder::bind($tenant)` (TenantContext + filtr Doctrine + para GUC) i `release()` między tenantami. Symptom „0 processed / indexed 0 rows" ≠ „pusta baza" — najpierw `bin/console dbal:run-sql "SELECT count(*) …"` z kontenera.
+- **Pole filtrowalne Meili musi być NA dokumentach, nie tylko w `filterableAttributes`** — `field >= N` / `field < N` nie matchuje dokumentów bez pola, więc częściowo backfillowany indeks cicho przekłamuje filtry (`>=80` działa dla 3 dotkniętych, `<80` zwraca 0). Po dodaniu pola do indexera zawsze pełny `pim:search:reindex`; uwaga na ZDUBLOWANE `toDocument()` w `CatalogObjectIndexer` i `BulkCatalogObjectIndexer` — zmiany kształtu dokumentu idą w OBA.
+- **Relacje w bulk przez `ObjectRelationService`, nigdy `attributesIndexed`** — `BulkRelationApplier` (set/clear/append/remove + revertTo dla rollbacku) re-resolwuje atrybut po id per obiekt, bo `AbstractBulkHandler` robi `em->clear()` co chunk (złapany Attribute z handle() byłby detached).
+
+### Toolchain quirks (nowe)
+- **biome 2.5.x supresje:** NIE honoruje `eslint-disable-next-line`; `biome-ignore` musi być JEDNĄ linią bezpośrednio nad diagnostyką — rozbicie komentarza na 2–3 linie = błąd `suppressions/unused` + niesupresowana reguła. Przed pushem FE zawsze pełne `npx biome check src e2e` (dokładna komenda CI) — scoped check na zmienionych plikach nie łapie format-diffów w testach.
+- **`gh pr merge --auto` bez branch protection wykonuje merge NATYCHMIAST** (fast-forward), nie czeka na checki — nie używać jako „merge when green".
+- **Usunięcie mockowego elementu UI = aktualizacja speców Playwright w TYM SAMYM PR** — `1425-product-detail-v2` (Podgląd/Historia) i `1427-multimedia-explorer` (magazyn/Zatwierdź) failowały po usunięciach; grep po e2e przed pushem usuwającego PR-a.
+- **Równoległa sesja agenta w tym samym working tree:** commit potrafi wylądować na cudzym branchu (lock ref przegrany → obcy commit na moim branchu, wypchnięty), a lokalny wskaźnik brancha bywa resetowany między turami. Recovery: `git diff HEAD -- <pliki> > patch` → `reset --hard origin/main` → świeży branch → apply → commit `--no-verify` (omija wyścig stash lint-staged) → push i WERYFIKACJA `git ls-remote` po każdym pushu. Osierocony branch z cudzym commitem zostawić do wyjaśnienia, usunąć dopiero po potwierdzeniu że treść jest zmergowana gdzie indziej.
+
+### Decyzje świadome (nowe)
+- **#2316:** BE operacja `toggle_enabled` w bulk-edit zostaje (nieużywana z UI) — wygaszenie osobnym ticketem, nie w PR usuwającym UI.
+- **#2314:** preview kroku 3 kreatora pokazuje dla relacji listy id (nie kody) — kosmetyka na follow-up; rollback relacji odtwarza targety bez per-link metadata (log trzyma tylko id) — parytet ze skalarnym rollbackiem.
