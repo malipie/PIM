@@ -12,6 +12,7 @@ use App\Catalog\Domain\Entity\BulkSession;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * VIEW-12 (#543) — handler for `set_attribute` bulk action.
@@ -29,6 +30,10 @@ final class BulkSetAttributeHandler extends AbstractBulkHandler
 {
     private string $attrCode = '';
     private mixed $newValue = null;
+    /** #2314 — set when the attribute is relation-type; see BulkRelationApplier. */
+    private ?Uuid $relationAttributeId = null;
+    /** @var list<string> */
+    private array $relationTargetIds = [];
 
     public function __construct(
         CatalogObjectRepositoryInterface $catalogObjects,
@@ -36,6 +41,7 @@ final class BulkSetAttributeHandler extends AbstractBulkHandler
         BulkContext $bulkContext,
         private readonly AttributeLockReader $lockReader,
         BulkReindexQueueInterface $reindexQueue,
+        private readonly BulkRelationApplier $relationApplier,
     ) {
         parent::__construct($catalogObjects, $em, $bulkContext, $reindexQueue);
     }
@@ -52,11 +58,30 @@ final class BulkSetAttributeHandler extends AbstractBulkHandler
         $this->attrCode = $attrCode;
         $this->newValue = $newValue;
 
+        // #2314 — relation attributes write link rows, not attributesIndexed.
+        $this->relationAttributeId = $this->relationApplier->relationAttributeId($attrCode);
+        $this->relationTargetIds = null !== $this->relationAttributeId
+            ? $this->relationApplier->parseTargetIds($newValue)
+            : [];
+
         return $this->runBatch($session);
     }
 
     protected function processObject(CatalogObject $object, BulkSession $session, BulkCounters $counters): void
     {
+        if (null !== $this->relationAttributeId) {
+            $this->relationApplier->apply(
+                BulkRelationApplier::MODE_REPLACE,
+                $object,
+                $this->relationAttributeId,
+                $this->relationTargetIds,
+                $session,
+                $counters,
+            );
+
+            return;
+        }
+
         if ($this->lockReader->isLocked($object, $this->attrCode)) {
             ++$counters->skipped;
             $this->em->persist(new BulkLog(
