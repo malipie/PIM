@@ -88,6 +88,11 @@ const BulkDuplicateModal = lazy(() =>
     default: m.BulkDuplicateModal,
   })),
 );
+const BulkGenerateContentModal = lazy(() =>
+  import('@/components/catalog/bulk-actions/generate-content-modal').then((m) => ({
+    default: m.BulkGenerateContentModal,
+  })),
+);
 const BulkDeleteConfirmModal = lazy(() =>
   import('@/components/catalog/bulk-actions/hard-confirm-modal').then((m) => ({
     default: m.BulkDeleteConfirmModal,
@@ -243,6 +248,8 @@ export function UniversalListPage({
   const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDuplicateOpen, setBulkDuplicateOpen] = useState(false);
+  // AICG-P5-03 (#2341) — bulk "Generuj treść AI" modal.
+  const [bulkGenerateOpen, setBulkGenerateOpen] = useState(false);
   const [cmdKOpen, setCmdKOpen] = useState(false);
   const [lastBulkSession, setLastBulkSession] = useState<RollbackSession | null>(null);
 
@@ -961,6 +968,7 @@ export function UniversalListPage({
         onOpenCategoryModal={isCategorizable ? () => setBulkCategoryOpen(true) : undefined}
         onOpenDeleteModal={() => setBulkDeleteOpen(true)}
         onOpenDuplicateModal={isProduct ? () => setBulkDuplicateOpen(true) : undefined}
+        onOpenGenerateContent={isProduct ? () => setBulkGenerateOpen(true) : undefined}
         onOpenCmdK={() => setCmdKOpen(true)}
         onOpenExportModal={
           isProduct || isCustomKind ? () => goToExport('selected', Array.from(selected)) : undefined
@@ -1017,6 +1025,22 @@ export function UniversalListPage({
               setSelected(new Set());
               setShowSelectedOnly(false);
               refetch();
+            }}
+          />
+        ) : null}
+
+        {bulkGenerateOpen ? (
+          <BulkGenerateContentModal
+            selectedIds={Array.from(selected)}
+            totalMatching={
+              crossPageSelection.active ? crossPageSelection.totalMatched : selected.size
+            }
+            objectTypeCode={objectTypeCode}
+            filterDsl={panelDsl}
+            onClose={() => setBulkGenerateOpen(false)}
+            onStarted={() => {
+              setSelected(new Set());
+              setShowSelectedOnly(false);
             }}
           />
         ) : null}

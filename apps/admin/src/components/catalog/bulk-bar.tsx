@@ -26,6 +26,12 @@ interface BulkBarProps {
    * sync <100 SKU → BinaryFileResponse, ≥100 → async session.
    */
   onOpenExportModal?: () => void;
+  /**
+   * AICG-P5-03 (#2341) — opens the bulk "Generuj treść AI" modal
+   * (descriptions / SEO via the content tools, one pending batch in the
+   * agent inbox). Supplied only on product-kind lists.
+   */
+  onOpenGenerateContent?: () => void;
 }
 
 /**
@@ -46,6 +52,7 @@ export function BulkBar({
   onOpenDuplicateModal,
   onOpenCmdK,
   onOpenExportModal,
+  onOpenGenerateContent,
 }: BulkBarProps) {
   const { t } = useTranslation();
 
@@ -107,6 +114,20 @@ export function BulkBar({
             <Download className="size-3.5" aria-hidden="true" />
             {t('products.bulk.export', { defaultValue: 'Eksport' })}
           </button>
+          {onOpenGenerateContent !== undefined ? (
+            <button
+              type="button"
+              onClick={onOpenGenerateContent}
+              data-testid="bulk-generate-content"
+              className={cn(
+                'text-[13px] font-medium px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 inline-flex items-center gap-1.5',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
+              )}
+            >
+              <Sparkles className="size-3.5" aria-hidden="true" />
+              {t('aicg.bulk.action', { defaultValue: 'Generuj treść AI' })}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onOpenCmdK ?? placeholder('VIEW-05.5')}
