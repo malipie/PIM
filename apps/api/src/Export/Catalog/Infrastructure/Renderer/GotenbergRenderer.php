@@ -60,6 +60,13 @@ final class GotenbergRenderer implements PdfRenderer
         };
     }
 
+    public function supportsLargeDocuments(): bool
+    {
+        // The sidecar renders in its own Chromium process space — no PHP
+        // worker-memory ceiling applies (CPDF-P6-04, decision A).
+        return true;
+    }
+
     public function render(string $html, PdfRenderOptions $options): string
     {
         [$paperWidth, $paperHeight] = self::PAPER_SIZES[$options->paperSize] ?? self::PAPER_SIZES['A4'];
@@ -123,6 +130,6 @@ final class GotenbergRenderer implements PdfRenderer
 
     private function backOff(int $attempt): void
     {
-        ($this->sleep)(min(2 ** $attempt, self::BACKOFF_CAP_SECONDS));
+        ($this->sleep)((int) min(2 ** $attempt, self::BACKOFF_CAP_SECONDS));
     }
 }

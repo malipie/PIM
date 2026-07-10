@@ -23,6 +23,13 @@ use Throwable;
  */
 final class DompdfRenderer implements PdfRenderer
 {
+    public function supportsLargeDocuments(): bool
+    {
+        // Dompdf accumulates the whole document in PHP memory — the render
+        // pipeline caps the product count (CPDF-P6-04, decision A).
+        return false;
+    }
+
     public function render(string $html, PdfRenderOptions $options): string
     {
         $dompdfOptions = new Options();

@@ -16,12 +16,15 @@ use App\Export\Application\Builder\ExportBuilder;
 use App\Export\Application\Catalog\ExportBuilderCatalogValues;
 use App\Export\Catalog\Application\CatalogRenderResult;
 use App\Export\Catalog\Application\CatalogRenderService;
+use App\Export\Catalog\Application\CatalogTooLargeException;
 use App\Export\Catalog\Application\HtmlValueSanitizer;
 use App\Export\Catalog\Domain\Entity\CatalogProfile;
 use App\Export\Catalog\Domain\Enum\CatalogTemplateKind;
 use App\Export\Catalog\Domain\Mapping\CatalogItemMapper;
 use App\Export\Catalog\Domain\Template\CatalogTemplateCatalog;
 use App\Export\Catalog\Infrastructure\Renderer\DompdfRenderer;
+use App\Export\Contracts\PdfRenderer;
+use App\Export\Contracts\PdfRenderOptions;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
@@ -137,6 +140,62 @@ final class CatalogRenderServiceTest extends KernelTestCase
     }
 
     #[Test]
+    public function capRaisesActionableErrorOnInMemoryRenderer(): void
+    {
+        // Decision A (CPDF-P6-04): Dompdf answers false to
+        // supportsLargeDocuments(), so exceeding the cap stops the render with
+        // an actionable message instead of OOM-killing the worker.
+        [, $typeId] = $this->seedObjects(12, 'plain');
+
+        $service = $this->service(maxInMemoryItems: 10);
+        $profile = $this->profile($typeId);
+
+        $target = tempnam(sys_get_temp_dir(), 'cpdf-');
+        self::assertNotFalse($target);
+
+        try {
+            $service->render($profile, $target);
+            self::fail('expected CatalogTooLargeException');
+        } catch (CatalogTooLargeException $error) {
+            self::assertStringContainsString('10-product limit', $error->getMessage());
+            self::assertStringContainsString('Gotenberg', $error->getMessage());
+        } finally {
+            @unlink($target);
+        }
+    }
+
+    #[Test]
+    public function capDoesNotApplyToLargeDocumentRenderers(): void
+    {
+        [, $typeId] = $this->seedObjects(12, 'plain');
+
+        // A Gotenberg-class renderer (supportsLargeDocuments() === true)
+        // renders uncapped — the same 12 products pass a cap of 10.
+        $sidecarLike = new class implements PdfRenderer {
+            public function supportsLargeDocuments(): bool
+            {
+                return true;
+            }
+
+            public function render(string $html, PdfRenderOptions $options): string
+            {
+                return '%PDF-fake';
+            }
+        };
+
+        $service = $this->service($sidecarLike, maxInMemoryItems: 10);
+        $profile = $this->profile($typeId);
+
+        $target = tempnam(sys_get_temp_dir(), 'cpdf-');
+        self::assertNotFalse($target);
+        $result = $service->render($profile, $target);
+
+        self::assertSame(12, $result->itemCount, 'the cap only guards in-memory renderers');
+
+        @unlink($target);
+    }
+
+    #[Test]
     public function renderSurvivesMaliciousDescriptionValue(): void
     {
         [, $typeId] = $this->seedObjects(1, '<script>alert(1)</script>');
@@ -155,7 +214,7 @@ final class CatalogRenderServiceTest extends KernelTestCase
         @unlink($target);
     }
 
-    private function service(): CatalogRenderService
+    private function service(?PdfRenderer $renderer = null, int $maxInMemoryItems = 500): CatalogRenderService
     {
         // No consumer wires CatalogRenderService yet, so the DI compiler may
         // inline/remove it — build it directly from its (retained) deps, the
@@ -184,7 +243,8 @@ final class CatalogRenderServiceTest extends KernelTestCase
             $twig,
             // PdfRenderer alias has no consumer yet (DI removes it) — the default
             // in-process Dompdf adapter is constructor-less, use it directly.
-            new DompdfRenderer(),
+            $renderer ?? new DompdfRenderer(),
+            $maxInMemoryItems,
         );
     }
 

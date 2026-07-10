@@ -37,4 +37,11 @@ final class DompdfRendererTest extends TestCase
 
         self::assertStringStartsWith('%PDF-', $pdf);
     }
+
+    public function testDoesNotSupportLargeDocuments(): void
+    {
+        // Dompdf builds the whole document in PHP memory — the render pipeline
+        // caps the product count (CPDF-P6-04, decision A).
+        self::assertFalse(new DompdfRenderer()->supportsLargeDocuments());
+    }
 }
