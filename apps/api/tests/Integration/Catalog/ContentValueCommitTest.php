@@ -65,7 +65,11 @@ final class ContentValueCommitTest extends KernelTestCase
         );
 
         self::assertTrue($proposal->isMaterialized());
-        self::assertSame(['value' => 'Opis globalny.'], $proposal->before, 'before must be the exact-scope row (none in en -> global row is NOT the before)');
+        // before is the EXACT-scope row: no en row exists yet, so the diff
+        // shows null -> generated (row creation), not the global fallback —
+        // consistent with what the commit writes and what a rollback would
+        // restore. The global reading stays visible untouched below.
+        self::assertNull($proposal->before);
 
         // Materialize only — the catalog is untouched.
         $port = self::getContainer()->get(PendingChangesPort::class);
