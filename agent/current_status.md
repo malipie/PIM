@@ -6,9 +6,11 @@
 ## 2026-07-10: Epik AICG W TOKU — Generowanie treści AI (opisy + SEO), marathon #2325–#2346
 - **Sub-faza / epik:** AICG (22 tickety, M0–M6, milestone'y #59–#65, label `epik-AICG`). Backlog SoT: `Project Plan/feature-aicg-tickets.md`; plan: `Project Plan/UI/feature-ai-content-generation.md` (decyzje A–E zatwierdzone 2026-07-08). Tryb: marathon przez cały epik, jeden ticket = jeden PR.
 - **✅ AICG-P0-01 #2325 (PR #2443):** ADR przyjęty jako **ADR-0030** (nie 0028 z backlogu — 0028 zarezerwował równolegle GRID, 0029 WFL; wolny numer = pliki ∪ rezerwacje backlogowe). `docs/adr/0030-ai-content-generation-tools.md`: toole treści `kind=Write` w istniejącym ToolRegistry, wyjątek „agent-native" (silnik=LLM), ContentRecipe+BrandVoiceProfile w `src/Agent/` (removability), grounding kontraktowany + `insufficient_grounding`, zero auto-zapisu, SEO w przepisie nie schemacie, defaultModel+BYOK. Backlog + issue przenumerowane.
-- **🔄 AICG-P0-02 #2326 (w toku):** `provenance_meta` + opcjonalne `source_attributes`/`recipe_id` — spec `docs/api/jsonb-schemas.md §5` + projekcja `AttributesIndexedRebuilder::globalSlot` (pass-through gdy well-typed, malformed dropped, gate na `agent_run_id`) + unit test 6 case'ów.
-- **Ostatnie 3 akcje:** (1) merge PR #2443 + close #2325 z proofem, (2) rozszerzenie globalSlot + docs §5, (3) unit suite 1516 zielone w pim-api-1.
-- **Następny krok:** PR dla P0-02 → CI → merge → M1 (P1-01 ContentRecipe).
+- **✅ AICG-P0-02 #2326 (PR #2444):** `provenance_meta` + opcjonalne `source_attributes`/`recipe_id` — spec `docs/api/jsonb-schemas.md §5` + projekcja `AttributesIndexedRebuilder::globalSlot` (pass-through gdy well-typed, malformed dropped, gate na `agent_run_id`) + unit test 6 case'ów. **M0 komplet.**
+- **⚠️ Hotfix czerwonego main (PR #2445):** PR #2440 (CPDF benchmark) wszedł z czerwonym deptrac (`Tooling` bez warstw `Export_Catalog_*` po splicie #2362) — 12 violations zamaskowanych przez docs-only merge'e; fix = ruleset Tooling + lessons (deptrac `--no-cache`, nie mergować z czerwonym checkiem).
+- **🔄 AICG-P1-01 #2327 (w toku):** encja `ContentRecipe` w `src/Agent/Domain/Entity/` + migracja `content_recipes` (RLS FORCE + super_admin bypass, UNIQUE(tenant_id,code)) + XML mapping + guard constraints (format∈{plain,html}) + testy (unit guard 8 case'ów zielone; kernel round-trip/izolacja/unique na CI). Smoke dev DB: migracja OK, RLS psql-proof (tenant A=1, tenant B=0).
+- **Ostatnie 3 akcje:** (1) merge #2444 + close #2326 z proofem, (2) hotfix deptrac #2445 merged, (3) P1-01 encja+migracja+smoke RLS na dev DB.
+- **Następny krok:** PR P1-01 → CI → merge → P1-02 BrandVoiceProfile (drafty gotowe).
 - **Blokery:** brak.
 
 ## 2026-07-10: ✅ EPIK CPDF ZAMKNIĘTY — Katalogi PDF (27/27 ticketów, M0–M6, #2282–#2308)
