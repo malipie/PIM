@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                                      https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="App\Agent\Domain\Entity\BrandVoiceProfile" table="brand_voice_profiles">
+        <indexes>
+            <index name="idx_brand_voice_profiles_tenant" columns="tenant_id"/>
+        </indexes>
+
+        <id name="id" type="uuid" column="id">
+            <generator strategy="NONE"/>
+        </id>
+
+        <many-to-one field="tenant" target-entity="App\Shared\Domain\Tenant">
+            <join-column name="tenant_id" referenced-column-name="id" nullable="false" on-delete="RESTRICT"/>
+        </many-to-one>
+
+        <field name="name" type="string" length="255"/>
+        <field name="tone" type="text"/>
+
+        <field name="glossary" type="json">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
+        <field name="bannedWords" type="json" column="banned_words">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
+        <field name="examples" type="json">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
+        <field name="isDefault" type="boolean" column="is_default">
+            <options>
+                <option name="default">false</option>
+            </options>
+        </field>
+
+        <field name="createdAt" type="datetime_immutable" column="created_at"/>
+        <field name="updatedAt" type="datetime_immutable" column="updated_at"/>
+    </entity>
+</doctrine-mapping>

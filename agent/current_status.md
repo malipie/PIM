@@ -8,9 +8,10 @@
 - **✅ AICG-P0-01 #2325 (PR #2443):** ADR przyjęty jako **ADR-0030** (nie 0028 z backlogu — 0028 zarezerwował równolegle GRID, 0029 WFL; wolny numer = pliki ∪ rezerwacje backlogowe). `docs/adr/0030-ai-content-generation-tools.md`: toole treści `kind=Write` w istniejącym ToolRegistry, wyjątek „agent-native" (silnik=LLM), ContentRecipe+BrandVoiceProfile w `src/Agent/` (removability), grounding kontraktowany + `insufficient_grounding`, zero auto-zapisu, SEO w przepisie nie schemacie, defaultModel+BYOK. Backlog + issue przenumerowane.
 - **✅ AICG-P0-02 #2326 (PR #2444):** `provenance_meta` + opcjonalne `source_attributes`/`recipe_id` — spec `docs/api/jsonb-schemas.md §5` + projekcja `AttributesIndexedRebuilder::globalSlot` (pass-through gdy well-typed, malformed dropped, gate na `agent_run_id`) + unit test 6 case'ów. **M0 komplet.**
 - **⚠️ Hotfix czerwonego main (PR #2445):** PR #2440 (CPDF benchmark) wszedł z czerwonym deptrac (`Tooling` bez warstw `Export_Catalog_*` po splicie #2362) — 12 violations zamaskowanych przez docs-only merge'e; fix = ruleset Tooling + lessons (deptrac `--no-cache`, nie mergować z czerwonym checkiem).
-- **🔄 AICG-P1-01 #2327 (w toku):** encja `ContentRecipe` w `src/Agent/Domain/Entity/` + migracja `content_recipes` (RLS FORCE + super_admin bypass, UNIQUE(tenant_id,code)) + XML mapping + guard constraints (format∈{plain,html}) + testy (unit guard 8 case'ów zielone; kernel round-trip/izolacja/unique na CI). Smoke dev DB: migracja OK, RLS psql-proof (tenant A=1, tenant B=0).
-- **Ostatnie 3 akcje:** (1) merge #2444 + close #2326 z proofem, (2) hotfix deptrac #2445 merged, (3) P1-01 encja+migracja+smoke RLS na dev DB.
-- **Następny krok:** PR P1-01 → CI → merge → P1-02 BrandVoiceProfile (drafty gotowe).
+- **✅ AICG-P1-01 #2327 (PR #2446):** encja `ContentRecipe` + migracja `content_recipes` (RLS FORCE, UNIQUE(tenant_id,code)) + guardy (format∈{plain,html}); smoke RLS psql-proof (A=1, B=0).
+- **🔄 AICG-P1-02 #2328 (w toku):** encja `BrandVoiceProfile` + migracja `brand_voice_profiles` (RLS FORCE + partial unique is_default per tenant) + guardy kształtu glossary/banned/examples; smoke dev DB: izolacja A=1/B=0, druga default → ERROR unique.
+- **Ostatnie 3 akcje:** (1) merge #2446 + close #2327 z proofem, (2) P1-02 encja+migracja+testy, (3) smoke RLS+partial-unique na dev DB.
+- **Następny krok:** PR P1-02 → CI → merge → P1-03 CRUD+RBAC (research gotowy).
 - **Blokery:** brak.
 
 ## 2026-07-10: ✅ EPIK CPDF ZAMKNIĘTY — Katalogi PDF (27/27 ticketów, M0–M6, #2282–#2308)
