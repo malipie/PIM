@@ -10,6 +10,7 @@ use App\Catalog\Contracts\Event\ObjectCategoriesChanged;
 use App\Catalog\Contracts\Event\ObjectCreated;
 use App\Catalog\Contracts\Event\ObjectEnabledChanged;
 use App\Catalog\Contracts\Event\ObjectPublished;
+use App\Catalog\Contracts\Workflow\EditorialWorkflowSubject;
 use App\Catalog\Domain\ObjectKind;
 use App\Shared\Application\Blameable;
 use App\Shared\Application\TenantScoped;
@@ -53,7 +54,7 @@ use const ARRAY_FILTER_USE_BOTH;
  *   - `kind='product'` for variants (size/color of a parent SKU);
  *   - `kind='category'` for the tree (parent category in ltree).
  */
-class CatalogObject extends AggregateRoot implements TenantScoped, Blameable
+class CatalogObject extends AggregateRoot implements TenantScoped, Blameable, EditorialWorkflowSubject
 {
     public const string STATUS_DRAFT = 'draft';
     public const string STATUS_REVIEW = 'review';
