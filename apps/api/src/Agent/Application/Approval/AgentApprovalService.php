@@ -139,7 +139,10 @@ final readonly class AgentApprovalService
                     issues: array_map(static fn (string $m): array => ['objectId' => '', 'attributeCode' => '', 'message' => $m], $schemaResult->messages),
                 );
             } else {
-                $result = $this->commits->commitAcceptedBatch($batchId, $approvedBy, [
+                // AICG-P3-02 (#2335) — content batches carry the audit trail
+                // (source_attributes + recipe_id, jsonb-schemas §5) in the
+                // pending row meta; fold it into the batch provenance stamp.
+                $result = $this->commits->commitAcceptedBatch($batchId, $approvedBy, $this->contentMetaFromBatch($batchId) + [
                     'agent_run_id' => $run->getId()->toRfc4122(),
                     'model' => $run->getModel(),
                     'intent' => $run->getIntent(),
@@ -353,5 +356,30 @@ final readonly class AgentApprovalService
         }
 
         return $run;
+    }
+
+    /**
+     * AICG-P3-02 (#2335) — the content audit keys of the batch's first
+     * row (content tools write one homogeneous batch per run; bulk-edit
+     * rows carry no such meta, so this is a no-op for them).
+     *
+     * @return array<string, mixed>
+     */
+    private function contentMetaFromBatch(Uuid $batchId): array
+    {
+        foreach ($this->pendingChanges->iterateBatch($batchId) as $view) {
+            $meta = $view->meta ?? [];
+            $content = [];
+            if (\is_array($meta['source_attributes'] ?? null)) {
+                $content['source_attributes'] = $meta['source_attributes'];
+            }
+            if (\is_string($meta['recipe_id'] ?? null)) {
+                $content['recipe_id'] = $meta['recipe_id'];
+            }
+
+            return $content;
+        }
+
+        return [];
     }
 }
