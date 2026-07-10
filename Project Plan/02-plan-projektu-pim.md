@@ -872,4 +872,21 @@ Domknięcie luki zapowiadanej w epik-04 „Feeds" i epiku 0.10 („XML feeds + G
 
 ---
 
+## Epik WFL — Workflow: maszyna stanów, review, zadania (Faza 1 — 2026-07-10)
+
+Realizacja rezerwacji „Workflow engine (Symfony Workflow z stanami: draft, review, approved, published)" (§4.2 Faza 1 Track B) w pełnym zakresie DoD + częściowe zaciągnięcie Fazy 2 Track E (definicje per tenant za feature flagiem). Domknięcie uśpionej warstwy RBAC: `WorkflowStatePolicy` (#674) + permissiony `workflow.*` czekają podpięte od Phase 3 — ten epik je egzekwuje.
+
+**Co:** komponent `symfony/workflow` (state machine `object_editorial`: `draft → review → published → archived`, marking na `objects.status`) + guardy mapowane na RBAC (PRD §3.8: macierz per-rola, auto-unpublish z audit flagą) + log przejść z komentarzami + gate completeness na publish (per ObjectType, default OFF) + bulk transitions przez maszynę + persystentne notyfikacje (dzwonek) + kolejka „Do przeglądu" (sidebar Workflow przestaje być `comingSoon`) + zadania z przypisaniem/due date („Moje zadania" + widget dashboardu) + definicje DB-driven per tenant z builderem w Settings (M5, feature flag, odcinalne do Fazy 2). Benchmark: Pimcore (silnik, dialogi przejść), Akeneo (taski, kryteria completeness), inRiver (inbox zadań), Salsify (hook AI→review, [DEF]).
+
+**Tracking:** GitHub label `epik-WFL` + milestone'y M0–M6 (#74–#80) + 27 issues #2409–#2436 (bez #2411).
+- Backlog (single source of truth): [`Project Plan/feature-workflow-tickets.md`](feature-workflow-tickets.md) (28 ticketów: 27 issues + 1 [DEF], prefix `WFL`).
+- Decyzja: **ADR-0028** (`docs/adr/0028-workflow-engine-and-placement.md`, finalizacja w WFL-P0-01).
+- Spec źródłowa: [`PRD/PRD-PIM-rbac.md`](PRD/PRD-PIM-rbac.md) §3.8 (workflow-state policy) + benchmark w nagłówku backlogu.
+
+**Estymacja:** ~210–300h (M0 silnik+ADR · M1 egzekwowanie+RBAC · M2 zdarzenia+notyfikacje · M3 UI · M4 zadania · M5 definicje/builder · M6 hardening+E2E+demo). Świadome odcięcia do Fazy 2: per-attribute proposals (substrat `pending_changes` istnieje), stany per locale/kanał, SLA/aging analytics, wersjonowanie produktów (osobny item Track B), email digest.
+
+**Sequencing:** po epiku CPDF. Zależności: RBAC (gotowe), completeness read-model (gotowe), Mercure (gotowe). Nowy BC `src/Workflow/` + mini-BC `src/Notification/` (infra generyczna pod przyszłe epiki).
+
+---
+
 *Koniec planu projektu. Dokument żyjący — aktualizowany co fazę.*
