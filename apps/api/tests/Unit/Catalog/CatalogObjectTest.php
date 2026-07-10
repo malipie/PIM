@@ -111,10 +111,10 @@ final class CatalogObjectTest extends TestCase
         $type = new ObjectType('product', ObjectKind::Product, ['pl' => 'Produkt']);
         $object = new CatalogObject($type, 'SKU-004');
 
-        $object->transitionTo(CatalogObject::STATUS_PUBLISHED);
+        $object->forceStatus(CatalogObject::STATUS_PUBLISHED);
         self::assertSame('published', $object->getStatus());
 
-        $object->transitionTo(CatalogObject::STATUS_ARCHIVED);
+        $object->forceStatus(CatalogObject::STATUS_ARCHIVED);
         self::assertSame('archived', $object->getStatus());
     }
 

@@ -248,7 +248,7 @@ class AppFixtures extends Fixture implements DependentFixtureInterface
             ['ACME-003', 'Acme Sprocket', 'Acme'],
         ] as [$sku, $name, $brand]) {
             $object = new CatalogObject($acmeProductType, $sku);
-            $object->transitionTo(CatalogObject::STATUS_PUBLISHED);
+            $object->forceStatus(CatalogObject::STATUS_PUBLISHED);
             $object->updateAttributeIndex([
                 'sku' => $sku,
                 'name' => $name,

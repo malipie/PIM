@@ -1,0 +1,45 @@
+framework:
+    workflows:
+        # ADR-0029 — editorial state machine for catalog objects. Marking
+        # lives on the existing `objects.status` column (method store);
+        # transition guards (RBAC permission map) attach in WFL-P1-01.
+        object_editorial:
+            type: state_machine
+            marking_store:
+                type: method
+                # Dedicated accessor pair on CatalogObject (get/setEditorialMarking)
+                # — see the entity docblock for why this is not `status`.
+                property: editorialMarking
+            supports:
+                - App\Catalog\Domain\Entity\CatalogObject
+            initial_marking: draft
+            places:
+                - draft
+                - review
+                - published
+                - archived
+            transitions:
+                submit_for_review:
+                    from: draft
+                    to: review
+                # Direct draft -> published shortcut for roles holding
+                # workflow.approve_reject (ADR-0029 pillar 2) — a solo
+                # operator must not be forced through the review loop.
+                publish:
+                    from: draft
+                    to: published
+                approve:
+                    from: review
+                    to: published
+                reject:
+                    from: review
+                    to: draft
+                unpublish:
+                    from: published
+                    to: draft
+                archive:
+                    from: [draft, published]
+                    to: archived
+                restore:
+                    from: archived
+                    to: draft

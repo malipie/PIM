@@ -65,7 +65,7 @@ final readonly class CatalogAssetSyncService implements CatalogAssetSync
         }
 
         $catalogObject = new CatalogObject($assetType, $code);
-        $catalogObject->transitionTo(CatalogObject::STATUS_PUBLISHED);
+        $catalogObject->forceStatus(CatalogObject::STATUS_PUBLISHED);
         $catalogObject->updateAttributeIndex($indexedAttributes);
         $catalogObject->recordCompleteness(['global' => 100]);
 

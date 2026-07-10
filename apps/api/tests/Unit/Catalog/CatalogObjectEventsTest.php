@@ -41,7 +41,7 @@ final class CatalogObjectEventsTest extends TestCase
         $object = $this->newObjectWithTenant();
         $object->pullEvents();
 
-        $object->transitionTo(CatalogObject::STATUS_PUBLISHED);
+        $object->forceStatus(CatalogObject::STATUS_PUBLISHED);
 
         $events = $object->pullEvents();
         self::assertCount(1, $events);
@@ -54,7 +54,7 @@ final class CatalogObjectEventsTest extends TestCase
         $object = $this->newObjectWithTenant();
         $object->pullEvents();
 
-        $object->transitionTo(CatalogObject::STATUS_ARCHIVED);
+        $object->forceStatus(CatalogObject::STATUS_ARCHIVED);
 
         $events = $object->pullEvents();
         self::assertCount(1, $events);
@@ -67,7 +67,7 @@ final class CatalogObjectEventsTest extends TestCase
         $object = $this->newObjectWithTenant();
         $object->pullEvents();
 
-        $object->transitionTo(CatalogObject::STATUS_DRAFT);
+        $object->forceStatus(CatalogObject::STATUS_DRAFT);
 
         self::assertSame([], $object->pullEvents());
     }

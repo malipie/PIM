@@ -158,7 +158,7 @@ final class LoadTestSeedCommand extends Command
         for ($i = 1; $i <= $products; ++$i) {
             $sku = \sprintf('%s%06d', $skuPrefix, $i);
             $object = new CatalogObject($productType, $sku);
-            $object->transitionTo(CatalogObject::STATUS_PUBLISHED);
+            $object->forceStatus(CatalogObject::STATUS_PUBLISHED);
             $this->entityManager->persist($object);
 
             // Deterministic, evenly-rotating attribute window per product so

@@ -26,9 +26,12 @@ final class CatalogObjectPatchInput
 
     /**
      * One of {@see \App\Catalog\Domain\Entity\CatalogObject::STATUS_*}.
-     * The handler delegates to `transitionTo()` which encodes the FSM.
+     * The handler resolves the target status against the
+     * `object_editorial` state machine (ADR-0029) and applies the
+     * matching transition; a target unreachable from the current
+     * status is rejected with 409 Conflict.
      */
-    #[Assert\Choice(choices: ['draft', 'published', 'archived'])]
+    #[Assert\Choice(choices: ['draft', 'review', 'published', 'archived'])]
     #[Groups(['object:patch'])]
     public ?string $status = null;
 

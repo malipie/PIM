@@ -125,7 +125,7 @@ final class BulkImportBenchmarkCommand extends Command
         for ($i = 1; $i <= $count; ++$i) {
             $sku = \sprintf('%s%05d', $skuPrefix, $i);
             $object = new CatalogObject($productType, $sku);
-            $object->transitionTo(CatalogObject::STATUS_PUBLISHED);
+            $object->forceStatus(CatalogObject::STATUS_PUBLISHED);
             $object->updateAttributeIndex([
                 'sku' => $sku,
                 'name' => \sprintf('Benchmark product %05d', $i),

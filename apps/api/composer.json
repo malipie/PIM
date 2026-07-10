@@ -55,6 +55,7 @@
         "symfony/twig-bundle": "7.4.*",
         "symfony/uid": "7.4.*",
         "symfony/validator": "7.4.*",
+        "symfony/workflow": "7.4.*",
         "symfony/yaml": "7.4.*"
     },
     "config": {

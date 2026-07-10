@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b11a6a8755986849a1cf96a725af1ad4",
+    "content-hash": "7742cdd2d33a1f6508100d2d1dd98fda",
     "packages": [
         {
             "name": "anthropic-ai/sdk",
@@ -11749,6 +11749,100 @@
                 }
             ],
             "time": "2026-03-24T13:12:05+00:00"
+        },
+        {
+            "name": "symfony/workflow",
+            "version": "v7.4.9",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/workflow.git",
+                "reference": "0c7651c6c8f152348184d3dc3e7b40039c87d5d0"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/workflow/zipball/0c7651c6c8f152348184d3dc3e7b40039c87d5d0",
+                "reference": "0c7651c6c8f152348184d3dc3e7b40039c87d5d0",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.2",
+                "symfony/deprecation-contracts": "2.5|^3"
+            },
+            "conflict": {
+                "symfony/event-dispatcher": "<6.4"
+            },
+            "require-dev": {
+                "psr/log": "^1|^2|^3",
+                "symfony/config": "^6.4|^7.0|^8.0",
+                "symfony/console": "^6.4|^7.0|^8.0",
+                "symfony/dependency-injection": "^6.4|^7.0|^8.0",
+                "symfony/error-handler": "^6.4|^7.0|^8.0",
+                "symfony/event-dispatcher": "^6.4|^7.0|^8.0",
+                "symfony/expression-language": "^6.4|^7.0|^8.0",
+                "symfony/http-kernel": "^6.4|^7.0|^8.0",
+                "symfony/security-core": "^6.4|^7.0|^8.0",
+                "symfony/stopwatch": "^6.4|^7.0|^8.0",
+                "symfony/validator": "^6.4|^7.0|^8.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Symfony\\Component\\Workflow\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Fabien Potencier",
+                    "email": "fabien@symfony.com"
+                },
+                {
+                    "name": "Grégoire Pineau",
+                    "email": "lyrixx@lyrixx.info"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Provides tools for managing a workflow or finite state machine",
+            "homepage": "https://symfony.com",
+            "keywords": [
+                "petrinet",
+                "place",
+                "state",
+                "statemachine",
+                "transition",
+                "workflow"
+            ],
+            "support": {
+                "source": "https://github.com/symfony/workflow/tree/v7.4.9"
+            },
+            "funding": [
+                {
+                    "url": "https://symfony.com/sponsor",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/fabpot",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/nicolas-grekas",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2026-04-18T13:18:21+00:00"
         },
         {
             "name": "symfony/yaml",

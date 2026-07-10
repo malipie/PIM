@@ -305,6 +305,22 @@ parameters:
               - type: directory
                 value: 'src/Export/Catalog/Contracts/.*'
 
+        # ─── Workflow — editorial state machine, transition log, tasks (ADR-0029) ───
+        - name: Workflow_Internals
+          collectors:
+              - type: directory
+                value: 'src/Workflow/Domain/.*'
+              - type: directory
+                value: 'src/Workflow/Application/.*'
+              - type: directory
+                value: 'src/Workflow/Infrastructure/.*'
+              - type: directory
+                value: 'src/Workflow/Presentation/.*'
+        - name: Workflow_Contracts
+          collectors:
+              - type: directory
+                value: 'src/Workflow/Contracts/.*'
+
         # ─── Tooling — fixtures, benchmarks, foundry stories, PHPStan rules ───
         - name: Tooling
           collectors:
@@ -340,9 +356,26 @@ parameters:
             - Asset_Contracts
             - Channel_Contracts
             - Identity_Contracts
+            # ADR-0029 — PATCH status resolves transitions against the
+            # object_editorial state machine; vocabulary via Workflow seam.
+            - Workflow_Contracts
             - Shared
             - Vendor
         Catalog_Contracts:
+            - Shared
+            - Vendor
+
+        # ADR-0029 — Workflow BC reaches Catalog/Identity only via seams;
+        # marking lives on CatalogObject, so Catalog_Internals may read the
+        # Workflow_Contracts vocabulary (transition names) and, from WFL-P1-*,
+        # Identity voters consult Workflow ports the same way.
+        Workflow_Internals:
+            - Workflow_Contracts
+            - Catalog_Contracts
+            - Identity_Contracts
+            - Shared
+            - Vendor
+        Workflow_Contracts:
             - Shared
             - Vendor
 
@@ -426,6 +459,9 @@ parameters:
         Identity_Internals:
             - Identity_Contracts
             - Catalog_Contracts
+            # ADR-0029 — workflow-state guards/voters consult Workflow seam
+            # (WFL-P1-01/P1-02).
+            - Workflow_Contracts
             # AUD-079 (W3-1): BackupVoter references the Backup entity it
             # protects — the same "voter references its resource" pattern
             # already accepted for ProductVoter / CategoryVoter / AssetVoter.
