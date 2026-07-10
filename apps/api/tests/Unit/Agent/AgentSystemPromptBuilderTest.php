@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Agent;
 use App\Agent\Application\Run\AgentSystemPromptBuilder;
 use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentRun;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
@@ -26,7 +27,7 @@ final class AgentSystemPromptBuilderTest extends TestCase
             'total_matching' => 95,
         ]);
 
-        $prompt = new AgentSystemPromptBuilder()->build($run);
+        $prompt = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class))->build($run);
 
         self::assertStringContainsString('SELECTION SCOPE', $prompt);
         self::assertStringContainsString('1 object(s) SELECTED', $prompt);
@@ -41,7 +42,7 @@ final class AgentSystemPromptBuilderTest extends TestCase
             'filter_dsl' => ['field' => 'brand', 'op' => 'eq', 'value' => 'Acme'],
         ]);
 
-        $prompt = new AgentSystemPromptBuilder()->build($run);
+        $prompt = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class))->build($run);
 
         self::assertStringNotContainsString('SELECTION SCOPE', $prompt);
     }
@@ -53,7 +54,7 @@ final class AgentSystemPromptBuilderTest extends TestCase
             'selected_ids' => [],
         ]);
 
-        $prompt = new AgentSystemPromptBuilder()->build($run);
+        $prompt = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class))->build($run);
 
         self::assertStringNotContainsString('SELECTION SCOPE', $prompt);
     }
