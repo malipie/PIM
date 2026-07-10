@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<serializer xmlns="http://symfony.com/schema/dic/serializer-mapping"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://symfony.com/schema/dic/serializer-mapping
+                                https://symfony.com/schema/dic/serializer-mapping/serializer-mapping-1.0.xsd">
+
+    <!--
+      AICG-P1-03 (#2329) — response shape of /api/content-recipes for the
+      settings UI (AICG-P5-04): the full recipe configuration the editor
+      round-trips. tenant stays unexposed (TenantFilter scopes queries).
+    -->
+    <class name="App\Agent\Domain\Entity\ContentRecipe">
+        <attribute name="id">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="code">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="name">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="objectTypeId">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="appliesTo">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="targetAttribute">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="sourceAttributes">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="constraints">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="toneHint">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="brandVoiceId">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="builtIn">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="createdAt">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="updatedAt">
+            <group>admin:read</group>
+        </attribute>
+    </class>
+</serializer>

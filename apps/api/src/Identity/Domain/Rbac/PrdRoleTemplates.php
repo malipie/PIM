@@ -87,6 +87,7 @@ final class PrdRoleTemplates
                 'settings.users.manage', 'settings.roles.manage', 'settings.tenant.manage',
                 'settings.locales.manage',
                 'settings.billing.manage', 'settings.integrations.manage', 'settings.integration_secrets.read',
+                'settings.ai_content.read', 'settings.ai_content.create', 'settings.ai_content.admin',
                 'api_tokens.own.crud', 'api_tokens.all.view_revoke',
                 'audit.view_own', 'audit.view_cross_user',
                 'tenant.delete',
@@ -112,6 +113,7 @@ final class PrdRoleTemplates
                 'settings.users.manage', 'settings.roles.manage', 'settings.tenant.manage',
                 'settings.locales.manage',
                 'settings.integrations.manage', 'settings.integration_secrets.read',
+                'settings.ai_content.read', 'settings.ai_content.create', 'settings.ai_content.admin',
                 'api_tokens.own.crud', 'api_tokens.all.view_revoke',
                 'audit.view_own', 'audit.view_cross_user',
                 // ULV-04a (#985) — universal ObjectListView verbs.
@@ -128,6 +130,10 @@ final class PrdRoleTemplates
                 'exports.view_own', 'exports.view_all', 'exports.run',
                 'workflow.view', 'workflow.approve_reject',
                 'agent.bulk_actions',
+                // AICG-P1-03 (#2329) — recipes/voice are content-team
+                // config: read + create (incl. clone); admin stays with
+                // Owner/Admin.
+                'settings.ai_content.read', 'settings.ai_content.create',
                 'audit.view_own',
                 'api_tokens.own.crud',
                 // ULV-04a (#985) — universal ObjectListView verbs.
@@ -143,6 +149,9 @@ final class PrdRoleTemplates
                 'imports.view_own', 'imports.run',
                 'workflow.view',
                 'agent.bulk_actions',
+                // AICG-P1-03 (#2329) — same content-team grant as
+                // catalog_manager.
+                'settings.ai_content.read', 'settings.ai_content.create',
                 'audit.view_own',
                 'api_tokens.own.crud',
             ],
