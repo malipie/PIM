@@ -1,6 +1,6 @@
 # Backlog — Katalogi PDF: product sheety, katalogi, cenniki (epik CPDF)
 
-> **Status:** backlog do realizacji. Utworzony 2026-07-08.
+> **Status:** ✅ **ZREALIZOWANY W CAŁOŚCI** (2026-07-10) — 27/27 ticketów merged, milestone'y M0–M6 (#52–#58) zamknięte, każde issue z live-smoke proofem w komencie zamknięcia. Podsumowanie: `agent/current_status.md` (sekcja 2026-07-10). Utworzony 2026-07-08.
 > **Źródło architektury:** [`UI/feature-catalogs-pdf.md`](UI/feature-catalogs-pdf.md) (§2 decyzje, §4 as-is/reuse, §6 architektura, §7 IN/OUT, §9 brief UI, §10 fazy, §12 mini-ADR).
 > **Decyzja architektoniczna:** ADR-0027 (`docs/adr/0027-catalog-pdf-renderer-port.md`) — finalizowany w CPDF-P0-01. *(Numer potwierdzony `ls docs/adr/`: 0025/0026 zajęte; 0027 wolny.)*
 > **Designy UI:** do dostarczenia w briefie §9 planu (pattern Exports/Konfigurator XML — `Zrodla/Front_Claude_Design/**`). Do czasu handoffu FE klonuje layout Exports/Feeds.
