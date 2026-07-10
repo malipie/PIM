@@ -8,7 +8,8 @@ use RuntimeException;
 
 /**
  * Raised when a template kind is requested whose archetype is not yet shipped
- * (ADR-0027, CPDF-P2-01): the grid archetype arrives in CPDF-P6-02.
+ * (ADR-0027, CPDF-P2-01). All three built-in archetypes ship as of CPDF-P6-02;
+ * kept for future template kinds.
  */
 final class TemplateNotAvailableException extends RuntimeException
 {

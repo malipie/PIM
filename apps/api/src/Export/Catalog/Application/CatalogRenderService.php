@@ -53,7 +53,7 @@ final class CatalogRenderService
      */
     public function render(CatalogProfile $profile, string $targetPath, ?Closure $onChunk = null): CatalogRenderResult
     {
-        // grid raises TemplateNotAvailableException until CPDF-P6-02 — propagate.
+        // Future template kinds raise TemplateNotAvailableException — propagate.
         $template = $this->templates->get($profile->getTemplateKind());
         $mappings = CatalogFieldMapping::listFromArray($profile->getFieldMappings());
         $scope = $this->scope($profile, $mappings);
@@ -103,6 +103,8 @@ final class CatalogRenderService
         $html = $this->twig->render($template->twig, [
             'branding' => $profile->getBranding(),
             'products' => $products,
+            // Grid cover/TOC heading; sheet and pricelist ignore it.
+            'title' => $profile->getName(),
         ]);
 
         $pdf = $this->renderer->render($html, new PdfRenderOptions());

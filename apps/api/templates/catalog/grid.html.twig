@@ -1,0 +1,199 @@
+{#
+  Catalog PDF — "grid" archetype (ADR-0027, CPDF-P6-02): a full product
+  catalogue composed of three sections (the PrintContainer idea from Pimcore):
+  a branded cover page, a table of contents, and a paginated grid of product
+  cards (3 per row).
+
+  Dompdf-safe CSS only (CSS 2.1 subset, same rules as sheet/pricelist):
+  - the card grid is a <table> (Dompdf has no flex/grid); products are
+    chunked into rows with Twig's `batch(3)`;
+  - the page footer is `position: fixed` with a CSS 2.1 `counter(page)` page
+    number (Dompdf repeats it on every page, cover included);
+  - TOC page numbers need `target-counter()`, which Dompdf does not support —
+    they are gated behind the `premium` flag (false by default) and arrive
+    with the Gotenberg renderer (CPDF-P6-03/P6-05). On Dompdf the TOC
+    degrades gracefully to anchor links without page numbers.
+  - full @page margin boxes are likewise premium-gated; the plain fixed
+    footer below is the Dompdf-safe baseline.
+
+  The template receives:
+    - branding: map (company_name?, logo?, color?)
+    - products: list of maps keyed by slot name (title/sku/image/price)
+    - title:    catalog display name (cover + TOC heading)
+    - premium:  optional bool — full CSS Paged Media (Gotenberg-class
+                renderers only); defaults to false
+
+  strict_variables is ON in the test env, so every variable access is guarded
+  with `|default(...)` or `is defined`.
+#}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page {
+            margin: 48px 40px 64px 40px;
+        }
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            color: #111827;
+            margin: 0;
+            font-size: 12px;
+        }
+        .page-footer {
+            position: fixed;
+            bottom: -48px;
+            left: 0;
+            right: 0;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 6px;
+            font-size: 10px;
+            color: #9ca3af;
+        }
+        .page-footer .pagenum:before {
+            content: counter(page);
+        }
+        .cover {
+            page-break-after: always;
+            text-align: center;
+        }
+        .cover .band {
+            background-color: {{ branding.color|default('#1d4ed8') }};
+            height: 12px;
+            margin: 0 -8px 96px -8px;
+        }
+        .cover .logo {
+            max-height: 96px;
+            margin-bottom: 24px;
+        }
+        .cover .company {
+            font-size: 20px;
+            font-weight: bold;
+            color: {{ branding.color|default('#1d4ed8') }};
+            margin-bottom: 48px;
+        }
+        .cover .title {
+            font-size: 34px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+        .cover .count {
+            font-size: 13px;
+            color: #6b7280;
+        }
+        .toc {
+            page-break-after: always;
+        }
+        .toc h2 {
+            font-size: 20px;
+            border-bottom: 3px solid {{ branding.color|default('#1d4ed8') }};
+            padding-bottom: 8px;
+        }
+        .toc ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .toc li {
+            border-bottom: 1px dotted #e5e7eb;
+            padding: 4px 0;
+            font-size: 11px;
+        }
+        .toc a {
+            color: #111827;
+            text-decoration: none;
+        }
+        {% if premium|default(false) %}
+        /* Gotenberg-class renderers resolve the target page of each anchor. */
+        .toc a .toc-page:after {
+            content: target-counter(attr(href url), page);
+            float: right;
+            color: #6b7280;
+        }
+        {% endif %}
+        .grid {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+        }
+        .grid td {
+            width: 33%;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 10px;
+            vertical-align: top;
+            page-break-inside: avoid;
+        }
+        .card-image {
+            text-align: center;
+            height: 110px;
+            margin-bottom: 8px;
+        }
+        .card-image img {
+            max-width: 100%;
+            max-height: 110px;
+        }
+        .card-title {
+            font-weight: bold;
+            font-size: 12.5px;
+            margin-bottom: 2px;
+        }
+        .card-sku {
+            font-size: 10px;
+            color: #6b7280;
+            margin-bottom: 6px;
+        }
+        .card-price {
+            font-weight: bold;
+            color: {{ branding.color|default('#1d4ed8') }};
+        }
+    </style>
+</head>
+<body>
+    <div class="page-footer">
+        {{ branding.company_name|default('') }} &mdash; <span class="pagenum"></span>
+    </div>
+
+    <div class="cover">
+        <div class="band"></div>
+        {% if branding.logo is defined and branding.logo %}
+            <img class="logo" src="{{ branding.logo }}" alt="">
+        {% endif %}
+        <div class="company">{{ branding.company_name|default('') }}</div>
+        <div class="title">{{ title|default('') }}</div>
+        <div class="count">{{ products|length }} products</div>
+    </div>
+
+    <div class="toc">
+        <h2>{{ title|default('') }}</h2>
+        <ul>
+            {% for product in products %}
+                <li>
+                    <a href="#product-{{ loop.index }}">{{ product.title|default('') }}<span class="toc-page"></span></a>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <table class="grid">
+        {% for row in products|batch(3) %}
+            <tr>
+                {% for product in row %}
+                    <td id="product-{{ loop.parent.loop.index0 * 3 + loop.index }}">
+                        {% if product.image is defined and product.image %}
+                            <div class="card-image">
+                                <img src="{{ product.image }}" alt="">
+                            </div>
+                        {% endif %}
+                        <div class="card-title">{{ product.title|default('') }}</div>
+                        <div class="card-sku">{{ product.sku|default('') }}</div>
+                        {% if product.price is defined and product.price %}
+                            <div class="card-price">{{ product.price }}</div>
+                        {% endif %}
+                    </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

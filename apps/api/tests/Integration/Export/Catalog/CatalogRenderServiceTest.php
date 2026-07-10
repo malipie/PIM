@@ -103,6 +103,40 @@ final class CatalogRenderServiceTest extends KernelTestCase
     }
 
     #[Test]
+    public function rendersGridCatalogWithCoverAndTocToPdf(): void
+    {
+        // Cover page + TOC page + the card grid — 30 products must span
+        // at least three pages (CPDF-P6-02).
+        [, $typeId] = $this->seedObjects(30, 'plain');
+
+        $service = $this->service();
+        $profile = new CatalogProfile(
+            'grid-cat',
+            'Grid catalog',
+            CatalogTemplateKind::Grid,
+            $typeId,
+            branding: ['color' => '#0ea5e9', 'company_name' => 'ACME'],
+            fieldMappings: [
+                ['slot' => 'title', 'source' => ['kind' => 'attribute', 'ref' => 'name']],
+                ['slot' => 'sku', 'source' => ['kind' => 'attribute', 'ref' => 'sku']],
+                ['slot' => 'price', 'source' => ['kind' => 'static', 'value' => '99,00 zł']],
+            ],
+        );
+
+        $target = tempnam(sys_get_temp_dir(), 'cpdf-');
+        self::assertNotFalse($target);
+        $result = $service->render($profile, $target);
+
+        self::assertSame(30, $result->itemCount, 'every seeded product becomes one grid card');
+        self::assertGreaterThanOrEqual(3, $result->pageCount, 'cover + TOC + grid pages');
+
+        $pdf = (string) file_get_contents($target);
+        self::assertStringStartsWith('%PDF-', $pdf, 'the render produced a valid PDF file');
+
+        @unlink($target);
+    }
+
+    #[Test]
     public function renderSurvivesMaliciousDescriptionValue(): void
     {
         [, $typeId] = $this->seedObjects(1, '<script>alert(1)</script>');
