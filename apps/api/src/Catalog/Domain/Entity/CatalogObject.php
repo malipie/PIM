@@ -10,6 +10,10 @@ use App\Catalog\Contracts\Event\ObjectCategoriesChanged;
 use App\Catalog\Contracts\Event\ObjectCreated;
 use App\Catalog\Contracts\Event\ObjectEnabledChanged;
 use App\Catalog\Contracts\Event\ObjectPublished;
+use App\Catalog\Contracts\Event\ObjectRejected;
+use App\Catalog\Contracts\Event\ObjectRestored;
+use App\Catalog\Contracts\Event\ObjectSubmittedForReview;
+use App\Catalog\Contracts\Event\ObjectUnpublished;
 use App\Catalog\Contracts\Workflow\EditorialWorkflowSubject;
 use App\Catalog\Domain\ObjectKind;
 use App\Shared\Application\Blameable;
@@ -344,6 +348,41 @@ class CatalogObject extends AggregateRoot implements TenantScoped, Blameable, Ed
                 objectId: $this->id,
                 tenantId: $this->tenant->getId(),
             ));
+        }
+    }
+
+    /**
+     * WFL-P2-01 (#2420) — editorial transition events that cannot be
+     * derived from the target place alone (reject and unpublish both
+     * land in draft). Called by EditorialTransitionEventRecorder on the
+     * workflow `transition` event; published/archived stay recorded by
+     * {@see setEditorialMarking()} so the two sources never duplicate.
+     */
+    public function recordSubmittedForReview(?string $comment): void
+    {
+        if (null !== $this->tenant) {
+            $this->recordThat(new ObjectSubmittedForReview($this->id, $this->tenant->getId(), $comment));
+        }
+    }
+
+    public function recordRejected(?string $comment): void
+    {
+        if (null !== $this->tenant) {
+            $this->recordThat(new ObjectRejected($this->id, $this->tenant->getId(), $comment));
+        }
+    }
+
+    public function recordUnpublished(bool $autoUnpublish): void
+    {
+        if (null !== $this->tenant) {
+            $this->recordThat(new ObjectUnpublished($this->id, $this->tenant->getId(), $autoUnpublish));
+        }
+    }
+
+    public function recordRestored(): void
+    {
+        if (null !== $this->tenant) {
+            $this->recordThat(new ObjectRestored($this->id, $this->tenant->getId()));
         }
     }
 

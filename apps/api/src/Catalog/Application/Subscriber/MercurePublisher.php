@@ -10,6 +10,10 @@ use App\Catalog\Contracts\Event\ObjectAttributesChanged;
 use App\Catalog\Contracts\Event\ObjectCreated;
 use App\Catalog\Contracts\Event\ObjectEnabledChanged;
 use App\Catalog\Contracts\Event\ObjectPublished;
+use App\Catalog\Contracts\Event\ObjectRejected;
+use App\Catalog\Contracts\Event\ObjectRestored;
+use App\Catalog\Contracts\Event\ObjectSubmittedForReview;
+use App\Catalog\Contracts\Event\ObjectUnpublished;
 use App\Catalog\Domain\ObjectKind;
 use App\Shared\Application\TenantAwareMessage;
 use App\Shared\Domain\DomainEvent;
@@ -121,6 +125,46 @@ final readonly class MercurePublisher
     {
         $this->publish(
             type: 'object.archived',
+            event: $event,
+            payload: ['objectId' => $event->aggregateId()],
+        );
+    }
+
+    #[AsMessageHandler]
+    public function onObjectSubmittedForReview(ObjectSubmittedForReview $event): void
+    {
+        $this->publish(
+            type: 'object.submitted_for_review',
+            event: $event,
+            payload: ['objectId' => $event->aggregateId(), 'comment' => $event->comment],
+        );
+    }
+
+    #[AsMessageHandler]
+    public function onObjectRejected(ObjectRejected $event): void
+    {
+        $this->publish(
+            type: 'object.rejected',
+            event: $event,
+            payload: ['objectId' => $event->aggregateId(), 'comment' => $event->comment],
+        );
+    }
+
+    #[AsMessageHandler]
+    public function onObjectUnpublished(ObjectUnpublished $event): void
+    {
+        $this->publish(
+            type: 'object.unpublished',
+            event: $event,
+            payload: ['objectId' => $event->aggregateId(), 'autoUnpublish' => $event->autoUnpublish],
+        );
+    }
+
+    #[AsMessageHandler]
+    public function onObjectRestored(ObjectRestored $event): void
+    {
+        $this->publish(
+            type: 'object.restored',
             event: $event,
             payload: ['objectId' => $event->aggregateId()],
         );

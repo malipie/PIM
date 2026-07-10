@@ -9,6 +9,7 @@ use App\Catalog\Application\Subscriber\MercurePublisher;
 use App\Catalog\Contracts\Event\ObjectAttributesChanged;
 use App\Catalog\Contracts\Event\ObjectCreated;
 use App\Catalog\Contracts\Event\ObjectEnabledChanged;
+use App\Catalog\Contracts\Event\ObjectSubmittedForReview;
 use App\Catalog\Domain\ObjectKind;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -46,6 +47,26 @@ final class MercurePublisherTest extends TestCase
      * @var list<Update>
      */
     private array $captured = [];
+
+    #[Test]
+    public function submittedForReviewCarriesTheCommentPayload(): void
+    {
+        $publisher = $this->makePublisher();
+        $event = new ObjectSubmittedForReview(
+            objectId: Uuid::fromString('019ddb19-a0f7-750a-a9cb-a6a6447ccb26'),
+            tenantId: Uuid::fromString(self::TENANT_ID),
+            comment: 'Gotowe do przeglądu',
+        );
+
+        $publisher->onObjectSubmittedForReview($event);
+
+        self::assertCount(1, $this->captured);
+        $payload = json_decode($this->captured[0]->getData(), true);
+        self::assertIsArray($payload);
+        self::assertSame('object.submitted_for_review', $payload['type']);
+        self::assertIsArray($payload['data']);
+        self::assertSame('Gotowe do przeglądu', $payload['data']['comment']);
+    }
 
     #[Test]
     public function objectCreatedPushesPerRowAndBroadcastTopics(): void
