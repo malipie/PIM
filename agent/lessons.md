@@ -2,6 +2,12 @@
 
 > Plik startowy zasiany twardymi wytycznymi z `Project Plan/01-architektura-pim.md`. Po każdej korekcie operatora lub odkrytym wzorcu (sukces ALBO porażka) — dopisz wpis. Czytaj przed każdą sesją.
 
+## Lessons z AICG-P0-02 (2026-07-10, czerwony main po CPDF + deptrac cache)
+
+### Patterns to Avoid
+- **Lokalny `deptrac analyse` z cache pokazuje zieleń mimo realnych violations na CI.** `.deptrac.cache` w kontenerze przeżywa zmiany kodu z innych branchy (bind-mount + przełączanie); PR #2444 dostał 12 violations na CI, podczas gdy lokalny run mówił „Errors 0". Przy weryfikacji bramki architektury zawsze `deptrac analyse --no-cache`.
+- **Path-filtrowane workflow maskują czerwony main.** PR #2440 (CPDF P6-04) wszedł z FAILED `PHPUnit (unit,architecture)` + `Agent removability` (benchmark sięga `Export_Catalog_Internals`, ruleset `Tooling` sprzed splitu #2362); kolejne merge'e były docs-only, więc PHP suite się nie odpalał i main wyglądał na zdrowy. Wykryte dopiero przez CI pierwszego PR-a BE (AICG-P0-02). Reguła bez zmian od incydentu #2208: **nie mergować z jakimkolwiek czerwonym checkiem**; a przy dziedzicznie czerwonym CI własnego PR-a najpierw sprawdź, czy fail nie reprodukuje się na czystym main (`git log` ostatnich merged PR-ów po nazwie failującego checku). Fix: PR #2445 (Tooling + Export_Catalog_* w deptrac).
+
 ## Lessons z epiku DASH (2026-07-05…08, uinteraktywnienie dashboardu, #2249–#2275)
 
 ### Patterns to Follow

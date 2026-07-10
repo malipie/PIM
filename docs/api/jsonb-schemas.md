@@ -273,13 +273,15 @@ Lista reguł dwóch rodzajów:
     "agent_run_id": { "type": "string", "format": "uuid", "description": "provenance=agent — id AgentRun (epik 0.7, tabela agent_runs)" },
     "model": { "type": "string", "description": "provenance=agent — id modelu Anthropic użytego w runie (np. claude-sonnet-*)" },
     "intent": { "type": "string", "description": "provenance=agent — intencja usera, z której powstała zmiana (skrót)" },
-    "channel": { "type": "string", "description": "Integration channel id jeśli provenance=integration" }
+    "channel": { "type": "string", "description": "Integration channel id jeśli provenance=integration" },
+    "source_attributes": { "type": "array", "items": { "type": "string" }, "description": "provenance=agent, opcjonalne (AICG) — kody atrybutów-źródeł użytych jako fakty przy generowaniu treści (audyt „skąd ten fakt")" },
+    "recipe_id": { "type": ["string", "null"], "format": "uuid", "description": "provenance=agent, opcjonalne (AICG) — id ContentRecipe, z którego wygenerowano wartość" }
   },
   "additionalProperties": true
 }
 ```
 
-### Shape per provenance=agent (AGENT-P0-04 #1947, ADR-0024)
+### Shape per provenance=agent (AGENT-P0-04 #1947, ADR-0024; rozszerzenie AICG-P0-02 #2326, ADR-0030)
 
 Wartości zapisane przez agenta (po akcepcie batcha `pending_changes`) niosą:
 
@@ -288,6 +290,22 @@ Wartości zapisane przez agenta (po akcepcie batcha `pending_changes`) niosą:
 ```
 
 `agent_run_id` linkuje wartość do runu (audyt + tooltip badge'a „agent" w UI, P6-05).
+
+Wartości wygenerowane przez **toole treści** (epik AICG, ADR-0030) niosą dodatkowo dwa opcjonalne pola:
+
+```json
+{
+  "agent_run_id": "<uuid AgentRun>",
+  "model": "claude-sonnet-…",
+  "intent": "generate_product_description",
+  "source_attributes": ["material", "color", "brand"],
+  "recipe_id": "<uuid ContentRecipe|null>"
+}
+```
+
+- `source_attributes` — dokładnie te kody atrybutów, których wartości weszły do promptu jako fakty (kontrakt anty-halucynacyjny: audyt „skąd ten fakt"). Brak pola = zapis sprzed AICG lub nie-treściowy; readery traktują jak `[]`.
+- `recipe_id` — `ContentRecipe`, według którego pisano. Brak pola / `null` = generacja bez przepisu; readery traktują jak `null`.
+- **Backward compatibility:** oba pola są czysto addytywne (reguła cross-cutting #2) — zapisy `provenance_meta` sprzed rozszerzenia parsują bez zmian, a projekcja do `attributes_indexed` (`AttributesIndexedRebuilder::globalSlot`) przepuszcza je tylko, gdy są obecne i poprawnie typowane (malformed → dropped, nigdy nie propagowane).
 
 ### Reguły
 

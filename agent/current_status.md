@@ -3,6 +3,14 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-10: Epik AICG W TOKU — Generowanie treści AI (opisy + SEO), marathon #2325–#2346
+- **Sub-faza / epik:** AICG (22 tickety, M0–M6, milestone'y #59–#65, label `epik-AICG`). Backlog SoT: `Project Plan/feature-aicg-tickets.md`; plan: `Project Plan/UI/feature-ai-content-generation.md` (decyzje A–E zatwierdzone 2026-07-08). Tryb: marathon przez cały epik, jeden ticket = jeden PR.
+- **✅ AICG-P0-01 #2325 (PR #2443):** ADR przyjęty jako **ADR-0030** (nie 0028 z backlogu — 0028 zarezerwował równolegle GRID, 0029 WFL; wolny numer = pliki ∪ rezerwacje backlogowe). `docs/adr/0030-ai-content-generation-tools.md`: toole treści `kind=Write` w istniejącym ToolRegistry, wyjątek „agent-native" (silnik=LLM), ContentRecipe+BrandVoiceProfile w `src/Agent/` (removability), grounding kontraktowany + `insufficient_grounding`, zero auto-zapisu, SEO w przepisie nie schemacie, defaultModel+BYOK. Backlog + issue przenumerowane.
+- **🔄 AICG-P0-02 #2326 (w toku):** `provenance_meta` + opcjonalne `source_attributes`/`recipe_id` — spec `docs/api/jsonb-schemas.md §5` + projekcja `AttributesIndexedRebuilder::globalSlot` (pass-through gdy well-typed, malformed dropped, gate na `agent_run_id`) + unit test 6 case'ów.
+- **Ostatnie 3 akcje:** (1) merge PR #2443 + close #2325 z proofem, (2) rozszerzenie globalSlot + docs §5, (3) unit suite 1516 zielone w pim-api-1.
+- **Następny krok:** PR dla P0-02 → CI → merge → M1 (P1-01 ContentRecipe).
+- **Blokery:** brak.
+
 ## 2026-07-10: ✅ EPIK CPDF ZAMKNIĘTY — Katalogi PDF (27/27 ticketów, M0–M6, #2282–#2308)
 - **Co:** pełny web-to-print dla PIM: `CatalogProfile`/`CatalogRun` + silnik szablonów Twig (3 archetypy: sheet / pricelist / grid z okładką+spisem) + port `PdfRenderer` (Dompdf in-process default, Gotenberg sidecar opt-in) + async z progresem Mercure + delivery cache-and-serve z tokenem URL + pełne UI (hub KPI/karty/akcje, kreator 6-krok, live preview, menu gate RBAC). Marathon 2026-07-09/10, każdy ticket: branch → PR → CI → squash-merge → **live smoke proof w komencie zamknięcia** (CLOSED MEANS CLOSED).
 - **Finał M5 (UI):** #2382 Mercure live progress (proof: Playwright na żywym stacku łapie subskrypcję EventSource `catalogs/{id}/runs`, progress → terminal → refresh karty), #2383 menu gate (`exports.view_own|view_all` anyOf; persona negatywna = modeler bez `exports.*` → brak wpisu + Forbidden403 na deep-linkach).
