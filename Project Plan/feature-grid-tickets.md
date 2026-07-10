@@ -38,6 +38,38 @@ _Milestone'y GitHub: #66–#73 (M1–M8 — GRID). Label: `epik-GRID`._
 
 ---
 
+## Strategia PR — łączenie ticketów (decyzja operatora 2026-07-10)
+
+**Motywacja:** `quality-php.yml` działa na `paths-ignore` (fail-safe, AUD-061) — pełne bramki PHP (w tym shard `api-catalog` ~20 min) odpalają się na **każdym** PR dotykającym kodu, nawet czysto frontendowym. Każdy PR z kodem = stały koszt ~20–25 min CI niezależnie od rozmiaru diffu, więc łączenie sąsiadujących ticketów w jeden PR to czysta oszczędność przebiegów bez utraty pokrycia (bramki walidują diff, nie liczbę PR-ów). Komplementarny lever: rozcięcie sharda `api-catalog` — osobny ticket infra (poza epikiem).
+
+**Mapowanie 23 tickety → 13 PR-ów:**
+
+| PR | Tickety | Uzasadnienie sklejenia |
+|---|---|---|
+| 1 | P1-01 + P1-02 | model kolumn + renderery — oba czysty lib, bez widocznej zmiany UI |
+| 2 | P1-03 + P1-04 | konsumpcja modelu w obu widokach — jedna zmiana koncepcyjna |
+| 3 | P2-01 + P2-02 + P2-03 | cały column manager — jedna powierzchnia UI, wspólne E2E |
+| 4 | P3-01 + P3-02 | endpoint `?full=1` + jego jedyny konsument — razem smoke-owalne end-to-end |
+| 5 | P4-01 + P4-03 | oba BE na SavedView (walidacja + default/system protection) |
+| 6 | P4-02 | osobno — zależy od PR 3 i 5 |
+| 7 | P5-01 | **osobno** — ADR + benchmark, `[PM]`, nie mieszać z implementacją |
+| 8 | P5-02 + P5-03 | sort BE+FE — bez nagłówków sort nie jest sensownie smoke-owalny |
+| 9 | P6-01 + P6-02 | flaga `editable` bez edytorów to martwy kod |
+| 10 | P6-03 | osobno — nadbudowa; PR 9 już duży (15–21h) |
+| 11 | P7-01 + P7-02 | eksport end-to-end (BE endpoint + przycisk) |
+| 12 | P8-01 | **osobno** — wirtualizacja = izolowane ryzyko regresji, revert chirurgiczny |
+| 13 | P8-02 + P8-03 | E2E journey + closeout |
+
+**Reguły jakościowe (nienegocjowalne przy bundlowaniu):**
+
+- **Issues zostają 1:1** — PR ma `Closes #A, Closes #B`; AC odhaczane osobno per ticket w PR body; każde issue zamykane z **własnym** proofem smoke (CLOSED MEANS CLOSED bez zmian).
+- Bundlujemy tylko tickety z **jednej spójnej powierzchni feature** (revert PR-a = spójna cofka, nie amputacja połowy mechanizmu).
+- **Nie bundlujemy przez granice ryzyka:** ADR (`[PM]`) i tickety high-risk izolowane (PR 7, PR 12).
+- Czerwone CI jednej części bundla → naprawa albo **rozcięcie PR-a z powrotem**; nigdy wycinanie testów/AC, żeby „przeszło".
+- Bundel nie zwalnia z pełnego DoD żadnego ticketu składowego (E2E, axe, OpenAPI snapshot, i18n itd. per ticket).
+
+---
+
 ## Konwencje
 
 - **Cls:** `BE` · `FE` · `DOCS` · `PERF` · `E2E`.
