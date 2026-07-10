@@ -61,6 +61,12 @@ export interface ProductDetailContentProps {
   onAskAI?: (attributeCode: string) => void;
   askAiProposalFor?: (attributeCode: string) => import('react').ReactNode;
   recipeNameById?: Map<string, string>;
+  /**
+   * #2341-followup — remount nonce per field: bumped for the attribute
+   * whose Ask AI proposal was just accepted so its (uncontrolled) editor
+   * re-reads the freshly committed value without a page reload.
+   */
+  fieldVersion?: (attributeCode: string) => number;
 }
 
 /**
@@ -96,6 +102,7 @@ export function ProductDetailContent({
   onAskAI,
   askAiProposalFor,
   recipeNameById,
+  fieldVersion,
 }: ProductDetailContentProps) {
   // AICG-P5-01 — the affordance targets editable text-family fields only.
   const TEXT_FAMILY = new Set(['text', 'textarea', 'wysiwyg']);
@@ -125,7 +132,7 @@ export function ProductDetailContent({
       {visibleAttributes(group).map((attr) => {
         const contentMeta = resolveProvenanceContentMeta(attr, product);
         return (
-          <div key={attr.id}>
+          <div key={`${attr.id}-${fieldVersion?.(attr.code) ?? 0}`}>
             <AttrRow
               attribute={attr}
               value={fieldValue(attr.code)}

@@ -13,8 +13,9 @@ import { useCanI } from '@/lib/identity/use-identity';
 /**
  * AICG-P5-04 (#2342) — ContentRecipe CRUD in Settings → AI: the recipe
  * ("how to write copy for this target") is tenant configuration, not
- * code. Built-in rows are read-only with a clone action (backend 409s
- * direct edits); create/edit covers target, source attributes, format,
+ * code. Built-in rows carry an informational badge but are fully
+ * editable + deletable (operator decision, #2341-followup) — plus a
+ * clone action; create/edit covers target, source attributes, format,
  * length budget, SEO rules, tone hint and the pinned brand voice.
  */
 
@@ -266,7 +267,7 @@ export function ContentRecipesSection() {
                   <CopyPlus className="size-3.5" aria-hidden />
                 </button>
               ) : null}
-              {canAdmin && !recipe.builtIn ? (
+              {canAdmin ? (
                 <>
                   <button
                     type="button"
