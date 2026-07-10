@@ -6,6 +6,7 @@ namespace App\Catalog\Presentation\Controller;
 
 use App\Catalog\Application\Bulk\BulkAddCategoryHandler;
 use App\Catalog\Application\Bulk\BulkAppendValueHandler;
+use App\Catalog\Application\Bulk\BulkChangeStatusHandler;
 use App\Catalog\Application\Bulk\BulkClearAttributeHandler;
 use App\Catalog\Application\Bulk\BulkDeleteHandler;
 use App\Catalog\Application\Bulk\BulkDuplicateHandler;
@@ -25,6 +26,7 @@ use App\Identity\Contracts\Policy\WorkflowStateEditPolicyInterface;
 use App\Shared\Application\BulkOperationLock;
 use App\Shared\Application\TenantContext;
 use App\Shared\Application\UserIdentityAware;
+use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use DateTimeInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -97,6 +99,7 @@ final class BulkActionsController
         private readonly WorkflowStateEditPolicyInterface $statePolicy,
         private readonly CatalogObjectRepositoryInterface $catalogObjects,
         private readonly BulkSetAttributeHandler $setAttributeHandler,
+        private readonly BulkChangeStatusHandler $changeStatusHandler,
         private readonly BulkClearAttributeHandler $clearAttributeHandler,
         private readonly BulkAppendValueHandler $appendValueHandler,
         private readonly BulkRemoveValueHandler $removeValueHandler,
@@ -438,6 +441,14 @@ final class BulkActionsController
                     $this->extractChannelCodes($payload),
                     false,
                 ),
+                // WFL-P1-05 (#2419) — transitions via the state machine;
+                // per-object authorization happens inside can() (guards),
+                // NOT via a coarse bulk permission.
+                'change_status' => $this->changeStatusHandler->handle(
+                    $session,
+                    $this->requireTransition($payload),
+                    $this->optionalComment($payload),
+                ),
                 'delete' => $this->dispatchDelete($session, $body, $targetIds),
                 'duplicate' => $this->duplicateHandler->handle($session),
                 default => throw new NotFoundHttpException(\sprintf('Bulk action "%s" not implemented.', $actionType)),
@@ -495,6 +506,45 @@ final class BulkActionsController
         }
 
         return [$editable, $locked];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function requireTransition(array $payload): string
+    {
+        $transition = $payload['transition'] ?? null;
+        if (!\is_string($transition) || !\in_array($transition, ObjectEditorialWorkflow::TRANSITIONS, true)) {
+            throw new BadRequestHttpException(\sprintf(
+                'payload.transition must be one of: %s.',
+                \implode(', ', ObjectEditorialWorkflow::TRANSITIONS),
+            ));
+        }
+
+        return $transition;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function optionalComment(array $payload): ?string
+    {
+        $comment = $payload['comment'] ?? null;
+        if (null === $comment) {
+            return null;
+        }
+        if (!\is_string($comment)) {
+            throw new BadRequestHttpException('payload.comment must be a string.');
+        }
+        $comment = \trim($comment);
+        if ('' === $comment) {
+            return null;
+        }
+        if (\mb_strlen($comment) > 2000) {
+            throw new BadRequestHttpException('payload.comment must not exceed 2000 characters.');
+        }
+
+        return $comment;
     }
 
     /**
