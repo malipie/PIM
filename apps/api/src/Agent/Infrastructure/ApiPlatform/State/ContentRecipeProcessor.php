@@ -30,8 +30,9 @@ use Symfony\Component\Uid\Uuid;
  *   - aggregate guard violations (constraints.format, source codes)
  *     surface as 422,
  *   - UNIQUE(tenant_id, code) as 409,
- *   - built-in recipes reject PATCH/DELETE with 409 pointing to the
- *     clone route — the seeded templates stay intact (ADR-0030).
+ *   - built-in recipes are a configurable BASE, not read-only fixtures:
+ *     PATCH/DELETE are allowed (operator decision, #2341-followup); the
+ *     is_built_in flag stays as a badge + the tool's default preference.
  *
  * @implements ProcessorInterface<ContentRecipeInput|ContentRecipePatchInput|ContentRecipe, ContentRecipe|null>
  */
@@ -48,10 +49,13 @@ final readonly class ContentRecipeProcessor implements ProcessorInterface
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): ?ContentRecipe
     {
         if ($operation instanceof DeleteOperationInterface) {
+            // #2341-followup (operator decision): built-in recipes are a
+            // configurable BASE, not read-only fixtures — the tenant may
+            // edit or delete them. The is_built_in flag stays as an
+            // informational badge + the tool's default-resolution
+            // preference; re-running the defaults seeder only re-creates a
+            // deleted built-in on an explicit seed.
             $recipe = $this->find($uriVariables);
-            if ($recipe->isBuiltIn()) {
-                throw new ConflictHttpException('Built-in recipes cannot be deleted — clone them and edit the copy.');
-            }
             $this->em->remove($recipe);
             $this->em->flush();
 
@@ -108,10 +112,9 @@ final readonly class ContentRecipeProcessor implements ProcessorInterface
             throw new LogicException('ContentRecipeProcessor expects ContentRecipePatchInput on Patch.');
         }
 
+        // #2341-followup (operator decision): built-in recipes are fully
+        // editable — the badge stays informational, no read-only lock.
         $recipe = $this->find($uriVariables);
-        if ($recipe->isBuiltIn()) {
-            throw new ConflictHttpException('Built-in recipes are read-only — clone them and edit the copy.');
-        }
 
         try {
             if (null !== $data->name) {

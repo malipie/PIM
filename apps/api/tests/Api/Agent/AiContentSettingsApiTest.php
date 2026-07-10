@@ -176,18 +176,22 @@ final class AiContentSettingsApiTest extends ApiTestCase
     }
 
     #[Test]
-    public function builtInRecipesAreReadOnlyAndCloneable(): void
+    public function builtInRecipesAreEditableDeletableAndCloneable(): void
     {
+        // #2341-followup (operator decision): built-in recipes are a
+        // configurable base — editable, deletable AND cloneable.
         $client = $this->authenticatedClient();
         $id = $this->seedBuiltInRecipe()->toRfc4122();
 
+        // Editable in place (no clone required).
         $patch = $client->request('PATCH', '/api/content-recipes/'.$id, [
             'headers' => ['content-type' => 'application/merge-patch+json'],
             'json' => ['name' => 'Nadpisany'],
         ]);
-        self::assertSame(409, $patch->getStatusCode());
-        self::assertSame(409, $client->request('DELETE', '/api/content-recipes/'.$id)->getStatusCode());
+        self::assertSame(200, $patch->getStatusCode());
+        self::assertSame('Nadpisany', $patch->toArray()['name']);
 
+        // Still cloneable into a non-built-in copy.
         $clone = $client->request('POST', '/api/content-recipes/'.$id.'/clone', ['json' => []]);
         self::assertSame(201, $clone->getStatusCode());
         $clonePayload = $clone->toArray();
@@ -195,11 +199,9 @@ final class AiContentSettingsApiTest extends ApiTestCase
         self::assertSame('builtin_recipe_copy', $clonePayload['code']);
         self::assertFalse($clonePayload['is_built_in']);
 
-        $editClone = $client->request('PATCH', '/api/content-recipes/'.$clonePayload['id'], [
-            'headers' => ['content-type' => 'application/merge-patch+json'],
-            'json' => ['name' => 'Kopia po edycji'],
-        ]);
-        self::assertSame(200, $editClone->getStatusCode());
+        // And deletable in place.
+        self::assertSame(204, $client->request('DELETE', '/api/content-recipes/'.$id)->getStatusCode());
+        self::assertSame(404, $client->request('GET', '/api/content-recipes/'.$id)->getStatusCode());
     }
 
     #[Test]
