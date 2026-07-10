@@ -12,6 +12,7 @@ use App\Catalog\Domain\Entity\BulkSession;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * VIEW-13 (#545) — `clear_attribute` bulk action.
@@ -20,10 +21,12 @@ use Doctrine\ORM\EntityManagerInterface;
  * for resetting a field across N products. BulkLog records `old_value`
  * for the 24h rollback path. Locked attributes (VIEW-33 / PRD §8.3)
  * skip with a warning entry. Shared lifecycle: {@see AbstractBulkHandler}.
+ * Relation attributes clear their link rows instead (#2314).
  */
 final class BulkClearAttributeHandler extends AbstractBulkHandler
 {
     private string $attrCode = '';
+    private ?Uuid $relationAttributeId = null;
 
     public function __construct(
         CatalogObjectRepositoryInterface $catalogObjects,
@@ -31,6 +34,7 @@ final class BulkClearAttributeHandler extends AbstractBulkHandler
         BulkContext $bulkContext,
         private readonly AttributeLockReader $lockReader,
         BulkReindexQueueInterface $reindexQueue,
+        private readonly BulkRelationApplier $relationApplier,
     ) {
         parent::__construct($catalogObjects, $em, $bulkContext, $reindexQueue);
     }
@@ -41,12 +45,26 @@ final class BulkClearAttributeHandler extends AbstractBulkHandler
     public function handle(BulkSession $session, string $attrCode): array
     {
         $this->attrCode = $attrCode;
+        $this->relationAttributeId = $this->relationApplier->relationAttributeId($attrCode);
 
         return $this->runBatch($session);
     }
 
     protected function processObject(CatalogObject $object, BulkSession $session, BulkCounters $counters): void
     {
+        if (null !== $this->relationAttributeId) {
+            $this->relationApplier->apply(
+                BulkRelationApplier::MODE_CLEAR,
+                $object,
+                $this->relationAttributeId,
+                [],
+                $session,
+                $counters,
+            );
+
+            return;
+        }
+
         if ($this->lockReader->isLocked($object, $this->attrCode)) {
             ++$counters->skipped;
             $this->em->persist(new BulkLog(

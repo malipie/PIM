@@ -51,6 +51,7 @@ final class BulkRollbackHandler
         private readonly EntityManagerInterface $em,
         private readonly BulkContext $bulkContext,
         private readonly BulkReindexQueueInterface $reindexQueue,
+        private readonly BulkRelationApplier $relationApplier,
     ) {
     }
 
@@ -83,6 +84,16 @@ final class BulkRollbackHandler
             $payload = $session->getActionPayload();
             $chunk = 0;
 
+            // #2314 — relation attributes were mutated through the link
+            // table, so their rollback replays the old target-id list via
+            // the relation write path instead of attributesIndexed.
+            $attrCode = \is_string($payload['attr'] ?? null) ? $payload['attr'] : null;
+            $relationAttributeId = null !== $attrCode && \in_array($action, [
+                'set_attribute', 'clear_attribute', 'append_value', 'remove_value',
+            ], true)
+                ? $this->relationApplier->relationAttributeId($attrCode)
+                : null;
+
             foreach ($logs as $log) {
                 $object = $this->catalogObjects->findById($log->getObjectId());
                 if (!$object instanceof CatalogObject) {
@@ -90,6 +101,11 @@ final class BulkRollbackHandler
                 }
 
                 $reverted = match (true) {
+                    null !== $relationAttributeId => $this->relationApplier->revertTo(
+                        $object,
+                        $relationAttributeId,
+                        $log->getOldValue(),
+                    ),
                     \in_array($action, [
                         'set_attribute',
                         'clear_attribute',
@@ -99,7 +115,7 @@ final class BulkRollbackHandler
                     ], true) => $this->revertAttributeSlot(
                         $object,
                         $log,
-                        \is_string($payload['attr'] ?? null) ? $payload['attr'] : null,
+                        $attrCode,
                     ),
                     'multi_attribute_edit' === $action => $this->revertAttributeSlot(
                         $object,

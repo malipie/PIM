@@ -1,7 +1,10 @@
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RelationCreateField } from '@/components/objects/relation-create-field';
 import { Input } from '@/components/ui/input';
+import type { AttributeMeta } from '@/features/catalog/products/components/types';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +22,7 @@ import { cn } from '@/lib/utils';
  *  - `color` → <input type=color> + hex <Input>
  *  - `select` → dropdown z `/api/attributes/{code}/options`
  *  - `multiselect` → chips picker z tej samej listy options
+ *  - `relation` → picker obiektów docelowych (#2314, reuse RelationCreateField)
  *  - typ undefined → fallback do `text`
  *
  * Wartość zwracana w `onChange` jest typowana per atrybut:
@@ -54,6 +58,80 @@ function labelOf(row: AttributeOptionRow): string {
   if (label === null || label === undefined) return row.code;
   if (typeof label === 'string') return label;
   return label.pl ?? label.en ?? Object.values(label)[0] ?? row.code;
+}
+
+interface AttributeApiRow {
+  id: string;
+  code: string;
+  label?: Record<string, string> | string | null;
+  relationTargetObjectTypeIds?: string[];
+  relationCardinality?: 'one' | 'many' | null;
+}
+
+/**
+ * #2314 — relation attributes pick target objects, not free text. Fetch the
+ * attribute's relation config (allowed target ObjectTypes + cardinality) and
+ * reuse the detail-form picker; the emitted value is a target object UUID
+ * (cardinality=one) or a UUID list (many) — exactly what the BE bulk
+ * relation lane expects.
+ */
+function BulkRelationValueInput({
+  attrCode,
+  value,
+  onChange,
+}: {
+  attrCode: string;
+  value: unknown;
+  onChange: (next: unknown) => void;
+}) {
+  const { t } = useTranslation();
+  const metaQuery = useQuery({
+    queryKey: ['attributes', 'relation-meta', attrCode],
+    staleTime: 60_000,
+    enabled: attrCode !== '',
+    queryFn: async (): Promise<AttributeMeta | null> => {
+      const res = await jsonFetch<{
+        'hydra:member'?: AttributeApiRow[];
+        member?: AttributeApiRow[];
+      }>('/api/attributes?itemsPerPage=200');
+      const rows = res['hydra:member'] ?? res.member ?? [];
+      const row = rows.find((r) => r.code === attrCode);
+      if (row === undefined) return null;
+      return {
+        id: row.id,
+        code: row.code,
+        type: 'relation',
+        label:
+          typeof row.label === 'object' && row.label !== null
+            ? row.label
+            : { pl: row.label ?? row.code },
+        is_system: false,
+        position: 0,
+        is_required_in_group: false,
+        relation_target_object_type_ids: row.relationTargetObjectTypeIds ?? [],
+        relation_cardinality: row.relationCardinality ?? 'many',
+      };
+    },
+  });
+
+  if (metaQuery.isLoading) {
+    return (
+      <p className="text-[12px] text-zinc-500">
+        {t('bulk_value.loading', { defaultValue: 'Ładuję…' })}
+      </p>
+    );
+  }
+  if (metaQuery.data == null) {
+    return (
+      <p className="text-[12px] text-zinc-500">
+        {t('bulk_value.relation_meta_missing', {
+          defaultValue: 'Nie udało się wczytać konfiguracji relacji',
+        })}
+      </p>
+    );
+  }
+
+  return <RelationCreateField attribute={metaQuery.data} value={value} onChange={onChange} />;
 }
 
 export function BulkValueInput({
@@ -94,6 +172,10 @@ export function BulkValueInput({
       cancelled = true;
     };
   }, [attrCode, isSelect]);
+
+  if (attrType === 'relation') {
+    return <BulkRelationValueInput attrCode={attrCode} value={value} onChange={onChange} />;
+  }
 
   if (attrType === 'boolean') {
     const boolValue = value === true || value === 'true';
