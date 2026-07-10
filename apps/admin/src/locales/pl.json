@@ -3947,6 +3947,20 @@
     "proposal_title": "Propozycja agenta",
     "empty_proposal": "(pusta propozycja)",
     "accept": "Akceptuj",
-    "reject": "Odrzuć"
+    "reject": "Odrzuć",
+    "bulk": {
+      "action": "Generuj treść AI",
+      "title": "Akcja zbiorcza · Generuj treść AI",
+      "count": "{{count}} produktów wybranych",
+      "mode_label": "Co wygenerować",
+      "mode_descriptions": "Opisy produktów",
+      "mode_seo": "Meta SEO",
+      "estimate_label": "Szacowany koszt",
+      "estimate": "≈{{estimate}} USD ({{count}} × ~0.012 USD za produkt, stawki modelu domyślnego)",
+      "cap": "W tej wersji jeden przebieg obsługuje do {{cap}} produktów (budżet narzędzi runu). Zawęź zaznaczenie.",
+      "approval_hint": "Propozycje trafiają do skrzynki agenta — nic nie zapisze się bez akceptacji.",
+      "start": "Generuj",
+      "started": "Generowanie wystartowało — propozycje trafią do skrzynki agenta."
+    }
   }
 }

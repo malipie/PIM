@@ -3927,6 +3927,20 @@
     "proposal_title": "Agent proposal",
     "empty_proposal": "(empty proposal)",
     "accept": "Accept",
-    "reject": "Reject"
+    "reject": "Reject",
+    "bulk": {
+      "action": "Generate AI content",
+      "title": "Bulk action · Generate AI content",
+      "count": "{{count}} products selected",
+      "mode_label": "What to generate",
+      "mode_descriptions": "Product descriptions",
+      "mode_seo": "SEO meta",
+      "estimate_label": "Estimated cost",
+      "estimate": "≈{{estimate}} USD ({{count}} × ~0.012 USD per product, default model rates)",
+      "cap": "This version handles up to {{cap}} products per run (the run tool budget). Narrow the selection.",
+      "approval_hint": "Proposals land in the agent inbox — nothing is written without your approval.",
+      "start": "Generate",
+      "started": "Generation started — proposals will land in the agent inbox."
+    }
   }
 }
