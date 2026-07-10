@@ -28,9 +28,12 @@ use Twig\Environment;
  *
  * Memory: the value source is memory-bounded (chunked ExportBuilder +
  * EntityManager::clear()), but Dompdf accumulates the whole document in memory,
- * so large catalogs are capped/chunked in CPDF-P6-04 (decision A). Image
- * embedding as a data-URI is refined in CPDF-P6-03 (decision B) — for now the
- * resolved image value is passed straight through.
+ * so renderers that answer false to {@see PdfRenderer::supportsLargeDocuments()}
+ * get a product cap ($maxInMemoryItems, env CATALOG_PDF_MAX_ITEMS — decision A,
+ * CPDF-P6-04): exceeding it raises {@see CatalogTooLargeException} with an
+ * actionable "enable Gotenberg" message instead of an OOM'd worker. Image
+ * embedding stays URL-based (decision B, CPDF-P6-03) — the resolved image
+ * value is passed straight through and the sidecar fetches it itself.
  */
 final class CatalogRenderService
 {
@@ -44,6 +47,7 @@ final class CatalogRenderService
         private readonly HtmlValueSanitizer $sanitizer,
         private readonly Environment $twig,
         private readonly PdfRenderer $renderer,
+        private readonly int $maxInMemoryItems = 500,
     ) {
     }
 
@@ -72,8 +76,16 @@ final class CatalogRenderService
         /** @var list<array<string, mixed>> $products */
         $products = [];
         $processed = 0;
+        $capped = !$this->renderer->supportsLargeDocuments();
 
         foreach ($this->values->forScope($scope) as $row) {
+            if ($capped && $processed >= $this->maxInMemoryItems) {
+                // Stop before the in-process renderer OOMs the worker
+                // (decision A, CPDF-P6-04) — the async handler records the
+                // message on the run.
+                throw CatalogTooLargeException::forCap($this->maxInMemoryItems);
+            }
+
             $slots = $this->mapper->map($mappings, $row);
 
             $product = [];

@@ -14,6 +14,8 @@ use App\Export\Catalog\Domain\Repository\CatalogRunRepositoryInterface;
 use App\Shared\Application\TenantContext;
 use Closure;
 use DateTimeImmutable;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use RuntimeException;
 use Throwable;
 
@@ -49,13 +51,17 @@ use Throwable;
  */
 final class CatalogRegenerator
 {
+    private readonly LoggerInterface $logger;
+
     public function __construct(
         private readonly CatalogRenderService $renderer,
         private readonly CatalogCacheStorage $cache,
         private readonly CatalogProfileRepositoryInterface $profiles,
         private readonly CatalogRunRepositoryInterface $runs,
         private readonly TenantContext $tenantContext,
+        ?LoggerInterface $logger = null,
     ) {
+        $this->logger = $logger ?? new NullLogger();
     }
 
     /**
@@ -98,6 +104,16 @@ final class CatalogRegenerator
             $managedRun = $this->runs->findById($run->getId()) ?? $run;
             $managedRun->markDone($result->pageCount, $result->byteSize, $result->itemCount, $durationMs);
             $this->runs->save($managedRun);
+
+            // Peak-memory telemetry (CPDF-P6-04, decision A): feeds the worker
+            // memory guardrail (§3.10 Prometheus alert) with a per-run number.
+            $this->logger->info('Catalog render completed', [
+                'run_id' => $managedRun->getId()->toRfc4122(),
+                'items' => $result->itemCount,
+                'pages' => $result->pageCount,
+                'duration_ms' => $durationMs,
+                'peak_memory_mb' => round(memory_get_peak_usage(true) / 1024 / 1024, 1),
+            ]);
 
             return $managedRun;
         } catch (CatalogCancelledException) {

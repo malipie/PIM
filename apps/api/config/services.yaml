@@ -95,6 +95,15 @@ services:
     App\Export\Contracts\PdfRenderer:
         factory: ['@App\Export\Catalog\Infrastructure\Renderer\CatalogPdfRendererFactory', 'create']
 
+    # CPDF-P6-04 (decision A) — product cap for in-process renderers (Dompdf
+    # builds the whole document in PHP memory; exceeding the cap raises a clear
+    # "enable Gotenberg" error instead of OOM-killing the worker). Benchmarked
+    # default in apps/api/.env; renderers with supportsLargeDocuments() render
+    # uncapped.
+    App\Export\Catalog\Application\CatalogRenderService:
+        arguments:
+            $maxInMemoryItems: '%env(int:CATALOG_PDF_MAX_ITEMS)%'
+
     # W2-7 / AUD-042 — single RFC 7807 contract for custom controllers.
     # `$debug` is bound to the kernel flag so the listener can keep the
     # real exception message in `detail` for 5xx locally while collapsing

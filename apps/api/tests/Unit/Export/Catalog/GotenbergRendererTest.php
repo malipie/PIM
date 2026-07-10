@@ -112,6 +112,14 @@ final class GotenbergRendererTest extends TestCase
     }
 
     #[Test]
+    public function supportsLargeDocuments(): void
+    {
+        // The sidecar renders in its own Chromium process space — the catalog
+        // product cap does not apply (CPDF-P6-04, decision A).
+        self::assertTrue($this->renderer(new MockHttpClient())->supportsLargeDocuments());
+    }
+
+    #[Test]
     public function nonPdfResponseBodyIsRejected(): void
     {
         $client = new MockHttpClient([new MockResponse('<html>not a pdf</html>')]);
