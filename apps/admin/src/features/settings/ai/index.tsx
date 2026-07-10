@@ -2,11 +2,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Cpu, KeyRound, Loader2, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PermissionGate } from '@/components/identity';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import { getAgentCost } from '@/features/agent/api';
 import { httpErrorDetail, jsonFetch } from '@/lib/http';
 import { AgentShortcuts } from './agent-shortcuts';
+import { BrandVoiceSection } from './brand-voice-section';
+import { ContentRecipesSection } from './content-recipes-section';
 
 interface AgentKeyStatus {
   agent_feature_enabled: boolean;
@@ -443,6 +446,13 @@ export function AiSettingsPage() {
               </section>
             </>
           )}
+
+          {/* AICG-P5-04/05 (#2342/#2343) — AI content configuration lives
+              next to the agent settings; visible with settings.ai_content.read. */}
+          <PermissionGate code="settings.ai_content.read">
+            <ContentRecipesSection />
+            <BrandVoiceSection />
+          </PermissionGate>
         </div>
 
         <AgentShortcuts />
