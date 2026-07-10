@@ -6,6 +6,8 @@ import { DetailLoadingState } from '@/components/catalog/detail-loading-state';
 import { DetailNotFoundState } from '@/components/catalog/detail-not-found-state';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { useContentRecipes } from '@/features/agent/hooks/use-content-recipes';
+import { AskAiProposal } from './ask-ai-proposal';
 import { ProductDetailContent } from './product-detail-content';
 import { ProductDetailHeader } from './product-detail-header';
 import type { TabKey } from './product-detail-helpers';
@@ -13,6 +15,7 @@ import { TabLoadingFallback } from './product-detail-other-tabs';
 import { ProductDetailSidebar } from './product-detail-sidebar';
 import { scopedCompleteness } from './scope';
 import type { ProductChannel, ProductDetailMode, ProductLocale } from './types';
+import { useAskAi } from './use-ask-ai';
 import { useProductDetailData } from './use-product-detail-data';
 import { useProductDetailForm } from './use-product-detail-form';
 
@@ -181,6 +184,26 @@ export function ProductDetailPage({
     backHref,
     detailPathFor,
   });
+
+  // AICG-P5-01/02 (#2339/#2340) — the "Ask AI" lifecycle: a content run
+  // per asked text field, its inline proposal, and the recipe names for
+  // the badge tooltip. Edit mode only (a fresh create has no facts yet).
+  const askAi = useAskAi({
+    productId: isEditMode ? id : undefined,
+    locale,
+    channel,
+    onAccepted: () => productQuery.refetch(),
+  });
+  const { nameById: recipeNameById } = useContentRecipes(isEditMode);
+  const askAiProposalFor = (attributeCode: string) =>
+    askAi.state !== null && askAi.state.attributeCode === attributeCode ? (
+      <AskAiProposal
+        state={askAi.state}
+        onAccept={() => void askAi.accept()}
+        onReject={() => void askAi.reject()}
+        onDismiss={askAi.dismiss}
+      />
+    ) : null;
 
   // #1149 — default the locale selection to the tenant default once the
   // enabled-locale list arrives (shipped by effective-attribute-groups),
@@ -426,6 +449,9 @@ export function ProductDetailPage({
               fieldValue={fieldValue}
               onFieldChange={setFieldValue}
               onToggleGroup={toggleGroup}
+              onAskAI={isEditMode ? askAi.start : undefined}
+              askAiProposalFor={askAiProposalFor}
+              recipeNameById={recipeNameById}
             />
           </Suspense>
 

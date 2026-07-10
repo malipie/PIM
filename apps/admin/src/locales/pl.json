@@ -1638,7 +1638,9 @@
     "source": "Źródło",
     "timestamp": "Zaktualizowano",
     "agent_tooltip": "Ustawione przez agenta",
-    "agent_run": "run"
+    "agent_run": "run",
+    "generated_from": "wygenerowano z",
+    "recipe": "przepis"
   },
   "search": {
     "placeholder": "Szukaj…",
@@ -3932,5 +3934,19 @@
       "materializing": "Przygotowuję plan zmian…",
       "committing": "Zapisuję…"
     }
+  },
+  "aicg": {
+    "ask_title": "Zapytaj AI — wygeneruj treść z atrybutów produktu",
+    "ask_aria": "Wygeneruj treść pola {{label}} z atrybutów produktu",
+    "generating": "Agent pisze propozycję…",
+    "deciding": "Zapisywanie decyzji…",
+    "needs_input": "Agent potrzebuje doprecyzowania.",
+    "open_chat": "Otwórz czat",
+    "error": "Generowanie nie powiodło się.",
+    "dismiss": "Zamknij",
+    "proposal_title": "Propozycja agenta",
+    "empty_proposal": "(pusta propozycja)",
+    "accept": "Akceptuj",
+    "reject": "Odrzuć"
   }
 }

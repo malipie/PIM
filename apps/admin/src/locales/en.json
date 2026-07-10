@@ -1626,7 +1626,9 @@
     "source": "Source",
     "timestamp": "Updated",
     "agent_tooltip": "Set by the agent",
-    "agent_run": "run"
+    "agent_run": "run",
+    "generated_from": "generated from",
+    "recipe": "recipe"
   },
   "search": {
     "placeholder": "Search…",
@@ -3912,5 +3914,19 @@
       "materializing": "Materializing the plan…",
       "committing": "Committing…"
     }
+  },
+  "aicg": {
+    "ask_title": "Ask AI — generate content from product attributes",
+    "ask_aria": "Generate the {{label}} field from product attributes",
+    "generating": "The agent is writing a proposal…",
+    "deciding": "Saving the decision…",
+    "needs_input": "The agent needs clarification.",
+    "open_chat": "Open chat",
+    "error": "Generation failed.",
+    "dismiss": "Dismiss",
+    "proposal_title": "Agent proposal",
+    "empty_proposal": "(empty proposal)",
+    "accept": "Accept",
+    "reject": "Reject"
   }
 }

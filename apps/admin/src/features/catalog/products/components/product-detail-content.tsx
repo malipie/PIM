@@ -9,6 +9,7 @@ import {
   GROUP_ICONS,
   isSpecialTab,
   resolveProvenance,
+  resolveProvenanceContentMeta,
   resolveProvenanceRunId,
   type TabKey,
 } from './product-detail-helpers';
@@ -50,6 +51,16 @@ export interface ProductDetailContentProps {
   fieldValue: (code: string) => unknown;
   onFieldChange: (code: string, value: unknown) => void;
   onToggleGroup: (groupId: string) => void;
+  /**
+   * AICG-P5-01/02 (#2339/#2340) — supplied by the page in edit mode:
+   * `onAskAI(code)` starts a content run for the field;
+   * `askAiProposalFor(code)` returns the inline proposal node rendered
+   * under the asked row (null elsewhere);
+   * `recipeNameById` feeds the badge tooltip's "przepis: <nazwa>".
+   */
+  onAskAI?: (attributeCode: string) => void;
+  askAiProposalFor?: (attributeCode: string) => import('react').ReactNode;
+  recipeNameById?: Map<string, string>;
 }
 
 /**
@@ -82,7 +93,16 @@ export function ProductDetailContent({
   fieldValue,
   onFieldChange,
   onToggleGroup,
+  onAskAI,
+  askAiProposalFor,
+  recipeNameById,
 }: ProductDetailContentProps) {
+  // AICG-P5-01 — the affordance targets editable text-family fields only.
+  const TEXT_FAMILY = new Set(['text', 'textarea', 'wysiwyg']);
+  const askAiFor = (attr: GroupMeta['attributes'][number]) =>
+    onAskAI !== undefined && isEditMode && !attr.is_system && TEXT_FAMILY.has(attr.type)
+      ? () => onAskAI(attr.code)
+      : undefined;
   // DP-08 (#2039) — conditional visibility: a member whose `visible_when`
   // rule fails against the CURRENT form values is not rendered. Reactive by
   // construction (fieldValue reads the live draft), and hidden values are
@@ -102,28 +122,40 @@ export function ProductDetailContent({
       onToggle={() => onToggleGroup(group.id)}
       isSystem={isLegacyOptionalSystemGroupCode(group.code)}
     >
-      {visibleAttributes(group).map((attr) => (
-        <AttrRow
-          key={attr.id}
-          attribute={attr}
-          value={fieldValue(attr.code)}
-          provenance={resolveProvenance(attr, product)}
-          provenanceSource={resolveProvenanceRunId(attr, product)}
-          locale={locale}
-          channel={channel}
-          isEditing={isEditing}
-          isLocked={attr.is_system}
-          onChange={(next) => onFieldChange(attr.code, next)}
-          createMode={mode === 'create'}
-          relationContextProductId={isEditMode ? id : undefined}
-          isInherited={
-            scopeStatus[attr.code]?.has_override === false &&
-            scopeStatus[attr.code]?.inherited_from != null
-          }
-          inheritedFrom={scopeStatus[attr.code]?.inherited_from ?? null}
-          requiredError={requiredErrors.has(attr.code)}
-        />
-      ))}
+      {visibleAttributes(group).map((attr) => {
+        const contentMeta = resolveProvenanceContentMeta(attr, product);
+        return (
+          <div key={attr.id}>
+            <AttrRow
+              attribute={attr}
+              value={fieldValue(attr.code)}
+              provenance={resolveProvenance(attr, product)}
+              provenanceSource={resolveProvenanceRunId(attr, product)}
+              provenanceSourceAttributes={contentMeta.sourceAttributes}
+              provenanceRecipeId={
+                contentMeta.recipeId !== null
+                  ? (recipeNameById?.get(contentMeta.recipeId) ?? contentMeta.recipeId)
+                  : null
+              }
+              onAskAI={askAiFor(attr)}
+              locale={locale}
+              channel={channel}
+              isEditing={isEditing}
+              isLocked={attr.is_system}
+              onChange={(next) => onFieldChange(attr.code, next)}
+              createMode={mode === 'create'}
+              relationContextProductId={isEditMode ? id : undefined}
+              isInherited={
+                scopeStatus[attr.code]?.has_override === false &&
+                scopeStatus[attr.code]?.inherited_from != null
+              }
+              inheritedFrom={scopeStatus[attr.code]?.inherited_from ?? null}
+              requiredError={requiredErrors.has(attr.code)}
+            />
+            {askAiProposalFor?.(attr.code)}
+          </div>
+        );
+      })}
     </AttrGroupCard>
   );
 

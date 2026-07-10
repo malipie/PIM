@@ -15,6 +15,13 @@ interface ProvenanceBadgeProps {
   provenance: Provenance;
   source?: string | null;
   occurredAt?: string | null;
+  /**
+   * AICG-P5-02 (#2340) — content-generation audit ("skąd ten fakt"):
+   * attribute codes the copy was generated from + the recipe id, read
+   * from provenance_meta (jsonb-schemas §5). Agent-only, optional.
+   */
+  sourceAttributes?: string[] | null;
+  recipeId?: string | null;
   className?: string;
 }
 
@@ -22,12 +29,22 @@ export function ProvenanceBadge({
   provenance,
   source,
   occurredAt,
+  sourceAttributes,
+  recipeId,
   className,
 }: ProvenanceBadgeProps) {
   const { t, i18n } = useTranslation();
   const tone = TONES[provenance];
   const label = t(`provenance.${provenance}`, { defaultValue: provenance });
-  const tooltip = buildTooltip(t, provenance, source, occurredAt, i18n.language);
+  const tooltip = buildTooltip(
+    t,
+    provenance,
+    source,
+    occurredAt,
+    i18n.language,
+    sourceAttributes,
+    recipeId,
+  );
 
   return (
     <span
@@ -56,12 +73,22 @@ function buildTooltip(
   source: string | null | undefined,
   occurredAt: string | null | undefined,
   locale: string,
+  sourceAttributes?: string[] | null,
+  recipeId?: string | null,
 ): string {
   const parts = [t(`provenance.${provenance}`, { defaultValue: provenance })];
   if (provenance === 'agent') {
     parts[0] = t('provenance.agent_tooltip', { defaultValue: 'Ustawione przez agenta' });
     if (source) {
       parts.push(`${t('provenance.agent_run', { defaultValue: 'run' })}: ${source}`);
+    }
+    if (sourceAttributes != null && sourceAttributes.length > 0) {
+      parts.push(
+        `${t('provenance.generated_from', { defaultValue: 'wygenerowano z' })}: ${sourceAttributes.join(', ')}`,
+      );
+    }
+    if (recipeId != null && recipeId !== '') {
+      parts.push(`${t('provenance.recipe', { defaultValue: 'przepis' })}: ${recipeId}`);
     }
   } else if (source) {
     parts.push(`${t('provenance.source', { defaultValue: 'Source' })}: ${source}`);

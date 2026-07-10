@@ -193,3 +193,29 @@ export function resolveProvenanceRunId(
   const runId = indexed?.[attr.code]?.provenance_meta?.agent_run_id;
   return typeof runId === 'string' ? runId : null;
 }
+
+/**
+ * AICG-P5-02 (#2340) — the content-generation audit from the indexed
+ * projection's provenance_meta (jsonb-schemas §5): which attribute
+ * codes the copy was generated from + the recipe id. Both optional —
+ * pre-AICG agent writes carry neither.
+ */
+export function resolveProvenanceContentMeta(
+  attr: AttributeMeta,
+  product: CatalogObjectDto | null | undefined,
+): { sourceAttributes: string[] | null; recipeId: string | null } {
+  const indexed = product?.attributesIndexed as
+    | Record<string, { provenance_meta?: { source_attributes?: unknown; recipe_id?: unknown } }>
+    | undefined;
+  const meta = indexed?.[attr.code]?.provenance_meta;
+  const rawSources = meta?.source_attributes;
+  const sourceAttributes = Array.isArray(rawSources)
+    ? rawSources.filter((code): code is string => typeof code === 'string')
+    : null;
+  const recipeId = typeof meta?.recipe_id === 'string' ? meta.recipe_id : null;
+  return {
+    sourceAttributes:
+      sourceAttributes !== null && sourceAttributes.length > 0 ? sourceAttributes : null,
+    recipeId,
+  };
+}
