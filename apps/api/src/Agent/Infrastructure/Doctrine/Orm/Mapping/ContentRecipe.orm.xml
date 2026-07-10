@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                                      https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="App\Agent\Domain\Entity\ContentRecipe" table="content_recipes">
+        <indexes>
+            <index name="idx_content_recipes_object_type" columns="tenant_id,object_type_id"/>
+        </indexes>
+        <unique-constraints>
+            <unique-constraint name="uniq_content_recipes_code" columns="tenant_id,code"/>
+        </unique-constraints>
+
+        <id name="id" type="uuid" column="id">
+            <generator strategy="NONE"/>
+        </id>
+
+        <many-to-one field="tenant" target-entity="App\Shared\Domain\Tenant">
+            <join-column name="tenant_id" referenced-column-name="id" nullable="false" on-delete="RESTRICT"/>
+        </many-to-one>
+
+        <field name="code" type="string" length="128"/>
+        <field name="name" type="string" length="255"/>
+        <field name="objectTypeId" type="uuid" column="object_type_id" nullable="true"/>
+
+        <field name="appliesTo" type="json" column="applies_to">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
+        <field name="targetAttribute" type="string" length="128" column="target_attribute"/>
+
+        <field name="sourceAttributes" type="json" column="source_attributes">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
+        <field name="constraints" type="json" column="constraints_config">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
+        <field name="toneHint" type="string" length="255" column="tone_hint" nullable="true"/>
+        <field name="brandVoiceId" type="uuid" column="brand_voice_id" nullable="true"/>
+
+        <field name="isBuiltIn" type="boolean" column="is_built_in">
+            <options>
+                <option name="default">false</option>
+            </options>
+        </field>
+
+        <field name="createdAt" type="datetime_immutable" column="created_at"/>
+        <field name="updatedAt" type="datetime_immutable" column="updated_at"/>
+    </entity>
+</doctrine-mapping>
