@@ -205,7 +205,7 @@ final readonly class DemoCatalogSeeder
             $category = new CatalogObject($type, $code);
             // ADR-015 — demo categories live in the Product tree.
             $category->scopeCategoryTo($productType);
-            $category->transitionTo(CatalogObject::STATUS_PUBLISHED);
+            $category->forceStatus(CatalogObject::STATUS_PUBLISHED);
             $category->attachToPath($path);
 
             // Closed system kind — only the intrinsic `name` (display label).
@@ -233,7 +233,7 @@ final readonly class DemoCatalogSeeder
         for ($i = 1; $i <= 10; ++$i) {
             $code = \sprintf('ASSET-%03d', $i);
             $catalogAsset = new CatalogObject($type, $code);
-            $catalogAsset->transitionTo(CatalogObject::STATUS_PUBLISHED);
+            $catalogAsset->forceStatus(CatalogObject::STATUS_PUBLISHED);
 
             $name = \sprintf('Demo image %d', $i);
 
@@ -288,7 +288,7 @@ final readonly class DemoCatalogSeeder
         for ($i = 1; $i <= self::PRODUCT_COUNT; ++$i) {
             $sku = \sprintf('DEMO-%03d', $i);
             $product = new CatalogObject($type, $sku);
-            $product->transitionTo(0 === $i % 11 ? CatalogObject::STATUS_DRAFT : CatalogObject::STATUS_PUBLISHED);
+            $product->forceStatus(0 === $i % 11 ? CatalogObject::STATUS_DRAFT : CatalogObject::STATUS_PUBLISHED);
 
             $brand = $brands[$i % \count($brands)];
             $color = $colors[$i % \count($colors)];

@@ -121,7 +121,7 @@ final class ImportObjectCreator
     private function applyState(CatalogObject $object, ?string $status, ?bool $enabled, ?array $variantAxes): void
     {
         if (null !== $status) {
-            $object->transitionTo($status);
+            $object->forceStatus($status);
         }
         if (null !== $enabled) {
             $object->changeEnabled($enabled);

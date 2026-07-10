@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace App\Catalog\Application\Command\UpdateCatalogObject;
 
 use App\Catalog\Application\ObjectAttributesUpserter;
+use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Channel\Contracts\ChannelResolverInterface;
 use App\Shared\Domain\Tenant;
+use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use Doctrine\ORM\OptimisticLockException;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Workflow\WorkflowInterface;
 
 #[AsMessageHandler]
 final readonly class UpdateCatalogObjectHandler
@@ -21,6 +25,8 @@ final readonly class UpdateCatalogObjectHandler
         private CatalogObjectRepositoryInterface $catalogObjects,
         private ObjectAttributesUpserter $attributesUpserter,
         private ChannelResolverInterface $channels,
+        #[Target(ObjectEditorialWorkflow::NAME)]
+        private WorkflowInterface $objectEditorial,
     ) {
     }
 
@@ -50,8 +56,8 @@ final readonly class UpdateCatalogObjectHandler
         if (null !== $command->enabled) {
             $object->changeEnabled($command->enabled);
         }
-        if (null !== $command->status) {
-            $object->transitionTo($command->status);
+        if (null !== $command->status && $command->status !== $object->getStatus()) {
+            $this->applyStatusTransition($object, $command->status);
         }
 
         if ($command->clearParent) {
@@ -111,5 +117,30 @@ final readonly class UpdateCatalogObjectHandler
                 channelId: $channelId,
             );
         }
+    }
+
+    /**
+     * PATCH sends a target status, not a transition name — resolve it
+     * against the `object_editorial` state machine (ADR-0029). Only
+     * transitions enabled for the current marking qualify, so topology
+     * (and, from WFL-P1-01 on, RBAC guards) is enforced on the legacy
+     * PATCH surface too.
+     */
+    private function applyStatusTransition(CatalogObject $object, string $targetStatus): void
+    {
+        foreach ($this->objectEditorial->getEnabledTransitions($object) as $transition) {
+            if (\in_array($targetStatus, $transition->getTos(), true)) {
+                $this->objectEditorial->apply($object, $transition->getName());
+
+                return;
+            }
+        }
+
+        throw new ConflictHttpException(\sprintf(
+            'Status transition "%s" -> "%s" is not allowed by the "%s" workflow.',
+            $object->getStatus(),
+            $targetStatus,
+            ObjectEditorialWorkflow::NAME,
+        ));
     }
 }

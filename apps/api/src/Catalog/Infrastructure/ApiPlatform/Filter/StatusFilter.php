@@ -11,11 +11,11 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use Doctrine\ORM\QueryBuilder;
 
 /**
- * `?status=published|draft|archived` plus `?enabled=true|false`.
+ * `?status=draft|review|published|archived` plus `?enabled=true|false`.
  *
  * Two related but distinct flags on `CatalogObject`:
- *   - `status` is the editorial state (FSM: draft → published →
- *     archived). String exact match.
+ *   - `status` is the editorial state (`object_editorial` state
+ *     machine, ADR-0029: draft → review → published → archived). String exact match.
  *   - `enabled` is the publishing kill-switch independent of status —
  *     a published row can be disabled to hide it everywhere without
  *     losing its archive history. Boolean.
@@ -33,6 +33,7 @@ final class StatusFilter implements FilterInterface
      */
     private const array ALLOWED_STATUSES = [
         CatalogObject::STATUS_DRAFT,
+        CatalogObject::STATUS_REVIEW,
         CatalogObject::STATUS_PUBLISHED,
         CatalogObject::STATUS_ARCHIVED,
     ];

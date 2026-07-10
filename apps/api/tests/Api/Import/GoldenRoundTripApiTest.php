@@ -154,7 +154,7 @@ final class GoldenRoundTripApiTest extends CatalogApiTestCase
 
         $product = new CatalogObject($objectType, 'GR-001');
         // IMP2-1.7: non-default status/enabled exercise the column round-trip.
-        $product->transitionTo('published');
+        $product->forceStatus('published');
         $product->changeEnabled(false);
         $em->persist($product);
         foreach (self::MATRIX as $code => [, $envelope]) {

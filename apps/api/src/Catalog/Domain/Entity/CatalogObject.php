@@ -55,6 +55,7 @@ use const ARRAY_FILTER_USE_BOTH;
 class CatalogObject extends AggregateRoot implements TenantScoped, Blameable
 {
     public const string STATUS_DRAFT = 'draft';
+    public const string STATUS_REVIEW = 'review';
     public const string STATUS_PUBLISHED = 'published';
     public const string STATUS_ARCHIVED = 'archived';
     private Uuid $id;
@@ -290,13 +291,26 @@ class CatalogObject extends AggregateRoot implements TenantScoped, Blameable
         return $this->status;
     }
 
-    public function transitionTo(string $status): void
+    /**
+     * Marking-store writer for the `object_editorial` state machine
+     * (ADR-0029). Called by Symfony Workflow's MethodMarkingStore on
+     * `apply()` — application code MUST NOT call this directly; go
+     * through the workflow (`can()`/`apply()`) so topology and guards
+     * are enforced. Non-editorial write paths (import/seed) use
+     * {@see forceStatus()} instead.
+     *
+     * @param array<string, mixed> $context transition context passed to
+     *                                      `Workflow::apply()` (comment, actor…) — consumed by the
+     *                                      transition-log listener (WFL-P0-04), unused here
+     */
+    public function setStatus(string $status, array $context = []): void
     {
+        unset($context);
+
         if ($this->status === $status) {
             return;
         }
 
-        $previous = $this->status;
         $this->status = $status;
         $this->touch();
 
@@ -315,7 +329,20 @@ class CatalogObject extends AggregateRoot implements TenantScoped, Blameable
                 tenantId: $this->tenant->getId(),
             ));
         }
-        unset($previous);
+    }
+
+    /**
+     * Deliberate state-machine bypass for non-editorial write paths —
+     * import/integration/seeding set status regardless of editorial
+     * state (ADR-0029 pillar 8: an integration must never get stuck on
+     * review). Editorial paths (API PATCH, transition endpoints) go
+     * through the `object_editorial` workflow instead.
+     *
+     * @internal infrastructure paths only (import, fixtures, benchmarks)
+     */
+    public function forceStatus(string $status): void
+    {
+        $this->setStatus($status);
     }
 
     /**

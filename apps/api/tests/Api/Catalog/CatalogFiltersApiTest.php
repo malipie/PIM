@@ -264,7 +264,7 @@ final class CatalogFiltersApiTest extends CatalogApiTestCase
         foreach ($codes as $code) {
             $object = new CatalogObject($type, $code);
             if (CatalogObject::STATUS_DRAFT !== $status) {
-                $object->transitionTo($status);
+                $object->forceStatus($status);
             }
             if ([] !== $attributes) {
                 $object->updateAttributeIndex($attributes);

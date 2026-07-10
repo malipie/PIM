@@ -41,7 +41,7 @@ final class DeleteOrphanedAttributeApiTest extends CatalogApiTestCase
         $attribute = new Attribute('orphan_color', ['en' => 'Orphan color'], AttributeType::Text);
         $em->persist($attribute);
         $object = new CatalogObject($productType, 'ORPH-001');
-        $object->transitionTo(CatalogObject::STATUS_PUBLISHED);
+        $object->forceStatus(CatalogObject::STATUS_PUBLISHED);
         $em->persist($object);
         $em->flush();
 
@@ -91,7 +91,7 @@ final class DeleteOrphanedAttributeApiTest extends CatalogApiTestCase
         $attribute = new Attribute('attached_color', ['en' => 'Attached color'], AttributeType::Text);
         $em->persist($attribute);
         $object = new CatalogObject($productType, 'ATT-001');
-        $object->transitionTo(CatalogObject::STATUS_PUBLISHED);
+        $object->forceStatus(CatalogObject::STATUS_PUBLISHED);
         $em->persist($object);
         $em->flush();
 
