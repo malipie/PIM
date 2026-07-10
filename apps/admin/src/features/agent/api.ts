@@ -79,6 +79,60 @@ export function startAgentRun(
   });
 }
 
+export interface ContentCostEstimate {
+  product_count: number;
+  input_tokens_per_product: number;
+  output_tokens_per_product: number;
+  est_input_tokens: number;
+  est_output_tokens: number;
+  est_cost_usd: string;
+  model: string;
+}
+
+export interface BulkGenerateContentResult {
+  run_id: string;
+  pending_change_batch_id: string;
+  product_count: number;
+  estimate: ContentCostEstimate;
+}
+
+export type BulkContentMode = 'descriptions' | 'seo';
+
+/**
+ * AICG-P6-03 (#2346) — the deterministic pre-flight estimate for a bulk
+ * content run (tokens + USD), so the modal shows the price before spending.
+ */
+export function previewContentCost(
+  productCount: number,
+  mode: BulkContentMode,
+): Promise<ContentCostEstimate> {
+  return jsonFetch<ContentCostEstimate>('/api/agent/content/cost-preview', {
+    ...JSON_OPTS,
+    method: 'POST',
+    body: { product_count: productCount, mode },
+  });
+}
+
+/**
+ * AICG-P6-03 (#2346) — the dedicated bulk path: one run whose write tool
+ * runs per product in a memory-bounded worker batch (no 10-tool-call cap).
+ */
+export function bulkGenerateContent(input: {
+  objectTypeCode: string;
+  mode: BulkContentMode;
+  selectedIds: string[];
+}): Promise<BulkGenerateContentResult> {
+  return jsonFetch<BulkGenerateContentResult>('/api/agent/content/bulk-generate', {
+    ...JSON_OPTS,
+    method: 'POST',
+    body: {
+      object_type_code: input.objectTypeCode,
+      mode: input.mode,
+      selected_ids: input.selectedIds,
+    },
+  });
+}
+
 export function getAgentRun(id: string): Promise<AgentRunDetail> {
   return jsonFetch<AgentRunDetail>(`/api/agent/runs/${id}`, JSON_OPTS);
 }

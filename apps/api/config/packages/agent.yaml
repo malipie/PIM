@@ -30,6 +30,10 @@ framework:
             # dev/prod worker already consumes; TenantAwareMessage rebinds
             # tenant + RLS GUC in the worker middlewares.
             App\Agent\Application\Run\AgentRunMessage: import
+            # AICG-P6-03 (#2346) — the dedicated bulk content path runs on
+            # the same worker queue; the handler is memory-bounded (batch
+            # of 200 + clear), so a large selection cannot OOM the worker.
+            App\Agent\Application\Content\BulkGenerateContentMessage: import
     serializer:
         mapping:
             paths:
