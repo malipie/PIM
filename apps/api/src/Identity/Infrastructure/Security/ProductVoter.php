@@ -41,6 +41,15 @@ final class ProductVoter extends AbstractPrdVoter
             'view' => 'products.view',
             'add' => 'products.add',
             'edit' => 'products.edit',
+            // WFL-P1-02 (#2416) — alias for the API Platform Patch
+            // operation attribute (`is_granted('UPDATE', object)`). The
+            // PRD §3.2 matrix always intended products.edit to gate
+            // product edits, but this voter only spoke lowercase verbs,
+            // so PRD-only principals (marketing, catalog_manager) were
+            // denied by default and the §3.8 state policy was dead code
+            // on the PATCH surface. Remaining uppercase aliases
+            // (READ/CREATE/DELETE) are audited in WFL-P6-01.
+            'UPDATE' => 'products.edit',
             'delete' => 'products.delete',
             'bulk_operations' => 'products.bulk_operations',
             'approve_pending_changes' => 'products.approve_pending_changes',

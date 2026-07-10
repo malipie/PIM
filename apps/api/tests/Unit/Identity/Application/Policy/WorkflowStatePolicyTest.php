@@ -110,8 +110,37 @@ final class WorkflowStatePolicyTest extends TestCase
             'workflow.edit_any_state',
         ]));
 
-        // PHPStan @param non-empty-string — call with a literal to satisfy.
-        self::assertFalse($policy->canEditInState($this->user(), 'review'));
+        // 'review' graduated to a real state (WFL-P1-02) — use a literal
+        // that stays outside the machine to keep the default-deny pinned.
+        self::assertFalse($policy->canEditInState($this->user(), 'limbo'));
+    }
+
+    #[Test]
+    public function reviewIsEditableForReviewersAndEditAnywhere(): void
+    {
+        $reviewer = new WorkflowStatePolicy($this->resolverWith([
+            'products.edit',
+            'workflow.edit_in_review',
+        ]));
+        self::assertTrue($reviewer->canEditInState($this->user(), WorkflowStatePolicy::STATE_REVIEW));
+
+        $editAnywhere = new WorkflowStatePolicy($this->resolverWith([
+            'workflow.edit_any_state',
+        ]));
+        self::assertTrue($editAnywhere->canEditInState($this->user(), WorkflowStatePolicy::STATE_REVIEW));
+    }
+
+    #[Test]
+    public function reviewLocksOutPlainEditors(): void
+    {
+        // WFL-P1-02 (#2416) — marketing edits drafts but not rows waiting
+        // for a decision (PRD §3.8 macierz: edit-in-review = ✗).
+        $policy = new WorkflowStatePolicy($this->resolverWith([
+            'products.edit',
+        ]));
+
+        self::assertTrue($policy->canEditInState($this->user(), WorkflowStatePolicy::STATE_DRAFT));
+        self::assertFalse($policy->canEditInState($this->user(), WorkflowStatePolicy::STATE_REVIEW));
     }
 
     private function user(): User

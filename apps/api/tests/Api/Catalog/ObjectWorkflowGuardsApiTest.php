@@ -113,18 +113,8 @@ final class ObjectWorkflowGuardsApiTest extends CatalogApiTestCase
         self::assertResponseIsSuccessful();
     }
 
-    /**
-     * Layering note: the legacy PATCH surface is gated by
-     * `is_granted('UPDATE', object)` (CatalogObjectVoter, legacy
-     * `object.write`) BEFORE the workflow guard can run — a marketing
-     * user is stopped at 403 and never reaches the state machine. That
-     * is defence in depth, not a bypass: guard parity for the PATCH
-     * path itself is pinned by the acting-user kernel test in
-     * tests/Integration/Workflow (getEnabledTransitions honours guards
-     * for whoever DOES pass the endpoint gate).
-     */
     #[Test]
-    public function patchStatusSurfaceIsGatedBeforeTheGuards(): void
+    public function patchStatusSurfaceHonoursTheSameGuards(): void
     {
         $this->createUserWithRole('marketing3@demo.localhost', 'marketing');
         $id = $this->seedProduct('WFL-G-PATCH');
@@ -134,7 +124,13 @@ final class ObjectWorkflowGuardsApiTest extends CatalogApiTestCase
             'headers' => ['content-type' => 'application/merge-patch+json'],
             'json' => ['status' => CatalogObject::STATUS_PUBLISHED],
         ]);
-        self::assertResponseStatusCodeSame(403, 'endpoint RBAC fires before the workflow guard');
+        self::assertResponseStatusCodeSame(409, 'no guard-enabled transition reaches published for marketing');
+
+        $client->request('PATCH', '/api/products/'.$id, [
+            'headers' => ['content-type' => 'application/merge-patch+json'],
+            'json' => ['status' => CatalogObject::STATUS_REVIEW],
+        ]);
+        self::assertResponseIsSuccessful();
     }
 
     /**

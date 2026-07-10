@@ -148,7 +148,8 @@ final class BulkOperationLockConflictApiTest extends CatalogApiTestCase
         $em = $this->createStub(EntityManagerInterface::class);
         $em->method('flush')->willThrowException(new RuntimeException('flush exploded mid-batch'));
 
-        $controller = new BulkEditController($objects, $tenantContext, $em, $bulkLock);
+        $statePolicy = self::getContainer()->get(\App\Identity\Contracts\Policy\WorkflowStateEditPolicyInterface::class);
+        $controller = new BulkEditController($objects, $statePolicy, $tenantContext, $em, $bulkLock);
 
         $request = new Request(
             content: json_encode([

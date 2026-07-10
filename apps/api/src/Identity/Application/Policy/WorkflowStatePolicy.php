@@ -45,6 +45,7 @@ use App\Identity\Domain\Entity\User;
 final readonly class WorkflowStatePolicy
 {
     public const string STATE_DRAFT = 'draft';
+    public const string STATE_REVIEW = 'review';
     public const string STATE_PUBLISHED = 'published';
     public const string STATE_ARCHIVED = 'archived';
 
@@ -61,6 +62,11 @@ final readonly class WorkflowStatePolicy
 
         return match ($state) {
             self::STATE_DRAFT => $permissions->has('products.edit'),
+            // WFL-P1-02 (#2416) — the review place shipped with the
+            // object_editorial state machine (ADR-0029); editable only
+            // for reviewers (edit_in_review) or the edit-anywhere grant.
+            self::STATE_REVIEW => $permissions->has('workflow.edit_in_review')
+                || $permissions->has('workflow.edit_any_state'),
             self::STATE_PUBLISHED => $permissions->has('workflow.edit_any_state'),
             self::STATE_ARCHIVED => false,
             default => false,

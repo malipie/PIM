@@ -21,6 +21,7 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Contracts\Policy\PermissionCheckerInterface;
+use App\Identity\Contracts\Policy\WorkflowStateEditPolicyInterface;
 use App\Shared\Application\BulkOperationLock;
 use App\Shared\Application\TenantContext;
 use App\Shared\Application\UserIdentityAware;
@@ -67,11 +68,33 @@ final class BulkActionsController
         'duplicate' => 'products.add',
     ];
 
+    /**
+     * WFL-P1-02 (#2416) — actions that edit entity CONTENT and therefore
+     * honour the PRD §3.8 workflow-state policy. Deliberately excluded:
+     * publish_channels/unpublish_channels (publication management, own
+     * permission), delete (products.delete governs it; archived rows are
+     * removable by design) and duplicate (creates a fresh draft).
+     *
+     * @var list<string>
+     */
+    private const array STATE_LOCKED_ACTIONS = [
+        'set_attribute',
+        'clear_attribute',
+        'append_value',
+        'remove_value',
+        'increment_numeric',
+        'multi_attribute_edit',
+        'add_category',
+        'remove_category',
+        'move_category',
+    ];
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly TenantContext $tenantContext,
         private readonly Security $security,
         private readonly PermissionCheckerInterface $permissionChecker,
+        private readonly WorkflowStateEditPolicyInterface $statePolicy,
         private readonly CatalogObjectRepositoryInterface $catalogObjects,
         private readonly BulkSetAttributeHandler $setAttributeHandler,
         private readonly BulkClearAttributeHandler $clearAttributeHandler,
@@ -320,6 +343,29 @@ final class BulkActionsController
             throw new BadRequestHttpException('target_ids exceeds 10000 hard cap.');
         }
 
+        // WFL-P1-02 (#2416) — workflow-state gate per object BEFORE any
+        // handler runs: rows in review/published/archived that the caller
+        // may not edit NOW are dropped here and reported, so no bulk
+        // actionType can become a state-policy bypass (lekcja #2129).
+        $lockedIds = [];
+        if (\in_array($actionType, self::STATE_LOCKED_ACTIONS, true)) {
+            [$targetIds, $lockedIds] = $this->partitionByStateEditability($targetIds);
+            // Early return only when the lock explains the empty set —
+            // unknown ids keep flowing to the session path (and its 409
+            // bulk-lock semantics) exactly as before.
+            if ([] === $targetIds && [] !== $lockedIds) {
+                return new JsonResponse([
+                    'action' => $actionType,
+                    'target_count' => 0,
+                    'success_count' => 0,
+                    'skipped_count' => 0,
+                    'error_count' => 0,
+                    'locked_count' => \count($lockedIds),
+                    'locked_ids' => \array_slice($lockedIds, 0, 100),
+                ], 200);
+            }
+        }
+
         // IMP2-2.9 (#1485) — every bulk write path shares the per-tenant lock with
         // imports / bulk-edit. A collision is a 409 (RFC 7807); released in finally
         // so an exception mid-batch never leaks the lock.
@@ -404,12 +450,51 @@ final class BulkActionsController
                 'success_count' => $result['success'],
                 'skipped_count' => $result['skipped'],
                 'error_count' => $result['error'],
+                'locked_count' => \count($lockedIds),
+                'locked_ids' => \array_slice($lockedIds, 0, 100),
                 'rollback_available_until' => $session->getRollbackAvailableUntil()?->format(DateTimeInterface::ATOM),
                 'completed_at' => $session->getCompletedAt()?->format(DateTimeInterface::ATOM),
             ]);
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * Splits target ids into [editable, locked] against the workflow
+     * state policy (one grouped status query, no per-row hydration).
+     * The policy is per-principal, so each distinct state is evaluated
+     * once, not per row.
+     *
+     * @param list<string> $targetIds
+     *
+     * @return array{0: list<string>, 1: list<string>}
+     */
+    private function partitionByStateEditability(array $targetIds): array
+    {
+        /** @var list<array{id: Uuid, status: string}> $rows */
+        $rows = $this->em->createQueryBuilder()
+            ->select('o.id AS id', 'o.status AS status')
+            ->from(CatalogObject::class, 'o')
+            ->where('o.id IN (:ids)')
+            ->setParameter('ids', $targetIds)
+            ->getQuery()
+            ->getArrayResult();
+
+        $editableByState = [];
+        $editable = [];
+        $locked = [];
+        foreach ($rows as $row) {
+            $state = $row['status'];
+            $editableByState[$state] ??= $this->statePolicy->canEditInState($state);
+            if ($editableByState[$state]) {
+                $editable[] = $row['id']->toRfc4122();
+            } else {
+                $locked[] = $row['id']->toRfc4122();
+            }
+        }
+
+        return [$editable, $locked];
     }
 
     /**

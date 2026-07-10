@@ -9,6 +9,7 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
+use App\Identity\Contracts\Policy\WorkflowStateEditPolicyInterface;
 use App\Shared\Application\BulkOperationLock;
 use App\Shared\Application\TenantContext;
 use DateTimeInterface;
@@ -16,6 +17,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -49,6 +51,7 @@ final class BulkEditController
 
     public function __construct(
         private readonly CatalogObjectRepositoryInterface $objects,
+        private readonly WorkflowStateEditPolicyInterface $statePolicy,
         private readonly TenantContext $tenantContext,
         private readonly EntityManagerInterface $em,
         private readonly BulkOperationLock $bulkLock,
@@ -130,6 +133,19 @@ final class BulkEditController
                     $object = $this->objects->findById($uuid);
                     if (!$object instanceof CatalogObject || ObjectKind::Product !== $object->getKind()) {
                         throw new NotFoundHttpException(\sprintf('Product %s not found.', $rawId));
+                    }
+
+                    // WFL-P1-02 (#2416) — PRD §3.8 state gate per row; the
+                    // catch below records it as a per-id error, so locked
+                    // rows are reported instead of silently written. No
+                    // auto-unpublish on bulk paths by design (a mass
+                    // unpublish-for-edit would be a surprising side effect).
+                    $state = $object->getStatus();
+                    if (!$this->statePolicy->canEditInState($state)) {
+                        throw new AccessDeniedHttpException(\sprintf(
+                            'workflow_state_locked: object is "%s" — content edits are blocked by the workflow state policy.',
+                            $state,
+                        ));
                     }
 
                     $this->applyOperation($operation, $object, $payload);
