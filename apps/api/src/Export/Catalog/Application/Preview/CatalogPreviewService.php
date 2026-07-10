@@ -62,7 +62,7 @@ final class CatalogPreviewService
     ): array {
         $limit = max(1, min($limit, self::MAX_LIMIT));
 
-        // grid raises TemplateNotAvailableException until CPDF-P6-02 — propagate
+        // Future template kinds raise TemplateNotAvailableException — propagate
         // (the controller maps it to a 422).
         $template = $this->templates->get($kind);
         $mappings = CatalogFieldMapping::listFromArray($fieldMappings);

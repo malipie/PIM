@@ -6,14 +6,13 @@ namespace App\Tests\Unit\Export\Catalog;
 
 use App\Export\Catalog\Domain\Enum\CatalogTemplateKind;
 use App\Export\Catalog\Domain\Template\CatalogTemplateCatalog;
-use App\Export\Catalog\Domain\Template\TemplateNotAvailableException;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * CPDF-P2-01 / CPDF-P6-01 — the built-in catalog template catalog exposes the
- * sheet and pricelist archetypes with their slots and default mappings, and
- * rejects kinds whose archetype is not yet shipped.
+ * CPDF-P2-01 / CPDF-P6-01 / CPDF-P6-02 — the built-in catalog template catalog
+ * exposes the sheet, pricelist and grid archetypes with their slots and
+ * default mappings.
  */
 final class CatalogTemplateCatalogTest extends TestCase
 {
@@ -48,19 +47,26 @@ final class CatalogTemplateCatalogTest extends TestCase
     }
 
     #[Test]
-    public function allReturnsSheetAndPricelist(): void
+    public function gridExposesFourSlotsWithDefaultMappings(): void
     {
-        $all = new CatalogTemplateCatalog()->all();
+        $template = new CatalogTemplateCatalog()->get(CatalogTemplateKind::Grid);
 
-        self::assertCount(2, $all);
-        self::assertSame(CatalogTemplateKind::Sheet, $all[0]->kind);
-        self::assertSame(CatalogTemplateKind::Pricelist, $all[1]->kind);
+        self::assertSame(CatalogTemplateKind::Grid, $template->kind);
+        self::assertSame('catalog/grid.html.twig', $template->twig);
+        self::assertSame(['title', 'sku', 'image', 'price'], $template->slotNames());
+        self::assertCount(4, $template->defaultMappings);
+        self::assertContains(['slot' => 'title', 'source' => 'name'], $template->defaultMappings);
+        self::assertContains(['slot' => 'image', 'source' => 'main_image'], $template->defaultMappings);
     }
 
     #[Test]
-    public function gridIsNotAvailableYet(): void
+    public function allReturnsEveryArchetype(): void
     {
-        $this->expectException(TemplateNotAvailableException::class);
-        new CatalogTemplateCatalog()->get(CatalogTemplateKind::Grid);
+        $all = new CatalogTemplateCatalog()->all();
+
+        self::assertCount(3, $all);
+        self::assertSame(CatalogTemplateKind::Sheet, $all[0]->kind);
+        self::assertSame(CatalogTemplateKind::Pricelist, $all[1]->kind);
+        self::assertSame(CatalogTemplateKind::Grid, $all[2]->kind);
     }
 }
