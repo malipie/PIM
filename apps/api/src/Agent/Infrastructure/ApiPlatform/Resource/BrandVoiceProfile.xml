@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AICG-P1-03 (#2329, ADR-0030) — BrandVoiceProfile as an API Platform
+     resource. Same voter mapping as ContentRecipe: READ/CREATE/ADMIN →
+     settings.ai_content.{read,create,admin}. Setting is_default swaps
+     the previous default transactionally in the processor; the partial
+     unique index is the DB backstop. -->
+<resources xmlns="https://api-platform.com/schema/metadata/resources-3.0"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="https://api-platform.com/schema/metadata/resources-3.0
+                               https://api-platform.com/schema/metadata/resources-3.0.xsd">
+    <resource class="App\Agent\Domain\Entity\BrandVoiceProfile" shortName="BrandVoiceProfile">
+        <normalizationContext>
+            <values>
+                <value name="groups">
+                    <values>
+                        <value>admin:read</value>
+                    </values>
+                </value>
+            </values>
+        </normalizationContext>
+        <operations>
+            <operation class="ApiPlatform\Metadata\GetCollection"
+                       uriTemplate="/brand-voice-profiles{._format}"
+                       security="is_granted('READ', 'App\\Agent\\Domain\\Entity\\BrandVoiceProfile')"/>
+            <operation class="ApiPlatform\Metadata\Get"
+                       uriTemplate="/brand-voice-profiles/{id}{._format}"
+                       security="is_granted('READ', object)"/>
+            <operation class="ApiPlatform\Metadata\Post"
+                       uriTemplate="/brand-voice-profiles{._format}"
+                       input="App\Agent\Infrastructure\ApiPlatform\Resource\BrandVoiceProfileInput"
+                       processor="App\Agent\Infrastructure\ApiPlatform\State\BrandVoiceProfileProcessor"
+                       security="is_granted('CREATE', 'App\\Agent\\Domain\\Entity\\BrandVoiceProfile')"/>
+            <operation class="ApiPlatform\Metadata\Patch"
+                       uriTemplate="/brand-voice-profiles/{id}{._format}"
+                       input="App\Agent\Infrastructure\ApiPlatform\Resource\BrandVoiceProfilePatchInput"
+                       processor="App\Agent\Infrastructure\ApiPlatform\State\BrandVoiceProfileProcessor"
+                       security="is_granted('ADMIN', object)"/>
+            <operation class="ApiPlatform\Metadata\Delete"
+                       uriTemplate="/brand-voice-profiles/{id}{._format}"
+                       processor="App\Agent\Infrastructure\ApiPlatform\State\BrandVoiceProfileProcessor"
+                       security="is_granted('ADMIN', object)"/>
+        </operations>
+    </resource>
+</resources>

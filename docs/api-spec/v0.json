@@ -1818,6 +1818,485 @@
                 "x-cortex-permission": "modeling.attribute_groups.add_edit"
             }
         },
+        "/api/brand-voice-profiles": {
+            "get": {
+                "operationId": "api_brand-voice-profiles_get_collection",
+                "tags": [
+                    "BrandVoiceProfile"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "BrandVoiceProfile collection",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "type": "object",
+                                    "description": "BrandVoiceProfile.jsonld-admin.read collection.",
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/HydraCollectionBaseSchema"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "required": [
+                                                "member"
+                                            ],
+                                            "properties": {
+                                                "member": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/BrandVoiceProfile.jsonld-admin.read"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/BrandVoiceProfile-admin.read"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    }
+                },
+                "summary": "Retrieves the collection of BrandVoiceProfile resources.",
+                "description": "Retrieves the collection of BrandVoiceProfile resources.",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "The collection page number",
+                        "required": false,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        },
+                        "style": "form",
+                        "explode": true
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "api_brand-voice-profiles_post",
+                "tags": [
+                    "BrandVoiceProfile"
+                ],
+                "responses": {
+                    "201": {
+                        "description": "BrandVoiceProfile resource created",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BrandVoiceProfile.jsonld-admin.read"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BrandVoiceProfile-admin.read"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "422": {
+                        "description": "An error occurred",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    }
+                },
+                "summary": "Creates a BrandVoiceProfile resource.",
+                "description": "Creates a BrandVoiceProfile resource.",
+                "parameters": [],
+                "requestBody": {
+                    "description": "The new BrandVoiceProfile resource",
+                    "content": {
+                        "application/ld+json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BrandVoiceProfile.BrandVoiceProfileInput"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BrandVoiceProfile.BrandVoiceProfileInput"
+                            }
+                        }
+                    },
+                    "required": true
+                }
+            }
+        },
+        "/api/brand-voice-profiles/{id}": {
+            "get": {
+                "operationId": "api_brand-voice-profiles_id_get",
+                "tags": [
+                    "BrandVoiceProfile"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "BrandVoiceProfile resource",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BrandVoiceProfile.jsonld-admin.read"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BrandVoiceProfile-admin.read"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    }
+                },
+                "summary": "Retrieves a BrandVoiceProfile resource.",
+                "description": "Retrieves a BrandVoiceProfile resource.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "BrandVoiceProfile identifier",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ]
+            },
+            "delete": {
+                "operationId": "api_brand-voice-profiles_id_delete",
+                "tags": [
+                    "BrandVoiceProfile"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "BrandVoiceProfile resource deleted"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    }
+                },
+                "summary": "Removes the BrandVoiceProfile resource.",
+                "description": "Removes the BrandVoiceProfile resource.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "BrandVoiceProfile identifier",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "api_brand-voice-profiles_id_patch",
+                "tags": [
+                    "BrandVoiceProfile"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "BrandVoiceProfile resource updated",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BrandVoiceProfile.jsonld-admin.read"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BrandVoiceProfile-admin.read"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "422": {
+                        "description": "An error occurred",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    }
+                },
+                "summary": "Updates the BrandVoiceProfile resource.",
+                "description": "Updates the BrandVoiceProfile resource.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "BrandVoiceProfile identifier",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "requestBody": {
+                    "description": "The updated BrandVoiceProfile resource",
+                    "content": {
+                        "application/merge-patch+json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BrandVoiceProfile.BrandVoiceProfilePatchInput.jsonMergePatch"
+                            }
+                        }
+                    },
+                    "required": true
+                }
+            }
+        },
         "/api/assets": {
             "get": {
                 "operationId": "assets_get_collection",
@@ -5197,6 +5676,485 @@
                         "application/merge-patch+json": {
                             "schema": {
                                 "$ref": "#/components/schemas/Connection.ConnectionPatchInput-connection.patch.jsonMergePatch"
+                            }
+                        }
+                    },
+                    "required": true
+                }
+            }
+        },
+        "/api/content-recipes": {
+            "get": {
+                "operationId": "api_content-recipes_get_collection",
+                "tags": [
+                    "ContentRecipe"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ContentRecipe collection",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "type": "object",
+                                    "description": "ContentRecipe.jsonld-admin.read collection.",
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/HydraCollectionBaseSchema"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "required": [
+                                                "member"
+                                            ],
+                                            "properties": {
+                                                "member": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/ContentRecipe.jsonld-admin.read"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ContentRecipe-admin.read"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    }
+                },
+                "summary": "Retrieves the collection of ContentRecipe resources.",
+                "description": "Retrieves the collection of ContentRecipe resources.",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "The collection page number",
+                        "required": false,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        },
+                        "style": "form",
+                        "explode": true
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "api_content-recipes_post",
+                "tags": [
+                    "ContentRecipe"
+                ],
+                "responses": {
+                    "201": {
+                        "description": "ContentRecipe resource created",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ContentRecipe.jsonld-admin.read"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ContentRecipe-admin.read"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "422": {
+                        "description": "An error occurred",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    }
+                },
+                "summary": "Creates a ContentRecipe resource.",
+                "description": "Creates a ContentRecipe resource.",
+                "parameters": [],
+                "requestBody": {
+                    "description": "The new ContentRecipe resource",
+                    "content": {
+                        "application/ld+json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ContentRecipe.ContentRecipeInput"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ContentRecipe.ContentRecipeInput"
+                            }
+                        }
+                    },
+                    "required": true
+                }
+            }
+        },
+        "/api/content-recipes/{id}": {
+            "get": {
+                "operationId": "api_content-recipes_id_get",
+                "tags": [
+                    "ContentRecipe"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ContentRecipe resource",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ContentRecipe.jsonld-admin.read"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ContentRecipe-admin.read"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    }
+                },
+                "summary": "Retrieves a ContentRecipe resource.",
+                "description": "Retrieves a ContentRecipe resource.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ContentRecipe identifier",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ]
+            },
+            "delete": {
+                "operationId": "api_content-recipes_id_delete",
+                "tags": [
+                    "ContentRecipe"
+                ],
+                "responses": {
+                    "204": {
+                        "description": "ContentRecipe resource deleted"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    }
+                },
+                "summary": "Removes the ContentRecipe resource.",
+                "description": "Removes the ContentRecipe resource.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ContentRecipe identifier",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "api_content-recipes_id_patch",
+                "tags": [
+                    "ContentRecipe"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "ContentRecipe resource updated",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ContentRecipe.jsonld-admin.read"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ContentRecipe-admin.read"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "400": {
+                        "description": "Invalid input",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "422": {
+                        "description": "An error occurred",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConstraintViolation"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/ld+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error.jsonld"
+                                }
+                            },
+                            "application/problem+json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            },
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "links": {}
+                    }
+                },
+                "summary": "Updates the ContentRecipe resource.",
+                "description": "Updates the ContentRecipe resource.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ContentRecipe identifier",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "requestBody": {
+                    "description": "The updated ContentRecipe resource",
+                    "content": {
+                        "application/merge-patch+json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ContentRecipe.ContentRecipePatchInput.jsonMergePatch"
                             }
                         }
                     },
@@ -13420,6 +14378,45 @@
                 ],
                 "x-pim-source": "custom-route",
                 "x-cortex-permission": "settings.integrations.manage"
+            }
+        },
+        "/api/content-recipes/{id}/clone": {
+            "post": {
+                "operationId": "api_content_recipes_id_clone_post",
+                "tags": [
+                    "content-recipes"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api content recipes id clone",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "settings.ai_content.create"
             }
         },
         "/api/dashboard/activity": {
@@ -21927,6 +22924,238 @@
                 ],
                 "description": "Container that groups attributes for admin UX (e.g. \"SEO\", \"Logistics\",\n\"Marketing\"). After ADR-012 a group is a first-class entity with its own\nURL / audit / icon / colour, used as the unit of attachment to ObjectType\n(global) and Category (inherited down the tree).\n\n`label` is JSONB `{pl: \"...\", en: \"...\"}` so the same row carries every\nsupported locale \u2014 no separate translations table. `description` follows\nthe same pattern.\n\nTwo attachment paths to attributes coexist during the UI-08 migration:\n - legacy 1:N `Attribute.group_id` (still alive, written by 0.3.X seeders),\n - first-class M:N via `attribute_group_attributes` junction (ADR-012).\n\n`is_system_group=true` marks groups managed by the system \u2014 not deletable,\nnot detachable from ObjectType, code is immutable. Legacy `audit` rows are\nthe exception after #1074/#1075: audit visibility is user-managed modeling\nconfiguration, not platform infrastructure."
             },
+            "BrandVoiceProfile-admin.read": {
+                "type": "object",
+                "description": "AICG-P1-02 (#2328, ADR-0030 decision B) \u2014 the tenant's brand voice:\ntone, imposed glossary, banned words and good/bad examples, injected\ninto the content-generation system prompt by AgentSystemPromptBuilder\n(AICG-P2-03). Consistency over creativity (plan \u00a75 rule 6).\n\nLives in the removable Agent BC: a voice profile is useless without\nthe LLM engine (ADR-0030 decision 3). At most one profile per tenant\ncarries `is_default` \u2014 enforced by a partial unique index; flipping\nthe default is a repository-level swap (AICG-P1-03), not an entity\nconcern.\n\nJSONB shapes (plan \u00a76.4):\n  glossary: [{term: string, use: string}]\n  examples: [{good: string, bad: string}]\n  banned_words: [string]",
+                "properties": {
+                    "id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "tone": {
+                        "type": "string"
+                    },
+                    "glossary": {
+                        "type": "array",
+                        "items": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
+                    "bannedWords": {
+                        "type": "array",
+                        "items": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
+                    "examples": {
+                        "type": "array",
+                        "items": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
+                    "createdAt": {
+                        "readOnly": true,
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "readOnly": true,
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "default": {
+                        "readOnly": true,
+                        "type": "boolean"
+                    }
+                }
+            },
+            "BrandVoiceProfile.BrandVoiceProfileInput": {
+                "type": "object",
+                "description": "AICG-P1-02 (#2328, ADR-0030 decision B) \u2014 the tenant's brand voice:\ntone, imposed glossary, banned words and good/bad examples, injected\ninto the content-generation system prompt by AgentSystemPromptBuilder\n(AICG-P2-03). Consistency over creativity (plan \u00a75 rule 6).\n\nLives in the removable Agent BC: a voice profile is useless without\nthe LLM engine (ADR-0030 decision 3). At most one profile per tenant\ncarries `is_default` \u2014 enforced by a partial unique index; flipping\nthe default is a repository-level swap (AICG-P1-03), not an entity\nconcern.\n\nJSONB shapes (plan \u00a76.4):\n  glossary: [{term: string, use: string}]\n  examples: [{good: string, bad: string}]\n  banned_words: [string]",
+                "required": [
+                    "name",
+                    "tone"
+                ],
+                "properties": {
+                    "name": {
+                        "maxLength": 255,
+                        "default": "",
+                        "type": "string"
+                    },
+                    "tone": {
+                        "default": "",
+                        "type": "string"
+                    },
+                    "glossary": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "bannedWords": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "examples": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "isDefault": {
+                        "default": false,
+                        "type": "boolean"
+                    }
+                }
+            },
+            "BrandVoiceProfile.BrandVoiceProfilePatchInput.jsonMergePatch": {
+                "type": "object",
+                "description": "AICG-P1-02 (#2328, ADR-0030 decision B) \u2014 the tenant's brand voice:\ntone, imposed glossary, banned words and good/bad examples, injected\ninto the content-generation system prompt by AgentSystemPromptBuilder\n(AICG-P2-03). Consistency over creativity (plan \u00a75 rule 6).\n\nLives in the removable Agent BC: a voice profile is useless without\nthe LLM engine (ADR-0030 decision 3). At most one profile per tenant\ncarries `is_default` \u2014 enforced by a partial unique index; flipping\nthe default is a repository-level swap (AICG-P1-03), not an entity\nconcern.\n\nJSONB shapes (plan \u00a76.4):\n  glossary: [{term: string, use: string}]\n  examples: [{good: string, bad: string}]\n  banned_words: [string]",
+                "properties": {
+                    "name": {
+                        "maxLength": 255,
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "tone": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "glossary": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "bannedWords": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "examples": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "isDefault": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    }
+                }
+            },
+            "BrandVoiceProfile.jsonld-admin.read": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/HydraItemBaseSchema"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "uuid"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "tone": {
+                                "type": "string"
+                            },
+                            "glossary": {
+                                "type": "array",
+                                "items": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "bannedWords": {
+                                "type": "array",
+                                "items": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "examples": {
+                                "type": "array",
+                                "items": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "createdAt": {
+                                "readOnly": true,
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "updatedAt": {
+                                "readOnly": true,
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "default": {
+                                "readOnly": true,
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                ],
+                "description": "AICG-P1-02 (#2328, ADR-0030 decision B) \u2014 the tenant's brand voice:\ntone, imposed glossary, banned words and good/bad examples, injected\ninto the content-generation system prompt by AgentSystemPromptBuilder\n(AICG-P2-03). Consistency over creativity (plan \u00a75 rule 6).\n\nLives in the removable Agent BC: a voice profile is useless without\nthe LLM engine (ADR-0030 decision 3). At most one profile per tenant\ncarries `is_default` \u2014 enforced by a partial unique index; flipping\nthe default is a repository-level swap (AICG-P1-03), not an entity\nconcern.\n\nJSONB shapes (plan \u00a76.4):\n  glossary: [{term: string, use: string}]\n  examples: [{good: string, bad: string}]\n  banned_words: [string]"
+            },
             "CatalogObject-admin.read": {
                 "type": "object",
                 "description": "Generic catalog object exposed via three sugar paths per ObjectKind. /api/products + /api/categories + /api/assets share the same backing table (objects), discriminator column kind, and ApiResource \u2014 the per-kind operation extraProperties.kind drives State Processor + query extensions.",
@@ -22842,6 +24071,347 @@
                     }
                 ],
                 "description": "Unprocessable entity"
+            },
+            "ContentRecipe-admin.read": {
+                "type": "object",
+                "description": "AICG-P1-01 (#2327, ADR-0030) \u2014 a reusable \"how to write\" configuration\nfor the content-generation tools (the Akeneo *AI Configurations*\ncounterpart): which attribute the generated text targets, which\nattribute codes feed the grounding as facts, and the constraints the\noutput must satisfy (format, length, SEO rules).\n\nLives in the removable Agent BC on purpose: a recipe is useless\nwithout the LLM engine, so it disappears with `rm -rf src/Agent`\n(ADR-0030 decision 3). Cross-BC references (`objectTypeId`,\n`brandVoiceId`) are bare UUIDs per ADR-0015 \u2014 never Doctrine\nassociations into Catalog/Agent aggregates.\n\n`constraints` shape (plan \u00a76.3):\n  {format: 'plain'|'html', max_len?: int, seo?: {keyword?, title_len?, meta_len?}}\nThe guard only pins the slots the engine relies on (format enum,\nsource attribute codes as strings); SEO rules stay free-form for the\nSeoRulesValidator (AICG-P4-01) \u2014 decision C: rules live in the\nrecipe, not the schema.",
+                "properties": {
+                    "id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "objectTypeId": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "appliesTo": {
+                        "readOnly": true,
+                        "description": "Optional scope narrowing (category / channel), free-form envelope.",
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
+                    "targetAttribute": {
+                        "type": "string"
+                    },
+                    "sourceAttributes": {
+                        "description": "attribute codes fed to the grounding as facts",
+                        "type": "array",
+                        "items": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
+                    "constraints": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
+                    "toneHint": {
+                        "readOnly": true,
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "brandVoiceId": {
+                        "readOnly": true,
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
+                    },
+                    "createdAt": {
+                        "readOnly": true,
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "readOnly": true,
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "builtIn": {
+                        "readOnly": true,
+                        "type": "boolean"
+                    }
+                }
+            },
+            "ContentRecipe.ContentRecipeInput": {
+                "type": "object",
+                "description": "AICG-P1-01 (#2327, ADR-0030) \u2014 a reusable \"how to write\" configuration\nfor the content-generation tools (the Akeneo *AI Configurations*\ncounterpart): which attribute the generated text targets, which\nattribute codes feed the grounding as facts, and the constraints the\noutput must satisfy (format, length, SEO rules).\n\nLives in the removable Agent BC on purpose: a recipe is useless\nwithout the LLM engine, so it disappears with `rm -rf src/Agent`\n(ADR-0030 decision 3). Cross-BC references (`objectTypeId`,\n`brandVoiceId`) are bare UUIDs per ADR-0015 \u2014 never Doctrine\nassociations into Catalog/Agent aggregates.\n\n`constraints` shape (plan \u00a76.3):\n  {format: 'plain'|'html', max_len?: int, seo?: {keyword?, title_len?, meta_len?}}\nThe guard only pins the slots the engine relies on (format enum,\nsource attribute codes as strings); SEO rules stay free-form for the\nSeoRulesValidator (AICG-P4-01) \u2014 decision C: rules live in the\nrecipe, not the schema.",
+                "required": [
+                    "code",
+                    "name",
+                    "targetAttribute"
+                ],
+                "properties": {
+                    "code": {
+                        "maxLength": 128,
+                        "pattern": "^([a-z0-9_]+)$",
+                        "default": "",
+                        "type": "string"
+                    },
+                    "name": {
+                        "maxLength": 255,
+                        "default": "",
+                        "type": "string"
+                    },
+                    "targetAttribute": {
+                        "maxLength": 128,
+                        "default": "",
+                        "type": "string"
+                    },
+                    "sourceAttributes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "constraints": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
+                    "objectTypeId": {
+                        "format": "uuid",
+                        "externalDocs": {
+                            "url": "https://schema.org/identifier"
+                        },
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "appliesTo": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
+                    "toneHint": {
+                        "maxLength": 255,
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "brandVoiceId": {
+                        "format": "uuid",
+                        "externalDocs": {
+                            "url": "https://schema.org/identifier"
+                        },
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                }
+            },
+            "ContentRecipe.ContentRecipePatchInput.jsonMergePatch": {
+                "type": "object",
+                "description": "AICG-P1-01 (#2327, ADR-0030) \u2014 a reusable \"how to write\" configuration\nfor the content-generation tools (the Akeneo *AI Configurations*\ncounterpart): which attribute the generated text targets, which\nattribute codes feed the grounding as facts, and the constraints the\noutput must satisfy (format, length, SEO rules).\n\nLives in the removable Agent BC on purpose: a recipe is useless\nwithout the LLM engine, so it disappears with `rm -rf src/Agent`\n(ADR-0030 decision 3). Cross-BC references (`objectTypeId`,\n`brandVoiceId`) are bare UUIDs per ADR-0015 \u2014 never Doctrine\nassociations into Catalog/Agent aggregates.\n\n`constraints` shape (plan \u00a76.3):\n  {format: 'plain'|'html', max_len?: int, seo?: {keyword?, title_len?, meta_len?}}\nThe guard only pins the slots the engine relies on (format enum,\nsource attribute codes as strings); SEO rules stay free-form for the\nSeoRulesValidator (AICG-P4-01) \u2014 decision C: rules live in the\nrecipe, not the schema.",
+                "properties": {
+                    "name": {
+                        "maxLength": 255,
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "targetAttribute": {
+                        "maxLength": 128,
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "sourceAttributes": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "constraints": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
+                    "objectTypeId": {
+                        "format": "uuid",
+                        "externalDocs": {
+                            "url": "https://schema.org/identifier"
+                        },
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "appliesTo": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
+                    "toneHint": {
+                        "maxLength": 255,
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "brandVoiceId": {
+                        "format": "uuid",
+                        "externalDocs": {
+                            "url": "https://schema.org/identifier"
+                        },
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                }
+            },
+            "ContentRecipe.jsonld-admin.read": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/HydraItemBaseSchema"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "uuid"
+                            },
+                            "code": {
+                                "type": "string"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "objectTypeId": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "uuid"
+                            },
+                            "appliesTo": {
+                                "readOnly": true,
+                                "description": "Optional scope narrowing (category / channel), free-form envelope.",
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "targetAttribute": {
+                                "type": "string"
+                            },
+                            "sourceAttributes": {
+                                "description": "attribute codes fed to the grounding as facts",
+                                "type": "array",
+                                "items": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "constraints": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            },
+                            "toneHint": {
+                                "readOnly": true,
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "brandVoiceId": {
+                                "readOnly": true,
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "uuid"
+                            },
+                            "createdAt": {
+                                "readOnly": true,
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "updatedAt": {
+                                "readOnly": true,
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "builtIn": {
+                                "readOnly": true,
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                ],
+                "description": "AICG-P1-01 (#2327, ADR-0030) \u2014 a reusable \"how to write\" configuration\nfor the content-generation tools (the Akeneo *AI Configurations*\ncounterpart): which attribute the generated text targets, which\nattribute codes feed the grounding as facts, and the constraints the\noutput must satisfy (format, length, SEO rules).\n\nLives in the removable Agent BC on purpose: a recipe is useless\nwithout the LLM engine, so it disappears with `rm -rf src/Agent`\n(ADR-0030 decision 3). Cross-BC references (`objectTypeId`,\n`brandVoiceId`) are bare UUIDs per ADR-0015 \u2014 never Doctrine\nassociations into Catalog/Agent aggregates.\n\n`constraints` shape (plan \u00a76.3):\n  {format: 'plain'|'html', max_len?: int, seo?: {keyword?, title_len?, meta_len?}}\nThe guard only pins the slots the engine relies on (format enum,\nsource attribute codes as strings); SEO rules stay free-form for the\nSeoRulesValidator (AICG-P4-01) \u2014 decision C: rules live in the\nrecipe, not the schema."
             },
             "Error": {
                 "type": "object",
@@ -26430,6 +28000,14 @@
         }
     ],
     "tags": [
+        {
+            "name": "BrandVoiceProfile",
+            "description": "AICG-P1-02 (#2328, ADR-0030 decision B) \u2014 the tenant's brand voice:\ntone, imposed glossary, banned words and good/bad examples, injected\ninto the content-generation system prompt by AgentSystemPromptBuilder\n(AICG-P2-03). Consistency over creativity (plan \u00a75 rule 6).\n\nLives in the removable Agent BC: a voice profile is useless without\nthe LLM engine (ADR-0030 decision 3). At most one profile per tenant\ncarries `is_default` \u2014 enforced by a partial unique index; flipping\nthe default is a repository-level swap (AICG-P1-03), not an entity\nconcern.\n\nJSONB shapes (plan \u00a76.4):\n  glossary: [{term: string, use: string}]\n  examples: [{good: string, bad: string}]\n  banned_words: [string]"
+        },
+        {
+            "name": "ContentRecipe",
+            "description": "AICG-P1-01 (#2327, ADR-0030) \u2014 a reusable \"how to write\" configuration\nfor the content-generation tools (the Akeneo *AI Configurations*\ncounterpart): which attribute the generated text targets, which\nattribute codes feed the grounding as facts, and the constraints the\noutput must satisfy (format, length, SEO rules).\n\nLives in the removable Agent BC on purpose: a recipe is useless\nwithout the LLM engine, so it disappears with `rm -rf src/Agent`\n(ADR-0030 decision 3). Cross-BC references (`objectTypeId`,\n`brandVoiceId`) are bare UUIDs per ADR-0015 \u2014 never Doctrine\nassociations into Catalog/Agent aggregates.\n\n`constraints` shape (plan \u00a76.3):\n  {format: 'plain'|'html', max_len?: int, seo?: {keyword?, title_len?, meta_len?}}\nThe guard only pins the slots the engine relies on (format enum,\nsource attribute codes as strings); SEO rules stay free-form for the\nSeoRulesValidator (AICG-P4-01) \u2014 decision C: rules live in the\nrecipe, not the schema."
+        },
         {
             "name": "Attribute",
             "description": "A single tenant-scoped attribute definition.\n\nAttributes describe the shape of `Object` values (per ADR-009 generic\nObjectType model). One attribute can be reused across many ObjectTypes\nvia the `object_type_attributes` junction (added in #32) \u2014 e.g. reusing\n`main_image` across product-like kinds. `Asset` / `Category` are closed\nsystem kinds (amends ADR-009) and attach no attributes.\n\n`validation_rules` is plain JSONB in #31. The per-type interpreter that\nenforces \"min/max for `number`\", \"max_length for `text`\", etc. lands in\n#39 (0.3.9). Until then it is a structured payload the entity stores\nverbatim \u2014 admins can already configure it; nothing on the server side\ntrips on out-of-range values yet.\n\n`group_id` FK is nullable + ON DELETE SET NULL \u2014 removing an attribute\ngroup leaves its members ungrouped rather than deleting them."

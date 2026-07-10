@@ -30,3 +30,18 @@ framework:
             # dev/prod worker already consumes; TenantAwareMessage rebinds
             # tenant + RLS GUC in the worker middlewares.
             App\Agent\Application\Run\AgentRunMessage: import
+    serializer:
+        mapping:
+            paths:
+                # AICG-P1-03 (#2329) — serialization groups of the AICG
+                # settings resources; contributed from this deletable file
+                # (NOT framework.yaml) so the removability contract holds.
+                - '%kernel.project_dir%/src/Agent/Infrastructure/Serializer'
+
+api_platform:
+    mapping:
+        paths:
+            # AICG-P1-03 (#2329) — ContentRecipe + BrandVoiceProfile as
+            # API Platform resources (ADR-0020). Path contributed here for
+            # the same removability reason as the serializer path above.
+            - '%kernel.project_dir%/src/Agent/Infrastructure/ApiPlatform/Resource'

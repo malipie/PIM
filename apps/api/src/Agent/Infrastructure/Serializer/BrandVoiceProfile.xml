@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<serializer xmlns="http://symfony.com/schema/dic/serializer-mapping"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://symfony.com/schema/dic/serializer-mapping
+                                https://symfony.com/schema/dic/serializer-mapping/serializer-mapping-1.0.xsd">
+
+    <!--
+      AICG-P1-03 (#2329) — response shape of /api/brand-voice-profiles
+      for the settings UI (AICG-P5-05).
+    -->
+    <class name="App\Agent\Domain\Entity\BrandVoiceProfile">
+        <attribute name="id">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="name">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="tone">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="glossary">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="bannedWords">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="examples">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="default">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="createdAt">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="updatedAt">
+            <group>admin:read</group>
+        </attribute>
+    </class>
+</serializer>

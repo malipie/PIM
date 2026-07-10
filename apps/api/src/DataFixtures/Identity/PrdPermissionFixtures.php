@@ -112,6 +112,12 @@ final class PrdPermissionFixtures extends Fixture
         'settings.billing.manage',
         'settings.integrations.manage',
         'settings.integration_secrets.read',
+        // AICG-P1-03 (#2329, ADR-0030) — AI content settings
+        // (ContentRecipe + BrandVoiceProfile): read = list/view,
+        // create = add + clone built-in, admin = edit/delete/set-default.
+        'settings.ai_content.read',
+        'settings.ai_content.create',
+        'settings.ai_content.admin',
 
         // API tokens
         'api_tokens.own.crud',

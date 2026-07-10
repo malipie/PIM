@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AICG-P1-03 (#2329, ADR-0030) — ContentRecipe as an API Platform
+     resource (REST + GraphQL + JSON-LD, ADR-0020). Operations are gated
+     by AiContentSettingsVoter (Agent BC — core must not import Agent
+     classes, so the voter ships with the module): READ/CREATE/ADMIN map
+     to settings.ai_content.{read,create,admin}. Built-in recipes are
+     read-only in place; cloning goes through the dedicated custom route
+     (ContentRecipeCloneController). -->
+<resources xmlns="https://api-platform.com/schema/metadata/resources-3.0"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="https://api-platform.com/schema/metadata/resources-3.0
+                               https://api-platform.com/schema/metadata/resources-3.0.xsd">
+    <resource class="App\Agent\Domain\Entity\ContentRecipe" shortName="ContentRecipe">
+        <normalizationContext>
+            <values>
+                <value name="groups">
+                    <values>
+                        <value>admin:read</value>
+                    </values>
+                </value>
+            </values>
+        </normalizationContext>
+        <operations>
+            <operation class="ApiPlatform\Metadata\GetCollection"
+                       uriTemplate="/content-recipes{._format}"
+                       security="is_granted('READ', 'App\\Agent\\Domain\\Entity\\ContentRecipe')"/>
+            <operation class="ApiPlatform\Metadata\Get"
+                       uriTemplate="/content-recipes/{id}{._format}"
+                       security="is_granted('READ', object)"/>
+            <operation class="ApiPlatform\Metadata\Post"
+                       uriTemplate="/content-recipes{._format}"
+                       input="App\Agent\Infrastructure\ApiPlatform\Resource\ContentRecipeInput"
+                       processor="App\Agent\Infrastructure\ApiPlatform\State\ContentRecipeProcessor"
+                       security="is_granted('CREATE', 'App\\Agent\\Domain\\Entity\\ContentRecipe')"/>
+            <operation class="ApiPlatform\Metadata\Patch"
+                       uriTemplate="/content-recipes/{id}{._format}"
+                       input="App\Agent\Infrastructure\ApiPlatform\Resource\ContentRecipePatchInput"
+                       processor="App\Agent\Infrastructure\ApiPlatform\State\ContentRecipeProcessor"
+                       security="is_granted('ADMIN', object)"/>
+            <operation class="ApiPlatform\Metadata\Delete"
+                       uriTemplate="/content-recipes/{id}{._format}"
+                       processor="App\Agent\Infrastructure\ApiPlatform\State\ContentRecipeProcessor"
+                       security="is_granted('ADMIN', object)"/>
+        </operations>
+    </resource>
+</resources>
