@@ -146,7 +146,7 @@ final class ModelSelectionTest extends KernelTestCase
             registry: $registry,
             executor: new GuardedToolExecutor($registry, $em),
             models: $selector,
-            prompts: new AgentSystemPromptBuilder(),
+            prompts: new AgentSystemPromptBuilder($em),
             costs: new UsageCostCalculator($selector, 3.0, 15.0, 5.0, 25.0),
             tenantConfig: $tenantConfig,
             entityManager: $em,

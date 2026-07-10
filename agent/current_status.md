@@ -13,9 +13,11 @@
 - **✅ AICG-P1-03 #2329 (PR #2448):** CRUD API Platform obu bytów + moduł RBAC `settings.ai_content` (voter w Agent BC), built-in read-only + clone route, transakcyjny swap defaultu, OpenAPI snapshot; live smoke: 201/403 viewer/clone/swap.
 - **✅ AICG-P1-04 #2330 (PR #2449):** seeder built-in przepisów + default głosu, komenda `pim:agent:seed-content-defaults`, fix RLS GUC w konsoli. **M1 KOMPLET.**
 - **✅ AICG-P2-01 #2331 (PR #2450):** `ObjectFactsPort` (seam Catalog/Contracts, read-only fakty + overlay locale/channel + sibling locales, provenance stripped) + `ContentGroundingService` (∩ recipe.sourceAttributes, zawężenie publication profile). Gotcha: port bez runtime-konsumenta inline'owany przez kontener → w kernel teście konstrukcja wprost.
-- **🔄 AICG-P2-02 #2332 (w toku, SEC):** `GroundingGate`+`GroundingVerdict` — failing-test-first w historii (commit 1 = czerwony spec, commit 2 = impl); verdict jako structured tool_result (nie wyjątek); progi z przepisu (`constraints.grounding.{min_facts,required}`, default min_facts=1).
-- **Ostatnie 3 akcje:** (1) merge #2450 + close #2331, (2) P2-02 failing-first commit + implementacja (6/6), (3) bramki zielone.
-- **Następny krok:** PR P2-02 → CI → merge → P2-03 prompt builder.
+- **✅ AICG-P2-02 #2332 (PR #2451, SEC):** `GroundingGate`+`GroundingVerdict` — failing-first w historii; verdict jako structured tool_result; progi z przepisu (`constraints.grounding.{min_facts,required}`, default min_facts=1).
+- **🔄 AICG-P2-03 #2333 (w toku):** `AgentSystemPromptBuilder` + sekcje content (recipe: target/format/max_len/SEO/tone; brand voice: ton/glosariusz/banned/przykłady; kontrakt anty-halucynacyjny) gdy run niesie `recipe_id`/`brand_voice_id`; backward compat (prompt niezmieniony bez kluczy); głos przypięty do przepisu resolwowany gdy kontekst go nie nazywa.
+- **Decyzja operatora (2026-07-10, czat):** selektywne bundle PR-ów dla par producer–consumer: P4-01+P4-02, P5-01+P5-02, P5-04+P5-05 (~3 rundy CI mniej); [SEC] i granice BC bez zmian — osobno.
+- **Ostatnie 3 akcje:** (1) merge #2451 + close #2332, (2) P2-03 builder + 8 testów (28 asercji), (3) unit suite 1546 zielone.
+- **Następny krok:** PR P2-03 → CI → merge → **M3** (P3-01 materializer).
 - **Blokery:** brak.
 
 ## 2026-07-10: ✅ EPIK CPDF ZAMKNIĘTY — Katalogi PDF (27/27 ticketów, M0–M6, #2282–#2308)
