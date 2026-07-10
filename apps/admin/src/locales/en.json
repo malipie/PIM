@@ -934,7 +934,12 @@
           "crud": "CRUD",
           "view_revoke": "View / revoke",
           "list": "List",
-          "break_glass_recovery": "Break-glass"
+          "break_glass_recovery": "Break-glass",
+          "edit_in_review": "Edit (in review)",
+          "manage_definitions": "Manage definitions",
+          "transition": {
+            "unpublish": "Unpublish (auto)"
+          }
         }
       }
     }
