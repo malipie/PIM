@@ -9,6 +9,8 @@ use App\Catalog\Domain\ObjectKind;
 use App\Search\Application\BulkCatalogObjectIndexer;
 use App\Search\Application\IndexSettingsTemplate;
 use App\Search\Infrastructure\MeilisearchClientFactory;
+use App\Shared\Domain\Repository\TenantRepositoryInterface;
+use App\Shared\Infrastructure\Console\TenantConsoleBinder;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\ProgressBar;
@@ -46,6 +48,8 @@ final class SearchReindexCommand extends Command
         private readonly BulkCatalogObjectIndexer $indexer,
         private readonly BulkContext $bulkContext,
         private readonly MeilisearchClientFactory $clientFactory,
+        private readonly TenantRepositoryInterface $tenants,
+        private readonly TenantConsoleBinder $tenantBinder,
     ) {
         parent::__construct();
     }
@@ -71,6 +75,12 @@ final class SearchReindexCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 'Delete every existing document from the targeted index before reindex. Use after pim:db:reset to drop orphans from previous tenants.',
+            )
+            ->addOption(
+                'tenant',
+                't',
+                InputOption::VALUE_REQUIRED,
+                'Tenant code to reindex. Omit to reindex every tenant (full rebuild).',
             );
     }
 
@@ -95,12 +105,37 @@ final class SearchReindexCommand extends Command
         $dryRun = true === $input->getOption('dry-run');
         $purge = true === $input->getOption('purge');
 
+        // #2466 — RLS policies read the `app.current_tenant` GUC, which no
+        // console command establishes; without binding a tenant the iterator
+        // sees zero rows (the app connects as `pim_app`). Resolve the target
+        // tenant(s) up front and reindex per tenant.
+        $tenantOption = $input->getOption('tenant');
+        if (\is_string($tenantOption) && '' !== $tenantOption) {
+            $tenant = $this->tenants->findByCode($tenantOption);
+            if (null === $tenant) {
+                $io->error(\sprintf('Tenant "%s" not found.', $tenantOption));
+
+                return Command::INVALID;
+            }
+            $targetTenants = [$tenant];
+        } else {
+            $targetTenants = $this->tenants->findAllOrderedByCode();
+            if ([] === $targetTenants) {
+                $io->error('No tenants found — run doctrine:fixtures:load first.');
+
+                return Command::INVALID;
+            }
+        }
+
         $io->title(\sprintf(
-            '%s reindex of %s into %s%s',
+            '%s reindex of %s into %s%s (%s)',
             $dryRun ? 'DRY-RUN' : 'Live',
             null === $kind ? 'every kind' : $kind->value,
             IndexSettingsTemplate::indexName(),
             $purge ? ' (purging existing docs first)' : '',
+            \is_string($tenantOption) && '' !== $tenantOption
+                ? 'tenant '.$tenantOption
+                : \sprintf('%d tenant(s)', \count($targetTenants)),
         ));
 
         if ($purge && !$dryRun) {
@@ -116,25 +151,41 @@ final class SearchReindexCommand extends Command
         // contract says "bulk = skip", and reindex IS bulk.
         $this->bulkContext->setBulk(true);
 
+        $totalCount = 0;
+        $totalBatches = 0;
+        $perTenant = [];
+
         try {
-            $stats = $this->indexer->reindex(
-                kind: $kind,
-                dryRun: $dryRun,
-                onProgress: static function (int $indexed, int $batchSize) use ($progress): void {
-                    $progress->advance($batchSize);
-                },
-            );
+            foreach ($targetTenants as $tenant) {
+                $this->tenantBinder->bind($tenant);
+                $stats = $this->indexer->reindex(
+                    kind: $kind,
+                    dryRun: $dryRun,
+                    onProgress: static function (int $indexed, int $batchSize) use ($progress): void {
+                        $progress->advance($batchSize);
+                    },
+                );
+                $totalCount += $stats['count'];
+                $totalBatches += $stats['batches'];
+                $perTenant[] = \sprintf('%s: %d row(s)', $tenant->getCode(), $stats['count']);
+            }
         } finally {
+            $this->tenantBinder->release();
             $this->bulkContext->setBulk(false);
             $progress->finish();
             $io->newLine(2);
         }
 
+        foreach ($perTenant as $line) {
+            $io->writeln('  '.$line);
+        }
+
         $io->success(\sprintf(
-            '%s — indexed %d row(s) in %d batch(es).',
+            '%s — indexed %d row(s) in %d batch(es) across %d tenant(s).',
             $dryRun ? 'Dry run complete' : 'Reindex complete',
-            $stats['count'],
-            $stats['batches'],
+            $totalCount,
+            $totalBatches,
+            \count($targetTenants),
         ));
 
         return Command::SUCCESS;
