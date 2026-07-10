@@ -9,7 +9,7 @@
 
 Ten plik to **single source of truth** backlogu. GitHub Issues są lustrem (skondensowane body + link tutaj). Tracking faktyczny w Issues + milestone'ach.
 
-**28 ticketów (27 issues + 1 [DEF]), ~210–300h.** Epik to w dużej mierze **obudzenie istniejącej, niepodłączonej warstwy**: komponent `symfony/workflow` NIE jest zainstalowany — dziś istnieje ręczny `CatalogObject::transitionTo()` bez guardów (dowolne przejście przez generyczny PATCH), uśpiony `WorkflowStatePolicy` (RBAC #674 — zaimplementowany + przetestowany, zero produkcyjnych call sites), zaseedowane permissiony `workflow.view/approve_reject/edit_any_state` oraz PRD §3.8 z gotową specyfikacją stanów `draft → review → published → archived` i macierzą per-rola. Substrat do reuse: `pending_changes` (ADR-0024), completeness per kanał/locale (read-model + porty), Mercure, placeholder „Workflow" w sidebarze (`comingSoon: true`).
+**28 ticketów (27 issues + 1 [DEF]), ~210–300h; realizacja w 20 PR-ach (7 par — §Pakiety PR).** Epik to w dużej mierze **obudzenie istniejącej, niepodłączonej warstwy**: komponent `symfony/workflow` NIE jest zainstalowany — dziś istnieje ręczny `CatalogObject::transitionTo()` bez guardów (dowolne przejście przez generyczny PATCH), uśpiony `WorkflowStatePolicy` (RBAC #674 — zaimplementowany + przetestowany, zero produkcyjnych call sites), zaseedowane permissiony `workflow.view/approve_reject/edit_any_state` oraz PRD §3.8 z gotową specyfikacją stanów `draft → review → published → archived` i macierzą per-rola. Substrat do reuse: `pending_changes` (ADR-0024), completeness per kanał/locale (read-model + porty), Mercure, placeholder „Workflow" w sidebarze (`comingSoon: true`).
 
 ---
 
@@ -75,6 +75,22 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **Bounded context:** nowy BC `apps/api/src/Workflow/` (`Workflow_Internals` + `Workflow_Contracts` w deptrac.yaml); marking (kolumna `status`) zostaje na `CatalogObject` w Catalog; enforcement edycji w Identity (voters) + Catalog (processors) przez `Workflow_Contracts`. Finalna decyzja placement w ADR-0029 (WFL-P0-01).
 - **Tytuł Issue:** angielski Conventional Commit `{feat|docs|chore|test}(scope): subject`. Body + AC po polsku. Kod po angielsku.
 
+### Pakiety PR (redukcja przebiegów CI — decyzja operatora 2026-07-10)
+
+Issues pozostają 1:1 (osobne AC, osobne zamknięcie z proofem — CLOSED MEANS CLOSED bez zmian), ale poniższe PARY ticketów realizowane są na **jednym branchu → jednym PR → jednym CI**; PR zamyka oba (`Closes #A, Closes #B`), a jego body odhacza AC per ticket osobno. **Nie rozbijać z powrotem na osobne PR-y** i nie łączyć ponad pary (pakiety 3+ żyją za długo jako branch i konfliktują z równoległymi sesjami).
+
+| Pakiet | Tickety | Issues | Uzasadnienie |
+|---|---|---|---|
+| A | WFL-P0-02 + WFL-P0-03 | #2410 + #2412 | szkielet BC/Deptrac nie ma samodzielnej wartości; silnik go wymaga |
+| B | WFL-P0-04 + WFL-P0-05 | #2413 + #2414 | tabela logu + jej jedyny konsument (endpointy, w tym GET logu) |
+| C | WFL-P1-02 + WFL-P1-03 | #2416 + #2417 | auto-unpublish = gałąź tej samej ścieżki zapisu; jedna macierz testów stan×permission |
+| D | WFL-P2-02 + WFL-P2-03 | #2421 + #2422 | BE+FE jednej funkcji → smoke end-to-end w jednym PR (SMOKE TEST RULE zyskuje) |
+| E | WFL-P3-01 + WFL-P3-05 | #2423 + #2427 | ta sama powierzchnia (product detail), wspólne E2E |
+| F | WFL-P4-01 + WFL-P4-02 | #2428 + #2429 | API tasków bez automatyki nie jest smokeable end-to-end |
+| G | WFL-P5-01 + WFL-P5-02 | #2431 + #2432 | CRUD = cienka warstwa nad walidatorem/loaderem z P5-01 |
+
+Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only → lekkie CI ~40s, łączenie nic nie daje), WFL-P1-01 ([SEC] fundament autoryzacji — czysta atrybucja przy czerwonym CI), WFL-P6-01/P6-02 (security pass vs E2E to osobne dyscypliny). Efekt: 27 issues → **20 PR-ów** (~18 pełnych przebiegów CI zamiast ~25).
+
 ### Standard DoD (każdy ticket, o ile nie zaznaczono inaczej)
 
 - [ ] Acceptance criteria spełnione.
@@ -138,7 +154,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard (docs-only — bez bramek kodowych).
 
 ### WFL-P0-02: chore(deptrac): add Workflow bounded context layers
-- **Typ:** `chore` · **Cls:** BE · **Milestone:** M0 · **Est:** 3-4h · **Risk:** medium
+- **Typ:** `chore` · **Cls:** BE · **Milestone:** M0 · **Est:** 3-4h · **Risk:** medium · **Pakiet PR: A** (jeden branch/PR z WFL-P0-03 #2412)
 - **Blocked by:** WFL-P0-01 · **Blocks:** WFL-P0-03, WFL-P0-04
 - **Po co:** ADR-0029 ustala nowy BC `src/Workflow/`. Deptrac musi egzekwować granicę CI-owo od dnia 1 — inaczej pierwszy ticket M1 przypadkiem sięgnie do `Catalog\Domain` i utrwali dług.
 - **Stan obecny:** `deptrac.yaml` ma wzorzec `X_Internals`/`X_Contracts` per BC (np. `Catalog_Internals`/`Catalog_Contracts`); `src/Workflow/` nie istnieje.
@@ -157,7 +173,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard (BE, bez endpointów/FE).
 
 ### WFL-P0-03: feat(workflow): install symfony/workflow with object_editorial state machine
-- **Typ:** `feat` · **Cls:** BE · **Milestone:** M0 · **Est:** 8-12h · **Risk:** medium
+- **Typ:** `feat` · **Cls:** BE · **Milestone:** M0 · **Est:** 8-12h · **Risk:** medium · **Pakiet PR: A** (jeden branch/PR z WFL-P0-02 #2410)
 - **Blocked by:** WFL-P0-02 · **Blocks:** WFL-P0-04, WFL-P0-05
 - **Po co:** Serce epiku — podmiana ręcznego, bez-guardowego `transitionTo()` na prawdziwą maszynę stanów z egzekwowaną topologią. Wszystko dalej (guardy, log, UI) wisi na tej definicji.
 - **Stan obecny:** `CatalogObject::transitionTo()` (linie 293-319) pozwala na dowolne przejście; `CatalogObjectPatchInput.php:31` przyjmuje `status` z `Assert\Choice(['draft','published','archived'])` — doc-comment fałszywie twierdzi, że „transitionTo() encodes the FSM"; stan `review` nie istnieje.
@@ -179,7 +195,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard.
 
 ### WFL-P0-04: feat(workflow): add workflow transition log with tenant RLS
-- **Typ:** `feat` · **Cls:** BE · **Milestone:** M0 · **Est:** 6-8h · **Risk:** low
+- **Typ:** `feat` · **Cls:** BE · **Milestone:** M0 · **Est:** 6-8h · **Risk:** low · **Pakiet PR: B** (jeden branch/PR z WFL-P0-05 #2414)
 - **Blocked by:** WFL-P0-02 · **Blocks:** WFL-P0-05, WFL-P3-05
 - **Po co:** Audytowalna historia decyzji edytorskich (kto zgłosił, kto zatwierdził, z jakim komentarzem) — wzorzec „notes & events" Pimcore'a. Zasila timeline (M3), kolejkę review (kto zgłosił) i automatykę zadań (M4). Świadomie zamiast wersjonowania produktów.
 - **Stan obecny:** brak tabeli; audit dh-auditor loguje zmiany encji, ale bez semantyki przejść/komentarzy.
@@ -198,7 +214,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard.
 
 ### WFL-P0-05: feat(workflow): add transition endpoints with guard-aware discovery
-- **Typ:** `feat` · **Cls:** BE · **Milestone:** M0 · **Est:** 10-14h · **Risk:** medium
+- **Typ:** `feat` · **Cls:** BE · **Milestone:** M0 · **Est:** 10-14h · **Risk:** medium · **Pakiet PR: B** (jeden branch/PR z WFL-P0-04 #2413)
 - **Blocked by:** WFL-P0-03, WFL-P0-04 · **Blocks:** WFL-P1-01, WFL-P3-01
 - **Po co:** API-first: przejścia to operacje proceduralne (CQRS, ADR-0012) — dedykowane trasy zamiast magii w PATCH. `GET` z listą dozwolonych przejść + powodami blokad to kontrakt, na którym FE zbuduje guard-aware przyciski (M3) bez duplikowania logiki.
 - **Stan obecny:** jedyna ścieżka = generyczny PATCH; brak discovery.
@@ -240,7 +256,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard + failing-test-first udokumentowany w PR.
 
 ### WFL-P1-02: feat(identity): enforce workflow-state edit policy on write paths
-- **Typ:** `feat` · **Cls:** BE+SEC · **Milestone:** M1 · **Est:** 8-12h · **Risk:** high · `[SEC]`
+- **Typ:** `feat` · **Cls:** BE+SEC · **Milestone:** M1 · **Est:** 8-12h · **Risk:** high · `[SEC]` · **Pakiet PR: C** (jeden branch/PR z WFL-P1-03 #2417)
 - **Blocked by:** WFL-P1-01 · **Blocks:** WFL-P1-03, WFL-P3-03
 - **Po co:** Sedno PRD §3.8: „macierz mówi czy w ogóle może edit, workflow-state mówi czy może edit TERAZ". Bez tego published można edytować mimo review-flow — cała warstwa editorial jest teatrem. To jest moment wpięcia uśpionego `WorkflowStatePolicy` (dziś 0 call sites).
 - **Stan obecny:** `WorkflowStatePolicy::canEditInState()` gotowy + testy unit; `CatalogObjectVoter`/`ObjectScopedVoter` istnieją, ale nie delegują; wszystkie ścieżki zapisu (PATCH obiektu, zapis wartości, bulk, Excel grid) ignorują stan.
@@ -261,7 +277,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard + failing-test-first.
 
 ### WFL-P1-03: feat(workflow): add auto-unpublish-for-edit with audit flag
-- **Typ:** `feat` · **Cls:** BE · **Milestone:** M1 · **Est:** 6-8h · **Risk:** medium
+- **Typ:** `feat` · **Cls:** BE · **Milestone:** M1 · **Est:** 6-8h · **Risk:** medium · **Pakiet PR: C** (jeden branch/PR z WFL-P1-02 #2416)
 - **Blocked by:** WFL-P1-02 · **Blocks:** WFL-P3-03
 - **Po co:** PRD §3.8 + open question (linia 1117, default potwierdzony: auto-transition): user z `workflow.transition.unpublish` edytujący published nie może być zmuszany do dwóch requestów — atomowo unpublish + edit w jednej transakcji, z audytowalnym śladem.
 - **Stan obecny:** `WorkflowStatePolicy::requiresAutoUnpublish()` gotowy (short-circuit do false dopóki permission niezaseedowana — P1-01 to odblokowuje).
@@ -342,7 +358,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard.
 
 ### WFL-P2-02: feat(notifications): add persistent in-app notifications API
-- **Typ:** `feat` · **Cls:** BE · **Milestone:** M2 · **Est:** 10-14h · **Risk:** medium
+- **Typ:** `feat` · **Cls:** BE · **Milestone:** M2 · **Est:** 10-14h · **Risk:** medium · **Pakiet PR: D** (jeden branch/PR z WFL-P2-03 #2422)
 - **Blocked by:** WFL-P2-01 · **Blocks:** WFL-P2-03, WFL-P4-02
 - **Po co:** Table stakes (benchmark: wszyscy poza Plytix): „zgłoszono do review" musi dotrzeć do approverów, „odrzucono z komentarzem" do autora — także gdy są offline (Mercure jest ulotny). Infra celowo generyczna (type+payload), bo M4 (zadania) i przyszłe epiki będą emitować własne typy.
 - **Stan obecny:** brak persystentnych notyfikacji; jedynie ulotne SSE.
@@ -363,7 +379,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard.
 
 ### WFL-P2-03: feat(admin): add notification bell with live updates
-- **Typ:** `feat` · **Cls:** FE · **Milestone:** M2 · **Est:** 8-10h · **Risk:** low
+- **Typ:** `feat` · **Cls:** FE · **Milestone:** M2 · **Est:** 8-10h · **Risk:** low · **Pakiet PR: D** (jeden branch/PR z WFL-P2-02 #2421)
 - **Blocked by:** WFL-P2-02 · **Blocks:** —
 - **Po co:** Notyfikacje bez UI nie istnieją. Dzwonek w top barze to standardowy pattern (benchmark: notification center wszędzie) — i pierwsza widoczna wartość epiku dla operatora.
 - **Stan obecny:** top bar bez dzwonka; brak komponentu.
@@ -385,7 +401,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 # M3 — UI: badge, przejścia, kolejka review
 
 ### WFL-P3-01: feat(admin): add status badge and transition actions on product detail
-- **Typ:** `feat` · **Cls:** FE · **Milestone:** M3 · **Est:** 10-14h · **Risk:** medium
+- **Typ:** `feat` · **Cls:** FE · **Milestone:** M3 · **Est:** 10-14h · **Risk:** medium · **Pakiet PR: E** (jeden branch/PR z WFL-P3-05 #2427)
 - **Blocked by:** WFL-P0-05, WFL-P1-01 · **Blocks:** WFL-P3-03
 - **Po co:** Stan edytorski musi być widoczny i sterowalny tam, gdzie użytkownik pracuje — na karcie produktu (wzorzec Pimcore: chip stanu + przyciski przejść w headerze). Guard-aware discovery z `GET /workflow` = przyciski zawsze zgodne z uprawnieniami, zero duplikacji logiki na FE.
 - **Stan obecny:** product detail bez kontrolki statusu (status = zwykłe pole filtru na liście); brak `StatusBadge` dla produktów.
@@ -462,7 +478,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard.
 
 ### WFL-P3-05: feat(admin): add workflow history timeline on product detail
-- **Typ:** `feat` · **Cls:** FE · **Milestone:** M3 · **Est:** 6-8h · **Risk:** low
+- **Typ:** `feat` · **Cls:** FE · **Milestone:** M3 · **Est:** 6-8h · **Risk:** low · **Pakiet PR: E** (jeden branch/PR z WFL-P3-01 #2423)
 - **Blocked by:** WFL-P0-04, WFL-P0-05 · **Blocks:** —
 - **Po co:** Audyt decyzji edytorskich dostępny tam, gdzie toczy się praca (wzorzec Notes & Events Pimcore'a): kto zgłosił, kto odrzucił i dlaczego — bez grzebania w bazie.
 - **Stan obecny:** log w `workflow_transitions` + endpoint cursor (P0-05); brak UI.
@@ -481,7 +497,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 # M4 — Zadania (workflow tasks)
 
 ### WFL-P4-01: feat(workflow): add workflow tasks entity and API
-- **Typ:** `feat` · **Cls:** BE · **Milestone:** M4 · **Est:** 10-14h · **Risk:** medium
+- **Typ:** `feat` · **Cls:** BE · **Milestone:** M4 · **Est:** 10-14h · **Risk:** medium · **Pakiet PR: F** (jeden branch/PR z WFL-P4-02 #2429)
 - **Blocked by:** WFL-P0-04 · **Blocks:** WFL-P4-02, WFL-P4-03
 - **Po co:** Przewaga nad Pimcore i esencja Akeneo/inRiver: praca ma trafiać DO ludzi (assignment + due date + inbox), a nie czekać aż ktoś sam znajdzie obiekty w stanie X. Encja + API najpierw, automatyka i UI osobno.
 - **Stan obecny:** brak modelu zadań; PRD §3.7: „Workflow tasks — visible dla wszystkich z permission (workflow jest kolaboracyjne)" — bez ownership semantics.
@@ -499,7 +515,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard.
 
 ### WFL-P4-02: feat(workflow): automate task lifecycle on transitions
-- **Typ:** `feat` · **Cls:** BE · **Milestone:** M4 · **Est:** 6-10h · **Risk:** medium
+- **Typ:** `feat` · **Cls:** BE · **Milestone:** M4 · **Est:** 6-10h · **Risk:** medium · **Pakiet PR: F** (jeden branch/PR z WFL-P4-01 #2428)
 - **Blocked by:** WFL-P4-01, WFL-P2-02 · **Blocks:** WFL-P4-03
 - **Po co:** Zadania tworzone ręcznie nikt nie będzie tworzył — wartość jest w automatyce (wzorzec Akeneo: krok workflow = task; inRiver: assignment przy trigger). Pętla: submit tworzy pracę, decyzja ją domyka, reject oddaje autorowi.
 - **Stan obecny:** eventy przejść (P2-01), taski (P4-01), notyfikacje (P2-02) — do spięcia.
@@ -553,7 +569,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 > **Uwaga scope:** M0–M4 dostarczają pełny, spójny produkt na JEDNEJ seedowanej definicji. M5 realizuje PRD-owe `manage_workflow_definitions` (builder stanów/przejść per tenant) za feature flagiem `workflow_custom_definitions` (default OFF). Jeśli priorytety się zmienią, M5 wycina się w całości do Fazy 2 bez ruszania M0–M4 — plan projektu i tak rezerwuje tam „customowe workflow per tenant".
 
 ### WFL-P5-01: feat(workflow): add database-driven workflow definitions with registry loader
-- **Typ:** `feat` · **Cls:** BE · **Milestone:** M5 · **Est:** 12-16h · **Risk:** high · `[PM]`
+- **Typ:** `feat` · **Cls:** BE · **Milestone:** M5 · **Est:** 12-16h · **Risk:** high · `[PM]` · **Pakiet PR: G** (jeden branch/PR z WFL-P5-02 #2432)
 - **Blocked by:** WFL-P1-01 · **Blocks:** WFL-P5-02, WFL-P5-03
 - **Po co:** Lekcja Pimcore (guardy w configu = deploy na każdą zmianę reguł, visual designer = płatny dodatek): definicje w DB per tenant to nasz wyróżnik w multi-tenant SaaS. Runtime loader to najtrudniejszy technicznie kawałek epiku — stąd [PM].
 - **Stan obecny:** definicja `object_editorial` statycznie w YAML (P0-03).
@@ -575,7 +591,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **DoD:** standard.
 
 ### WFL-P5-02: feat(workflow): add workflow definitions CRUD API
-- **Typ:** `feat` · **Cls:** BE · **Milestone:** M5 · **Est:** 6-8h · **Risk:** low
+- **Typ:** `feat` · **Cls:** BE · **Milestone:** M5 · **Est:** 6-8h · **Risk:** low · **Pakiet PR: G** (jeden branch/PR z WFL-P5-01 #2431)
 - **Blocked by:** WFL-P5-01 · **Blocks:** WFL-P5-03
 - **Po co:** API-first — builder UI (P5-03) i przyszli integratorzy dostają ten sam kontrakt.
 - **Zakres:**
