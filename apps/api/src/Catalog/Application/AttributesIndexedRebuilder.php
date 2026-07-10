@@ -97,7 +97,20 @@ final readonly class AttributesIndexedRebuilder
         $slot['provenance'] = $value->getProvenance()->value;
         $meta = $value->getProvenanceMeta();
         if (isset($meta['agent_run_id']) && \is_string($meta['agent_run_id'])) {
-            $slot['provenance_meta'] = ['agent_run_id' => $meta['agent_run_id']];
+            // AICG-P0-02 (#2326) — content-generation audit fields ride along
+            // when present; both optional, absent for pre-AICG rows. Malformed
+            // shapes are dropped, never propagated (jsonb-schemas rule #1).
+            $projected = ['agent_run_id' => $meta['agent_run_id']];
+            if (isset($meta['recipe_id']) && \is_string($meta['recipe_id'])) {
+                $projected['recipe_id'] = $meta['recipe_id'];
+            }
+            if (isset($meta['source_attributes']) && \is_array($meta['source_attributes'])) {
+                $codes = array_values(array_filter($meta['source_attributes'], \is_string(...)));
+                if ([] !== $codes) {
+                    $projected['source_attributes'] = $codes;
+                }
+            }
+            $slot['provenance_meta'] = $projected;
         }
 
         return $slot;
