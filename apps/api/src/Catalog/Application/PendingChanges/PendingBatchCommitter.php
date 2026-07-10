@@ -21,6 +21,7 @@ use App\Catalog\Domain\Entity\BulkLog;
 use App\Catalog\Domain\Entity\BulkSession;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Provenance;
+use App\Channel\Contracts\ChannelResolverInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use Doctrine\DBAL\ArrayParameterType;
@@ -52,8 +53,13 @@ use const JSON_THROW_ON_ERROR;
  *     the multi_attribute_edit action shape, so the existing 24h
  *     rollback path (BulkRollbackHandler) can replay old values (P3-04).
  *
- * MVP: all-or-nothing (no partial accept), global values only — the
- * same basis P3-01 materialized.
+ * MVP: all-or-nothing (no partial accept).
+ *
+ * AICG-P3-01 (#2334) — value rows carry their scope: a pending change
+ * materialized with scope_locale / scope_channel commits to that exact
+ * ObjectValue row (BatchValueWriter routes through the same
+ * localizable/scopable rules as manual edits). Bulk-edit batches keep
+ * materializing global rows, so their behaviour is unchanged.
  */
 final readonly class PendingBatchCommitter implements PendingBatchCommitPort
 {
@@ -70,6 +76,7 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
         private BulkAddCategoryHandler $addCategories,
         private BulkRemoveCategoryHandler $removeCategories,
         private BulkMoveCategoryHandler $moveCategories,
+        private ChannelResolverInterface $channelResolver,
     ) {
     }
 
@@ -166,6 +173,17 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
         }
     }
 
+    /**
+     * AICG-P3-01 — scoped proposals persist the channel CODE (bare
+     * cross-BC data, ADR-0015); the write path needs the id. Resolved at
+     * commit time so a channel deleted between materialize and approve
+     * surfaces as an issue, not a broken row.
+     */
+    private function resolveChannelId(string $code, string $tenantId): ?Uuid
+    {
+        return $this->channelResolver->resolveId($code, $this->managedTenant($tenantId));
+    }
+
     private function managedTenant(string $tenantId): Tenant
     {
         $tenant = $this->entityManager->getReference(Tenant::class, Uuid::fromString($tenantId));
@@ -184,7 +202,7 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
      * status=accepted rows commit — a race that rejected/expired part of
      * the batch between accept() and here cannot leak rows in.
      *
-     * @return array{0: array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>}>>, 1: ?array{operation: string, categoryIds: list<string>, objectIds: list<string>}}
+     * @return array{0: array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>, locale: ?string, channel: ?string}>>, 1: ?array{operation: string, categoryIds: list<string>, objectIds: list<string>}}
      */
     private function collectAcceptedChanges(Uuid $batchId): array
     {
@@ -201,6 +219,9 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
                     'code' => $view->attributeCode,
                     'before' => $view->before,
                     'after' => $view->after,
+                    // AICG-P3-01 — scoped proposals commit to their exact row.
+                    'locale' => $view->scopeLocale,
+                    'channel' => $view->scopeChannel,
                 ];
                 continue;
             }
@@ -276,8 +297,8 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
     }
 
     /**
-     * @param array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>}>> $perObject
-     * @param array<string, mixed>                                                                                 $provenanceMeta
+     * @param array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>, locale: ?string, channel: ?string}>> $perObject
+     * @param array<string, mixed>                                                                                                                    $provenanceMeta
      *
      * @return array{0: int, 1: int, 2: int, 3: list<array{objectId: string, attributeCode: string, message: string}>}
      */
@@ -314,11 +335,20 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
                         $issues[] = ['objectId' => $objectId, 'attributeCode' => $change['code'], 'message' => 'Attribute no longer exists.'];
                         continue;
                     }
+                    $channelCode = $change['channel'] ?? null;
+                    $channelId = null;
+                    if (\is_string($channelCode) && '' !== $channelCode) {
+                        $channelId = $this->resolveChannelId($channelCode, $tenantId);
+                        if (null === $channelId) {
+                            $issues[] = ['objectId' => $objectId, 'attributeCode' => $change['code'], 'message' => \sprintf('Channel "%s" no longer exists.', $channelCode)];
+                            continue;
+                        }
+                    }
                     $writes[] = [
                         'attribute' => $attribute,
                         'envelope' => $change['after'],
-                        'locale' => null,
-                        'channelId' => null,
+                        'locale' => \is_string($change['locale'] ?? null) ? $change['locale'] : null,
+                        'channelId' => $channelId,
                     ];
                 }
 
@@ -394,8 +424,8 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
     }
 
     /**
-     * @param array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>}>> $perObject
-     * @param list<string>                                                                                         $chunkIds
+     * @param array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>, locale: ?string, channel: ?string}>> $perObject
+     * @param list<string>                                                                                                                            $chunkIds
      *
      * @return array<string, Attribute> code => attribute
      */
