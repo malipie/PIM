@@ -8,6 +8,7 @@ use App\Catalog\Domain\ObjectKind;
 use App\Shared\Application\TenantScoped;
 use App\Shared\Domain\Tenant;
 use DateTimeImmutable;
+use InvalidArgumentException;
 use LogicException;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -74,6 +75,17 @@ class ObjectType implements TenantScoped
      * @var list<array<string, mixed>>
      */
     private array $validationRules = [];
+
+    /**
+     * WFL-P1-04 (#2418) — completeness gate on publish/approve
+     * transitions (ADR-0029 pillar 6). NULL = gate off (default).
+     * Shape (docs/api/jsonb-schemas.md §6): {enabled: bool,
+     * min_completeness_pct: int 0-100, scope: 'global'|'per_channel',
+     * channels?: list<string>}.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $workflowPublishGate = null;
     private ?Attribute $labelAttribute = null;
     private ?Attribute $imageAttribute = null;
 
@@ -314,6 +326,56 @@ class ObjectType implements TenantScoped
     public function updateValidationRules(array $rules): void
     {
         $this->validationRules = $rules;
+        $this->touch();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getWorkflowPublishGate(): ?array
+    {
+        return $this->workflowPublishGate;
+    }
+
+    /**
+     * @param array<string, mixed>|null $gate
+     *
+     * @throws InvalidArgumentException on a malformed gate payload
+     */
+    public function setWorkflowPublishGate(?array $gate): void
+    {
+        if (null !== $gate) {
+            if (!\is_bool($gate['enabled'] ?? null)) {
+                throw new InvalidArgumentException('workflowPublishGate.enabled must be a boolean.');
+            }
+            $minPct = $gate['min_completeness_pct'] ?? null;
+            if (!\is_int($minPct) || $minPct < 0 || $minPct > 100) {
+                throw new InvalidArgumentException('workflowPublishGate.min_completeness_pct must be an integer 0-100.');
+            }
+            $scope = $gate['scope'] ?? 'global';
+            if (!\in_array($scope, ['global', 'per_channel'], true)) {
+                throw new InvalidArgumentException('workflowPublishGate.scope must be "global" or "per_channel".');
+            }
+            if ('per_channel' === $scope) {
+                $channels = $gate['channels'] ?? null;
+                if (!\is_array($channels) || [] === $channels) {
+                    throw new InvalidArgumentException('workflowPublishGate.channels must be a non-empty list for per_channel scope.');
+                }
+                foreach ($channels as $channel) {
+                    if (!\is_string($channel) || '' === \trim($channel)) {
+                        throw new InvalidArgumentException('workflowPublishGate.channels entries must be non-empty strings.');
+                    }
+                }
+            }
+            $known = ['enabled', 'min_completeness_pct', 'scope', 'channels'];
+            foreach (\array_keys($gate) as $key) {
+                if (!\in_array($key, $known, true)) {
+                    throw new InvalidArgumentException(\sprintf('workflowPublishGate: unknown key "%s".', $key));
+                }
+            }
+        }
+
+        $this->workflowPublishGate = $gate;
         $this->touch();
     }
 

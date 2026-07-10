@@ -76,6 +76,8 @@ final class UpdateObjectTypeController
                 exposeToMainMenu: $this->boolOrNull($body['exposeToMainMenu'] ?? null),
                 isCategorizable: $this->boolOrNull($body['isCategorizable'] ?? null),
                 hasMultimedia: $this->boolOrNull($body['hasMultimedia'] ?? null),
+                updateWorkflowPublishGate: \array_key_exists('workflowPublishGate', $body),
+                workflowPublishGate: $this->gateOrNull($body['workflowPublishGate'] ?? null),
             );
         } catch (BuiltInObjectTypeException $e) {
             throw new HttpException(Response::HTTP_FORBIDDEN, $e->getMessage(), $e);
@@ -97,11 +99,38 @@ final class UpdateObjectTypeController
             'allowedParentTypeIds' => $objectType->getAllowedParentTypeIds(),
             'completenessRules' => $objectType->getCompletenessRules(),
             'validationRules' => $objectType->getValidationRules(),
+            'workflowPublishGate' => $objectType->getWorkflowPublishGate(),
             'exposeToMainMenu' => $objectType->isExposedToMainMenu(),
             'isCategorizable' => $objectType->isCategorizable(),
             'hasMultimedia' => $objectType->hasMultimedia(),
             'schemaVersion' => $objectType->getSchemaVersion(),
         ]);
+    }
+
+    /**
+     * Shape is validated in {@see \App\Catalog\Domain\Entity\ObjectType::setWorkflowPublishGate()}
+     * (thrown InvalidArgumentException surfaces as 422 via the catch above)
+     * — here only the JSON type is asserted.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function gateOrNull(mixed $raw): ?array
+    {
+        if (null === $raw) {
+            return null;
+        }
+        if (!\is_array($raw)) {
+            throw new BadRequestHttpException('workflowPublishGate must be an object or null.');
+        }
+        $clean = [];
+        foreach ($raw as $key => $value) {
+            if (!\is_string($key)) {
+                throw new BadRequestHttpException('workflowPublishGate keys must be strings.');
+            }
+            $clean[$key] = $value;
+        }
+
+        return $clean;
     }
 
     /**
