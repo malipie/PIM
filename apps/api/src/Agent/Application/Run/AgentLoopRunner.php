@@ -162,6 +162,19 @@ final readonly class AgentLoopRunner
                     $outcome = $this->executor->execute($run, $toolUse['name'], $input, $context);
                     ++$toolCallCount;
 
+                    // AICG-P3-02 (#2335) — agent-native tools make a nested
+                    // LLM call and report its usage as `llm_usage`; add it
+                    // to the run's counters so the 8.5 budgets and the
+                    // per-run token limit see every generated token.
+                    $llmUsage = $outcome['content']['llm_usage'] ?? null;
+                    if (\is_array($llmUsage)) {
+                        $run->addUsage(
+                            \is_int($llmUsage['input_tokens'] ?? null) ? $llmUsage['input_tokens'] : 0,
+                            \is_int($llmUsage['output_tokens'] ?? null) ? $llmUsage['output_tokens'] : 0,
+                            \is_string($llmUsage['cost_usd'] ?? null) ? $llmUsage['cost_usd'] : '0',
+                        );
+                    }
+
                     $toolResults[] = [
                         'type' => 'tool_result',
                         'toolUseID' => $toolUse['id'],
