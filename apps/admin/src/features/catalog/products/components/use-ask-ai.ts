@@ -41,6 +41,11 @@ export function useAskAi({ productId, locale, channel, onAccepted }: UseAskAiArg
   const [active, setActive] = useState<{ attributeCode: string; runId: string } | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [deciding, setDeciding] = useState(false);
+  // #2341-followup — the accepted value is committed + refetched, but the
+  // uncontrolled rich-text editor keeps its stale (often empty) content
+  // until it remounts. Bumping this per-field nonce on accept forces the
+  // answered field to remount and re-read the fresh value — no page reload.
+  const [answered, setAnswered] = useState<{ code: string; nonce: number } | null>(null);
 
   const runQuery = useQuery({
     queryKey: ['aicg-ask-run', active?.runId],
@@ -91,11 +96,13 @@ export function useAskAi({ productId, locale, channel, onAccepted }: UseAskAiArg
     if (active === null) {
       return;
     }
+    const acceptedCode = active.attributeCode;
     setDeciding(true);
     try {
       await approveAgentRun(active.runId);
       await onAccepted();
       setActive(null);
+      setAnswered((prev) => ({ code: acceptedCode, nonce: (prev?.nonce ?? 0) + 1 }));
     } finally {
       setDeciding(false);
     }
@@ -146,5 +153,13 @@ export function useAskAi({ productId, locale, channel, onAccepted }: UseAskAiArg
     };
   }
 
-  return { state, startError, start, accept, reject, dismiss };
+  // Remount key for a field: non-zero only for the attribute whose Ask AI
+  // proposal was just accepted, so exactly that field re-reads the value.
+  const fieldVersion = useCallback(
+    (attributeCode: string): number =>
+      answered !== null && answered.code === attributeCode ? answered.nonce : 0,
+    [answered],
+  );
+
+  return { state, startError, start, accept, reject, dismiss, fieldVersion };
 }

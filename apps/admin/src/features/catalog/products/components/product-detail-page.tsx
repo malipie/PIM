@@ -452,6 +452,7 @@ export function ProductDetailPage({
               onAskAI={isEditMode ? askAi.start : undefined}
               askAiProposalFor={askAiProposalFor}
               recipeNameById={recipeNameById}
+              fieldVersion={askAi.fieldVersion}
             />
           </Suspense>
 
