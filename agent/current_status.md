@@ -3,6 +3,13 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-10: Epik WFL W TOKU — Workflow (maszyna stanów, review, zadania), marathon #2409–#2436
+- **Sub-faza / epik:** WFL (28 ticketów: 27 issues + 1 [DEF], M0–M6, milestone'y #74–#80, label `epik-WFL`). Backlog SoT: `Project Plan/feature-workflow-tickets.md` (benchmark + filary + pakiety PR A–G — 20 PR-ów zamiast 27, decyzja operatora 2026-07-10). Tryb: marathon przez cały epik.
+- **✅ WFL-P0-01 #2409:** ADR-0029 accepted (`docs/adr/0029-workflow-engine-and-placement.md`): symfony/workflow state machine `object_editorial` (draft→review→published→archived + skrót `publish`), marking na `objects.status`, nowy BC `src/Workflow/`, guardy = mapa transition→permission RBAC (dane, nie expressions), log przejść zamiast wersjonowania, gate completeness default OFF, definicje DB za flagą (M5 odcinalne), import/integration bypass. + wpis README indeksu + streszczenie §13 architektury.
+- **Ostatnie 3 akcje:** (1) backlog + 27 issues + pakiety PR (PR #2437/#2453), (2) korekta kolizji ADR 0028→0029 (PR #2438), (3) ADR-0029 (ten PR).
+- **Następny krok:** pakiet A (P0-02 #2410 deptrac/szkielet BC + P0-03 #2412 instalacja symfony/workflow + definicja + review state) — jeden branch/PR.
+- **Blokery:** brak.
+
 ## 2026-07-10: Epik AICG W TOKU — Generowanie treści AI (opisy + SEO), marathon #2325–#2346
 - **Sub-faza / epik:** AICG (22 tickety, M0–M6, milestone'y #59–#65, label `epik-AICG`). Backlog SoT: `Project Plan/feature-aicg-tickets.md`; plan: `Project Plan/UI/feature-ai-content-generation.md` (decyzje A–E zatwierdzone 2026-07-08). Tryb: marathon przez cały epik, jeden ticket = jeden PR.
 - **✅ AICG-P0-01 #2325 (PR #2443):** ADR przyjęty jako **ADR-0030** (nie 0028 z backlogu — 0028 zarezerwował równolegle GRID, 0029 WFL; wolny numer = pliki ∪ rezerwacje backlogowe). `docs/adr/0030-ai-content-generation-tools.md`: toole treści `kind=Write` w istniejącym ToolRegistry, wyjątek „agent-native" (silnik=LLM), ContentRecipe+BrandVoiceProfile w `src/Agent/` (removability), grounding kontraktowany + `insufficient_grounding`, zero auto-zapisu, SEO w przepisie nie schemacie, defaultModel+BYOK. Backlog + issue przenumerowane.
