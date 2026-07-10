@@ -2,7 +2,7 @@
 
 > **Status:** backlog do realizacji. Utworzony 2026-07-09.
 > **Źródło architektury:** rekonesans 2026-07-09 (audyt repo + benchmark Akeneo / Pimcore / inRiver / Salsify / Sales Layer / Ergonode — esencja w §Benchmark niżej) + [`PRD/PRD-PIM-rbac.md`](PRD/PRD-PIM-rbac.md) §3.8 „Workflow-state policy" (stany, macierz per-rola, auto-unpublish) + rezerwacje w planie projektu (§4.2 Faza 1 Track B „Workflow engine", §5.2 Faza 2 Track E „advanced").
-> **Decyzja architektoniczna:** ADR-0028 (`docs/adr/0028-workflow-engine-and-placement.md`) — finalizowany w WFL-P0-01. *(Numer potwierdzony `ls docs/adr/`: 0027 zajęty przez CPDF; 0028 wolny.)*
+> **Decyzja architektoniczna:** ADR-0029 (`docs/adr/0029-workflow-engine-and-placement.md`) — finalizowany w WFL-P0-01. *(Korekta 2026-07-10: 0028 zarezerwowany równolegle przez epik GRID — `0028-attribute-sort-strategy.md`, PR #2408 zmergowany pierwszy; WFL bierze 0029. Weryfikować `git grep ADR-00 origin/main -- '*.md'`, nie tylko `ls docs/adr/`.)*
 > **Designy UI:** brak dedykowanego handoffu — FE klonuje istniejące wzorce (agent inbox „Skrzynka", `StatusPill`, `HistoryTable`, dialogi ui-v2, `PillTabs`).
 > **Epik label:** `epik-WFL`. Prefix ID: `WFL`, format `WFL-P{faza}-{nn}`.
 > **Milestone'y:** M0 Silnik + ADR · M1 Egzekwowanie + RBAC · M2 Zdarzenia + notyfikacje · M3 UI (badge, przejścia, kolejka review) · M4 Zadania · M5 Definicje per tenant (builder) · M6 Hardening + E2E + demo.
@@ -26,7 +26,7 @@ Ten plik to **single source of truth** backlogu. GitHub Issues są lustrem (skon
 | **Rynek — table stakes** | Role-gated transitions · gate completeness na publish · bulk zmiana statusu z grida · komentarze przy przejściach · notification center · audit trail | Wszystko w scope M0–M4 |
 | **Whitespace** | SLA / aging-tasks analytics, per-field approval — nikt nie robi porządnie | Faza 2 (plan już rezerwuje Track E); `pending_changes` + Dashboard BC dają tanią ścieżkę |
 
-## Filary projektowe (finalizowane w ADR-0028)
+## Filary projektowe (finalizowane w ADR-0029)
 
 1. **Silnik = `symfony/workflow`**, typ `state_machine`, definicja `object_editorial`; marking store = istniejąca kolumna `objects.status` (method marking store na `CatalogObject`).
 2. **Stany:** `draft → review → published → archived`. **Przejścia:** `submit_for_review` (draft→review), `publish` (draft→published, skrót dla ról z approve — solo operator nie cierpi pętli review), `approve` (review→published), `reject` (review→draft), `unpublish` (published→draft), `archive` (draft|published→archived), `restore` (archived→draft).
@@ -72,7 +72,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **[PM]:** ticket wymaga Plan Mode — cross-context, decyzja architektoniczna, lub nowa zależność core.
 - **[SEC]:** ticket bezpieczeństwa, failing-test-first.
 - **[DEF]:** hook świadomie odłożony — decyzja operatora przy realizacji epiku (nie ma issue na starcie).
-- **Bounded context:** nowy BC `apps/api/src/Workflow/` (`Workflow_Internals` + `Workflow_Contracts` w deptrac.yaml); marking (kolumna `status`) zostaje na `CatalogObject` w Catalog; enforcement edycji w Identity (voters) + Catalog (processors) przez `Workflow_Contracts`. Finalna decyzja placement w ADR-0028 (WFL-P0-01).
+- **Bounded context:** nowy BC `apps/api/src/Workflow/` (`Workflow_Internals` + `Workflow_Contracts` w deptrac.yaml); marking (kolumna `status`) zostaje na `CatalogObject` w Catalog; enforcement edycji w Identity (voters) + Catalog (processors) przez `Workflow_Contracts`. Finalna decyzja placement w ADR-0029 (WFL-P0-01).
 - **Tytuł Issue:** angielski Conventional Commit `{feat|docs|chore|test}(scope): subject`. Body + AC po polsku. Kod po angielsku.
 
 ### Standard DoD (każdy ticket, o ile nie zaznaczono inaczej)
@@ -116,19 +116,19 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 
 # M0 — Silnik + ADR (fundament)
 
-### WFL-P0-01: docs(architecture): add ADR-0028 for workflow engine and BC placement
+### WFL-P0-01: docs(architecture): add ADR-0029 for workflow engine and BC placement
 - **Typ:** `docs` · **Cls:** DOCS · **Milestone:** M0 · **Est:** 4-6h · **Risk:** low · `[PM]`
 - **Blocked by:** — · **Blocks:** WFL-P0-02, WFL-P0-03
 - **Po co:** Epik dotyka ≥3 bounded contextów (Catalog — marking na `CatalogObject`; Identity — polityka + permissiony; nowy BC Workflow; pośrednio Dashboard). Wybór silnika, topologii stanów i umiejscowienia musi zapaść raz, autorytatywnie, zanim powstanie kod — inaczej M1 (guardy) i M5 (definicje DB) renegocjują fundament.
-- **Stan obecny:** `symfony/workflow` niezainstalowany; ręczny FSM w `CatalogObject` (dowolne przejście, brak guardów); `WorkflowStatePolicy` uśpiony; PRD §3.8 specyfikuje stany + macierz per-rola + auto-unpublish i wprost zakłada Symfony Workflow; `ls docs/adr/` → 0027 zajęty, 0028 wolny.
+- **Stan obecny:** `symfony/workflow` niezainstalowany; ręczny FSM w `CatalogObject` (dowolne przejście, brak guardów); `WorkflowStatePolicy` uśpiony; PRD §3.8 specyfikuje stany + macierz per-rola + auto-unpublish i wprost zakłada Symfony Workflow; 0028 zarezerwowany przez GRID (sort strategy), WFL bierze 0029.
 - **Zakres:**
-  - Utworzyć `docs/adr/0028-workflow-engine-and-placement.md` wg `docs/adr/adr-template.md` (status Accepted, data 2026-07-09).
+  - Utworzyć `docs/adr/0029-workflow-engine-and-placement.md` wg `docs/adr/adr-template.md` (status Accepted, data 2026-07-09).
   - Sfinalizować filary z nagłówka tego pliku: (1) `symfony/workflow` typ `state_machine`, definicja `object_editorial`, marking store = kolumna `objects.status`; (2) topologia stanów/przejść (w tym skrót `publish` draft→published dla ról z approve); (3) nowy BC `src/Workflow/` + `Workflow_Contracts`, marking w Catalog, enforcement przez Contracts; (4) guardy = RBAC permission map (nie expression w configu — lekcja Pimcore: business user musi móc zarządzać w M5); (5) log przejść zamiast wersjonowania; (6) gate completeness per ObjectType default OFF; (7) definicje DB-driven za feature flagiem (M5, odcinalne); (8) ścieżki zapisu: import/integration piszą niezależnie od stanu, agent przez pending_changes + hook [DEF].
   - Udokumentować konsekwencje: PATCH `status` przestaje być wolnym polem (przejścia tylko przez maszynę — breaking change powierzchni API, wersjonowany w OpenAPI); świadome odcięcia (per-attribute approval, stany per locale/kanał, SLA) z uzasadnieniem.
   - Powiązane ADR: 0012 (CQRS custom routes), 0013 (Deptrac), 0015 (cross-BC bare UUID), 0020 (OpenAPI custom routes), 0024 (pending_changes single gate), 0026 (dashboard read model). Wpis do indeksu `docs/adr/README.md`.
 - **Poza zakresem:** implementacja (P0-02+); schema tabel (kierunek, nie kolumny); UI.
 - **AC:**
-  - [ ] `docs/adr/0028-workflow-engine-and-placement.md` istnieje, status Accepted, zgodny z template.
+  - [ ] `docs/adr/0029-workflow-engine-and-placement.md` istnieje, status Accepted, zgodny z template.
   - [ ] Jednoznaczne decyzje: silnik+typ+marking store; placement BC; mapa guard→permission; import bypass; definicje DB = M5 za flagą.
   - [ ] Sekcja konsekwencji opisuje breaking change PATCH `status` i plan migracji konsumentów.
   - [ ] „Powiązane ADR" linkuje istniejące pliki 0012/0013/0015/0020/0024/0026.
@@ -140,17 +140,17 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 ### WFL-P0-02: chore(deptrac): add Workflow bounded context layers
 - **Typ:** `chore` · **Cls:** BE · **Milestone:** M0 · **Est:** 3-4h · **Risk:** medium
 - **Blocked by:** WFL-P0-01 · **Blocks:** WFL-P0-03, WFL-P0-04
-- **Po co:** ADR-0028 ustala nowy BC `src/Workflow/`. Deptrac musi egzekwować granicę CI-owo od dnia 1 — inaczej pierwszy ticket M1 przypadkiem sięgnie do `Catalog\Domain` i utrwali dług.
+- **Po co:** ADR-0029 ustala nowy BC `src/Workflow/`. Deptrac musi egzekwować granicę CI-owo od dnia 1 — inaczej pierwszy ticket M1 przypadkiem sięgnie do `Catalog\Domain` i utrwali dług.
 - **Stan obecny:** `deptrac.yaml` ma wzorzec `X_Internals`/`X_Contracts` per BC (np. `Catalog_Internals`/`Catalog_Contracts`); `src/Workflow/` nie istnieje.
 - **Zakres:**
   - Warstwy `Workflow_Internals` (collector `src/Workflow/{Domain,Application,Infrastructure,Presentation}/.*`) i `Workflow_Contracts` (`src/Workflow/Contracts/.*`).
   - Ruleset: `Workflow_Internals` → [`Workflow_Contracts`, `Catalog_Contracts`, `Identity_Contracts`, `Shared`, `Vendor`]; `Workflow_Contracts` → [`Shared`, `Vendor`].
-  - Dopuścić `Workflow_Contracts` w dependencies `Catalog_Internals` oraz `Identity_Internals` (enforcement edycji i guardy sięgają portów Workflow) — zgodnie z ADR-0028.
+  - Dopuścić `Workflow_Contracts` w dependencies `Catalog_Internals` oraz `Identity_Internals` (enforcement edycji i guardy sięgają portów Workflow) — zgodnie z ADR-0029.
   - Szkielet katalogów `src/Workflow/` + rejestracja w `services.yaml`/bundle wg wzorca istniejących BC.
   - `deptrac` 0 nowych naruszeń; bez wpisów `skip_violations`.
 - **Poza zakresem:** jakakolwiek logika domenowa.
 - **AC:**
-  - [ ] Warstwy + ruleset w `deptrac.yaml` zgodne z ADR-0028; CI deptrac green.
+  - [ ] Warstwy + ruleset w `deptrac.yaml` zgodne z ADR-0029; CI deptrac green.
   - [ ] Szkielet `src/Workflow/` z autoloadem działa (`bin/console` bez błędów DI).
 - **Smoke:** `vendor/bin/deptrac` w kontenerze `pim-api-1` → 0 violations.
 - **Reuse:** wzorzec warstw Feed/Catalog w `deptrac.yaml` (XMLF-P0-02, CPDF-P0-02).
@@ -165,7 +165,7 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
   - `composer require symfony/workflow` (najnowsza stabilna).
   - `framework.workflows.object_editorial`: type `state_machine`, marking_store method na `CatalogObject::getStatus()/setStatus()`, supports `CatalogObject`; places `draft/review/published/archived`; transitions wg §Filary pkt 2 (`submit_for_review`, `publish`, `approve`, `reject`, `unpublish`, `archive` z draft|published, `restore`).
   - Nowy stan `review`: stała `STATUS_REVIEW` w encji; whitelist w `StatusFilter` + `CatalogObjectPatchInput`; migracja niepotrzebna dla kolumny (string), sprawdzić check constrainty/indeksy.
-  - Refactor ścieżki zapisu statusu: `UpdateCatalogObjectHandler` deleguje zmianę `status` z PATCH do `workflow->can()/apply()` — status niezgodny z dozwolonym przejściem → 409 RFC 7807 (breaking change udokumentowany w ADR-0028); `transitionTo()` przestaje być publicznym „wolnym" setterem.
+  - Refactor ścieżki zapisu statusu: `UpdateCatalogObjectHandler` deleguje zmianę `status` z PATCH do `workflow->can()/apply()` — status niezgodny z dozwolonym przejściem → 409 RFC 7807 (breaking change udokumentowany w ADR-0029); `transitionTo()` przestaje być publicznym „wolnym" setterem.
   - Eventy domenowe: reuse `ObjectPublished`/`ObjectArchived`; dorobienie brakujących stubów pod M2 (bez konsumentów).
   - Testy unit: pełna macierz can/apply (dozwolone i zabronione pary stanów).
 - **Poza zakresem:** guardy permission (M1); log przejść (P0-04); endpointy przejść (P0-05); UI.
@@ -245,9 +245,9 @@ _Odwrotny indeks ID → numer (issues #2409–#2436, utworzone 2026-07-10; #2411
 - **Po co:** Sedno PRD §3.8: „macierz mówi czy w ogóle może edit, workflow-state mówi czy może edit TERAZ". Bez tego published można edytować mimo review-flow — cała warstwa editorial jest teatrem. To jest moment wpięcia uśpionego `WorkflowStatePolicy` (dziś 0 call sites).
 - **Stan obecny:** `WorkflowStatePolicy::canEditInState()` gotowy + testy unit; `CatalogObjectVoter`/`ObjectScopedVoter` istnieją, ale nie delegują; wszystkie ścieżki zapisu (PATCH obiektu, zapis wartości, bulk, Excel grid) ignorują stan.
 - **Zakres:**
-  - Delegacja z voterów / procesorów do `WorkflowStatePolicy` przez `Workflow_Contracts`/`Identity_Contracts` (zgodnie z ADR-0028): `published` → edycja tylko z `workflow.edit_any_state`; `review` → `workflow.edit_in_review` lub `edit_any_state`; `archived` → read-only twardo (bez wyjątków poza restore); `draft` → bez zmian.
+  - Delegacja z voterów / procesorów do `WorkflowStatePolicy` przez `Workflow_Contracts`/`Identity_Contracts` (zgodnie z ADR-0029): `published` → edycja tylko z `workflow.edit_any_state`; `review` → `workflow.edit_in_review` lub `edit_any_state`; `archived` → read-only twardo (bez wyjątków poza restore); `draft` → bez zmian.
   - Pokrycie WSZYSTKICH ścieżek zapisu wartości/atrybutów/kategorii: `CatalogObjectProcessor`/`UpdateCatalogObjectHandler`, zapis `object_values`, bulk actions (`BulkActionsController` — wszystkie actionType!), Excel-grid path. Lekcja `bulk-endpoint-permission-escalation`: sprawdzać per-action, nie jedną coarse permission.
-  - **Świadoma decyzja (ADR-0028):** ścieżki `import`/`integration` (provenance) piszą niezależnie od stanu — integracja nie może utknąć na review; ścieżka agenta bez zmian (własny gate `pending_changes`).
+  - **Świadoma decyzja (ADR-0029):** ścieżki `import`/`integration` (provenance) piszą niezależnie od stanu — integracja nie może utknąć na review; ścieżka agenta bez zmian (własny gate `pending_changes`).
   - 403 RFC 7807 z komunikatem stanu („Produkt opublikowany — wymaga cofnięcia publikacji") — kontrakt dla FE banera (P3-03).
   - Failing-test-first: macierz stan × permission × ścieżka zapisu (PATCH, values, bulk, grid).
 - **Poza zakresem:** auto-unpublish (P1-03); UI lock (P3-03).
