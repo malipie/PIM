@@ -525,6 +525,20 @@ services:
       - ./scripts/load:/load
     entrypoint: ["k6"]
 
+  # ─── Gotenberg (PDF renderer sidecar) — gotenberg profile only ────────────
+  # Optional high-fidelity Chromium renderer for PDF catalogs (ADR-0027,
+  # CPDF-P6-03). Never starts by default: activate with
+  # `docker compose --profile gotenberg up -d gotenberg` and point the API at
+  # it via CATALOG_PDF_RENDERER=gotenberg + GOTENBERG_URL=http://gotenberg:3000
+  # (both read at container start; unset ⇒ the in-process Dompdf default).
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    # Worker-class limits: each Chromium render peaks at ~85-200 MB (plan §4).
+    <<: [*default_restart, *resource_limits_worker]
+    profiles: ["gotenberg"]
+    expose:
+      - "3000"
+
   # ─── Mailpit (dev mail catcher) ───────────────────────────────────────────
   mailpit:
     image: axllent/mailpit:latest

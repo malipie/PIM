@@ -84,11 +84,16 @@ services:
             # (supersedes the narrower P1-01 migrations-only exclude).
             - '../src/Agent/'
 
-    # CPDF-P0-03 (ADR-0027) — the PdfRenderer port defaults to the in-process
-    # Dompdf adapter so a stock install renders catalogs with zero extra infra.
-    # CPDF-P6-03 adds GotenbergRenderer and the CATALOG_PDF_RENDERER switch;
-    # until then this alias is the only adapter (no GOTENBERG_URL ⇒ Dompdf).
-    App\Export\Contracts\PdfRenderer: '@App\Export\Catalog\Infrastructure\Renderer\DompdfRenderer'
+    # CPDF-P0-03 / CPDF-P6-03 (ADR-0027) — the PdfRenderer port resolves through
+    # a factory: `CATALOG_PDF_RENDERER=gotenberg` + `GOTENBERG_URL` activate the
+    # headless-Chromium sidecar (docker compose --profile gotenberg), anything
+    # else falls back to the zero-infra in-process Dompdf default.
+    App\Export\Catalog\Infrastructure\Renderer\CatalogPdfRendererFactory:
+        arguments:
+            $renderer: '%env(default::CATALOG_PDF_RENDERER)%'
+            $gotenbergUrl: '%env(default::GOTENBERG_URL)%'
+    App\Export\Contracts\PdfRenderer:
+        factory: ['@App\Export\Catalog\Infrastructure\Renderer\CatalogPdfRendererFactory', 'create']
 
     # W2-7 / AUD-042 — single RFC 7807 contract for custom controllers.
     # `$debug` is bound to the kernel flag so the listener can keep the
