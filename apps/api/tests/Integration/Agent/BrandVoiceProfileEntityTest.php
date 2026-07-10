@@ -49,9 +49,15 @@ final class BrandVoiceProfileEntityTest extends KernelTestCase
         self::assertNotNull($reloaded);
         self::assertSame('Ekspercki', $reloaded->getName());
         self::assertSame('ekspercki, zwięzły', $reloaded->getTone());
-        self::assertSame([['term' => 'smart TV', 'use' => 'telewizor smart']], $reloaded->getGlossary());
+        // Per-key assertions: Postgres jsonb canonicalises object key
+        // order, so a whole-array assertSame is order-fragile.
+        self::assertCount(1, $reloaded->getGlossary());
+        self::assertSame('smart TV', $reloaded->getGlossary()[0]['term']);
+        self::assertSame('telewizor smart', $reloaded->getGlossary()[0]['use']);
         self::assertSame(['tani'], $reloaded->getBannedWords());
-        self::assertSame([['good' => 'Precyzyjny opis.', 'bad' => 'Super okazja!!!']], $reloaded->getExamples());
+        self::assertCount(1, $reloaded->getExamples());
+        self::assertSame('Precyzyjny opis.', $reloaded->getExamples()[0]['good']);
+        self::assertSame('Super okazja!!!', $reloaded->getExamples()[0]['bad']);
         self::assertFalse($reloaded->isDefault());
     }
 
@@ -86,6 +92,17 @@ final class BrandVoiceProfileEntityTest extends KernelTestCase
         $tenant = $this->createTenant('alpha');
         $this->activateTenantFilter($tenant);
         $em = $this->em();
+
+        // Foundry's ResetDatabase rebuilds the test schema from ORM
+        // mapping, which cannot express partial indexes (same caveat as
+        // object_channel_placements' at-most-one-primary index) — so the
+        // production DDL from AgentMigrations\Version20260710090000 is
+        // re-issued here verbatim to pin its semantics. DAMA rolls the
+        // transaction (index included) back after the test.
+        $em->getConnection()->executeStatement(
+            'CREATE UNIQUE INDEX IF NOT EXISTS uniq_brand_voice_profiles_default '
+            .'ON brand_voice_profiles (tenant_id) WHERE is_default = true'
+        );
 
         $first = new BrandVoiceProfile('First', 'neutralny');
         $first->markDefault(true);
