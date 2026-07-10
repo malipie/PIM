@@ -14,10 +14,14 @@
 - **✅ AICG-P1-04 #2330 (PR #2449):** seeder built-in przepisów + default głosu, komenda `pim:agent:seed-content-defaults`, fix RLS GUC w konsoli. **M1 KOMPLET.**
 - **✅ AICG-P2-01 #2331 (PR #2450):** `ObjectFactsPort` (seam Catalog/Contracts, read-only fakty + overlay locale/channel + sibling locales, provenance stripped) + `ContentGroundingService` (∩ recipe.sourceAttributes, zawężenie publication profile). Gotcha: port bez runtime-konsumenta inline'owany przez kontener → w kernel teście konstrukcja wprost.
 - **✅ AICG-P2-02 #2332 (PR #2451, SEC):** `GroundingGate`+`GroundingVerdict` — failing-first w historii; verdict jako structured tool_result; progi z przepisu (`constraints.grounding.{min_facts,required}`, default min_facts=1).
-- **🔄 AICG-P2-03 #2333 (w toku):** `AgentSystemPromptBuilder` + sekcje content (recipe: target/format/max_len/SEO/tone; brand voice: ton/glosariusz/banned/przykłady; kontrakt anty-halucynacyjny) gdy run niesie `recipe_id`/`brand_voice_id`; backward compat (prompt niezmieniony bez kluczy); głos przypięty do przepisu resolwowany gdy kontekst go nie nazywa.
+- **✅ AICG-P2-03 #2333 → M3–M5 komplet** (PR-y do #2461): `AgentSystemPromptBuilder` sekcje content, materializer tekstowy `ContentValueMaterializer` (P3-01, PendingChanges scoped), `GenerateProductDescriptionTool` (P3-02, flagowy agent-native) + `GenerateSeoTextTool` (P4-02, SEO w przepisie), `SeoRulesValidator` (P4-01), FE: Ask AI inline (P5-01/02), bulk modal (P5-03 #2341), Settings→AI recipes+voice (P5-04/05 #2342/#2343 bundle).
+- **✅ M6 — DOMKNIĘCIE EPIKU (2026-07-10):**
+  - **P6-01 #2344 `translate_value`** (PR #2463, merged): trzeci wariant grounded — fakt=wartość@source_locale, output@target_locale, recipe-less, `insufficient_grounding` gdy brak źródła. Live smoke PL→EN (HTML zachowany 1:1) + negatywny (brak wartości → skip). ✅ closed z proofem.
+  - **P6-02 #2345 `[SEC]` red-team** (PR #2464, merged): `PromptInjectionRedTeamTest` +3 scenariusze tooli treści (injection nie przekierowuje targetu · grounding code-driven nie wycieka sekretu · sfałszowany batch/wyciek promptu → tylko pending), 6/6. Świadome odejście: potwierdził istniejące zabezpieczenia (brak luki, brak zmiany produkcyjnej). ✅ closed z proofem.
+  - **P6-03 #2346 perf** (PR #2465, w CI): `ContentCostEstimator` + `POST /api/agent/content/cost-preview` + `POST /api/agent/content/bulk-generate` (dedykowana ścieżka: `BulkGenerateContentHandler extends AbstractBatchHandler`, batch 200 + `clear()`, reuse tooli 1:1, jeden batch approval) + day-cap gate 2-stopniowy (429). Modal zdjął cap 8 + client-estymatę. Live smoke: preview 200, bulk 2 prod → 202 → awaiting_approval, reject → 0 zapisu.
 - **Decyzja operatora (2026-07-10, czat):** selektywne bundle PR-ów dla par producer–consumer: P4-01+P4-02, P5-01+P5-02, P5-04+P5-05 (~3 rundy CI mniej); [SEC] i granice BC bez zmian — osobno.
-- **Ostatnie 3 akcje:** (1) merge #2451 + close #2332, (2) P2-03 builder + 8 testów (28 asercji), (3) unit suite 1546 zielone.
-- **Następny krok:** PR P2-03 → CI → merge → **M3** (P3-01 materializer).
+- **Ostatnie 3 akcje:** (1) merge #2463/#2464 + close #2344/#2345 z proofem, (2) P6-03 backend+FE+3 test-suity (12 testów) + live smoke bulk, (3) rebase P5b (#2462) po konflikcie locales.
+- **Następny krok:** CI zielone #2462 (P5b) + #2465 (P6-03) → merge → close #2342/#2343/#2346 z proofem → **EPIK AICG ZAMKNIĘTY (22/22)** → podsumowanie.
 - **Blokery:** brak.
 
 ## 2026-07-10: ✅ EPIK CPDF ZAMKNIĘTY — Katalogi PDF (27/27 ticketów, M0–M6, #2282–#2308)
