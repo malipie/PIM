@@ -546,6 +546,13 @@ parameters:
             - Shared
             - Import
             - Export
+            # CPDF P6-04 (#2440) — CatalogPdfBenchmarkCommand drives the real
+            # render pipeline (CatalogRenderService, template catalog, Dompdf)
+            # to measure production-shaped memory/time; same legitimate
+            # tooling cross-cut as Catalog_Internals above.
+            - Export_Contracts
+            - Export_Catalog_Internals
+            - Export_Catalog_Contracts
             - Vendor
 
     # Inline baseline of pre-existing cross-BC violations that the cleanup
