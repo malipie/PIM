@@ -11,9 +11,10 @@
 - **✅ AICG-P1-01 #2327 (PR #2446):** encja `ContentRecipe` + migracja `content_recipes` (RLS FORCE, UNIQUE(tenant_id,code)) + guardy (format∈{plain,html}); smoke RLS psql-proof (A=1, B=0).
 - **✅ AICG-P1-02 #2328 (PR #2447):** encja `BrandVoiceProfile` + migracja (RLS FORCE + partial unique is_default per tenant); smoke: izolacja A=1/B=0, druga default → ERROR unique. Lekcja: testowa baza z mappingów ORM (nie migracji) — partial indexes re-wydawane w teście.
 - **✅ AICG-P1-03 #2329 (PR #2448):** CRUD API Platform obu bytów + moduł RBAC `settings.ai_content` (voter w Agent BC), built-in read-only + clone route, transakcyjny swap defaultu, OpenAPI snapshot; live smoke: 201/403 viewer/clone/swap.
-- **🔄 AICG-P1-04 #2330 (w toku):** `AiContentDefaultsSeeder` + komenda `pim:agent:seed-content-defaults` (Agent BC — core fixtures nie importują Agent); live: 2 tenanty × (2 built-in przepisy + 1 default głos), re-run idempotentny 0; fix RLS GUC w konsoli przez `RlsTenantGuard::reassert`.
-- **Ostatnie 3 akcje:** (1) merge #2448 + close #2329 z proofem live-smoke, (2) P1-04 seeder+komenda+testy, (3) live seed na dev DB (3+3, re-run 0) + weryfikacja przez API.
-- **Następny krok:** PR P1-04 → CI → merge → **M2** (P2-01 grounding).
+- **✅ AICG-P1-04 #2330 (PR #2449):** seeder built-in przepisów + default głosu, komenda `pim:agent:seed-content-defaults`, fix RLS GUC w konsoli. **M1 KOMPLET.**
+- **🔄 AICG-P2-01 #2331 (w toku):** `ObjectFactsPort` (nowy seam Catalog/Contracts, read-only fakty per locale/channel z overlay + sibling locales, provenance stripped) + `ContentGroundingService` w Agent BC (przecięcie recipe.sourceAttributes ∩ dostępne, zawężenie publication profile ADR-0018, missing codes dla bramki P2-02).
+- **Ostatnie 3 akcje:** (1) merge #2449 + close #2330 — M1 komplet, (2) P2-01 port faktów + grounding + testy (unit 4/4), (3) bramki zielone w pim-api-1.
+- **Następny krok:** PR P2-01 → CI → merge → P2-02 bramka [SEC] failing-first.
 - **Blokery:** brak.
 
 ## 2026-07-10: ✅ EPIK CPDF ZAMKNIĘTY — Katalogi PDF (27/27 ticketów, M0–M6, #2282–#2308)
