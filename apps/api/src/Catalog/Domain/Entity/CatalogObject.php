@@ -17,6 +17,7 @@ use App\Shared\Domain\AggregateRoot;
 use App\Shared\Domain\Tenant;
 use DateTimeImmutable;
 use LogicException;
+use Symfony\Component\Serializer\Attribute\Ignore;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -292,18 +293,32 @@ class CatalogObject extends AggregateRoot implements TenantScoped, Blameable
     }
 
     /**
-     * Marking-store writer for the `object_editorial` state machine
-     * (ADR-0029). Called by Symfony Workflow's MethodMarkingStore on
-     * `apply()` — application code MUST NOT call this directly; go
-     * through the workflow (`can()`/`apply()`) so topology and guards
-     * are enforced. Non-editorial write paths (import/seed) use
-     * {@see forceStatus()} instead.
+     * Marking-store reader for the `object_editorial` state machine
+     * (ADR-0029). The marking property is deliberately named
+     * `editorialMarking` (not `status`) so Symfony property-info never
+     * mistakes the writer below for a `status` mutator — that would
+     * flip the public `status` field from readOnly string to a
+     * writable object in the exported OpenAPI schema.
+     */
+    #[Ignore]
+    public function getEditorialMarking(): string
+    {
+        return $this->status;
+    }
+
+    /**
+     * Marking-store writer — called by Symfony Workflow's
+     * MethodMarkingStore on `apply()`. Application code MUST NOT call
+     * this directly; go through the workflow (`can()`/`apply()`) so
+     * topology and guards are enforced. Non-editorial write paths
+     * (import/seed) use {@see forceStatus()} instead.
      *
      * @param array<string, mixed> $context transition context passed to
      *                                      `Workflow::apply()` (comment, actor…) — consumed by the
      *                                      transition-log listener (WFL-P0-04), unused here
      */
-    public function setStatus(string $status, array $context = []): void
+    #[Ignore]
+    public function setEditorialMarking(string $status, array $context = []): void
     {
         unset($context);
 
@@ -342,7 +357,7 @@ class CatalogObject extends AggregateRoot implements TenantScoped, Blameable
      */
     public function forceStatus(string $status): void
     {
-        $this->setStatus($status);
+        $this->setEditorialMarking($status);
     }
 
     /**

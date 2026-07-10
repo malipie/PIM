@@ -23411,6 +23411,7 @@
                     "status": {
                         "enum": [
                             "draft",
+                            "review",
                             "published",
                             "archived"
                         ],

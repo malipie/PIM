@@ -7,7 +7,9 @@ framework:
             type: state_machine
             marking_store:
                 type: method
-                property: status
+                # Dedicated accessor pair on CatalogObject (get/setEditorialMarking)
+                # — see the entity docblock for why this is not `status`.
+                property: editorialMarking
             supports:
                 - App\Catalog\Domain\Entity\CatalogObject
             initial_marking: draft
