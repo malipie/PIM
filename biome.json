@@ -55,7 +55,13 @@
         "noForEach": "off"
       },
       "a11y": {
-        "recommended": true
+        "recommended": true,
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": ["Input", "Textarea", "Combobox", "MultiSelect"]
+          }
+        }
       }
     }
   },
