@@ -10,9 +10,10 @@
 - **⚠️ Hotfix czerwonego main (PR #2445):** PR #2440 (CPDF benchmark) wszedł z czerwonym deptrac (`Tooling` bez warstw `Export_Catalog_*` po splicie #2362) — 12 violations zamaskowanych przez docs-only merge'e; fix = ruleset Tooling + lessons (deptrac `--no-cache`, nie mergować z czerwonym checkiem).
 - **✅ AICG-P1-01 #2327 (PR #2446):** encja `ContentRecipe` + migracja `content_recipes` (RLS FORCE, UNIQUE(tenant_id,code)) + guardy (format∈{plain,html}); smoke RLS psql-proof (A=1, B=0).
 - **✅ AICG-P1-02 #2328 (PR #2447):** encja `BrandVoiceProfile` + migracja (RLS FORCE + partial unique is_default per tenant); smoke: izolacja A=1/B=0, druga default → ERROR unique. Lekcja: testowa baza z mappingów ORM (nie migracji) — partial indexes re-wydawane w teście.
-- **🔄 AICG-P1-03 #2329 (w toku):** CRUD API Platform dla obu bytów (`/api/content-recipes`, `/api/brand-voice-profiles`) + moduł RBAC `settings.ai_content` (read/create/admin; voter w Agent BC — core nie importuje Agent) + built-in read-only + custom route clone + transakcyjny swap defaultu + OpenAPI snapshot. **Live smoke wykonany:** POST 201 / GET / clone 201 / PATCH 200 / default-swap / viewer 403 (GET+POST); artefakty posprzątane.
-- **Ostatnie 3 akcje:** (1) merge #2447 + close #2328, (2) P1-03 pełna powierzchnia CRUD+RBAC+testy API (10 case'ów), (3) live smoke na pim.localhost z provisioningiem permissions na dev DB.
-- **Następny krok:** PR P1-03 → CI → merge → P1-04 seedy.
+- **✅ AICG-P1-03 #2329 (PR #2448):** CRUD API Platform obu bytów + moduł RBAC `settings.ai_content` (voter w Agent BC), built-in read-only + clone route, transakcyjny swap defaultu, OpenAPI snapshot; live smoke: 201/403 viewer/clone/swap.
+- **🔄 AICG-P1-04 #2330 (w toku):** `AiContentDefaultsSeeder` + komenda `pim:agent:seed-content-defaults` (Agent BC — core fixtures nie importują Agent); live: 2 tenanty × (2 built-in przepisy + 1 default głos), re-run idempotentny 0; fix RLS GUC w konsoli przez `RlsTenantGuard::reassert`.
+- **Ostatnie 3 akcje:** (1) merge #2448 + close #2329 z proofem live-smoke, (2) P1-04 seeder+komenda+testy, (3) live seed na dev DB (3+3, re-run 0) + weryfikacja przez API.
+- **Następny krok:** PR P1-04 → CI → merge → **M2** (P2-01 grounding).
 - **Blokery:** brak.
 
 ## 2026-07-10: ✅ EPIK CPDF ZAMKNIĘTY — Katalogi PDF (27/27 ticketów, M0–M6, #2282–#2308)
