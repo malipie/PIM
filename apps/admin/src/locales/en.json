@@ -3936,11 +3936,11 @@
       "mode_descriptions": "Product descriptions",
       "mode_seo": "SEO meta",
       "estimate_label": "Estimated cost",
-      "estimate": "≈{{estimate}} USD ({{count}} × ~0.012 USD per product, default model rates)",
-      "cap": "This version handles up to {{cap}} products per run (the run tool budget). Narrow the selection.",
       "approval_hint": "Proposals land in the agent inbox — nothing is written without your approval.",
       "start": "Generate",
-      "started": "Generation started — proposals will land in the agent inbox."
+      "started": "Generation started — proposals will land in the agent inbox.",
+      "estimate_loading": "Estimating…",
+      "estimate_backend": "≈{{estimate}} USD ({{count}} products · ~{{tokens}} tokens, model {{model}})"
     },
     "settings": {
       "no_voice": "(tenant default voice)",

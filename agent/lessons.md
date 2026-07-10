@@ -3012,3 +3012,20 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 - **`paginationItemsPerPage` (AP4 XML) NIE trafia do OpenAPI snapshotu** — zmiana cap 200→1000 nie ruszyła `docs/api-spec/v0.json` (to runtime pagination default, nie schema). Nie ma bramki spec-drift dla tej zmiany.
 - **PHPStan „Ignored error pattern … was not matched in reported errors" przy `analyse <podzbiór-plików>`** = artefakt analizy podzbioru (baseline dotyczy plików spoza zestawu), NIE realny błąd. Potwierdź pełnym `phpstan analyse` (jak CI) zanim zaczniesz „naprawiać".
 - **Rzut `(mixed) → (string|int)` pada na PHPStan max** w testach czytających `array<string,mixed>` z `execute()`/`toArray()`. Wyciągnij do zmiennej + `assertIsString`/`assertIsInt`/`assertIsArray` (narrowing), nie `(string) $x`.
+
+## Lessons z AICG M6 (#2344–#2346 — translate/red-team/perf, domknięcie epiku)
+
+### Patterns to Follow (nowe)
+- **Reuse istniejącego toola w nowej ścieżce zamiast duplikować orkiestrację.** P6-03 bulk-path: `BulkGenerateContentHandler` NIE kopiuje ground→gate→llm→materialize — wywołuje `GenerateProductDescriptionTool::execute()` per produkt w pętli memory-bounded (batch 200 + `clear()`, `AbstractBatchHandler`). Efekt: identyczny kontrakt anty-halucynacyjny + provenance, zero refaktoru zmergowanego P3-02, zero drift ryzyka. Duplikacja promptu = drift; reuse = jedna prawda.
+- **Handler pętlujący po encjach z `flushAndClear()` MUSI re-find'ować run+tenant po każdym clear** (jak `AgentLoopRunner` linie 199-208). Usage sumuj w lokalnych zmiennych i zaaplikuj RAZ na końcu po ponownym find'zie — inaczej `addUsage` na detachowanej encji po clear.
+- **Red-team validating existing defenses = additive regression, nie failing→green.** [SEC] P6-02: gdy architektura już chroni (target z przepisu, grounding code-driven, approval-only), test od razu zielony. Nie ma tranzycji failing-first bo nie ma luki. Odnotuj to explicite w PR („potwierdził istniejące zabezpieczenia, brak zmiany produkcyjnej") zamiast sztucznie psuć kod.
+
+### Toolchain quirks (nowe)
+- **`php-cs-fixer fix <plik1> <plik2> ...` (wiele ścieżek) wymaga `--config`** — inaczej „For multiple paths config parameter is required" i przy `--quiet` NIC nie naprawia (błąd schowany). Fix per-plik (pojedyncza ścieżka działa) albo `--config .php-cs-fixer.dist.php`. Pre-commit lint-staged łapie potem to, co „naprawiłeś" a nie zapisało się.
+- **`pim.localhost` NIE resolvuje się w Pythonie na hoście (urllib/socket ENOTFOUND)** — ta sama pułapka co Node (memory: playwright-local-gotchas-dns-lang). Do live-smoke: `curl -sk` (Docker DNS) → zapis do pliku → parse `python3 json.load(..., strict=False)` z `PYTHONUTF8=1` (polskie znaki + control chars w JSON).
+- **Nowe custom `#[Route]` w Agent BC → regen `docs/api-spec/v0.json`**: `docker exec pim-api-1 php bin/console api:openapi:export | python3 -m json.tool > docs/api-spec/v0.json` (host — `docs/` nie jest bind-mountowane do kontenera, eksport przez stdout). `CustomRouteOpenApiFactory` dorzuca trasy automatycznie; brak regen = czerwona bramka spec-drift.
+
+### Decyzje świadome (nowe)
+- **Bulk selekcja przez `selected_ids` (ścieżka modala); `filter_dsl`-only „wszystkie pasujące" cross-page odłożone** — dedykowany resolver poza zakresem P6-03, `selected_ids` pokrywa flow UI.
+- **Bundle P5-04+P5-05 (#2342/#2343) za zgodą operatora** — para producer-consumer na jednym ekranie Settings→AI, jeden CI, osobne proofy na każdym issue. [SEC]/granice BC nadal osobno.
+- **`noLabelWithoutControl` w biome.json dostał `inputComponents: [Input,Textarea,Combobox,MultiSelect]`** — idiom label-owija-custom-kontrolkę jest poprawny a11y (implicit association), reguła statycznie nie widziała przez design-system komponenty; renderowany DOM waliduje axe w e2e.

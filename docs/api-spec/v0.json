@@ -10889,6 +10889,58 @@
                 "x-cortex-permission": "agent.bulk_actions"
             }
         },
+        "/api/agent/content/bulk-generate": {
+            "post": {
+                "operationId": "api_agent_content_bulk_generate_post",
+                "tags": [
+                    "agent"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api agent content bulk generate",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "settings.ai_content.create"
+            }
+        },
+        "/api/agent/content/cost-preview": {
+            "post": {
+                "operationId": "api_agent_content_cost_preview_post",
+                "tags": [
+                    "agent"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api agent content cost preview",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "settings.ai_content.read"
+            }
+        },
         "/api/agent/cost": {
             "get": {
                 "operationId": "api_agent_cost_get",

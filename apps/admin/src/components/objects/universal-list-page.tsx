@@ -1032,11 +1032,7 @@ export function UniversalListPage({
         {bulkGenerateOpen ? (
           <BulkGenerateContentModal
             selectedIds={Array.from(selected)}
-            totalMatching={
-              crossPageSelection.active ? crossPageSelection.totalMatched : selected.size
-            }
             objectTypeCode={objectTypeCode}
-            filterDsl={panelDsl}
             onClose={() => setBulkGenerateOpen(false)}
             onStarted={() => {
               setSelected(new Set());
