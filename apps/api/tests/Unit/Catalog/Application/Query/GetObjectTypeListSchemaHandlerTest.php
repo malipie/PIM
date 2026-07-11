@@ -151,6 +151,7 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             $this->repositoryReturning($objectType),
             $this->junctionRepositoryReturning([$visible, $restricted]),
             $this->permissionsRestrictByCode($restrictedId),
+            $this->groupResolver(),
         );
 
         $schema = $handler(new GetObjectTypeListSchemaQuery($objectType->getId()));
