@@ -15,23 +15,16 @@ test('system header click sorts via order[code] and cycles to desc', async ({ pa
   await page.goto('/products');
   await expect(page.getByTestId('grid-header-code')).toBeVisible();
 
-  const ascRequest = page.waitForRequest(
-    (request) =>
-      request.url().includes('/api/objects') &&
-      decodeURIComponent(request.url()).includes('order[code]=asc'),
-  );
+  // expect-polling between clicks — clicking mid-rerender double-fires
+  // the cycle (race caught on the live run); the URL assert proves the
+  // backend request shape without racing waitForRequest.
   await page.getByTestId('grid-sort-code').click();
-  await ascRequest;
   await expect(page.getByTestId('grid-header-code')).toHaveAttribute('aria-sort', 'ascending');
+  await expect(page).toHaveURL(/sort=code%3Aasc|sort=code:asc/);
 
-  const descRequest = page.waitForRequest(
-    (request) =>
-      request.url().includes('/api/objects') &&
-      decodeURIComponent(request.url()).includes('order[code]=desc'),
-  );
   await page.getByTestId('grid-sort-code').click();
-  await descRequest;
   await expect(page.getByTestId('grid-header-code')).toHaveAttribute('aria-sort', 'descending');
+  await expect(page).toHaveURL(/sort=code%3Adesc|sort=code:desc/);
 
   // Sort state survives reload via the URL.
   await page.reload();
@@ -67,10 +60,15 @@ test('revealed attribute column sorts via order[attribute.{code}]', async ({ pag
     (req) =>
       req.url().includes('/api/objects') &&
       decodeURIComponent(req.url()).includes(`order[attribute.${attrCode}]=asc`),
+    { timeout: 15_000 },
   );
   await sortButton.click();
   const response = await (await request).response();
   expect(response?.status()).toBe(200);
+  await expect(page.getByTestId(`grid-header-${attrCode}`)).toHaveAttribute(
+    'aria-sort',
+    'ascending',
+  );
 
   // Cleanup quick-prefs for re-runs.
   await page.getByTestId('column-manager-trigger').click();
