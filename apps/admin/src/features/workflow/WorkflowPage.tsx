@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { PageHeader } from '@/components/ui-v2/page-header';
 import { PillTabs } from '@/components/ui-v2/pill-tabs';
 import { useIdentity } from '@/lib/identity';
 
@@ -30,14 +29,8 @@ export function WorkflowPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-6" data-testid="workflow-page">
-      <PageHeader
-        title={t('workflow.queue.title', { defaultValue: 'Workflow' })}
-        subtitle={t('workflow.queue.subtitle', {
-          defaultValue: 'Przegląd, decyzje i zadania przepływu edytorskiego.',
-        })}
-      />
+      {/* Page title comes from the shell topbar breadcrumb (hub pattern). */}
       <PillTabs
-        className="mt-4"
         items={tabs}
         activeId={tab}
         onChange={setTab}
