@@ -84,6 +84,38 @@ final class WorkflowTasksApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function mineSurfacesReviewTaskForApprovePermissionHolderWithoutRoleMembership(): void
+    {
+        // #2495 — the review task is assigned to the `approver` role, but
+        // the admin (super_admin, holds workflow.approve_reject) is not a
+        // member of it. Before the fix, "mine" matched only direct
+        // assignment or literal role membership, so the task inbox went
+        // empty for the very people the notification fan-out pinged.
+        $this->createUserWithRole('marketing-p@demo.localhost', 'marketing');
+        $id = $this->seedProduct('WFL-T-PERM');
+
+        $marketing = $this->authenticatedClient('marketing-p@demo.localhost');
+        $submit = $marketing->request('POST', '/api/objects/'.$id.'/workflow/transitions/submit_for_review');
+        self::assertSame(200, $submit->getStatusCode());
+        $this->drainAsyncTransport();
+
+        // Admin holds the permission but not the approver role → sees it now.
+        $admin = $this->authenticatedClient();
+        $mine = $admin->request('GET', '/api/workflow/tasks?mine=1&status=open&object_id='.$id)->toArray();
+        $items = $mine['items'];
+        self::assertIsArray($items);
+        $types = \array_column(\array_filter($items, 'is_array'), 'type');
+        self::assertContains('review', $types, 'approve_reject holder sees the role-assigned review task in mine');
+
+        // The submitter (marketing, no approve_reject, not approver) does not.
+        $notMine = $marketing->request('GET', '/api/workflow/tasks?mine=1&status=open&object_id='.$id)->toArray();
+        $notMineItems = $notMine['items'];
+        self::assertIsArray($notMineItems);
+        $notMineTypes = \array_column(\array_filter($notMineItems, 'is_array'), 'type');
+        self::assertNotContains('review', $notMineTypes, 'a non-approver without the permission never sees review tasks in mine');
+    }
+
+    #[Test]
     public function rejectOpensFixTaskForTheAuthorWithNotification(): void
     {
         $this->createUserWithRole('marketing-f@demo.localhost', 'marketing');
