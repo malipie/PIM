@@ -107,28 +107,45 @@ final class ObjectTypeListSchemaApiTest extends CatalogApiTestCase
         $base = '/api/object_types/'.$productType->getId()->toRfc4122().'/list-schema';
 
         // Legacy mode: only show_in_list columns, no `default` key.
-        $legacy = $client->request('GET', $base)->toArray();
-        $legacyByKey = array_column($legacy['columns'], null, 'key');
+        $legacyByKey = self::columnsByKey($client->request('GET', $base)->toArray());
         self::assertArrayHasKey('grid_full_listed', $legacyByKey);
         self::assertArrayNotHasKey('grid_full_loc', $legacyByKey);
         self::assertArrayNotHasKey('default', $legacyByKey['grid_full_listed']);
 
         // Full mode: whole catalogue with default flags + group projection key.
-        $full = $client->request('GET', $base.'?full=1')->toArray();
-        $fullByKey = array_column($full['columns'], null, 'key');
+        $fullByKey = self::columnsByKey($client->request('GET', $base.'?full=1')->toArray());
         self::assertArrayHasKey('grid_full_listed', $fullByKey);
         self::assertArrayHasKey('grid_full_loc', $fullByKey);
-        self::assertTrue($fullByKey['grid_full_listed']['default']);
-        self::assertFalse($fullByKey['grid_full_loc']['default']);
+        self::assertTrue($fullByKey['grid_full_listed']['default'] ?? null);
+        self::assertFalse($fullByKey['grid_full_loc']['default'] ?? null);
         self::assertArrayHasKey('group', $fullByKey['grid_full_loc']);
         // ADR-0028 — localizable attributes are not sortable in any mode.
-        self::assertFalse($fullByKey['grid_full_loc']['sortable']);
-        self::assertTrue($fullByKey['grid_full_listed']['sortable']);
+        self::assertFalse($fullByKey['grid_full_loc']['sortable'] ?? null);
+        self::assertTrue($fullByKey['grid_full_listed']['sortable'] ?? null);
         // Defaults come first: listed before the non-default attribute.
-        $keys = array_column($full['columns'], 'key');
+        $keys = array_keys($fullByKey);
         self::assertLessThan(
             array_search('grid_full_loc', $keys, true),
             array_search('grid_full_listed', $keys, true),
         );
+    }
+
+    /**
+     * @param array<mixed> $payload
+     *
+     * @return array<string, array<mixed>>
+     */
+    private static function columnsByKey(array $payload): array
+    {
+        $columns = $payload['columns'] ?? null;
+        self::assertIsArray($columns);
+        $byKey = [];
+        foreach ($columns as $column) {
+            if (\is_array($column) && \is_string($column['key'] ?? null)) {
+                $byKey[$column['key']] = $column;
+            }
+        }
+
+        return $byKey;
     }
 }
