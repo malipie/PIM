@@ -21,6 +21,7 @@ function identityWith(permissions: readonly string[]): Identity {
     localeScope: [],
     channelScope: [],
     attributeGroupScope: [],
+    featureFlags: new Set<string>(),
   };
 }
 

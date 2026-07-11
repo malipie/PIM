@@ -7,6 +7,7 @@ export {
   canEditLocale,
   hasAllPermissions,
   hasAnyPermission,
+  hasFeature,
   hasPermission,
   hydrateIdentity,
   type Identity,

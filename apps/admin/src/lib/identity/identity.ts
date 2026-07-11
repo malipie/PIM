@@ -33,6 +33,11 @@ export interface MeResponse {
   channel_scope: string[];
   /** Modeler / channel-scoped role group narrowing. */
   attribute_group_scope: string[];
+  /**
+   * WFL-P5-03 (#2433) — runtime deployment feature flags (e.g.
+   * `workflow_custom_definitions`). Optional: older backends omit it.
+   */
+  feature_flags?: Record<string, boolean>;
 }
 
 /**
@@ -53,6 +58,8 @@ export interface Identity {
   localeScope: string[];
   channelScope: string[];
   attributeGroupScope: string[];
+  /** Enabled runtime feature flags — see {@link MeResponse.feature_flags}. */
+  featureFlags: ReadonlySet<string>;
 }
 
 const WILDCARD = '*';
@@ -75,7 +82,16 @@ export function hydrateIdentity(response: MeResponse): Identity {
     localeScope: response.locale_scope,
     channelScope: response.channel_scope,
     attributeGroupScope: response.attribute_group_scope,
+    featureFlags: new Set(
+      Object.entries(response.feature_flags ?? {})
+        .filter(([, enabled]) => enabled)
+        .map(([flag]) => flag),
+    ),
   };
+}
+
+export function hasFeature(identity: Identity | null, flag: string): boolean {
+  return identity?.featureFlags.has(flag) ?? false;
 }
 
 export function hasPermission(identity: Identity | null, code: string): boolean {

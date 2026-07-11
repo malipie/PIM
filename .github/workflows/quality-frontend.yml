@@ -138,6 +138,10 @@ jobs:
           POSTGRES_USER: pim
           POSTGRES_PASSWORD: ChangeMeInDev
           POSTGRES_DB: pim
+          # WFL-P5-03 - the definition-builder E2E exercises the full
+          # custom-definitions loop; with no enabled definition the provider
+          # still serves the static YAML, so other specs are unaffected.
+          WORKFLOW_CUSTOM_DEFINITIONS: "true"
 
       - name: Wait for FrankenPHP worker to accept exec commands
         run: |
@@ -189,6 +193,7 @@ jobs:
           POSTGRES_USER: pim
           POSTGRES_PASSWORD: ChangeMeInDev
           POSTGRES_DB: pim
+          WORKFLOW_CUSTOM_DEFINITIONS: "true"
 
       - name: Wait for Caddy edge to serve /api
         run: |

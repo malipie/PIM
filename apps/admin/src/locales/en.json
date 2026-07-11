@@ -256,7 +256,8 @@
       "security": "Security",
       "tenant": "Tenant config",
       "billing": "Billing & plan",
-      "ai": "AI configuration"
+      "ai": "AI configuration",
+      "workflow": "Workflow"
     },
     "placeholder": {
       "title": "Coming soon",
@@ -950,6 +951,58 @@
             "unpublish": "Unpublish (auto)"
           }
         }
+      }
+    },
+    "workflow": {
+      "title": "Workflow definitions",
+      "intro": "Tenant-specific editorial process: places, transitions, permissions and completeness gates — no deploy needed.",
+      "create_cta": "New definition",
+      "empty_title": "No definitions",
+      "empty_body": "Until you enable a custom definition, objects follow the built-in process (draft → review → published).",
+      "state_enabled": "Enabled",
+      "state_disabled": "Disabled",
+      "scope_global": "All object types",
+      "scope_object_type": "Single object type",
+      "shape_summary": "{{places}} places · {{transitions}} transitions",
+      "enable": "Enable",
+      "disable": "Disable",
+      "enabled_toast": "Definition enabled.",
+      "disabled_toast": "Definition disabled.",
+      "toggle_failed": "Could not change the state.",
+      "saved": "Definition saved.",
+      "invalid": "The definition has errors — fix the highlighted fields.",
+      "save_failed": "Saving failed.",
+      "not_found": "Definition not found.",
+      "edit_title": "Edit definition",
+      "new_title": "New definition",
+      "field_name": "Definition name",
+      "field_object_type": "Object type (empty = all)",
+      "object_type_all": "All types",
+      "places_title": "Places",
+      "place_add": "Add place",
+      "place_name": "Name (snake_case)",
+      "place_label_pl": "Label (pl)",
+      "place_label_en": "Label (en)",
+      "place_color": "Color",
+      "place_remove": "Remove place",
+      "transitions_title": "Transitions",
+      "transition_add": "Add transition",
+      "transition_name": "Name (snake_case)",
+      "transition_from": "From places",
+      "transition_to": "To place",
+      "transition_permission": "Required permission (optional)",
+      "transition_comment_required": "Comment required",
+      "transition_gate": "Min completeness % (empty = none)",
+      "transition_remove": "Remove transition",
+      "confirm_title": "This definition is enabled",
+      "confirm_body": "It governs live objects — saving changes the available transitions immediately. Continue?",
+      "confirm_cta": "Save anyway",
+      "violation": {
+        "required": "This field is required.",
+        "snake_case": "Use snake_case (letters, digits, underscores).",
+        "duplicate": "Duplicate name.",
+        "missing_draft": "The definition must contain the initial \"draft\" place.",
+        "pct_range": "Enter an integer between 0 and 100."
       }
     }
   },
