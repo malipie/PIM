@@ -352,7 +352,9 @@ services:
         arguments:
             $managerRegistry: '@doctrine'
             $orderParameterName: 'order'
-            $properties: { id: DESC }
+            # GRID-P5-03 (#2399) — system list columns sort on core fields;
+            # `id` stays the cursor key, the rest serve the header clicks.
+            $properties: { id: DESC, code: ~, status: ~, completenessPct: ~, updatedAt: ~ }
 
     # Meilisearch client factory (#49 / 0.5.1). MEILI_URL + MEILI_KEY come
     # from docker-compose env (MEILI_KEY defaults to the dev master key).

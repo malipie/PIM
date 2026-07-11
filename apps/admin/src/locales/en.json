@@ -4165,6 +4165,7 @@
       "compact": "Compact",
       "aria": "Row density"
     },
-    "resize_aria": "Resize column {{label}}"
+    "resize_aria": "Resize column {{label}}",
+    "sort_aria": "Sort by: {{label}}"
   }
 }

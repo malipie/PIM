@@ -45,6 +45,10 @@ interface ProductsGridProps {
   density?: GridDensity;
   /** GRID-P2-02 — drag-resize commit (key = model column key, width px). */
   onColumnResize?: (key: string, width: number) => void;
+  /** GRID-P5-03 — active sort (null = default id order). */
+  sort?: { key: string; dir: 'asc' | 'desc' } | null;
+  /** GRID-P5-03 — header click cycles asc → desc → off. Absent = sorting disabled (e.g. search mode). */
+  onSortChange?: (key: string) => void;
   selected: Set<string>;
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
@@ -142,6 +146,8 @@ export function ProductsGrid({
   showMediaColumn = true,
   density = 'normal',
   onColumnResize,
+  sort = null,
+  onSortChange,
   selected,
   onToggleSelect,
   onToggleSelectAll,
@@ -247,8 +253,33 @@ export function ProductsGrid({
             )}
             style={index === 0 ? { left: offsets.code } : undefined}
             data-testid={`grid-header-${column.key}`}
+            aria-sort={
+              sort?.key === column.key
+                ? sort.dir === 'asc'
+                  ? 'ascending'
+                  : 'descending'
+                : undefined
+            }
           >
-            {pickLabel(column.label, locale, column.key)}
+            {column.sortable && onSortChange !== undefined ? (
+              <button
+                type="button"
+                onClick={() => onSortChange(column.key)}
+                data-testid={`grid-sort-${column.key}`}
+                className="inline-flex items-center gap-0.5 uppercase tracking-wider hover:text-zinc-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 rounded"
+                aria-label={t('grid.sort_aria', {
+                  label: pickLabel(column.label, locale, column.key),
+                  defaultValue: 'Sortuj po: {{label}}',
+                })}
+              >
+                {pickLabel(column.label, locale, column.key)}
+                {sort?.key === column.key ? (
+                  <span aria-hidden="true">{sort.dir === 'asc' ? '\u2191' : '\u2193'}</span>
+                ) : null}
+              </button>
+            ) : (
+              pickLabel(column.label, locale, column.key)
+            )}
             {onColumnResize !== undefined ? (
               <button
                 type="button"
