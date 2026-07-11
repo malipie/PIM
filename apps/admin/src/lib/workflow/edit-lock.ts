@@ -82,7 +82,7 @@ export function requestUnpublish(
 ): Promise<{ object_id: string; requested: boolean }> {
   return jsonFetch(`/api/objects/${objectId}/workflow/request-unpublish`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(comment !== undefined && comment !== '' ? { comment } : {}),
+    contentType: 'application/json',
+    body: comment !== undefined && comment !== '' ? { comment } : {},
   });
 }
