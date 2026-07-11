@@ -3065,3 +3065,15 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 ### Decyzje świadome
 - **Bulk change_status products-only** — endpoint `/api/products/bulk-actions/change_status`; custom kinds (generyczny `/api/objects/...`) = follow-up przy epiku ULV. Callback `onOpenChangeStatus` podany do BulkBar tylko dla `isProduct`.
 - **Nie dzielono toasta zapisu roli per-call** — dwa wywołania (PATCH identity + PUT attribute-permissions) to jedna operacja „zapisz rolę"; po fixie schematu drugi wraca do 200, jeden toast sukcesu wystarcza.
+
+## Lessons z GRID M1 (P1-01..04, PR #2497 + #2499) — 2026-07-11
+
+### Pułapki (naprawione)
+- **Max-lines guard failuje w 9 s i BLOKUJE cały frontend job + Playwright** — czerwony PR bez żadnej informacji o testach. Przepisujesz duży komponent → `bash scripts/lint-admin-max-lines.sh` lokalnie PRZED pushem (products-grid.tsx 512>500 przebił zamrożony baseline 21; fix: ekstrakcja `ProductsGridRowView` do `products-grid-row.tsx`).
+- **List-schema labeluje systemową kolumnę `code` generycznie („Identyfikator"/„Identifier")** — lista produktów zawsze pokazywała „SKU" i spec `1423-products-list-v2` to asertuje (`getByText('SKU', {exact:true})`). Przy konsumpcji schemy na products mapuj label `code`→SKU (parity); custom kinds zostają przy schemie.
+- **Attach grupy atrybutów do ObjectType NIE tworzy junction `object_type_attributes`** — to dwie osobne relacje. `PATCH .../attributes/{id}/list-config` (ULV-10) i list-schema czytają junction → w E2E setup po `POST /api/object_types/{id}/groups/{groupId}` wołaj też `POST /api/object_types/{id}/attributes/bulk-attach` (`{attributeIds}`). Istotne dla GRID-P3-01 (`?full=1` czyta ten sam junction).
+
+### Patterns to Follow
+- **ViewColumnSeeds** — kolumny widokowe spoza schemy (kategorie, sync, cena, fallback nazwy) wchodzą do modelu kolumn jako seedy (`resolveGridColumns(schema, overrides, viewColumns)`) zamiast żyć obok modelu; column manager (M2) zarządza nimi jak każdą kolumną, a seed kolidujący z kluczem schemy jest pomijany (schema wygrywa). Klucze `__`-prefiksowane nie zderzą się z kodami atrybutów.
+- **Parity przez `defaultOverrides`** — schema zawsze emituje `status`/`updatedAt`, legacy grid ich nie pokazywał; hook `useGridColumns(id, {defaultOverrides})` aplikuje ukrycia tylko gdy brak stored prefs (null-vs-[] rozróżnia „brak prefsów" od „user zresetował").
+- **Excel: rich display bez łamania TSV** — `ExcelColumn.renderDisplay` renderuje bogatą komórkę, a wiersz niesie płaską projekcję tekstową pod tym samym kluczem (`attr:{code}`), więc clipboard `String(row[key])` działa bez zmian w gridzie.
