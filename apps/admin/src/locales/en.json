@@ -4166,6 +4166,10 @@
       "aria": "Row density"
     },
     "resize_aria": "Resize column {{label}}",
-    "sort_aria": "Sort by: {{label}}"
+    "sort_aria": "Sort by: {{label}}",
+    "paste": {
+      "report_mixed": "Pasted {{applied}}, skipped {{skipped}}",
+      "report_ok": "Pasted {{applied}} cells"
+    }
   }
 }
