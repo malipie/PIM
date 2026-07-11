@@ -22,6 +22,7 @@ export const FALLBACK_GRID_COLUMNS: GridColumn[] = [
     type: 'system_identifier',
     label: { pl: 'Kod', en: 'Code' },
     sortable: true,
+    editable: false,
     position: 0,
     hidden: false,
   },
@@ -31,6 +32,7 @@ export const FALLBACK_GRID_COLUMNS: GridColumn[] = [
     type: 'system_status',
     label: { pl: 'Status', en: 'Status' },
     sortable: true,
+    editable: false,
     position: 1,
     hidden: false,
   },
@@ -40,6 +42,7 @@ export const FALLBACK_GRID_COLUMNS: GridColumn[] = [
     type: 'system_completeness',
     label: { pl: 'Kompletność', en: 'Completeness' },
     sortable: true,
+    editable: false,
     position: 2,
     hidden: false,
   },
@@ -49,6 +52,7 @@ export const FALLBACK_GRID_COLUMNS: GridColumn[] = [
     type: 'system_date',
     label: { pl: 'Zmodyfikowano', en: 'Modified' },
     sortable: true,
+    editable: false,
     position: 3,
     hidden: false,
   },
@@ -92,6 +96,7 @@ export function resolveGridColumns(
       type: column.type,
       label: column.label ?? {},
       sortable: Boolean(column.sortable),
+      editable: column.editable === true,
       position: base.size,
       // GRID-P3-01 full-schema mode: non-default attributes (no
       // `show_in_list`) start hidden — the manager reveals them.
@@ -113,6 +118,7 @@ export function resolveGridColumns(
       type: seed.type,
       label: seed.label ?? {},
       sortable: Boolean(seed.sortable),
+      editable: false,
       position: 0, // re-numbered below
       hidden: false,
     };

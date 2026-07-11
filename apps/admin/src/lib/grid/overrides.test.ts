@@ -19,6 +19,7 @@ function col(key: string, overrides: Partial<GridColumn> = {}): GridColumn {
     type: 'text',
     label: { pl: key },
     sortable: false,
+    editable: false,
     position: 0,
     hidden: false,
     ...overrides,

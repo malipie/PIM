@@ -97,6 +97,64 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
     }
 
     #[Test]
+    public function editableFlagRespectsTypeAndEditPermission(): void
+    {
+        $objectType = $this->makeObjectType();
+        $text = $this->makeJunction($objectType, 'material', AttributeType::Text, showInList: true);
+        $media = $this->makeJunction($objectType, 'gallery', AttributeType::Asset, showInList: true);
+        $localizable = $this->makeJunction($objectType, 'name', AttributeType::Text, showInList: true);
+        $localizable->getAttribute()->changeLocalizable(true);
+
+        $handler = new GetObjectTypeListSchemaHandler(
+            $this->repositoryReturning($objectType),
+            $this->junctionRepositoryReturning([$text, $media, $localizable]),
+            $this->permissionsAllow(),
+            $this->groupResolver(),
+        );
+
+        $schema = $handler(new GetObjectTypeListSchemaQuery($objectType->getId()));
+        \assert(null !== $schema);
+        $byKey = [];
+        foreach ($schema->columns as $column) {
+            $byKey[$column['key']] = $column;
+        }
+
+        // Simple editable type + edit permission → editable.
+        self::assertTrue($byKey['material']['editable']);
+        // Media has no inline editor → not editable even with permission.
+        self::assertFalse($byKey['gallery']['editable']);
+        // Localizable needs the locale/channel context → not editable in MVP.
+        self::assertFalse($byKey['name']['editable']);
+        // System columns are never inline-editable through this flag.
+        self::assertFalse($byKey['code']['editable']);
+    }
+
+    #[Test]
+    public function editableFlagIsFalseWhenEditPermissionDenied(): void
+    {
+        $objectType = $this->makeObjectType();
+        $editable = $this->makeJunction($objectType, 'price', AttributeType::Price, showInList: true);
+        $viewOnlyId = $editable->getAttribute()->getId()->toRfc4122();
+
+        $handler = new GetObjectTypeListSchemaHandler(
+            $this->repositoryReturning($objectType),
+            $this->junctionRepositoryReturning([$editable]),
+            $this->permissionsViewOnly($viewOnlyId),
+            $this->groupResolver(),
+        );
+
+        $schema = $handler(new GetObjectTypeListSchemaQuery($objectType->getId()));
+        \assert(null !== $schema);
+        $byKey = [];
+        foreach ($schema->columns as $column) {
+            $byKey[$column['key']] = $column;
+        }
+        // Present (can view) but not editable (view-only).
+        self::assertArrayHasKey('price', $byKey);
+        self::assertFalse($byKey['price']['editable']);
+    }
+
+    #[Test]
     public function filterableAttributesAreOnlyTheFlaggedOnes(): void
     {
         $objectType = $this->makeObjectType();
@@ -221,6 +279,30 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             public function canViewAttribute(Uuid $attributeId): bool
             {
                 return $this->code !== $attributeId->toRfc4122();
+            }
+
+            public function canEditAttribute(Uuid $attributeId): bool
+            {
+                return $this->code !== $attributeId->toRfc4122();
+            }
+
+            public function isAttributePermissionEnforced(): bool
+            {
+                return true;
+            }
+        };
+    }
+
+    private function permissionsViewOnly(string $viewOnlyCode): AttributePermissionReader
+    {
+        return new class($viewOnlyCode) implements AttributePermissionReader {
+            public function __construct(private readonly string $code)
+            {
+            }
+
+            public function canViewAttribute(Uuid $attributeId): bool
+            {
+                return true;
             }
 
             public function canEditAttribute(Uuid $attributeId): bool
