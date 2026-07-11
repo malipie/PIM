@@ -109,11 +109,7 @@ final class SavedViewController
         if (!\is_string($resource) || '' === $resource) {
             $resource = 'products';
         }
-        $config = $body['config'] ?? [];
-        if (!\is_array($config)) {
-            throw new BadRequestHttpException('config must be an object.');
-        }
-        /* @var array<string, mixed> $config */
+        $config = $this->asConfigArray($body['config'] ?? []);
         $this->configValidator->validate($config);
         $isDefault = (bool) ($body['is_default'] ?? false);
         $description = $body['description'] ?? null;
@@ -162,9 +158,8 @@ final class SavedViewController
         if (\array_key_exists('description', $body)) {
             $view->changeDescription(\is_string($body['description']) ? $body['description'] : null);
         }
-        if (\array_key_exists('config', $body) && \is_array($body['config'])) {
-            /** @var array<string, mixed> $cfg */
-            $cfg = $body['config'];
+        if (\array_key_exists('config', $body)) {
+            $cfg = $this->asConfigArray($body['config']);
             $this->configValidator->validate($cfg);
             $view->updateConfig($cfg);
         }
@@ -280,6 +275,27 @@ final class SavedViewController
         if ($view->isSystem()) {
             throw new AccessDeniedHttpException('System views cannot be modified.');
         }
+    }
+
+    /**
+     * JSON objects decode to string-keyed arrays, but PHPStan sees
+     * array<mixed, mixed>; this narrows (and rejects non-objects) so the
+     * validator and entity keep their array<string, mixed> contract
+     * without a fragile inline @var (cs-fixer downgrades those).
+     *
+     * @return array<string, mixed>
+     */
+    private function asConfigArray(mixed $config): array
+    {
+        if (!\is_array($config)) {
+            throw new BadRequestHttpException('config must be an object.');
+        }
+        $out = [];
+        foreach ($config as $key => $value) {
+            $out[(string) $key] = $value;
+        }
+
+        return $out;
     }
 
     private function resolveObjectType(mixed $objectTypeId): ?ObjectType
