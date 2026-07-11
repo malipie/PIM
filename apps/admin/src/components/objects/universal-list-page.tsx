@@ -93,6 +93,11 @@ const BulkGenerateContentModal = lazy(() =>
     default: m.BulkGenerateContentModal,
   })),
 );
+const BulkChangeStatusDialog = lazy(() =>
+  import('@/components/catalog/bulk-change-status-dialog').then((m) => ({
+    default: m.BulkChangeStatusDialog,
+  })),
+);
 const BulkDeleteConfirmModal = lazy(() =>
   import('@/components/catalog/bulk-actions/hard-confirm-modal').then((m) => ({
     default: m.BulkDeleteConfirmModal,
@@ -250,6 +255,8 @@ export function UniversalListPage({
   const [bulkDuplicateOpen, setBulkDuplicateOpen] = useState(false);
   // AICG-P5-03 (#2341) — bulk "Generuj treść AI" modal.
   const [bulkGenerateOpen, setBulkGenerateOpen] = useState(false);
+  // WFL-P3-04 / #2493 — bulk workflow-transition dialog.
+  const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [cmdKOpen, setCmdKOpen] = useState(false);
   const [lastBulkSession, setLastBulkSession] = useState<RollbackSession | null>(null);
 
@@ -969,6 +976,7 @@ export function UniversalListPage({
         onOpenDeleteModal={() => setBulkDeleteOpen(true)}
         onOpenDuplicateModal={isProduct ? () => setBulkDuplicateOpen(true) : undefined}
         onOpenGenerateContent={isProduct ? () => setBulkGenerateOpen(true) : undefined}
+        onOpenChangeStatus={isProduct ? () => setBulkStatusOpen(true) : undefined}
         onOpenCmdK={() => setCmdKOpen(true)}
         onOpenExportModal={
           isProduct || isCustomKind ? () => goToExport('selected', Array.from(selected)) : undefined
@@ -1026,6 +1034,15 @@ export function UniversalListPage({
               setShowSelectedOnly(false);
               refetch();
             }}
+          />
+        ) : null}
+
+        {bulkStatusOpen ? (
+          <BulkChangeStatusDialog
+            ids={Array.from(selected)}
+            open={bulkStatusOpen}
+            onOpenChange={setBulkStatusOpen}
+            onApplied={onBulkApplied}
           />
         ) : null}
 
