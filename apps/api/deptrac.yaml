@@ -305,6 +305,22 @@ parameters:
               - type: directory
                 value: 'src/Export/Catalog/Contracts/.*'
 
+        # ─── Notification — persistent in-app notifications (WFL-P2-02) ───
+        - name: Notification_Internals
+          collectors:
+              - type: directory
+                value: 'src/Notification/Domain/.*'
+              - type: directory
+                value: 'src/Notification/Application/.*'
+              - type: directory
+                value: 'src/Notification/Infrastructure/.*'
+              - type: directory
+                value: 'src/Notification/Presentation/.*'
+        - name: Notification_Contracts
+          collectors:
+              - type: directory
+                value: 'src/Notification/Contracts/.*'
+
         # ─── Workflow — editorial state machine, transition log, tasks (ADR-0029) ───
         - name: Workflow_Internals
           collectors:
@@ -376,6 +392,20 @@ parameters:
             - Shared
             - Vendor
         Workflow_Contracts:
+            - Shared
+            - Vendor
+
+        # WFL-P2-02 — thin notification context (Dashboard precedent):
+        # consumes Catalog Contracts events, resolves recipients via the
+        # Identity seam and reads submit authorship via the Workflow seam.
+        Notification_Internals:
+            - Notification_Contracts
+            - Catalog_Contracts
+            - Identity_Contracts
+            - Workflow_Contracts
+            - Shared
+            - Vendor
+        Notification_Contracts:
             - Shared
             - Vendor
 

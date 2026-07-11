@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                                      https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="App\Notification\Domain\Entity\Notification" table="notifications">
+        <indexes>
+            <index name="notifications_tenant_user_read_idx" columns="tenant_id,user_id,read_at"/>
+            <index name="notifications_tenant_user_id_idx" columns="tenant_id,user_id,id"/>
+        </indexes>
+
+        <id name="id" type="uuid" column="id">
+            <generator strategy="NONE"/>
+        </id>
+
+        <many-to-one field="tenant" target-entity="App\Shared\Domain\Tenant">
+            <join-column name="tenant_id" referenced-column-name="id" nullable="false" on-delete="RESTRICT"/>
+        </many-to-one>
+
+        <field name="userId" type="uuid" column="user_id"/>
+        <field name="type" type="string" length="64"/>
+
+        <field name="payload" type="json" column="payload" nullable="true">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
+        <field name="readAt" type="datetime_immutable" column="read_at" nullable="true"/>
+        <field name="createdAt" type="datetime_immutable" column="created_at"/>
+    </entity>
+</doctrine-mapping>

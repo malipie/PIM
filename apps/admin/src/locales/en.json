@@ -49,7 +49,15 @@
   "notifications": {
     "aria_label": "Notifications",
     "title": "Recent activity",
-    "empty": "No recent events."
+    "empty": "No recent events.",
+    "workflow_section": "Workflow",
+    "workflow_type": {
+      "workflow": {
+        "submitted_for_review": "Submitted for review",
+        "approved": "Your change was approved",
+        "rejected": "Your change was rejected"
+      }
+    }
   },
   "auth": {
     "login_title": "Sign in",

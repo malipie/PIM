@@ -132,6 +132,7 @@ parameters:
               # WFL-P0-04 — Workflow BC entities share the same prePersist
               # tenant-stamping window (WorkflowTransition + M4/M5 entities).
               - src/Workflow/Domain/Entity/*.php
+              - src/Notification/Domain/Entity/*.php
               - src/Catalog/Domain/Entity/PendingChange.php
               - src/Channel/Domain/Entity/Channel.php
               - src/Channel/Domain/Entity/ChannelCategoryNode.php

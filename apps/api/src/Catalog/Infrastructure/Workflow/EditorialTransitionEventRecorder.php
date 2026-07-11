@@ -46,6 +46,7 @@ final readonly class EditorialTransitionEventRecorder implements EventSubscriber
 
         match ($transition->getName()) {
             ObjectEditorialWorkflow::TRANSITION_SUBMIT_FOR_REVIEW => $subject->recordSubmittedForReview($comment),
+            ObjectEditorialWorkflow::TRANSITION_APPROVE => $subject->recordApproved($comment),
             ObjectEditorialWorkflow::TRANSITION_REJECT => $subject->recordRejected($comment),
             ObjectEditorialWorkflow::TRANSITION_UNPUBLISH => $subject->recordUnpublished(
                 true === ($context['auto_unpublish'] ?? false),

@@ -72,6 +72,15 @@ final class MercureSubscribeTopics
     }
 
     /**
+     * WFL-P2-02 — per-user persistent notification stream (bell badge +
+     * live prepend). Tenant-prefixed like every subscribe topic.
+     */
+    public static function userNotifications(Uuid $tenantId, string $base, string $userId): string
+    {
+        return self::tenantPrefix($tenantId, $base).'/users/'.$userId.'/notifications';
+    }
+
+    /**
      * Live regeneration progress of one feed (XMLF-P4-02) — every run of the
      * feed publishes progress + status here; the monitor screen subscribes
      * per feed, so a new run appears on the already-open detail view.
