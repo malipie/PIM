@@ -4187,6 +4187,7 @@
       "compact": "Kompakt",
       "aria": "Gęstość wierszy"
     },
-    "resize_aria": "Zmień szerokość kolumny {{label}}"
+    "resize_aria": "Zmień szerokość kolumny {{label}}",
+    "sort_aria": "Sortuj po: {{label}}"
   }
 }

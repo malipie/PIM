@@ -92,9 +92,11 @@ doctrine:
             string_functions:
                 JSONB_CONTAINS: App\Catalog\Infrastructure\Doctrine\Dql\JsonbContainsFunction
                 JSONB_GET_TEXT: App\Catalog\Infrastructure\Doctrine\Dql\JsonbGetTextFunction
+                JSONB_PATH_TEXT: App\Catalog\Infrastructure\Doctrine\Dql\JsonbPathTextFunction
                 LTREE_DESCENDANT_OF: App\Catalog\Infrastructure\Doctrine\Dql\LtreeDescendantOfFunction
             numeric_functions:
                 JSONB_GET_NUMERIC: App\Catalog\Infrastructure\Doctrine\Dql\JsonbGetNumericFunction
+                JSONB_PATH_NUMERIC: App\Catalog\Infrastructure\Doctrine\Dql\JsonbPathNumericFunction
         mappings:
             Shared:
                 type: xml

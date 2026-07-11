@@ -63,6 +63,7 @@
         <filters>
             <filter>App\Catalog\Infrastructure\ApiPlatform\Filter\SkuFilter</filter>
             <filter>App\Catalog\Infrastructure\ApiPlatform\Filter\AttributeFilter</filter>
+            <filter>App\Catalog\Infrastructure\ApiPlatform\Filter\AttributeOrderFilter</filter>
             <filter>App\Catalog\Infrastructure\ApiPlatform\Filter\CategoryFilter</filter>
             <filter>App\Catalog\Infrastructure\ApiPlatform\Filter\CompletenessFilter</filter>
             <filter>App\Catalog\Infrastructure\ApiPlatform\Filter\StatusFilter</filter>
