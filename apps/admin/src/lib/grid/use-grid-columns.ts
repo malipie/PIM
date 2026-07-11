@@ -48,6 +48,8 @@ export interface UseGridColumnsOptions {
    * `status`/`updatedAt` by default). "Reset" clears back to these.
    */
   defaultOverrides?: GridColumnOverride[];
+  /** GRID-P3-02 — resolve against the full attribute catalogue (`?full=1`). */
+  fullSchema?: boolean;
 }
 
 export interface UseGridColumnsResult {
@@ -67,8 +69,8 @@ export function useGridColumns(
   objectTypeId: string | undefined,
   options: UseGridColumnsOptions = {},
 ): UseGridColumnsResult {
-  const { viewColumns, defaultOverrides } = options;
-  const schemaQuery = useListSchema(objectTypeId);
+  const { viewColumns, defaultOverrides, fullSchema } = options;
+  const schemaQuery = useListSchema(objectTypeId, { full: fullSchema });
   const [stored, setStoredState] = useState<GridColumnOverride[] | null>(() =>
     objectTypeId !== undefined ? readStoredOverrides(objectTypeId) : null,
   );

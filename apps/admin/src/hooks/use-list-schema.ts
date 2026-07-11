@@ -28,6 +28,10 @@ export interface ListSchemaColumn {
   position: number;
   sortable: boolean;
   system: boolean;
+  /** GRID-P3-01 — full mode only: `show_in_list` default flag. */
+  default?: boolean;
+  /** GRID-P3-01 — full mode only: owning AttributeGroup projection. */
+  group?: { id: string; code: string; label: Record<string, string>; position: number } | null;
 }
 
 export interface ListSchemaResponse {
@@ -45,14 +49,16 @@ export interface ListSchemaResponse {
  */
 export function useListSchema(
   objectTypeId: string | undefined,
+  options: { full?: boolean } = {},
 ): UseQueryResult<ListSchemaResponse> {
+  const full = options.full === true;
   return useQuery({
-    queryKey: ['list-schema', objectTypeId],
+    queryKey: ['list-schema', objectTypeId, full ? 'full' : 'std'],
     enabled: Boolean(objectTypeId),
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const response = await jsonFetch<ListSchemaResponse>(
-        `/api/object_types/${objectTypeId}/list-schema`,
+        `/api/object_types/${objectTypeId}/list-schema${full ? '?full=1' : ''}`,
         { accept: 'application/json' },
       );
 
