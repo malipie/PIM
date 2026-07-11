@@ -51,12 +51,15 @@ final class SystemMenuItemRegistryTest extends TestCase
     }
 
     #[Test]
-    public function workflowIsComingSoon(): void
+    public function workflowShipsAsARoutedEntry(): void
     {
+        // WFL-P3-02 (#2424) — the review queue ships, so the workflow
+        // entry stops being a comingSoon placeholder and routes to
+        // /workflow (still visibility-gated on workflow.view).
         $workflow = SystemMenuItemRegistry::get('workflow');
         self::assertNotNull($workflow);
-        self::assertTrue($workflow['comingSoon']);
-        self::assertNull($workflow['route']);
+        self::assertFalse($workflow['comingSoon']);
+        self::assertSame('/workflow', $workflow['route']);
     }
 
     #[Test]
