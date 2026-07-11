@@ -4170,6 +4170,23 @@
       "assets_few": "{{count}} pliki",
       "assets_many": "{{count}} plików",
       "assets_other": "{{count}} pliku"
-    }
+    },
+    "manager": {
+      "trigger": "Kolumny",
+      "title": "Zarządzaj kolumnami",
+      "search_placeholder": "Szukaj kolumny…",
+      "list_aria": "Kolumny listy",
+      "reset": "Resetuj do domyślnych",
+      "locked": "stała",
+      "drag_aria": "Przeciągnij, aby zmienić kolejność: {{label}}",
+      "move_up_aria": "Przesuń wyżej: {{label}}",
+      "move_down_aria": "Przesuń niżej: {{label}}"
+    },
+    "density": {
+      "normal": "Komfort",
+      "compact": "Kompakt",
+      "aria": "Gęstość wierszy"
+    },
+    "resize_aria": "Zmień szerokość kolumny {{label}}"
   }
 }

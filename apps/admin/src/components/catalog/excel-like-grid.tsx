@@ -15,6 +15,12 @@ export interface ExcelColumn<T extends Record<string, unknown>> {
    * projection under `key` alongside whatever this renders.
    */
   renderDisplay?: (row: T) => React.ReactNode;
+  /**
+   * GRID-P2-02 — the grid-model key this excel column maps back to
+   * (excel keys are row-field aliases like `sku` / `attr:{code}`);
+   * resize commits report this key so overrides land on the model.
+   */
+  modelKey?: string;
 }
 
 interface CellAddress {
@@ -66,10 +72,16 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
   rows,
   columns,
   onCommit,
+  density = 'normal',
+  onColumnResize,
 }: {
   rows: T[];
   columns: ExcelColumn<T>[];
   onCommit: (rowIdx: number, colKey: string, value: unknown) => void;
+  /** GRID-P2-03 — compact rows for spreadsheet-style work. */
+  density?: 'normal' | 'compact';
+  /** GRID-P2-02 — resize commit keyed by the column's `modelKey`. */
+  onColumnResize?: (modelKey: string, width: number) => void;
 }) {
   const [active, setActive] = useState<CellAddress | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<CellAddress | null>(null);
@@ -83,6 +95,16 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
     [columns],
   );
 
+  // GRID-P2-02 — uncommitted drag widths (declared before the virtualizer:
+  // estimateSize closes over them).
+  const resizeRef = useRef<{
+    key: string;
+    modelKey: string;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+  const [liveWidths, setLiveWidths] = useState<Record<string, number>>({});
+
   // Horizontal column virtualizer. Estimates from each column's declared
   // width (falling back to DEFAULT_COLUMN_WIDTH) so spacer math matches the
   // real header/body widths. Overscan keeps a couple of columns mounted on
@@ -91,16 +113,40 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
     horizontal: true,
     count: columns.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (index) => columns[index]?.width ?? DEFAULT_COLUMN_WIDTH,
+    estimateSize: (index) => {
+      const col = columns[index];
+      if (col === undefined) return DEFAULT_COLUMN_WIDTH;
+      return liveWidths[col.key] ?? col.width ?? DEFAULT_COLUMN_WIDTH;
+    },
     overscan: 4,
   });
 
-  const virtualColumns = columnVirtualizer.getVirtualItems();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: measure() is stable; re-run only when widths change.
+  useEffect(() => {
+    columnVirtualizer.measure();
+  }, [liveWidths]);
+
+  const windowColumns = columnVirtualizer.getVirtualItems();
+  // GRID-P2-02 — the identifier column (index 0) must stay mounted for
+  // position:sticky to hold while scrolled; prepend it when the window
+  // starts past it and shave its width off the lead spacer.
+  const firstWindowIndex = windowColumns[0]?.index ?? 0;
+  const pinnedWidth = columns[0]?.width ?? DEFAULT_COLUMN_WIDTH;
+  const virtualColumns =
+    firstWindowIndex > 0
+      ? [
+          { index: 0, start: 0, end: pinnedWidth } as (typeof windowColumns)[number],
+          ...windowColumns,
+        ]
+      : windowColumns;
   const totalWidth = columnVirtualizer.getTotalSize();
   // Width consumed by the off-screen columns before / after the window —
   // rendered as spacer cells so column alignment and horizontal scroll
   // extent stay identical to the non-virtualized table.
-  const leadWidth = virtualColumns.length > 0 ? (virtualColumns[0]?.start ?? 0) : 0;
+  const leadWidth =
+    windowColumns.length > 0
+      ? Math.max(0, (windowColumns[0]?.start ?? 0) - (firstWindowIndex > 0 ? pinnedWidth : 0))
+      : 0;
   const tailWidth =
     virtualColumns.length > 0
       ? Math.max(0, totalWidth - (virtualColumns[virtualColumns.length - 1]?.end ?? 0))
@@ -211,6 +257,8 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
     [active, editing, selectionRect, columns, rows, colIndex, onCommit],
   );
 
+  const widthOf = (col: ExcelColumn<T>): number | undefined => liveWidths[col.key] ?? col.width;
+
   const renderCell = (row: T, rowIdx: number, colIdx: number) => {
     const col = columns[colIdx];
     if (col === undefined) return null;
@@ -228,10 +276,12 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
       // biome-ignore lint/a11y/useKeyWithClickEvents: the parent <table> owns keyboard nav (handleKeyDown).
       <td
         key={col.key}
-        style={{ width: col.width }}
+        style={{ width: widthOf(col), ...(colIdx === 0 ? { left: 0 } : {}) }}
         onClick={(e) => handleCellClick(rowIdx, col.key, e.shiftKey)}
         onDoubleClick={() => handleCellDoubleClick(rowIdx, col.key)}
-        className={`relative border px-2 py-1 ${
+        className={`relative border px-2 ${density === 'compact' ? 'py-0.5 text-[12px]' : 'py-1'} ${
+          colIdx === 0 ? 'sticky z-10 bg-white' : ''
+        } ${
           isPrimary ? 'ring-2 ring-primary' : isActive ? 'bg-primary/10' : ''
         } ${col.readOnly === true ? 'bg-muted/40 text-muted-foreground' : 'cursor-cell'}`}
       >
@@ -277,10 +327,53 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
               return (
                 <th
                   key={col.key}
-                  style={{ width: col.width }}
-                  className="border px-2 py-1 text-left font-medium"
+                  style={{ width: widthOf(col), ...(vc.index === 0 ? { left: 0 } : {}) }}
+                  className={`relative border px-2 text-left font-medium ${
+                    density === 'compact' ? 'py-0.5' : 'py-1'
+                  } ${vc.index === 0 ? 'sticky z-20 bg-muted' : ''}`}
                 >
                   {col.label}
+                  {onColumnResize !== undefined && col.modelKey !== undefined ? (
+                    <button
+                      type="button"
+                      aria-label={`Resize ${col.label}`}
+                      data-testid={`excel-resize-${col.modelKey}`}
+                      onPointerDown={(event) => {
+                        const th = (event.currentTarget as HTMLElement).parentElement;
+                        if (th === null || col.modelKey === undefined) return;
+                        resizeRef.current = {
+                          key: col.key,
+                          modelKey: col.modelKey,
+                          startX: event.clientX,
+                          startWidth: th.offsetWidth,
+                        };
+                        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+                      }}
+                      onPointerMove={(event) => {
+                        const drag = resizeRef.current;
+                        if (drag === null) return;
+                        const width = Math.max(
+                          60,
+                          Math.min(640, drag.startWidth + event.clientX - drag.startX),
+                        );
+                        setLiveWidths((prev) =>
+                          prev[drag.key] === width ? prev : { ...prev, [drag.key]: width },
+                        );
+                      }}
+                      onPointerUp={() => {
+                        const drag = resizeRef.current;
+                        if (drag === null) return;
+                        resizeRef.current = null;
+                        setLiveWidths((prev) => {
+                          const width = prev[drag.key];
+                          if (width !== undefined) onColumnResize(drag.modelKey, width);
+                          const { [drag.key]: _done, ...rest } = prev;
+                          return rest;
+                        });
+                      }}
+                      className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize touch-none hover:bg-zinc-300/60"
+                    />
+                  ) : null}
                 </th>
               );
             })}
