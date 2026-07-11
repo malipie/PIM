@@ -4055,6 +4055,17 @@
       "system": "System",
       "auto_unpublish": "auto-unpublish",
       "bulk": "bulk"
+    },
+    "queue": {
+      "title": "Workflow — Do przeglądu",
+      "subtitle": "Obiekty czekające na decyzję (approve / reject).",
+      "empty_title": "Nic do przeglądu",
+      "empty_body": "Zgłoszone obiekty pojawią się tutaj automatycznie.",
+      "col_object": "Obiekt",
+      "col_completeness": "Kompletność",
+      "col_submitted": "Zgłoszono",
+      "select_all": "Zaznacz wszystkie",
+      "decided": "Zastosowano: {{count}} (pominięte: {{locked}})"
     }
   }
 }

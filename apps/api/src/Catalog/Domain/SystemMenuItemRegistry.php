@@ -65,10 +65,13 @@ final class SystemMenuItemRegistry
                 'protected' => false,
             ],
             'workflow' => [
-                'route' => null,
+                // WFL-P3-02 (#2424) — the review queue ships; the entry
+                // stops being a comingSoon placeholder. Menu visibility
+                // stays gated on workflow.view (menu-permissions.ts).
+                'route' => '/workflow',
                 'icon' => 'Workflow',
                 'labelKey' => 'nav.workflow',
-                'comingSoon' => true,
+                'comingSoon' => false,
                 'protected' => false,
             ],
             // Top-level „Integracje" hub — Imports MVP (0.13/UI-09) + sub-tab

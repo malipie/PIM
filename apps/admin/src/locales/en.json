@@ -4035,6 +4035,17 @@
       "system": "System",
       "auto_unpublish": "auto-unpublish",
       "bulk": "bulk"
+    },
+    "queue": {
+      "title": "Workflow — Review queue",
+      "subtitle": "Objects waiting for a decision (approve / reject).",
+      "empty_title": "Nothing to review",
+      "empty_body": "Submitted objects will show up here automatically.",
+      "col_object": "Object",
+      "col_completeness": "Completeness",
+      "col_submitted": "Submitted",
+      "select_all": "Select all",
+      "decided": "Applied: {{count}} (skipped: {{locked}})"
     }
   }
 }

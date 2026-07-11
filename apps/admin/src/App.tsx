@@ -195,6 +195,10 @@ const ProductShowPage = lazyPage(
   'ProductShowPage',
 );
 const CatalogsPdfPage = lazyPage(() => import('@/features/catalogs-pdf'), 'CatalogsPdfPage');
+const ReviewQueuePage = lazyPage(
+  () => import('@/features/workflow/ReviewQueuePage'),
+  'ReviewQueuePage',
+);
 const CatalogWizardPage = lazyPage(
   () => import('@/features/catalogs-pdf/wizard/CatalogWizardPage'),
   'CatalogWizardPage',
@@ -577,6 +581,16 @@ function App() {
                     deep-links here lands on Forbidden403Page instead of the
                     shell; per-action writes stay gated by their own BE checks
                     (integration.admin). Mirrors MENU_PERMISSIONS.catalogs_pdf. */}
+                  {/* WFL-P3-02 (#2424) — review queue; mirror of
+                      MENU_PERMISSIONS.workflow (workflow.view). */}
+                  <Route
+                    path="/workflow"
+                    element={
+                      <PermissionRoute anyOf={['workflow.view']}>
+                        <ReviewQueuePage />
+                      </PermissionRoute>
+                    }
+                  />
                   <Route
                     path="/catalogs-pdf"
                     element={
