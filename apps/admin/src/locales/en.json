@@ -1798,7 +1798,12 @@
       "disable": "Disable",
       "delete": "Delete",
       "toggle_done": "Updated {{count}} products",
-      "toggle_partial": "Updated {{processed}}, errors: {{errors}}"
+      "toggle_partial": "Updated {{processed}}, errors: {{errors}}",
+      "change_status": "Change status",
+      "change_status_title": "Change status ({{count}})",
+      "change_status_body": "The transition applies per object — rows blocked by state, permissions or the completeness gate are skipped and reported.",
+      "transition_label": "Transition",
+      "status_applied": "Status changed: {{count}} (skipped: {{skipped}})"
     },
     "show": {
       "tabs_aria": "Product detail tabs",

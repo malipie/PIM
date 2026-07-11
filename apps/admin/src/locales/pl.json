@@ -1815,7 +1815,12 @@
       "disable": "Wyłącz",
       "delete": "Usuń",
       "toggle_done": "Zaktualizowano {{count}} produktów",
-      "toggle_partial": "Zaktualizowano {{processed}}, błędów: {{errors}}"
+      "toggle_partial": "Zaktualizowano {{processed}}, błędów: {{errors}}",
+      "change_status": "Zmień status",
+      "change_status_title": "Zmień status ({{count}})",
+      "change_status_body": "Przejście stosowane per obiekt — wiersze zablokowane przez stan, uprawnienia lub gate kompletności zostaną pominięte i zaraportowane.",
+      "transition_label": "Przejście",
+      "status_applied": "Status zmieniony: {{count}} (pominięte: {{skipped}})"
     },
     "show": {
       "tabs_aria": "Karty szczegółów produktu",
