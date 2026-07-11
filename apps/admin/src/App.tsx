@@ -195,10 +195,7 @@ const ProductShowPage = lazyPage(
   'ProductShowPage',
 );
 const CatalogsPdfPage = lazyPage(() => import('@/features/catalogs-pdf'), 'CatalogsPdfPage');
-const ReviewQueuePage = lazyPage(
-  () => import('@/features/workflow/ReviewQueuePage'),
-  'ReviewQueuePage',
-);
+const WorkflowPage = lazyPage(() => import('@/features/workflow/WorkflowPage'), 'WorkflowPage');
 const CatalogWizardPage = lazyPage(
   () => import('@/features/catalogs-pdf/wizard/CatalogWizardPage'),
   'CatalogWizardPage',
@@ -587,7 +584,7 @@ function App() {
                     path="/workflow"
                     element={
                       <PermissionRoute anyOf={['workflow.view']}>
-                        <ReviewQueuePage />
+                        <WorkflowPage />
                       </PermissionRoute>
                     }
                   />

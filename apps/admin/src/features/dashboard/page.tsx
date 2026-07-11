@@ -3,6 +3,7 @@ import { AgentCommandHero } from './components/AgentCommandHero';
 import { CatalogHealthCard } from './components/CatalogHealthCard';
 import { DashboardGreeting } from './components/DashboardGreeting';
 import { KpiBand } from './components/KpiBand';
+import { MyTasksCard } from './components/MyTasksCard';
 import { TeamActivityCard } from './components/TeamActivityCard';
 
 /**
@@ -31,6 +32,7 @@ export function DashboardPage() {
         <CatalogHealthCard />
         <TeamActivityCard />
       </div>
+      <MyTasksCard />
       <ActionCenter />
     </div>
   );

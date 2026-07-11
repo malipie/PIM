@@ -229,8 +229,7 @@ export function ReviewQueuePage() {
   const selectedIds = useMemo(() => [...selected], [selected]);
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-6" data-testid="review-queue-page">
-      {/* Page title comes from the shell topbar breadcrumb (hub pattern). */}
+    <div data-testid="review-queue-page">
       <div className="mb-2 flex items-center justify-end gap-2">
         {canDecide && selected.size > 0 ? (
           <>
