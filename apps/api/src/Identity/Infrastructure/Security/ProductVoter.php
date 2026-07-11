@@ -50,10 +50,48 @@ final class ProductVoter extends AbstractPrdVoter
             // on the PATCH surface. Remaining uppercase aliases
             // (READ/CREATE/DELETE) are audited in WFL-P6-01.
             'UPDATE' => 'products.edit',
+            // WFL-P6-02 (#2435) — the products sugar path uses a
+            // kind-specific attribute for creation because at POST time
+            // the voter subject is the bare CatalogObject class string
+            // (no instance, no kind). A generic 'CREATE' alias here
+            // would leak products.add onto /api/categories and
+            // /api/objects, which share that attribute — the same
+            // escalation shape as GOLIVE #2129. CatalogObjectVoter
+            // aliases CREATE_PRODUCT to legacy object.write so pre-PRD
+            // principals keep working (affirmative strategy).
+            'CREATE_PRODUCT' => 'products.add',
+            // Same WFL-P6-02 story for reads: the item GET carries an
+            // instance (kind-checkable) but the collection GET carries
+            // the class string shared with the other kinds' lists, so
+            // both ask for READ_PRODUCT instead of aliasing 'READ'.
+            'READ_PRODUCT' => 'products.view',
+            // WFL-P6-02 (#2435) — the admin detail page loads objects
+            // through the poly-kind /api/objects/{id} item GET, which
+            // asks for plain 'READ' with an instance subject. Instances
+            // are kind-checked by acceptsSubject(), so this alias only
+            // ever grants products; supports() below keeps this voter
+            // out of class-string 'READ' (collection) decisions where
+            // the kind is unknowable.
+            'READ' => 'products.view',
             'delete' => 'products.delete',
             'bulk_operations' => 'products.bulk_operations',
             'approve_pending_changes' => 'products.approve_pending_changes',
         ];
+    }
+
+    protected function supports(string $attribute, mixed $subject): bool
+    {
+        // Class-string 'READ' is the shared collection gate for every
+        // kind's list — without an instance there is no kind to check,
+        // so granting products.view here would leak onto /api/objects
+        // and the other kinds' collections. Abstain and leave those to
+        // the legacy CatalogObjectVoter; collections that should follow
+        // products.view ask for READ_PRODUCT explicitly.
+        if ('READ' === $attribute && \is_string($subject)) {
+            return false;
+        }
+
+        return parent::supports($attribute, $subject);
     }
 
     protected function subjectClass(): string

@@ -29,6 +29,13 @@ final class CatalogObjectVoter extends AbstractRbacVoter
         return [
             'READ' => 'read',
             'CREATE' => 'write',
+            // WFL-P6-02 (#2435) — the products sugar path asks for
+            // CREATE_PRODUCT so ProductVoter can grant products.add
+            // without leaking onto the other kinds' POSTs. Legacy
+            // object.write principals keep creating products through
+            // this alias (affirmative strategy: either voter grants).
+            'CREATE_PRODUCT' => 'write',
+            'READ_PRODUCT' => 'read',
             'UPDATE' => 'write',
             'WRITE' => 'write',
             'DELETE' => 'delete',
