@@ -3029,3 +3029,24 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 - **Bulk selekcja przez `selected_ids` (ścieżka modala); `filter_dsl`-only „wszystkie pasujące" cross-page odłożone** — dedykowany resolver poza zakresem P6-03, `selected_ids` pokrywa flow UI.
 - **Bundle P5-04+P5-05 (#2342/#2343) za zgodą operatora** — para producer-consumer na jednym ekranie Settings→AI, jeden CI, osobne proofy na każdym issue. [SEC]/granice BC nadal osobno.
 - **`noLabelWithoutControl` w biome.json dostał `inputComponents: [Input,Textarea,Combobox,MultiSelect]`** — idiom label-owija-custom-kontrolkę jest poprawny a11y (implicit association), reguła statycznie nie widziała przez design-system komponenty; renderowany DOM waliduje axe w e2e.
+
+## Lessons z epiku WFL (workflow edytorski, #2409–#2436) — marsz 2026-07-09→11
+
+### Wzorce, które zadziałały
+- **Runtime loader za flagą bez rozgałęziania listenerów (WFL-P5-01)**: `EditorialWorkflowProvider` buduje maszynę z DB zachowując tę samą NAZWĘ `object_editorial` + współdzielony EventDispatcher → guard/gate/log/recorder działają identycznie dla YAML i DB. Metadane per-przejście przez `InMemoryMetadataStore`; guardy czytają `$event->getMetadata(key, transition)` z fallbackiem na statyczną mapę. Cache workera keyed `definitionId@updatedAt` inwaliduje bez restartu.
+- **`Event::getWorkflow()` deprecated od symfony/workflow 7.3** → używać `$event->getMetadata('key', $event->getTransition())` zamiast `$event->getWorkflow()->getMetadataStore()->getMetadata(...)`.
+- **Runtime feature flag do FE przez `GET /api/auth/me`**: nowe pole `feature_flags: {flag: bool}` (build-time `import.meta.env` nie widzi deployment toggle). Hydratacja do `identity.featureFlags: ReadonlySet`, helper `hasFeature`. Sidebar item filtrowany per `permission` + `featureFlag`.
+
+### Pułapki (naprawione)
+- **`jsonFetch` (apps/admin/src/lib/http.ts) NIE ma klucza `headers`** — kontrakt to `{method, body (obiekt, nie JSON.stringify), contentType, accept, query}`. Wzorzec `headers: {'Content-Type': ...} + body: JSON.stringify(...)` = TS2353 + podwójne kodowanie. Bug powielił się w 4 plikach workflow FE (api.ts, edit-lock.ts, tasks-api.ts, ReviewQueuePage bulk) bo kopiowany.
+- **`PageHeader` (ui-v2) to breadcrumb z `items[]`, NIE tytuł strony** — hub pattern (workflow, catalogs-pdf) zostawia tytuł topbarowi. `title`/`subtitle` props nie istnieją → TS2322.
+- **Taski workflow NIE wysyłają własnego powiadomienia** — fan-out zdarzenia (WFL-P2-02) już powiadomił tę samą publiczność; `task_assigned` na reject dublował `workflow.rejected` dla autora → złamany kontrakt NotificationsApiTest. Reguła: jedno zdarzenie = jedno powiadomienie.
+- **E2E `page.request` niesie TYLKO cookies, API chce Bearer** — setup calls (`/api/object_types`, `/api/objects`) wracały puste → „No product ObjectType seeded". Mint token przez `/api/auth/login` i przekaż `authorization` na setup/cleanup (wzorzec spec #1351).
+- **Dev auth_login limiter 200→400**: suita 223 specy, kilka mintuje dodatkowy Bearer → przekroczenie 200 loginów/15min → `loginAsAdmin` 429-loop do test timeout (view-13 flake). Prod trzyma 5/15min.
+- **Flip menu comingSoon→false łamie pre-existing unit test** — `SystemMenuItemRegistryTest::workflowIsComingSoon` asertował placeholder; ticket flipujący registry MUSI zaktualizować ten test w tym samym PR.
+- **`WORKFLOW_CUSTOM_DEFINITIONS` musi iść do api ORAZ worker** w docker-compose (bulk change_status handler resolvuje przez provider po stronie workera) + CI Playwright env `"true"` w obu `compose up` (api standalone + full stack).
+
+### Decyzje świadome
+- **Self-approve dozwolony w MVP** (brak four-eyes) — pin `WorkflowSecurityApiTest::selfApproveIsAllowedInMvp`; kandydat Fazy 2 (opcjonalna polityka per definicja). Udokumentowane w `docs/workflow.md` §7.
+- **Builder definicji form-based, NIE canvas-graph** (WFL-P5-03) — estymata realna, a11y za darmo z shadcn; canvas designer odłożony do Fazy 2 jeśli będzie popyt.
+- **Pakiety PR A–G** (pary ticketów, jeden branch/PR/CI, issues 1:1) — redukcja ~25→~18 przebiegów CI bez utraty granularności zamknięć (CLOSED MEANS CLOSED per issue z osobnym proofem).
