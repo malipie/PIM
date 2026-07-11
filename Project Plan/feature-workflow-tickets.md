@@ -144,10 +144,10 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Powiązane ADR: 0012 (CQRS custom routes), 0013 (Deptrac), 0015 (cross-BC bare UUID), 0020 (OpenAPI custom routes), 0024 (pending_changes single gate), 0026 (dashboard read model). Wpis do indeksu `docs/adr/README.md`.
 - **Poza zakresem:** implementacja (P0-02+); schema tabel (kierunek, nie kolumny); UI.
 - **AC:**
-  - [ ] `docs/adr/0029-workflow-engine-and-placement.md` istnieje, status Accepted, zgodny z template.
-  - [ ] Jednoznaczne decyzje: silnik+typ+marking store; placement BC; mapa guard→permission; import bypass; definicje DB = M5 za flagą.
-  - [ ] Sekcja konsekwencji opisuje breaking change PATCH `status` i plan migracji konsumentów.
-  - [ ] „Powiązane ADR" linkuje istniejące pliki 0012/0013/0015/0020/0024/0026.
+  - [x] `docs/adr/0029-workflow-engine-and-placement.md` istnieje, status Accepted, zgodny z template.
+  - [x] Jednoznaczne decyzje: silnik+typ+marking store; placement BC; mapa guard→permission; import bypass; definicje DB = M5 za flagą.
+  - [x] Sekcja konsekwencji opisuje breaking change PATCH `status` i plan migracji konsumentów.
+  - [x] „Powiązane ADR" linkuje istniejące pliki 0012/0013/0015/0020/0024/0026.
 - **Smoke:** wszystkie decyzje rozstrzygnięte (nie „proponowane"); linki wskazują istniejące pliki; spójność z `deptrac.yaml`.
 - **Reuse:** `docs/adr/adr-template.md` · `docs/adr/0023-konfigurator-xml-placement.md` + `0027-catalog-pdf-renderer-port.md` (wzorce placement ADR) · `docs/adr/0024-agent-removable-bc-and-tool-registry.md`.
 - **Referencje:** `Project Plan/PRD/PRD-PIM-rbac.md` §3.8 · §Benchmark + §Filary tego pliku.
@@ -166,8 +166,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - `deptrac` 0 nowych naruszeń; bez wpisów `skip_violations`.
 - **Poza zakresem:** jakakolwiek logika domenowa.
 - **AC:**
-  - [ ] Warstwy + ruleset w `deptrac.yaml` zgodne z ADR-0029; CI deptrac green.
-  - [ ] Szkielet `src/Workflow/` z autoloadem działa (`bin/console` bez błędów DI).
+  - [x] Warstwy + ruleset w `deptrac.yaml` zgodne z ADR-0029; CI deptrac green.
+  - [x] Szkielet `src/Workflow/` z autoloadem działa (`bin/console` bez błędów DI).
 - **Smoke:** `vendor/bin/deptrac` w kontenerze `pim-api-1` → 0 violations.
 - **Reuse:** wzorzec warstw Feed/Catalog w `deptrac.yaml` (XMLF-P0-02, CPDF-P0-02).
 - **DoD:** standard (BE, bez endpointów/FE).
@@ -186,10 +186,10 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Testy unit: pełna macierz can/apply (dozwolone i zabronione pary stanów).
 - **Poza zakresem:** guardy permission (M1); log przejść (P0-04); endpointy przejść (P0-05); UI.
 - **AC:**
-  - [ ] Workflow `object_editorial` zarejestrowany; `debug:config framework workflows` pokazuje definicję.
-  - [ ] Macierz przejść pokryta testami: m.in. draft→archived OK, review→archived ZABRONIONE, published→review ZABRONIONE.
-  - [ ] PATCH `status` niezgodny z przejściem → 409 z RFC 7807; zgodny → przejście przez maszynę (wpis eventowy).
-  - [ ] `?status=review` filtruje na liście obiektów.
+  - [x] Workflow `object_editorial` zarejestrowany; `debug:config framework workflows` pokazuje definicję.
+  - [x] Macierz przejść pokryta testami: m.in. draft→archived OK, review→archived ZABRONIONE, published→review ZABRONIONE.
+  - [x] PATCH `status` niezgodny z przejściem → 409 z RFC 7807; zgodny → przejście przez maszynę (wpis eventowy).
+  - [x] `?status=review` filtruje na liście obiektów.
 - **Smoke:** curl PATCH draft→published na `pim.localhost` → 200 (przejście `publish` topologicznie dozwolone), published→review → 409.
 - **Reuse:** `CatalogObject.php` · `StatusFilter.php` · `CatalogObjectPatchInput.php` · `UpdateCatalogObjectHandler.php`.
 - **DoD:** standard.
@@ -206,9 +206,9 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Integration test: przejście → wpis; cross-tenant read = 0.
 - **Poza zakresem:** endpoint listy (P0-05); UI timeline (P3-05).
 - **AC:**
-  - [ ] Każde przejście (PATCH i przyszły endpoint) zostawia wpis z from/to/actor.
-  - [ ] Cross-tenant = 0; TenantAudit green; RLS aktywne.
-  - [ ] Komentarz i context zapisują się, gdy podane.
+  - [x] Każde przejście (PATCH i przyszły endpoint) zostawia wpis z from/to/actor.
+  - [x] Cross-tenant = 0; TenantAudit green; RLS aktywne.
+  - [x] Komentarz i context zapisują się, gdy podane.
 - **Smoke:** przejście na `pim.localhost` → `psql` (user `pim`, omija RLS) pokazuje wpis z poprawnym tenant_id.
 - **Reuse:** `apps/api/migrations/Version20260702090000.php` (wzorzec RLS) · dh-auditor.
 - **DoD:** standard.
@@ -226,9 +226,9 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - OpenAPI przez `CustomRouteOpenApiFactory` + snapshot `docs/api-spec/v0.json`; ApiTestCase 401/403/404/409/422 + happy.
 - **Poza zakresem:** mapa guard→permission (P1-01); FE.
 - **AC:**
-  - [ ] POST wykonuje przejście + log + komentarz; niedozwolone → 409 z czytelnymi kodami blokad.
-  - [ ] GET zwraca enabled/blocked spójnie z maszyną (test: published → tylko `unpublish`/`archive`).
-  - [ ] Log endpoint stronicuje cursor-based; OpenAPI snapshot zaktualizowany (bez driftu).
+  - [x] POST wykonuje przejście + log + komentarz; niedozwolone → 409 z czytelnymi kodami blokad.
+  - [x] GET zwraca enabled/blocked spójnie z maszyną (test: published → tylko `unpublish`/`archive`).
+  - [x] Log endpoint stronicuje cursor-based; OpenAPI snapshot zaktualizowany (bez driftu).
 - **Smoke:** pełna pętla curl na `pim.localhost`: GET → POST submit_for_review → GET (place=review) → POST approve → published.
 - **Reuse:** `CustomRouteOpenApiFactory` · wzorce controllerów `Import/Presentation/Controller/ImportSessionStateController.php` (state endpoints) · RFC 7807 infra.
 - **DoD:** standard.
@@ -248,9 +248,9 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Failing-test-first: ApiTestCase per rola (10 ról × kluczowe przejścia — marketing nie approve'uje, approver nie edytuje draftu cudzą ścieżką itd.); test że `GET /workflow` zwraca tylko przejścia dozwolone dla danego usera.
 - **Poza zakresem:** enforcement edycji pól per stan (P1-02); auto-unpublish (P1-03).
 - **AC:**
-  - [ ] Macierz PRD §3.8 (per-rola × przejście) pokryta testami; wszystkie zielone.
-  - [ ] Odmowa przejścia → 409 z kodem brakującej permission (nie generyczne 403 — user ma wiedzieć czemu).
-  - [ ] Role builder w Settings pokazuje nowe kody; snapshot OpenAPI bez zmian kontraktu (guardy nie zmieniają tras).
+  - [x] Macierz PRD §3.8 (per-rola × przejście) pokryta testami; wszystkie zielone.
+  - [x] Odmowa przejścia → 409 z kodem brakującej permission (nie generyczne 403 — user ma wiedzieć czemu).
+  - [x] Role builder w Settings pokazuje nowe kody; snapshot OpenAPI bez zmian kontraktu (guardy nie zmieniają tras).
 - **Smoke:** na `pim.localhost` konto restricted (invitation dev-token, `role_code=marketing`): submit_for_review OK, approve → 409/403; admin: approve OK.
 - **Reuse:** `WorkflowStatePolicy` · `PermissionResolver` · `PrdRoleTemplates` · wzorzec restricted-user z lekcji `bulk-endpoint-permission-escalation`.
 - **DoD:** standard + failing-test-first udokumentowany w PR.
@@ -268,10 +268,10 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Failing-test-first: macierz stan × permission × ścieżka zapisu (PATCH, values, bulk, grid).
 - **Poza zakresem:** auto-unpublish (P1-03); UI lock (P3-03).
 - **AC:**
-  - [ ] Marketing nie zapisze published żadną ścieżką (PATCH/values/bulk/grid) — testy na każdą.
-  - [ ] `edit_any_state` (Owner/Admin) edytuje published; `edit_in_review` edytuje review; archived read-only dla wszystkich.
-  - [ ] Import na published przechodzi (test integracyjny z provenance=import).
-  - [ ] 403 zawiera kod stanu + akcję zalecaną (kontrakt udokumentowany w OpenAPI).
+  - [x] Marketing nie zapisze published żadną ścieżką (PATCH/values/bulk/grid) — testy na każdą.
+  - [x] `edit_any_state` (Owner/Admin) edytuje published; `edit_in_review` edytuje review; archived read-only dla wszystkich.
+  - [x] Import na published przechodzi (test integracyjny z provenance=import).
+  - [x] 403 zawiera kod stanu + akcję zalecaną (kontrakt udokumentowany w OpenAPI).
 - **Smoke:** restricted user na `pim.localhost`: edycja pola na published → 403 z komunikatem; admin → 200.
 - **Reuse:** `WorkflowStatePolicy` (as-is) · `CatalogObjectVoter`/`ObjectScopedVoter` · `EndpointGuardListener`.
 - **DoD:** standard + failing-test-first.
@@ -288,9 +288,9 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Testy: atomowość (fail edycji → rollback przejścia), audit flag, macierz ról.
 - **Poza zakresem:** UI (P3-03); request-unpublish flow (P3-03 + P4-02).
 - **AC:**
-  - [ ] Approver edytuje published jednym requestem; obiekt ląduje w draft; audit + log z flagą.
-  - [ ] Rollback przejścia gdy zapis edycji failuje (test transakcyjności).
-  - [ ] Marketing → 403 z `request_unpublish_available`.
+  - [x] Approver edytuje published jednym requestem; obiekt ląduje w draft; audit + log z flagą.
+  - [x] Rollback przejścia gdy zapis edycji failuje (test transakcyjności).
+  - [x] Marketing → 403 z `request_unpublish_available`.
 - **Smoke:** approver na `pim.localhost` edytuje published pole → 200, badge draft, wpis w timeline z flagą auto-unpublish (psql).
 - **Reuse:** `WorkflowStatePolicy::requiresAutoUnpublish()` · transakcje Doctrine w `PendingBatchCommitter` (wzorzec atomowości).
 - **DoD:** standard.
@@ -308,10 +308,10 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Testy: gate off = bez zmian; on global; on per_channel; edge: brak rules → completeness 100 (fallback z kontraktu §3).
 - **Poza zakresem:** UI konfiguracji gate w builderze (M5); UI tooltipa (P3-01).
 - **AC:**
-  - [ ] Gate OFF (default) → zachowanie bez zmian (testy regresji przejść).
-  - [ ] Gate ON: publish/approve poniżej progu → 409 z listą braków per atrybut; ≥ progu → przechodzi.
-  - [ ] Scope per_channel czyta `completeness.per_channel` zgodnie z kontraktem §3 (optional-safe).
-  - [ ] `docs/api/jsonb-schemas.md` zaktualizowany o `workflow_publish_gate`.
+  - [x] Gate OFF (default) → zachowanie bez zmian (testy regresji przejść).
+  - [x] Gate ON: publish/approve poniżej progu → 409 z listą braków per atrybut; ≥ progu → przechodzi.
+  - [x] Scope per_channel czyta `completeness.per_channel` zgodnie z kontraktem §3 (optional-safe).
+  - [x] `docs/api/jsonb-schemas.md` zaktualizowany o `workflow_publish_gate`.
 - **Smoke:** ustaw gate 100% na Product przez API, obiekt z brakiem → approve 409 z listą; uzupełnij pole → approve 200.
 - **Reuse:** `SqlCompletenessReport`/`CompletenessReportPort` · `objects.completeness_pct` · kontrakt JSONB §3.
 - **DoD:** standard.
@@ -329,9 +329,9 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Testy: mixed states (część przechodzi, część blokowana — raport per obiekt), eskalacja (marketing bulk approve → wszystkie blocked), async path (drain in-memory transport w CI — lekcja `ci-inmemory-messenger-drain`).
 - **Poza zakresem:** FE (P3-04).
 - **AC:**
-  - [ ] Bulk 100 obiektów draft→review działa; obiekt z blokadą failuje pojedynczo, nie blokując reszty; raport per obiekt z powodami.
-  - [ ] Marketing NIE wykona bulk approve (test eskalacji per-action).
-  - [ ] Async > progu: job w kolejce `import`, wynik przez Mercure, memory-safe (batch+clear).
+  - [x] Bulk 100 obiektów draft→review działa; obiekt z blokadą failuje pojedynczo, nie blokując reszty; raport per obiekt z powodami.
+  - [x] Marketing NIE wykona bulk approve (test eskalacji per-action).
+  - [x] Async > progu: job w kolejce `import`, wynik przez Mercure, memory-safe (batch+clear).
 - **Smoke:** bulk submit_for_review 20 produktów z grida curl-em → raport 20 ok; bulk approve restricted userem → 100% blocked.
 - **Reuse:** `BulkObjectsController` (mapping) · `AbstractBatchHandler` · lekcja `export-async-dev-worker-queue` (kolejka `import` w dev workerze).
 - **DoD:** standard.
@@ -351,8 +351,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Testy integracyjne: przejście → event + hub message (transport in-memory, drain — lekcja CI).
 - **Poza zakresem:** persystencja notyfikacji (P2-02); FE (P2-03/M3).
 - **AC:**
-  - [ ] Każde z 7 przejść emituje event z pełnym payloadem.
-  - [ ] Mercure message na obu topicach przy przejściu (test integracyjny).
+  - [x] Każde z 7 przejść emituje event z pełnym payloadem.
+  - [x] Mercure message na obu topicach przy przejściu (test integracyjny).
 - **Smoke:** `curl -N` na topic `workflow/{tenant}` podczas przejścia w drugiej sesji → event widoczny.
 - **Reuse:** infra Mercure + wzorce topiców `catalog-runs.{id}` · `recordThat()` w `CatalogObject`.
 - **DoD:** standard.
@@ -371,9 +371,9 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - OpenAPI + ApiTestCase (w tym IDOR: user A nie czyta notyfikacji usera B).
 - **Poza zakresem:** FE dzwonek (P2-03); email (świadome odcięcie); notyfikacje zadań (P4-02 emituje przez ten port).
 - **AC:**
-  - [ ] Submit → approverzy mają notyfikację (persystentna, przeżywa relogin); reject → autor ma, z komentarzem.
-  - [ ] Mark-read/read-all działa; unread count spójny; IDOR-test green; cross-tenant 0.
-  - [ ] Mercure user-topic dostaje event przy emisji.
+  - [x] Submit → approverzy mają notyfikację (persystentna, przeżywa relogin); reject → autor ma, z komentarzem.
+  - [x] Mark-read/read-all działa; unread count spójny; IDOR-test green; cross-tenant 0.
+  - [x] Mercure user-topic dostaje event przy emisji.
 - **Smoke:** dwie sesje na `pim.localhost` (marketing + admin): submit marketingiem → notyfikacja u admina po reloginie.
 - **Reuse:** wzorzec thin BC Dashboard (ADR-0026) · migracja RLS `Version20260702090000.php` · Mercure.
 - **DoD:** standard.
@@ -390,8 +390,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Playwright: notyfikacja pojawia się live (druga sesja robi submit), klik nawiguje.
 - **Poza zakresem:** strona „wszystkie notyfikacje" (dropdown wystarcza w MVP epiku); preferencje per user.
 - **AC:**
-  - [ ] Badge live bez refresh; klik → produkt + read; read-all zeruje badge.
-  - [ ] axe 0 serious/critical; działa po polsku (seed `i18nextLng=pl` w testach).
+  - [x] Badge live bez refresh; klik → produkt + read; read-all zeruje badge.
+  - [x] axe 0 serious/critical; działa po polsku (seed `i18nextLng=pl` w testach).
 - **Smoke:** pełna pętla na `pim.localhost` z dwiema sesjami wg SMOKE TEST RULE (Network 200, wynik widoczny, konsola czysta).
 - **Reuse:** wzorce Mercure FE (`useFeedRunsStream`) · toasty · dropdown ui-v2.
 - **DoD:** standard.
@@ -412,9 +412,9 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - i18n pl/en; axe; Playwright: happy (submit→approve adminem) + edge (przycisk approve niewidoczny/disabled dla marketing — role locators, lekcja gotchas).
 - **Poza zakresem:** lock UX published (P3-03); kolejka (P3-02); timeline (P3-05).
 - **AC:**
-  - [ ] Badge odzwierciedla stan live (Mercure `objects/{id}/workflow` lub refetch po akcji).
-  - [ ] Przyciski = dokładnie enabled_transitions z API; blocked z czytelnym tooltipem po polsku.
-  - [ ] Reject bez komentarza niemożliwy (walidacja w dialogu).
+  - [x] Badge odzwierciedla stan live (Mercure `objects/{id}/workflow` lub refetch po akcji).
+  - [x] Przyciski = dokładnie enabled_transitions z API; blocked z czytelnym tooltipem po polsku.
+  - [x] Reject bez komentarza niemożliwy (walidacja w dialogu).
 - **Smoke:** SMOKE TEST RULE na `pim.localhost`: klik submit → 200 → badge review → konsola czysta.
 - **Reuse:** `StatusPill` · dialogi ui-v2 · `use-object-list` (badge na liście).
 - **DoD:** standard.
@@ -432,9 +432,9 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - i18n; axe; Playwright: approve z kolejki znika z listy; marketing nie widzi akcji approve.
 - **Poza zakresem:** zadania (M4); saved views kolejki.
 - **AC:**
-  - [ ] `/workflow` renderuje kolejkę z metadanymi zgłoszenia i completeness; sidebar bez `comingSoon`.
-  - [ ] Approve/reject inline + bulk działają; lista odświeża się live z drugiej sesji.
-  - [ ] Menu niewidoczne bez `workflow.view` (test).
+  - [x] `/workflow` renderuje kolejkę z metadanymi zgłoszenia i completeness; sidebar bez `comingSoon`.
+  - [x] Approve/reject inline + bulk działają; lista odświeża się live z drugiej sesji.
+  - [x] Menu niewidoczne bez `workflow.view` (test).
 - **Smoke:** SMOKE TEST RULE: submit z sesji A → pojawia się w kolejce sesji B bez refresh → approve → znika.
 - **Reuse:** `AgentInboxPage` (kalka layoutu inbox) · `HistoryTable` · `PillTabs` · `use-object-list`.
 - **DoD:** standard.
@@ -452,9 +452,9 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - i18n; axe; Playwright: marketing widzi banner + request; approver unpublish&edit.
 - **Poza zakresem:** zadanie request_unpublish (P4-02 — tu tylko notyfikacja).
 - **AC:**
-  - [ ] Published dla marketing: pola disabled, banner, Request unpublish wysyła i potwierdza toastem.
-  - [ ] Approver: Unpublish & edit działa jednym flow; badge po zapisie = draft.
-  - [ ] Review/archived pokazują właściwe bannery wg permission.
+  - [x] Published dla marketing: pola disabled, banner, Request unpublish wysyła i potwierdza toastem.
+  - [x] Approver: Unpublish & edit działa jednym flow; badge po zapisie = draft.
+  - [x] Review/archived pokazują właściwe bannery wg permission.
 - **Smoke:** SMOKE TEST RULE dwiema rolami wg scenariusza PRD.
 - **Reuse:** kody błędów z P1-02/P1-03 · `NotifierPort` (P2-02) · bannery/dialogi ui-v2.
 - **DoD:** standard.
@@ -471,8 +471,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - i18n; axe; Playwright: mixed selection (draft+published) → raport pokazuje częściowe blokady.
 - **Poza zakresem:** zapisy segmentów jako work-queue (Faza 2 — smart lists).
 - **AC:**
-  - [ ] Bulk submit_for_review z grida działa; raport per obiekt czytelny po polsku.
-  - [ ] Selekcja mixed states nie blokuje całości; wyniki jasno rozdzielone.
+  - [x] Bulk submit_for_review z grida działa; raport per obiekt czytelny po polsku.
+  - [x] Selekcja mixed states nie blokuje całości; wyniki jasno rozdzielone.
 - **Smoke:** SMOKE TEST RULE: 5 draftów → bulk submit → 5× review w gridzie.
 - **Reuse:** `BulkActionsToolbar` · raport wyników bulk (istniejące wzorce bulk edit).
 - **DoD:** standard.
@@ -488,8 +488,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - i18n; axe.
 - **Poza zakresem:** historia zmian wartości (to audit/wersjonowanie — poza epikiem).
 - **AC:**
-  - [ ] Timeline pokazuje wszystkie przejścia z komentarzami; „pokaż starsze" dociąga kolejne strony.
-  - [ ] Wpis auto-unpublish ma wyróżnik wizualny.
+  - [x] Timeline pokazuje wszystkie przejścia z komentarzami; „pokaż starsze" dociąga kolejne strony.
+  - [x] Wpis auto-unpublish ma wyróżnik wizualny.
 - **Smoke:** SMOKE TEST RULE: wykonaj 3 przejścia → timeline pokazuje 3 wpisy w dobrej kolejności.
 - **Reuse:** `HistoryTable`/timeline wzorce · endpoint z P0-05.
 - **DoD:** standard.
@@ -508,8 +508,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - ApiTestCase: 401/403/404 + IDOR (complete cudzego bez permission = 403) + `mine` z rolą.
 - **Poza zakresem:** automatyka (P4-02); FE (P4-03); SLA/eskalacje (Faza 2).
 - **AC:**
-  - [ ] CRUD + complete/cancel/reassign działa wg macierzy uprawnień; `mine` łączy user + role assignments.
-  - [ ] Cross-tenant 0; IDOR-testy green; OpenAPI bez driftu.
+  - [x] CRUD + complete/cancel/reassign działa wg macierzy uprawnień; `mine` łączy user + role assignments.
+  - [x] Cross-tenant 0; IDOR-testy green; OpenAPI bez driftu.
 - **Smoke:** curl: create → list mine → complete → status done.
 - **Reuse:** wzorzec RLS/migracji z P0-04 · cursor pagination (reguła #9).
 - **DoD:** standard.
@@ -527,9 +527,9 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Testy integracyjne pełnej pętli: submit→task; reject→complete+fix; approve→complete.
 - **Poza zakresem:** due dates z automatu (manualne w MVP; auto-SLA = Faza 2); FE.
 - **AC:**
-  - [ ] Pełna pętla: submit tworzy task review; approve domyka; reject domyka + tworzy fix dla autora z komentarzem.
-  - [ ] Brak duplikatów przy powtórnym submit (test idempotencji).
-  - [ ] Assignee dostaje notyfikację.
+  - [x] Pełna pętla: submit tworzy task review; approve domyka; reject domyka + tworzy fix dla autora z komentarzem.
+  - [x] Brak duplikatów przy powtórnym submit (test idempotencji).
+  - [x] Assignee dostaje notyfikację.
 - **Smoke:** na `pim.localhost`: submit marketingiem → task widoczny w API admina; approve → task done.
 - **Reuse:** eventy P2-01 · `NotifierPort` P2-02 · port tasków P4-01.
 - **DoD:** standard.
@@ -546,8 +546,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - i18n; axe; Playwright: task pojawia się po submit z drugiej sesji; complete znika z „Moje".
 - **Poza zakresem:** widoki kanban per stan (Faza 2); due-date przypomnienia email.
 - **AC:**
-  - [ ] „Moje zadania" pokazuje user+rola assignments; przeterminowane wyróżnione; complete działa.
-  - [ ] Widget na dashboardzie liczy open i linkuje; live update bez refresh.
+  - [x] „Moje zadania" pokazuje user+rola assignments; przeterminowane wyróżnione; complete działa.
+  - [x] Widget na dashboardzie liczy open i linkuje; live update bez refresh.
 - **Smoke:** SMOKE TEST RULE dwiema sesjami: submit → task u approvera (dashboard + inbox) → complete.
 - **Reuse:** `PillTabs` · layout P3-02 · wzorce widgetów Dashboard.
 - **DoD:** standard.
@@ -582,10 +582,10 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Testy: walidator (każda reguła), loader z cache, flag OFF regresja pełnej macierzy przejść.
 - **Poza zakresem:** CRUD API (P5-02); UI (P5-03); migrator stanów między definicjami (odmowa wystarczy w MVP).
 - **AC:**
-  - [ ] Flag OFF → zachowanie w 100% identyczne (regresja M0–M4 green).
-  - [ ] Flag ON → definicja z DB steruje: dodany stan `translation` z przejściami działa end-to-end.
-  - [ ] Walidator odrzuca definicje niespójne (testy per reguła); usunięcie stanu z obiektami niemożliwe.
-  - [ ] Cache inwaliduje się po edycji definicji bez restartu workera.
+  - [x] Flag OFF → zachowanie w 100% identyczne (regresja M0–M4 green).
+  - [x] Flag ON → definicja z DB steruje: dodany stan `translation` z przejściami działa end-to-end.
+  - [x] Walidator odrzuca definicje niespójne (testy per reguła); usunięcie stanu z obiektami niemożliwe.
+  - [x] Cache inwaliduje się po edycji definicji bez restartu workera.
 - **Smoke:** flag ON + edycja definicji przez psql/API → nowy stan widoczny w `GET /workflow` bez restartu.
 - **Reuse:** guard/gate z P1-01/P1-04 (parametryzacja) · wzorce cache Shared.
 - **DoD:** standard.
@@ -598,7 +598,7 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Endpointy: `GET /api/workflow/definitions` (+`/{id}`), `POST`, `PUT /{id}`, `POST /{id}/enable|disable` — wszystkie `#[RequiresPermission('workflow','manage_definitions')]`; walidacja przez walidator z P5-01 (422 z listą błędów per pole); OpenAPI + snapshot.
   - ApiTestCase: 401/403 (marketing/approver bez manage), 422 (definicja niespójna), happy; cross-tenant 0.
 - **AC:**
-  - [ ] CRUD pełny za permission; 422 wskazuje konkretny błąd definicji; OpenAPI bez driftu.
+  - [x] CRUD pełny za permission; 422 wskazuje konkretny błąd definicji; OpenAPI bez driftu.
 - **Smoke:** curl: create definicji z nowym stanem → enable → `GET /workflow` obiektu pokazuje nowe przejścia.
 - **Reuse:** walidator P5-01 · `CustomRouteOpenApiFactory`.
 - **DoD:** standard.
@@ -614,8 +614,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - i18n; axe; Playwright: dodanie stanu + przejścia → widoczne na produkcie.
 - **Poza zakresem:** canvas drag&drop designer (Faza 2 jeśli będzie popyt); wersjonowanie definicji.
 - **AC:**
-  - [ ] Pełny cykl w UI: nowa definicja → stany/przejścia → enable → produkt pokazuje nowe przejścia.
-  - [ ] Błędy walidatora czytelne przy polach; bez flagi sekcja niewidoczna.
+  - [x] Pełny cykl w UI: nowa definicja → stany/przejścia → enable → produkt pokazuje nowe przejścia.
+  - [x] Błędy walidatora czytelne przy polach; bez flagi sekcja niewidoczna.
 - **Smoke:** SMOKE TEST RULE: dodaj stan `translation` w UI → przejście widoczne na produkcie bez deployu.
 - **Reuse:** wzorce Settings (role builder — `permission-catalogue.ts`) · formy shadcn.
 - **DoD:** standard.
@@ -634,8 +634,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - Race: podwójny approve (dwie sesje) → drugi dostaje 409, nie duplikat logu/tasków.
   - Gates CI: PHPStan max, Deptrac 0 violations na finalnej strukturze; Semgrep rules (jeśli reguły RBAC Phase 6 istnieją — dodać wzorzec dla tras workflow).
 - **AC:**
-  - [ ] Wszystkie wektory z listy mają test; 0 otwartych findings.
-  - [ ] Known limitations (self-approve) udokumentowane w `docs/workflow.md` (P6-03).
+  - [x] Wszystkie wektory z listy mają test; 0 otwartych findings.
+  - [x] Known limitations (self-approve) udokumentowane w `docs/workflow.md` (P6-03).
 - **Smoke:** ręczny mini red-team na `pim.localhost` (15 min): próby z restricted userem wg listy wektorów.
 - **Reuse:** wzorce testów RBAC Phase 3/6 · lekcja `bulk-endpoint-permission-escalation`.
 - **DoD:** standard.
@@ -650,8 +650,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - axe na: `/workflow` (obie zakładki), dialogi przejść, banner locka, dzwonek (0 serious/critical).
   - Lekcje lokalne: `i18nextLng=pl` w `addInitScript`; role locators (nie getByText); reset rate limitu loginów przy powtórkach (`restart redis api`).
 - **AC:**
-  - [ ] Oba scenariusze zielone w CI (właściwy shard); bez flake (3× stabilnie).
-  - [ ] axe green na wszystkich nowych powierzchniach.
+  - [x] Oba scenariusze zielone w CI (właściwy shard); bez flake (3× stabilnie).
+  - [x] axe green na wszystkich nowych powierzchniach.
 - **Smoke:** przebieg scenariusza ręcznie na `pim.localhost` przed zapisem testu (SMOKE TEST RULE).
 - **Reuse:** helpery Playwright (apiLogin z lekcjami DNS) · wzorce E2E agent inbox.
 - **DoD:** standard.
@@ -667,8 +667,8 @@ Pozostałe tickety = własny PR. Celowo solo: WFL-P0-01 i WFL-P6-03 (docs-only �
   - **Live smoke pełnej pętli** na `pim.localhost` z proofem (HTTP codes + screenshoty) — wymagany przed zamknięciem OSTATNIEGO issue epiku (CLOSED MEANS CLOSED).
   - Screencast 5 min (pętla marketing↔approver + bulk + builder jeśli M5 zrealizowane).
 - **AC:**
-  - [ ] Dokumentacja kompletna; snapshot bez driftu; PRD cross-ref zaktualizowany.
-  - [ ] Proof live smoke w komentarzu zamykającym; screencast nagrany.
+  - [x] Dokumentacja kompletna; snapshot bez driftu; PRD cross-ref zaktualizowany.
+  - [x] Proof live smoke w komentarzu zamykającym; screencast nagrany.
 - **Smoke:** = live smoke z zakresu.
 - **Reuse:** wzorce docs poprzednich epików.
 - **DoD:** standard (docs + weryfikacje).

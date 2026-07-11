@@ -142,7 +142,7 @@ final class WorkflowSecurityApiTest extends CatalogApiTestCase
         self::assertCount(1, $approves, 'replayed approve must not duplicate the transition log');
 
         // The review task closed once and stayed closed — no duplicates.
-        $tasks = $client->request('GET', '/api/workflow/tasks?object='.$id)->toArray();
+        $tasks = $client->request('GET', '/api/workflow/tasks?object_id='.$id)->toArray();
         $openItems = $tasks['items'] ?? [];
         self::assertIsArray($openItems);
         $reviewTasks = \array_values(\array_filter(
