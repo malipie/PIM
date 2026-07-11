@@ -317,11 +317,11 @@ export function UniversalListPage({
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     if (sort === null) params.delete('sort');
-    else params.set('sort', sort.key + ':' + sort.dir);
+    else params.set('sort', `${sort.key}:${sort.dir}`);
     window.history.replaceState(
       null,
       '',
-      window.location.pathname + '?' + params.toString() + window.location.hash,
+      `${window.location.pathname}?${params.toString()}${window.location.hash}`,
     );
   }, [sort]);
   const handleSortChange = (key: string): void => {
@@ -492,7 +492,7 @@ export function UniversalListPage({
         page,
         pageSize,
         hasVariants ? variantsMode : 'flat',
-        sort === null ? 'nosort' : sort.key + ':' + sort.dir,
+        sort === null ? 'nosort' : `${sort.key}:${sort.dir}`,
       ] as const,
     [objectTypeId, page, pageSize, hasVariants, variantsMode, sort],
   );
@@ -519,10 +519,10 @@ export function UniversalListPage({
         const column = visibleColumns.find((c) => c.key === sort.key);
         const orderProperty =
           column?.source === 'attribute'
-            ? 'attribute.' + sort.key
+            ? `attribute.${sort.key}`
             : (systemOrderField[sort.key] ?? null);
         if (orderProperty !== null) {
-          params['order[' + orderProperty + ']'] = sort.dir;
+          params[`order[${orderProperty}]`] = sort.dir;
         }
       }
       return jsonFetch<ListResponse>('/api/objects', {
