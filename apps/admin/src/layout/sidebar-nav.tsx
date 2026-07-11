@@ -103,8 +103,8 @@ const FALLBACK_ITEMS: EffectiveMenuItem[] = [
     label: null,
     labelKey: 'nav.workflow',
     icon: 'Workflow',
-    route: null,
-    comingSoon: true,
+    route: '/workflow',
+    comingSoon: false,
     protected: false,
   },
   {
