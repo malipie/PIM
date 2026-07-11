@@ -8,12 +8,12 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Contracts\Auth\CurrentUserProvider;
+use App\Workflow\Contracts\EditorialWorkflowProviderInterface;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use App\Workflow\Contracts\TransitionLogEntry;
 use App\Workflow\Contracts\TransitionLogPort;
 use DateTimeInterface;
 use JsonException;
-use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -21,7 +21,6 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Uid\Uuid;
-use Symfony\Component\Workflow\WorkflowInterface;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -48,8 +47,7 @@ final class ObjectWorkflowController
         private readonly CatalogObjectRepositoryInterface $objects,
         private readonly TransitionLogPort $transitionLog,
         private readonly CurrentUserProvider $currentUser,
-        #[Target(ObjectEditorialWorkflow::NAME)]
-        private readonly WorkflowInterface $objectEditorial,
+        private readonly EditorialWorkflowProviderInterface $workflows,
     ) {
     }
 
@@ -63,12 +61,13 @@ final class ObjectWorkflowController
     public function state(string $id): JsonResponse
     {
         $object = $this->loadObject($id);
+        $workflow = $this->workflows->for($object, $object->getObjectType()->getId()->toRfc4122());
 
         return new JsonResponse([
             'object_id' => $object->getId()->toRfc4122(),
             'workflow' => ObjectEditorialWorkflow::NAME,
             'current_place' => $object->getStatus(),
-            'transitions' => $this->describeTransitions($object),
+            'transitions' => $this->describeTransitions($workflow, $object),
         ]);
     }
 
@@ -85,15 +84,35 @@ final class ObjectWorkflowController
     #[RequiresPermission(module: 'workflow', action: 'view')]
     public function apply(string $id, string $transition, Request $request): JsonResponse
     {
-        if (!\in_array($transition, ObjectEditorialWorkflow::TRANSITIONS, true)) {
+        $object = $this->loadObject($id);
+        $workflow = $this->workflows->for($object, $object->getObjectType()->getId()->toRfc4122());
+
+        // Custom tenant definitions (WFL-P5-01) may rename transitions —
+        // validate against the RESOLVED machine, not the static list.
+        $definitionTransition = null;
+        foreach ($workflow->getDefinition()->getTransitions() as $candidate) {
+            if ($candidate->getName() === $transition) {
+                $definitionTransition = $candidate;
+                break;
+            }
+        }
+        if (null === $definitionTransition) {
             throw new NotFoundHttpException(\sprintf('Unknown workflow transition "%s".', $transition));
         }
 
-        $object = $this->loadObject($id);
         $comment = $this->extractComment($request);
 
-        if (!$this->objectEditorial->can($object, $transition)) {
-            $blockers = $this->blockerMessages($object, $transition);
+        // Tenant definitions may demand a decision comment (metadata).
+        $commentRequired = $workflow->getMetadataStore()->getMetadata('comment_required', $definitionTransition);
+        if (true === $commentRequired && null === $comment) {
+            throw new UnprocessableEntityHttpException(\sprintf(
+                'Transition "%s" requires a comment.',
+                $transition,
+            ));
+        }
+
+        if (!$workflow->can($object, $transition)) {
+            $blockers = $this->blockerMessages($workflow, $object, $transition);
 
             throw new ConflictHttpException(\sprintf(
                 'Transition "%s" is not allowed from "%s"%s',
@@ -104,7 +123,7 @@ final class ObjectWorkflowController
         }
 
         $context = null === $comment ? [] : ['comment' => $comment];
-        $this->objectEditorial->apply($object, $transition, $context);
+        $workflow->apply($object, $transition, $context);
 
         // Flushes the marking change together with the log row persisted
         // by TransitionLoggingSubscriber (persist-only, ADR-0029).
@@ -195,16 +214,16 @@ final class ObjectWorkflowController
     /**
      * @return list<array<string, mixed>>
      */
-    private function describeTransitions(CatalogObject $object): array
+    private function describeTransitions(\Symfony\Component\Workflow\WorkflowInterface $workflow, CatalogObject $object): array
     {
         $described = [];
-        foreach ($this->objectEditorial->getDefinition()->getTransitions() as $transition) {
+        foreach ($workflow->getDefinition()->getTransitions() as $transition) {
             if (!\in_array($object->getStatus(), $transition->getFroms(), true)) {
                 continue;
             }
 
             $blockers = [];
-            foreach ($this->objectEditorial->buildTransitionBlockerList($object, $transition->getName()) as $blocker) {
+            foreach ($workflow->buildTransitionBlockerList($object, $transition->getName()) as $blocker) {
                 $blockers[] = ['code' => $blocker->getCode(), 'message' => $blocker->getMessage()];
             }
 
@@ -222,10 +241,10 @@ final class ObjectWorkflowController
     /**
      * @return list<string>
      */
-    private function blockerMessages(CatalogObject $object, string $transition): array
+    private function blockerMessages(\Symfony\Component\Workflow\WorkflowInterface $workflow, CatalogObject $object, string $transition): array
     {
         $messages = [];
-        foreach ($this->objectEditorial->buildTransitionBlockerList($object, $transition) as $blocker) {
+        foreach ($workflow->buildTransitionBlockerList($object, $transition) as $blocker) {
             $messages[] = $blocker->getMessage();
         }
 

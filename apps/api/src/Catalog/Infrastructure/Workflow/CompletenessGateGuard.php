@@ -43,16 +43,24 @@ final readonly class CompletenessGateGuard implements EventSubscriberInterface
 
     public function onGuard(GuardEvent $event): void
     {
-        if (!\in_array($event->getTransition()->getName(), self::GATED_TRANSITIONS, true)) {
-            return;
-        }
-
         $subject = $event->getSubject();
         if (!$subject instanceof CatalogObject) {
             return;
         }
 
-        $gate = $subject->getObjectType()->getWorkflowPublishGate();
+        // Tenant definitions (WFL-P5-01) attach a per-transition gate as
+        // metadata; the static machine gates publish/approve from the
+        // ObjectType config. Metadata wins when present.
+        $metadataGate = $event->getMetadata('completeness_gate', $event->getTransition());
+        if (\is_array($metadataGate)) {
+            $gate = $metadataGate + ['enabled' => true];
+        } else {
+            if (!\in_array($event->getTransition()->getName(), self::GATED_TRANSITIONS, true)) {
+                return;
+            }
+            $gate = $subject->getObjectType()->getWorkflowPublishGate();
+        }
+
         if (null === $gate || true !== ($gate['enabled'] ?? false)) {
             return;
         }

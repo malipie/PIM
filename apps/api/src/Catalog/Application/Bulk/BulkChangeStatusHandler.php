@@ -10,10 +10,8 @@ use App\Catalog\Domain\Entity\BulkLog;
 use App\Catalog\Domain\Entity\BulkSession;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
-use App\Workflow\Contracts\ObjectEditorialWorkflow;
+use App\Workflow\Contracts\EditorialWorkflowProviderInterface;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\DependencyInjection\Attribute\Target;
-use Symfony\Component\Workflow\WorkflowInterface;
 
 /**
  * WFL-P1-05 (#2419) — bulk `change_status` through the state machine
@@ -40,8 +38,7 @@ final class BulkChangeStatusHandler extends AbstractBulkHandler
         EntityManagerInterface $em,
         BulkContext $bulkContext,
         BulkReindexQueueInterface $reindexQueue,
-        #[Target(ObjectEditorialWorkflow::NAME)]
-        private readonly WorkflowInterface $objectEditorial,
+        private readonly EditorialWorkflowProviderInterface $workflows,
     ) {
         parent::__construct($catalogObjects, $em, $bulkContext, $reindexQueue);
     }
@@ -59,9 +56,10 @@ final class BulkChangeStatusHandler extends AbstractBulkHandler
 
     protected function processObject(CatalogObject $object, BulkSession $session, BulkCounters $counters): void
     {
-        if (!$this->objectEditorial->can($object, $this->transition)) {
+        $workflow = $this->workflows->for($object, $object->getObjectType()->getId()->toRfc4122());
+        if (!$workflow->can($object, $this->transition)) {
             $reasons = [];
-            foreach ($this->objectEditorial->buildTransitionBlockerList($object, $this->transition) as $blocker) {
+            foreach ($workflow->buildTransitionBlockerList($object, $this->transition) as $blocker) {
                 $reasons[] = $blocker->getMessage();
             }
             if ([] === $reasons) {
@@ -87,7 +85,7 @@ final class BulkChangeStatusHandler extends AbstractBulkHandler
         if (null !== $this->comment) {
             $context['comment'] = $this->comment;
         }
-        $this->objectEditorial->apply($object, $this->transition, $context);
+        $workflow->apply($object, $this->transition, $context);
 
         ++$counters->success;
         $this->em->persist(new BulkLog(
