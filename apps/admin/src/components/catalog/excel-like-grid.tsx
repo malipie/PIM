@@ -74,12 +74,15 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
   rows,
   columns,
   onCommit,
+  onPasteReport,
   density = 'normal',
   onColumnResize,
 }: {
   rows: T[];
   columns: ExcelColumn<T>[];
   onCommit: (rowIdx: number, colKey: string, value: unknown) => void;
+  /** GRID-P6-03 — batch paste summary (applied vs skipped cells). */
+  onPasteReport?: (applied: number, skipped: number) => void;
   /** GRID-P2-03 — compact rows for spreadsheet-style work. */
   density?: 'normal' | 'compact';
   /** GRID-P2-02 — resize commit keyed by the column's `modelKey`. */
@@ -196,21 +199,56 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
     setEditing({ rowIdx, colKey });
   };
 
-  const commitEdit = (newValue: string): void => {
-    if (editing === null) return;
-    const col = columns.find((c) => c.key === editing.colKey);
-    if (col === undefined) return;
-    let coerced: unknown = newValue;
+  // GRID-P6-03 — coerce a raw string to the column's value type. Returns
+  // `{ ok: false }` when the input cannot be parsed (paste rejects it and
+  // reports a skip); select maps by option label OR code.
+  const coerceValue = (
+    col: ExcelColumn<T>,
+    raw: string,
+  ): { ok: true; value: unknown } | { ok: false } => {
+    if ('' === raw) return { ok: true, value: null };
     if (col.type === 'number') {
-      const parsed = Number.parseFloat(newValue);
-      coerced = Number.isNaN(parsed) ? null : parsed;
-    } else if (col.type === 'boolean') {
-      coerced = newValue === 'true';
-    } else if ('' === newValue) {
-      coerced = null;
+      const parsed = Number.parseFloat(raw);
+      return Number.isNaN(parsed) ? { ok: false } : { ok: true, value: parsed };
     }
-    onCommit(editing.rowIdx, editing.colKey, coerced);
+    if (col.type === 'boolean') {
+      const t = raw.trim().toLowerCase();
+      if (['true', '1', 'tak', 'yes', '✓'].includes(t)) return { ok: true, value: true };
+      if (['false', '0', 'nie', 'no', '✗'].includes(t)) return { ok: true, value: false };
+      return { ok: false };
+    }
+    if (col.type === 'select') {
+      const options = col.selectOptions ?? [];
+      const byCode = options.find((o) => o.code === raw.trim());
+      if (byCode !== undefined) return { ok: true, value: byCode.code };
+      const byLabel = options.find((o) => o.label.toLowerCase() === raw.trim().toLowerCase());
+      if (byLabel !== undefined) return { ok: true, value: byLabel.code };
+      return { ok: false };
+    }
+    return { ok: true, value: raw };
+  };
+
+  // GRID-P6-03 — exit edit mode AND return focus to the table so the
+  // next Ctrl+V/Ctrl+C reaches the grid keydown handler (single-click
+  // edit otherwise leaves focus in the removed <input>, breaking paste).
+  const stopEditing = (): void => {
     setEditing(null);
+    requestAnimationFrame(() => gridRef.current?.focus());
+  };
+
+  const commitEdit = (newValue: string): void => {
+    if (editing === null) {
+      stopEditing();
+      return;
+    }
+    const col = columns.find((c) => c.key === editing.colKey);
+    if (col === undefined) {
+      stopEditing();
+      return;
+    }
+    const result = coerceValue(col, newValue);
+    if (result.ok) onCommit(editing.rowIdx, editing.colKey, result.value);
+    stopEditing();
   };
 
   const handleKeyDown = useCallback(
@@ -236,17 +274,32 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
         event.preventDefault();
         void (async () => {
           const text = await navigator.clipboard.readText();
-          const lines = text.split(/\r?\n/);
+          const lines = text
+            .split(/\r?\n/)
+            .filter((l, idx, arr) => l !== '' || idx < arr.length - 1);
+          let applied = 0;
+          let skipped = 0;
           for (let i = 0; i < lines.length; i += 1) {
             const cells = lines[i]?.split('\t') ?? [];
             for (let j = 0; j < cells.length; j += 1) {
               const colKey = columns[colIndex(active.colKey) + j]?.key;
               if (colKey === undefined) continue;
               const col = columns.find((c) => c.key === colKey);
-              if (col === undefined || col.readOnly === true) continue;
-              onCommit(active.rowIdx + i, colKey, cells[j]);
+              if (col === undefined) continue;
+              if (col.readOnly === true) {
+                skipped += 1;
+                continue;
+              }
+              const result = coerceValue(col, cells[j] ?? '');
+              if (!result.ok) {
+                skipped += 1;
+                continue;
+              }
+              onCommit(active.rowIdx + i, colKey, result.value);
+              applied += 1;
             }
           }
+          if (applied > 0 || skipped > 0) onPasteReport?.(applied, skipped);
         })();
         return;
       }
@@ -265,7 +318,7 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
 
   const renderEditor = (col: ExcelColumn<T>, value: unknown): React.ReactNode => {
     const commonKeyDown = (e: React.KeyboardEvent): void => {
-      if (e.key === 'Escape') setEditing(null);
+      if (e.key === 'Escape') stopEditing();
     };
     if (col.type === 'select') {
       return (

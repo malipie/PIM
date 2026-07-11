@@ -4188,6 +4188,10 @@
       "aria": "Gęstość wierszy"
     },
     "resize_aria": "Zmień szerokość kolumny {{label}}",
-    "sort_aria": "Sortuj po: {{label}}"
+    "sort_aria": "Sortuj po: {{label}}",
+    "paste": {
+      "report_mixed": "Wklejono {{applied}}, pominięto {{skipped}}",
+      "report_ok": "Wklejono {{applied}} komórek"
+    }
   }
 }

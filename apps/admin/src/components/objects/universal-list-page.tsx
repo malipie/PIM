@@ -1161,6 +1161,24 @@ export function UniversalListPage({
           columns={excelColumns}
           density={density}
           onColumnResize={handleColumnResize}
+          onPasteReport={(applied, skipped) => {
+            if (skipped > 0) {
+              toast.info(
+                t('grid.paste.report_mixed', {
+                  applied,
+                  skipped,
+                  defaultValue: 'Wklejono {{applied}}, pominięto {{skipped}}',
+                }),
+              );
+            } else if (applied > 0) {
+              toast.success(
+                t('grid.paste.report_ok', {
+                  applied,
+                  defaultValue: 'Wklejono {{applied}} komórek',
+                }),
+              );
+            }
+          }}
           onCommit={(rowIdx, colKey, value) => {
             const row = visible[rowIdx];
             if (row === undefined) return;
