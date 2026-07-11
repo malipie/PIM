@@ -21693,6 +21693,95 @@
                 "x-cortex-permission": "user.admin"
             }
         },
+        "/api/workflow/tasks": {
+            "get": {
+                "operationId": "api_workflow_tasks_get",
+                "tags": [
+                    "workflow"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api workflow tasks",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "workflow.view"
+            },
+            "post": {
+                "operationId": "api_workflow_tasks_post",
+                "tags": [
+                    "workflow"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api workflow tasks",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "products.edit"
+            }
+        },
+        "/api/workflow/tasks/{id}": {
+            "patch": {
+                "operationId": "api_workflow_tasks_id_patch",
+                "tags": [
+                    "workflow"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api workflow tasks id",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "workflow.view"
+            }
+        },
         "/api/workspaces/current": {
             "get": {
                 "operationId": "api_workspaces_current_get",

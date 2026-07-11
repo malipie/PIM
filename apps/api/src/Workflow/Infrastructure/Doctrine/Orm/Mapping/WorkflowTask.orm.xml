@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping
+                                      https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+
+    <entity name="App\Workflow\Domain\Entity\WorkflowTask" table="workflow_tasks">
+        <indexes>
+            <index name="workflow_tasks_tenant_status_due_idx" columns="tenant_id,status,due_date"/>
+            <index name="workflow_tasks_tenant_assignee_idx" columns="tenant_id,assignee_user_id"/>
+            <index name="workflow_tasks_tenant_object_idx" columns="tenant_id,object_id"/>
+        </indexes>
+
+        <id name="id" type="uuid" column="id">
+            <generator strategy="NONE"/>
+        </id>
+
+        <many-to-one field="tenant" target-entity="App\Shared\Domain\Tenant">
+            <join-column name="tenant_id" referenced-column-name="id" nullable="false" on-delete="RESTRICT"/>
+        </many-to-one>
+
+        <field name="objectId" type="uuid" column="object_id" nullable="true"/>
+        <field name="title" type="string" length="255"/>
+        <field name="type" type="string" length="32" enum-type="App\Workflow\Contracts\WorkflowTaskType"/>
+        <field name="assigneeUserId" type="uuid" column="assignee_user_id" nullable="true"/>
+        <field name="assigneeRoleCode" type="string" length="64" column="assignee_role_code" nullable="true"/>
+        <field name="dueDate" type="date_immutable" column="due_date" nullable="true"/>
+        <field name="status" type="string" length="16" enum-type="App\Workflow\Contracts\WorkflowTaskStatus">
+            <options>
+                <option name="default">open</option>
+            </options>
+        </field>
+        <field name="createdBy" type="uuid" column="created_by" nullable="true"/>
+        <field name="resolvedBy" type="uuid" column="resolved_by" nullable="true"/>
+        <field name="resolvedAt" type="datetime_immutable" column="resolved_at" nullable="true"/>
+        <field name="comment" type="text" nullable="true"/>
+
+        <field name="context" type="json" column="context" nullable="true">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
+        <field name="createdAt" type="datetime_immutable" column="created_at"/>
+    </entity>
+</doctrine-mapping>
