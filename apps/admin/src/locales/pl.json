@@ -49,7 +49,15 @@
   "notifications": {
     "aria_label": "Powiadomienia",
     "title": "Ostatnia aktywność",
-    "empty": "Brak ostatnich zdarzeń."
+    "empty": "Brak ostatnich zdarzeń.",
+    "workflow_section": "Workflow",
+    "workflow_type": {
+      "workflow": {
+        "submitted_for_review": "Zgłoszono do przeglądu",
+        "approved": "Twoja zmiana zatwierdzona",
+        "rejected": "Twoja zmiana odrzucona"
+      }
+    }
   },
   "auth": {
     "login_title": "Zaloguj się",

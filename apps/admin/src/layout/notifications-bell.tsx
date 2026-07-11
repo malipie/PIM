@@ -14,6 +14,7 @@ import {
 
 import { useNotificationsInboxOptional } from './notifications-context';
 import { useNotifications } from './use-notifications';
+import { useWorkflowNotifications } from './use-workflow-notifications';
 
 /**
  * Notifications bell wrapping a Radix dropdown over the SSE feed (#54).
@@ -28,7 +29,9 @@ export function NotificationsBell() {
   const { entries, unreadCount, markAllRead } = useNotifications();
   // EXR-15 — exports in-app inbox merges into the bell (badge + list).
   const inbox = useNotificationsInboxOptional();
-  const totalUnread = unreadCount + (inbox?.unread ?? 0);
+  // WFL-P2-03 — persistent workflow notifications (survive reloads).
+  const workflow = useWorkflowNotifications();
+  const totalUnread = unreadCount + (inbox?.unread ?? 0) + workflow.unreadCount;
 
   return (
     <DropdownMenu
@@ -36,6 +39,7 @@ export function NotificationsBell() {
         if (open) {
           markAllRead();
           inbox?.markAllRead();
+          workflow.markAllRead();
         }
       }}
     >
@@ -62,6 +66,41 @@ export function NotificationsBell() {
           {t('notifications.title', { defaultValue: 'Recent activity' })}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {workflow.entries.length > 0 && (
+          <>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">
+              {t('notifications.workflow_section', { defaultValue: 'Workflow' })}
+            </DropdownMenuLabel>
+            {workflow.entries.slice(0, 6).map((entry) => {
+              const objectId =
+                typeof entry.payload?.object_id === 'string' ? entry.payload.object_id : null;
+              const comment =
+                typeof entry.payload?.comment === 'string' ? entry.payload.comment : null;
+              return (
+                <DropdownMenuItem
+                  key={entry.id}
+                  asChild
+                  className="flex flex-col items-start gap-0.5 whitespace-normal"
+                >
+                  <Link to={objectId !== null ? `/products/${objectId}` : '/workflow'}>
+                    <span className="text-sm font-medium">
+                      {t(`notifications.workflow_type.${entry.type}`, {
+                        defaultValue: entry.type,
+                      })}
+                    </span>
+                    {comment !== null && (
+                      <span className="text-xs text-muted-foreground">{comment}</span>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {formatTime(entry.created_at, i18n.language)}
+                    </span>
+                  </Link>
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuSeparator />
+          </>
+        )}
         {(inbox?.entries.length ?? 0) > 0 && (
           <>
             {inbox?.entries.slice(0, 6).map((entry) => (
@@ -91,7 +130,9 @@ export function NotificationsBell() {
             <DropdownMenuSeparator />
           </>
         )}
-        {entries.length === 0 && (inbox?.entries.length ?? 0) === 0 ? (
+        {entries.length === 0 &&
+        (inbox?.entries.length ?? 0) === 0 &&
+        workflow.entries.length === 0 ? (
           <div className="px-3 py-6 text-center text-xs text-muted-foreground">
             {t('notifications.empty', { defaultValue: 'No recent events.' })}
           </div>

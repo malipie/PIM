@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Domain\Entity;
 
+use App\Catalog\Contracts\Event\ObjectApproved;
 use App\Catalog\Contracts\Event\ObjectArchived;
 use App\Catalog\Contracts\Event\ObjectAttributesChanged;
 use App\Catalog\Contracts\Event\ObjectCategoriesChanged;
@@ -362,6 +363,13 @@ class CatalogObject extends AggregateRoot implements TenantScoped, Blameable, Ed
     {
         if (null !== $this->tenant) {
             $this->recordThat(new ObjectSubmittedForReview($this->id, $this->tenant->getId(), $comment));
+        }
+    }
+
+    public function recordApproved(?string $comment): void
+    {
+        if (null !== $this->tenant) {
+            $this->recordThat(new ObjectApproved($this->id, $this->tenant->getId(), $comment));
         }
     }
 
