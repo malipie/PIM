@@ -38,6 +38,17 @@ function optionLabelFor(
   };
 }
 
+/** GRID-P6-02 — attribute type → excel inline editor type. */
+const EXCEL_EDITOR_TYPE: Record<string, 'text' | 'number' | 'select' | 'boolean' | 'date'> = {
+  number: 'number',
+  metric: 'number',
+  price: 'number',
+  boolean: 'boolean',
+  date: 'date',
+  datetime: 'date',
+  select: 'select',
+};
+
 const EXCEL_WIDTH_BY_TYPE: Record<string, number> = {
   number: 110,
   metric: 110,
@@ -130,13 +141,24 @@ export function toExcelColumns(
     if (column.hidden) continue;
     const label = pickLabel(column.label, locale, column.key);
     if (column.source === 'attribute' && !column.key.startsWith('__')) {
+      const editorType = EXCEL_EDITOR_TYPE[column.type] ?? 'text';
+      const selectOptions =
+        column.type === 'select'
+          ? Object.entries(optionLabels[column.key] ?? {}).map(([code, labelMap]) => ({
+              code,
+              label: pickLabel(labelMap, locale, code),
+            }))
+          : undefined;
       out.push({
         key: `${EXCEL_ATTR_KEY_PREFIX}${column.key}`,
         modelKey: column.key,
         label,
-        type: 'text',
+        type: editorType,
         width: column.width ?? EXCEL_WIDTH_BY_TYPE[column.type] ?? 170,
-        readOnly: true, // typed editors land in GRID-P6-02
+        // GRID-P6-02 — editable = RBAC edit + inline-editable type
+        // (list-schema `editable` flag). Otherwise read-only.
+        readOnly: !column.editable,
+        ...(selectOptions !== undefined ? { selectOptions } : {}),
         renderDisplay: (row) => (
           <GridAttributeCell
             column={column}

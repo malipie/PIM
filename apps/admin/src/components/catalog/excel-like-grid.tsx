@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export interface ExcelColumn<T extends Record<string, unknown>> {
   key: keyof T & string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'boolean';
+  type: 'text' | 'number' | 'select' | 'boolean' | 'date';
   width?: number;
   readOnly?: boolean;
   options?: ReadonlyArray<string>;
@@ -21,6 +21,8 @@ export interface ExcelColumn<T extends Record<string, unknown>> {
    * resize commits report this key so overrides land on the model.
    */
   modelKey?: string;
+  /** GRID-P6-02 — options for a select editor ({code, label} pairs). */
+  selectOptions?: ReadonlyArray<{ code: string; label: string }>;
 }
 
 interface CellAddress {
@@ -204,6 +206,8 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
       coerced = Number.isNaN(parsed) ? null : parsed;
     } else if (col.type === 'boolean') {
       coerced = newValue === 'true';
+    } else if ('' === newValue) {
+      coerced = null;
     }
     onCommit(editing.rowIdx, editing.colKey, coerced);
     setEditing(null);
@@ -259,6 +263,68 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
 
   const widthOf = (col: ExcelColumn<T>): number | undefined => liveWidths[col.key] ?? col.width;
 
+  const renderEditor = (col: ExcelColumn<T>, value: unknown): React.ReactNode => {
+    const commonKeyDown = (e: React.KeyboardEvent): void => {
+      if (e.key === 'Escape') setEditing(null);
+    };
+    if (col.type === 'select') {
+      return (
+        // biome-ignore lint/a11y/noAutofocus: spreadsheet cell editor must grab focus on open
+        <select
+          ref={(el) => {
+            if (el !== null) el.focus();
+          }}
+          defaultValue={String(value ?? '')}
+          onBlur={(e) => commitEdit(e.target.value)}
+          onChange={(e) => commitEdit(e.target.value)}
+          onKeyDown={commonKeyDown}
+          className="w-full bg-background outline-none"
+        >
+          <option value="">—</option>
+          {(col.selectOptions ?? []).map((opt) => (
+            <option key={opt.code} value={opt.code}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
+    if (col.type === 'boolean') {
+      return (
+        <select
+          ref={(el) => {
+            if (el !== null) el.focus();
+          }}
+          defaultValue={value === true || value === 'true' ? 'true' : 'false'}
+          onBlur={(e) => commitEdit(e.target.value)}
+          onChange={(e) => commitEdit(e.target.value)}
+          onKeyDown={commonKeyDown}
+          className="w-full bg-background outline-none"
+        >
+          <option value="true">✓</option>
+          <option value="false">✗</option>
+        </select>
+      );
+    }
+    const inputType = col.type === 'number' ? 'number' : col.type === 'date' ? 'date' : 'text';
+    return (
+      <input
+        ref={editorRef}
+        type={inputType}
+        defaultValue={String(value ?? '')}
+        onBlur={(e) => commitEdit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            commitEdit((e.target as HTMLInputElement).value);
+          } else if (e.key === 'Escape') {
+            setEditing(null);
+          }
+        }}
+        className="w-full bg-background outline-none"
+      />
+    );
+  };
+
   const renderCell = (row: T, rowIdx: number, colIdx: number) => {
     const col = columns[colIdx];
     if (col === undefined) return null;
@@ -286,19 +352,7 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
         } ${col.readOnly === true ? 'bg-muted/40 text-muted-foreground' : 'cursor-cell'}`}
       >
         {isEditing ? (
-          <input
-            ref={editorRef}
-            defaultValue={String(value ?? '')}
-            onBlur={(e) => commitEdit(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                commitEdit((e.target as HTMLInputElement).value);
-              } else if (e.key === 'Escape') {
-                setEditing(null);
-              }
-            }}
-            className="w-full bg-background outline-none"
-          />
+          renderEditor(col, value)
         ) : col.renderDisplay !== undefined ? (
           col.renderDisplay(row)
         ) : (
