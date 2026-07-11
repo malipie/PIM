@@ -10,7 +10,6 @@ use App\Catalog\Contracts\Event\ObjectSubmittedForReview;
 use App\Catalog\Contracts\Event\ObjectUnpublished;
 use App\Catalog\Contracts\Event\ObjectUnpublishRequested;
 use App\Identity\Contracts\Auth\CurrentUserProvider;
-use App\Notification\Contracts\NotifierPort;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use App\Workflow\Contracts\TransitionLogPort;
 use App\Workflow\Contracts\WorkflowTaskType;
@@ -28,16 +27,17 @@ use Symfony\Component\Uid\Uuid;
  *   - approve / reject      → close open review tasks (resolved by the
  *                             decision maker); reject additionally
  *                             opens a `fix` task for the submit author
- *                             with the reviewer comment (+ a
- *                             task_assigned notification),
+ *                             with the reviewer comment,
  *   - unpublish             → close open request_unpublish tasks,
  *   - unpublish requested   → open `request_unpublish` task for the
  *                             approver role.
  *
  * Idempotent: an object never carries two OPEN tasks of one type
- * (a re-submit reuses the existing review task). Role-assigned tasks
- * skip the extra notification — the P2-02 fan-out already pinged the
- * same audience about the underlying event.
+ * (a re-submit reuses the existing review task). Tasks never send
+ * their own notification — the P2-02 fan-out already pinged the same
+ * audience about the underlying event (the fix task's author IS the
+ * `workflow.rejected` recipient), and the task itself lands in the
+ * assignee's inbox (WFL-P4-03).
  */
 final readonly class WorkflowTaskAutomation
 {
@@ -46,7 +46,6 @@ final readonly class WorkflowTaskAutomation
     public function __construct(
         private WorkflowTaskRepositoryInterface $tasks,
         private TransitionLogPort $transitionLog,
-        private NotifierPort $notifier,
         private CurrentUserProvider $currentUser,
     ) {
     }
@@ -100,12 +99,6 @@ final readonly class WorkflowTaskAutomation
             comment: $event->comment,
             context: ['object_id' => $event->objectId->toRfc4122()],
         ));
-
-        $this->notifier->notifyUsers([$author], 'workflow.task_assigned', [
-            'object_id' => $event->objectId->toRfc4122(),
-            'task_type' => WorkflowTaskType::Fix->value,
-            'comment' => $event->comment,
-        ]);
     }
 
     #[AsMessageHandler]
