@@ -50,8 +50,8 @@ export function applyWorkflowTransition(
 ): Promise<{ object_id: string; applied: string; current_place: string }> {
   return jsonFetch(`/api/objects/${objectId}/workflow/transitions/${transition}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(comment !== undefined && comment !== '' ? { comment } : {}),
+    contentType: 'application/json',
+    body: comment !== undefined && comment !== '' ? { comment } : {},
   });
 }
 
