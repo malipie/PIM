@@ -8,6 +8,8 @@ import { jsonFetch } from '@/lib/http';
 
 interface SaveViewModalProps {
   resource: string;
+  /** GRID-P4-03 — scopes the saved view (and its default) to this ObjectType. */
+  objectTypeId?: string;
   config: Record<string, unknown>;
   onClose: () => void;
   onSaved: (slug: string) => void;
@@ -18,7 +20,13 @@ interface SaveViewModalProps {
  * list page. Posts to `/api/saved-views` (UI-02.7). Includes an
  * "is default" checkbox + readable preview of what will be persisted.
  */
-export function SaveViewModal({ resource, config, onClose, onSaved }: SaveViewModalProps) {
+export function SaveViewModal({
+  resource,
+  objectTypeId,
+  config,
+  onClose,
+  onSaved,
+}: SaveViewModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -38,6 +46,7 @@ export function SaveViewModal({ resource, config, onClose, onSaved }: SaveViewMo
           name: name.trim(),
           description: description.trim() === '' ? undefined : description.trim(),
           resource,
+          object_type_id: objectTypeId,
           config,
           is_default: isDefault,
         },
@@ -149,11 +158,27 @@ function describeConfig(config: Record<string, unknown>): string[] {
   if (typeof config.variants_mode === 'string') {
     lines.push(`Variants mode: ${config.variants_mode}`);
   }
-  if (Array.isArray(config.visible_columns)) {
-    lines.push(`Visible columns: ${config.visible_columns.length}`);
+  if (Array.isArray(config.columns)) {
+    const visible = (config.columns as Array<{ hidden?: boolean }>).filter(
+      (c) => c?.hidden !== true,
+    );
+    lines.push(`Kolumny: ${visible.length} widocznych`);
+  }
+  const sort = config.sort;
+  if (
+    sort !== null &&
+    typeof sort === 'object' &&
+    typeof (sort as { key?: unknown }).key === 'string'
+  ) {
+    lines.push(
+      `Sortowanie: ${(sort as { key: string }).key} ${(sort as { dir?: string }).dir ?? ''}`,
+    );
+  }
+  if (typeof config.density === 'string') {
+    lines.push(`Gęstość: ${config.density}`);
   }
   if (typeof config.page_size === 'number') {
-    lines.push(`Page size: ${config.page_size}`);
+    lines.push(`Rozmiar strony: ${config.page_size}`);
   }
   return lines;
 }

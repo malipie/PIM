@@ -18,6 +18,8 @@ interface SavedView {
 
 interface SavedViewsRailProps {
   resource?: string;
+  /** GRID-P4-02 — bump to force a refetch after a view is saved. */
+  reloadToken?: number;
   activeSlug: string | null;
   onApply: (view: SavedView) => void;
   onSaveCurrent: () => void;
@@ -40,6 +42,7 @@ export function SavedViewsRail({
   onApply,
   onSaveCurrent,
   currentTotal = null,
+  reloadToken = 0,
 }: SavedViewsRailProps) {
   const { t } = useTranslation();
   const [views, setViews] = useState<SavedView[]>([]);
@@ -77,7 +80,7 @@ export function SavedViewsRail({
     return () => {
       cancelled = true;
     };
-  }, [resource]);
+  }, [resource, reloadToken]);
 
   const focusTabAt = (index: number): void => {
     const target = tabRefs.current[index];
