@@ -4021,5 +4021,40 @@
       "voice_good": "Przykład TAK",
       "voice_bad": "Przykład NIE"
     }
+  },
+  "workflow": {
+    "place": {
+      "draft": "Szkic",
+      "review": "W przeglądzie",
+      "published": "Opublikowany",
+      "archived": "Zarchiwizowany"
+    },
+    "transition": {
+      "submit_for_review": "Zgłoś do przeglądu",
+      "publish": "Opublikuj",
+      "approve": "Zatwierdź",
+      "reject": "Odrzuć",
+      "unpublish": "Cofnij publikację",
+      "archive": "Archiwizuj",
+      "restore": "Przywróć"
+    },
+    "dialog": {
+      "comment_required": "Odrzucenie wymaga komentarza dla autora.",
+      "comment_optional": "Możesz dodać komentarz (opcjonalnie).",
+      "comment_placeholder": "Komentarz…"
+    },
+    "toast": {
+      "applied": "Status zmieniony: {{place}}",
+      "failed": "Przejście nie powiodło się"
+    },
+    "history": {
+      "title": "Historia workflow",
+      "open": "Historia workflow",
+      "empty": "Brak przejść.",
+      "older": "Pokaż starsze",
+      "system": "System",
+      "auto_unpublish": "auto-unpublish",
+      "bulk": "bulk"
+    }
   }
 }
