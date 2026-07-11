@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { apiLogin, uniqueSku } from './helpers/auth';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, apiLogin, uniqueSku } from './helpers/auth';
 
 /**
  * Pakiet E (WFL-P3-01 #2423 + WFL-P3-05 #2427) — the editorial state
@@ -12,10 +12,22 @@ import { apiLogin, uniqueSku } from './helpers/auth';
 test('workflow control: submit -> approve loop with history on product detail', async ({
   page,
 }) => {
+  // page.request carries only cookies; the API wants a Bearer — mint one
+  // explicitly for the setup/cleanup calls (same pattern as spec #1351).
+  const loginResponse = await page.request.post('/api/auth/login', {
+    data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+    headers: { accept: 'application/json' },
+  });
+  expect(loginResponse.status()).toBe(200);
+  const { token } = (await loginResponse.json()) as { token: string };
+  const bearer = { authorization: `Bearer ${token}` };
+
   await apiLogin(page);
 
-  // Fresh draft via the API the admin itself uses (cookie-authed context).
-  const typesResponse = await page.request.get('/api/object_types');
+  // Fresh draft via the API the admin itself uses.
+  const typesResponse = await page.request.get('/api/object_types?itemsPerPage=200', {
+    headers: { ...bearer, accept: 'application/ld+json' },
+  });
   const types = (await typesResponse.json()) as {
     'hydra:member'?: { id: string; kind: string }[];
     member?: { id: string; kind: string }[];
@@ -27,7 +39,7 @@ test('workflow control: submit -> approve loop with history on product detail', 
 
   const createResponse = await page.request.post('/api/objects', {
     data: { code: uniqueSku('WFL-E2E'), objectTypeId: productType.id },
-    headers: { 'content-type': 'application/ld+json' },
+    headers: { ...bearer, 'content-type': 'application/ld+json' },
   });
   expect(createResponse.status()).toBe(201);
   const created = (await createResponse.json()) as { id: string };
@@ -57,6 +69,7 @@ test('workflow control: submit -> approve loop with history on product detail', 
   // Cleanup: back to draft so reruns start from a known place.
   const cleanup = await page.request.post(
     `/api/objects/${created.id}/workflow/transitions/unpublish`,
+    { headers: bearer },
   );
   expect(cleanup.status()).toBe(200);
 });
