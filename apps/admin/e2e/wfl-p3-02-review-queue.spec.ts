@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { apiLogin, uniqueSku } from './helpers/auth';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, apiLogin, uniqueSku } from './helpers/auth';
 
 /**
  * WFL-P3-02 (#2424) — the review queue lists submitted objects with the
@@ -8,10 +8,22 @@ import { apiLogin, uniqueSku } from './helpers/auth';
  * sidebar Workflow entry routes to the page (comingSoon retired).
  */
 test('review queue lists a submitted object and approve clears it', async ({ page }) => {
+  // page.request carries only cookies; the API wants a Bearer — mint one
+  // explicitly for the setup/cleanup calls (same pattern as spec #1351).
+  const loginResponse = await page.request.post('/api/auth/login', {
+    data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+    headers: { accept: 'application/json' },
+  });
+  expect(loginResponse.status()).toBe(200);
+  const { token } = (await loginResponse.json()) as { token: string };
+  const bearer = { authorization: `Bearer ${token}` };
+
   await apiLogin(page);
 
   // Fresh draft submitted via the API with a distinctive comment.
-  const typesResponse = await page.request.get('/api/object_types');
+  const typesResponse = await page.request.get('/api/object_types?itemsPerPage=200', {
+    headers: { ...bearer, accept: 'application/ld+json' },
+  });
   const types = (await typesResponse.json()) as {
     'hydra:member'?: { id: string; kind: string }[];
     member?: { id: string; kind: string }[];
@@ -24,14 +36,14 @@ test('review queue lists a submitted object and approve clears it', async ({ pag
   const sku = uniqueSku('WFL-Q');
   const createResponse = await page.request.post('/api/objects', {
     data: { code: sku, objectTypeId: productType.id },
-    headers: { 'content-type': 'application/ld+json' },
+    headers: { ...bearer, 'content-type': 'application/ld+json' },
   });
   expect(createResponse.status()).toBe(201);
   const created = (await createResponse.json()) as { id: string };
 
   const submit = await page.request.post(
     `/api/objects/${created.id}/workflow/transitions/submit_for_review`,
-    { data: { comment: 'E2E kolejka: sprawdź mnie' } },
+    { data: { comment: 'E2E kolejka: sprawdź mnie' }, headers: bearer },
   );
   expect(submit.status()).toBe(200);
 
@@ -49,6 +61,7 @@ test('review queue lists a submitted object and approve clears it', async ({ pag
   // Cleanup: back to draft for rerun hygiene.
   const cleanup = await page.request.post(
     `/api/objects/${created.id}/workflow/transitions/unpublish`,
+    { headers: bearer },
   );
   expect(cleanup.status()).toBe(200);
 });
