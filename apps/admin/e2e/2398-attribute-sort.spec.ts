@@ -15,16 +15,25 @@ test('system header click sorts via order[code] and cycles to desc', async ({ pa
   await page.goto('/products');
   await expect(page.getByTestId('grid-header-code')).toBeVisible();
 
-  // expect-polling between clicks — clicking mid-rerender double-fires
-  // the cycle (race caught on the live run); the URL assert proves the
-  // backend request shape without racing waitForRequest.
+  // Await the sorted list RESPONSE before the next click — clicking
+  // mid-refetch double-fires the cycle, and networkidle never settles
+  // here (Mercure SSE keeps a connection open).
+  const ascResponse = page.waitForResponse(
+    (r) =>
+      r.url().includes('/api/objects') &&
+      decodeURIComponent(r.url()).includes('order[code]=asc'),
+  );
   await page.getByTestId('grid-sort-code').click();
+  await ascResponse;
   await expect(page.getByTestId('grid-header-code')).toHaveAttribute('aria-sort', 'ascending');
   await expect(page).toHaveURL(/sort=code%3Aasc|sort=code:asc/);
+  await page.waitForTimeout(600);
 
   await page.getByTestId('grid-sort-code').click();
   await expect(page.getByTestId('grid-header-code')).toHaveAttribute('aria-sort', 'descending');
   await expect(page).toHaveURL(/sort=code%3Adesc|sort=code:desc/);
+
+  await page.waitForTimeout(600);
 
   // Sort state survives reload via the URL.
   await page.reload();
@@ -52,6 +61,7 @@ test('revealed attribute column sorts via order[attribute.{code}]', async ({ pag
   await hiddenRow.getByRole('checkbox').click();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId(`grid-header-${attrCode}`)).toBeVisible();
+  await page.waitForTimeout(600);
 
   const sortButton = page.getByTestId(`grid-sort-${attrCode}`);
   test.skip(!(await sortButton.isVisible()), 'Revealed attribute is not sortable (type rules)');
