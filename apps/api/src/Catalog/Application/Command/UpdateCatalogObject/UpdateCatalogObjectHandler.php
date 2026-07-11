@@ -8,10 +8,12 @@ use App\Catalog\Application\ObjectAttributesUpserter;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Channel\Contracts\ChannelResolverInterface;
+use App\Identity\Contracts\Policy\WorkflowStateEditPolicyInterface;
 use App\Shared\Domain\Tenant;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use Doctrine\ORM\OptimisticLockException;
 use Symfony\Component\DependencyInjection\Attribute\Target;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
@@ -27,6 +29,7 @@ final readonly class UpdateCatalogObjectHandler
         private ChannelResolverInterface $channels,
         #[Target(ObjectEditorialWorkflow::NAME)]
         private WorkflowInterface $objectEditorial,
+        private WorkflowStateEditPolicyInterface $statePolicy,
     ) {
     }
 
@@ -53,11 +56,41 @@ final readonly class UpdateCatalogObjectHandler
             ));
         }
 
-        if (null !== $command->enabled) {
-            $object->changeEnabled($command->enabled);
-        }
+        // Status transition first (guards enforce who may move the
+        // object); content edits below are then judged against the NEW
+        // state — "reject + fix in one PATCH" works for a reviewer.
         if (null !== $command->status && $command->status !== $object->getStatus()) {
             $this->applyStatusTransition($object, $command->status);
+        }
+
+        // WFL-P1-02/P1-03 (PRD §3.8) — the permission matrix says whether
+        // the caller may edit AT ALL; the workflow state says whether they
+        // may edit NOW. Published is editable in place only with
+        // workflow.edit_any_state; holders of workflow.transition.unpublish
+        // get the atomic auto-unpublish path; archived is read-only.
+        if ($this->hasContentEdits($command)) {
+            $state = $object->getStatus();
+            if (!$this->statePolicy->canEditInState($state)) {
+                if ($this->statePolicy->requiresAutoUnpublish($state)) {
+                    // Same flush as the edit below — transition + content
+                    // change land atomically; the transition-log row carries
+                    // the audit flag (PRD: AUTO_UNPUBLISH_FOR_EDIT).
+                    $this->objectEditorial->apply($object, ObjectEditorialWorkflow::TRANSITION_UNPUBLISH, [
+                        'auto_unpublish' => true,
+                        'special_flag' => 'AUTO_UNPUBLISH_FOR_EDIT',
+                    ]);
+                } else {
+                    throw new AccessDeniedHttpException(\sprintf(
+                        'workflow_state_locked: object is "%s" — content edits are blocked by the workflow state policy.%s',
+                        $state,
+                        CatalogObject::STATUS_PUBLISHED === $state ? ' request_unpublish_available' : '',
+                    ));
+                }
+            }
+        }
+
+        if (null !== $command->enabled) {
+            $object->changeEnabled($command->enabled);
         }
 
         if ($command->clearParent) {
@@ -117,6 +150,16 @@ final readonly class UpdateCatalogObjectHandler
                 channelId: $channelId,
             );
         }
+    }
+
+    private function hasContentEdits(UpdateCatalogObjectCommand $command): bool
+    {
+        return null !== $command->enabled
+            || $command->clearParent
+            || null !== $command->parentId
+            || $command->clearPath
+            || null !== $command->path
+            || (null !== $command->attributes && [] !== $command->attributes);
     }
 
     /**
