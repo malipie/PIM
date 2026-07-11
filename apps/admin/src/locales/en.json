@@ -4141,5 +4141,13 @@
       "completed": "Task completed",
       "cancelled": "Task cancelled"
     }
+  },
+  "grid": {
+    "cell": {
+      "yes": "Yes",
+      "no": "No",
+      "assets_one": "{{count}} file",
+      "assets_other": "{{count}} files"
+    }
   }
 }

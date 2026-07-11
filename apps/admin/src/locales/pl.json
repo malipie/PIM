@@ -4161,5 +4161,15 @@
       "completed": "Zadanie ukończone",
       "cancelled": "Zadanie anulowane"
     }
+  },
+  "grid": {
+    "cell": {
+      "yes": "Tak",
+      "no": "Nie",
+      "assets_one": "{{count}} plik",
+      "assets_few": "{{count}} pliki",
+      "assets_many": "{{count}} plików",
+      "assets_other": "{{count}} pliku"
+    }
   }
 }
