@@ -1,8 +1,13 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { SyncAggregate } from '@/components/catalog/sync-aggregate-icon';
+import { extractGridCellValue, stringifyGridCellValue } from '@/lib/grid/cell-value';
+import { autoFitWidth, clampColumnWidth } from '@/lib/grid/overrides';
 import type { GridColumn } from '@/lib/grid/types';
+import type { GridDensity } from '@/lib/grid/use-density';
+import { cn } from '@/lib/utils';
 import { ProductsGridRowView } from './products-grid-row';
 
 export interface ProductsGridRow {
@@ -36,6 +41,10 @@ interface ProductsGridProps {
   optionLabels?: OptionLabelIndex;
   /** ObjectType capability — hides the thumbnail slot for media-less kinds. */
   showMediaColumn?: boolean;
+  /** GRID-P2-03 — compact shrinks row height ~30% for spreadsheet-style work. */
+  density?: GridDensity;
+  /** GRID-P2-02 — drag-resize commit (key = model column key, width px). */
+  onColumnResize?: (key: string, width: number) => void;
   selected: Set<string>;
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
@@ -95,12 +104,24 @@ function widthFor(column: GridColumn): string {
   return WIDTH_BY_KEY[column.key] ?? WIDTH_BY_TYPE[column.type] ?? '160px';
 }
 
-function gridTemplate(columns: GridColumn[], showMediaColumn: boolean): string {
+function gridTemplate(
+  columns: GridColumn[],
+  showMediaColumn: boolean,
+  liveWidths: Record<string, number>,
+): string {
   const parts = ['44px'];
   if (showMediaColumn) parts.push('52px');
-  for (const column of columns) parts.push(widthFor(column));
+  for (const column of columns) {
+    const live = liveWidths[column.key];
+    parts.push(live !== undefined ? `${live}px` : widthFor(column));
+  }
   parts.push('44px');
   return parts.join(' ');
+}
+
+/** Sticky offsets for the leading structural + identifier cells (px). */
+export function stickyOffsets(showMediaColumn: boolean): { img: number; code: number } {
+  return { img: 44, code: showMediaColumn ? 96 : 44 };
 }
 
 function pickLabel(label: Record<string, string>, locale: string, fallback: string): string {
@@ -119,6 +140,8 @@ export function ProductsGrid({
   columns,
   optionLabels = {},
   showMediaColumn = true,
+  density = 'normal',
+  onColumnResize,
   selected,
   onToggleSelect,
   onToggleSelectAll,
@@ -135,8 +158,51 @@ export function ProductsGrid({
   const masterIds = rows.filter((r) => r.parentId === null).map((r) => r.id);
   const allSelected = masterIds.length > 0 && masterIds.every((id) => selected.has(id));
 
-  const template = gridTemplate(columns, showMediaColumn);
+  // GRID-P2-02 — uncommitted drag widths live here so pointermove does not
+  // round-trip through localStorage/overrides on every frame.
+  const [liveWidths, setLiveWidths] = useState<Record<string, number>>({});
+  const dragRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+  const template = gridTemplate(columns, showMediaColumn, liveWidths);
   const headerStyle: CSSProperties = { gridTemplateColumns: template };
+  const offsets = stickyOffsets(showMediaColumn);
+  const compact = density === 'compact';
+
+  const autoFitSamples = useMemo(() => {
+    const byKey: Record<string, string[]> = {};
+    for (const column of columns) {
+      if (column.source !== 'attribute') continue;
+      byKey[column.key] = rows
+        .slice(0, 25)
+        .map((row) =>
+          stringifyGridCellValue(extractGridCellValue(row.attributesIndexed?.[column.key], locale)),
+        );
+    }
+    return byKey;
+  }, [columns, rows, locale]);
+
+  const startResize = (key: string, event: ReactPointerEvent<HTMLButtonElement>): void => {
+    const headerCell = (event.currentTarget as HTMLElement).parentElement;
+    if (headerCell === null) return;
+    dragRef.current = { key, startX: event.clientX, startWidth: headerCell.offsetWidth };
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  };
+  const moveResize = (event: ReactPointerEvent<HTMLButtonElement>): void => {
+    const drag = dragRef.current;
+    if (drag === null) return;
+    const width = clampColumnWidth(drag.startWidth + (event.clientX - drag.startX));
+    setLiveWidths((prev) => (prev[drag.key] === width ? prev : { ...prev, [drag.key]: width }));
+  };
+  const endResize = (): void => {
+    const drag = dragRef.current;
+    if (drag === null) return;
+    dragRef.current = null;
+    setLiveWidths((prev) => {
+      const width = prev[drag.key];
+      if (width !== undefined) onColumnResize?.(drag.key, width);
+      const { [drag.key]: _committed, ...rest } = prev;
+      return rest;
+    });
+  };
 
   return (
     // NUI-13 — no `role="grid"`: the ARIA grid pattern mandates grid keyboard
@@ -152,7 +218,9 @@ export function ProductsGrid({
         className="grid items-center text-[11px] uppercase tracking-wider text-zinc-500 font-semibold border-b border-zinc-100 bg-zinc-50/60"
         style={headerStyle}
       >
-        <div className="px-3 py-2.5 pl-4">
+        <div
+          className={cn('sticky left-0 z-20 bg-zinc-50 px-3 pl-4', compact ? 'py-1.5' : 'py-2.5')}
+        >
           <input
             type="checkbox"
             checked={allSelected}
@@ -163,13 +231,51 @@ export function ProductsGrid({
             className="size-4 cursor-pointer accent-zinc-900"
           />
         </div>
-        {showMediaColumn ? <div className="px-3 py-2.5" /> : null}
-        {columns.map((column) => (
-          <div key={column.key} className="px-3 py-2.5" data-testid={`grid-header-${column.key}`}>
+        {showMediaColumn ? (
+          <div
+            className={cn('sticky z-20 bg-zinc-50 px-3', compact ? 'py-1.5' : 'py-2.5')}
+            style={{ left: offsets.img }}
+          />
+        ) : null}
+        {columns.map((column, index) => (
+          <div
+            key={column.key}
+            className={cn(
+              'relative px-3',
+              compact ? 'py-1.5' : 'py-2.5',
+              index === 0 && 'sticky z-20 bg-zinc-50 shadow-[inset_-1px_0_0_0_rgba(228,228,231,1)]',
+            )}
+            style={index === 0 ? { left: offsets.code } : undefined}
+            data-testid={`grid-header-${column.key}`}
+          >
             {pickLabel(column.label, locale, column.key)}
+            {onColumnResize !== undefined ? (
+              <button
+                type="button"
+                aria-label={t('grid.resize_aria', {
+                  label: pickLabel(column.label, locale, column.key),
+                  defaultValue: 'Zmień szerokość kolumny {{label}}',
+                })}
+                data-testid={`grid-resize-${column.key}`}
+                onPointerDown={(event) => startResize(column.key, event)}
+                onPointerMove={moveResize}
+                onPointerUp={endResize}
+                onPointerCancel={endResize}
+                onDoubleClick={() =>
+                  onColumnResize(
+                    column.key,
+                    autoFitWidth(
+                      pickLabel(column.label, locale, column.key),
+                      autoFitSamples[column.key] ?? [],
+                    ),
+                  )
+                }
+                className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize touch-none hover:bg-zinc-300/60"
+              />
+            ) : null}
           </div>
         ))}
-        <div className="px-3 py-2.5" />
+        <div className={cn('px-3', compact ? 'py-1.5' : 'py-2.5')} />
       </div>
 
       {isLoading ? (
@@ -189,6 +295,9 @@ export function ProductsGrid({
               showMediaColumn={showMediaColumn}
               template={template}
               locale={locale}
+              density={density}
+              stickyCodeLeft={offsets.code}
+              stickyImgLeft={offsets.img}
               isSelected={!isVariant(row) && selected.has(row.id)}
               onToggleSelect={onToggleSelect}
               isExpanded={expandedMasters.has(row.id)}

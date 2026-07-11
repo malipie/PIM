@@ -37,7 +37,9 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 
 import { BulkBar } from '@/components/catalog/bulk-bar';
+import { ColumnManager } from '@/components/catalog/column-manager';
 import { DeletePresetDialog } from '@/components/catalog/delete-preset-dialog';
+import { DensityToggle } from '@/components/catalog/density-toggle';
 import { ExcelLikeGrid } from '@/components/catalog/excel-like-grid';
 import { FilterChipsBar } from '@/components/catalog/filter-chips-bar';
 import {
@@ -70,7 +72,9 @@ import { useFilterDslState } from '@/lib/filters/use-filter-dsl-state';
 import { type SmartFilterPreset, useSmartPresets } from '@/lib/filters/use-smart-presets';
 import { type ExcelObjectRow, toExcelColumns, toExcelRow } from '@/lib/grid/excel-columns';
 import { useAttributeOptionLabels } from '@/lib/grid/grid-attribute-cell';
-import type { GridColumnOverride, ViewColumnSeed } from '@/lib/grid/types';
+import { clampColumnWidth, overridesFromColumns, setColumnWidth } from '@/lib/grid/overrides';
+import type { GridColumn, GridColumnOverride, ViewColumnSeed } from '@/lib/grid/types';
+import { useGridDensity } from '@/lib/grid/use-density';
 import { useGridColumns } from '@/lib/grid/use-grid-columns';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
@@ -273,13 +277,17 @@ export function UniversalListPage({
     return has('name') ? seeds.filter((seed) => seed.key !== '__name') : seeds;
   }, [schemaQuery.data, isCategorizable, isProduct, hasVariants]);
 
-  const { visibleColumns: modelColumns } = useGridColumns(objectTypeId, {
+  const {
+    columns: modelColumns,
+    setOverrides,
+    resetOverrides,
+  } = useGridColumns(objectTypeId, {
     viewColumns: gridViewColumns,
     defaultOverrides: DEFAULT_COLUMN_OVERRIDES,
   });
   // Visual parity: the schema labels the identifier column generically
   // ("Identyfikator"), but the products list has always shown "SKU".
-  const visibleColumns = useMemo(
+  const allColumns = useMemo(
     () =>
       isProduct
         ? modelColumns.map((column) =>
@@ -288,6 +296,15 @@ export function UniversalListPage({
         : modelColumns,
     [modelColumns, isProduct],
   );
+  const visibleColumns = useMemo(() => allColumns.filter((c) => !c.hidden), [allColumns]);
+  const [density, setDensity] = useGridDensity(objectTypeId);
+
+  // GRID-P2-01/02 — manager mutations + header drag-resize persist as
+  // quick-pref overrides (SavedView round-trip lands in M4).
+  const applyColumns = (next: GridColumn[]): void => setOverrides(overridesFromColumns(next));
+  const handleColumnResize = (key: string, width: number): void => {
+    applyColumns(setColumnWidth(allColumns, key, clampColumnWidth(width)));
+  };
   const optionLabels = useAttributeOptionLabels(visibleColumns);
   const excelColumns = useMemo(
     () => toExcelColumns(visibleColumns, uiLocale, optionLabels),
@@ -814,6 +831,13 @@ export function UniversalListPage({
 
         {hasVariants ? <VariantsToggle mode={variantsMode} onChange={setVariantsMode} /> : null}
 
+        <ColumnManager
+          columns={allColumns}
+          onChange={applyColumns}
+          onReset={resetOverrides}
+          locale={uiLocale}
+        />
+        <DensityToggle density={density} onChange={setDensity} />
         <ViewModeToggle mode={viewMode} onChange={handleViewModeChange} />
 
         <Button asChild className="h-11 rounded-2xl px-4">
@@ -1003,6 +1027,8 @@ export function UniversalListPage({
         <ExcelLikeGrid<ExcelObjectRow>
           rows={visible.map((row) => toExcelRow(row, visibleColumns, uiLocale, optionLabels))}
           columns={excelColumns}
+          density={density}
+          onColumnResize={handleColumnResize}
           onCommit={(rowIdx, colKey, value) => {
             const row = visible[rowIdx];
             if (row === undefined) return;
@@ -1015,6 +1041,8 @@ export function UniversalListPage({
           columns={visibleColumns}
           optionLabels={optionLabels}
           showMediaColumn={hasMultimedia}
+          density={density}
+          onColumnResize={handleColumnResize}
           selected={selected}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}

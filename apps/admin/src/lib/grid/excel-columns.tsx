@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import type { ExcelColumn } from '@/components/catalog/excel-like-grid';
 import type { ProductsGridRow } from '@/components/catalog/products-grid';
+import { SyncAggregateIcon } from '@/components/catalog/sync-aggregate-icon';
 
 import { extractGridCellValue, stringifyGridCellValue } from './cell-value';
 import { GridAttributeCell } from './grid-attribute-cell';
@@ -90,7 +91,17 @@ function systemExcelCell(column: GridColumn, locale: string): SystemExcelCell | 
         renderDisplay: (row) => (row.categories ?? []).join(', ') || '—',
       };
     case '__sync':
-      return { key: 'syncStatusAggregate', type: 'text', width: 110, readOnly: true };
+      return {
+        key: 'syncDisplay',
+        type: 'text',
+        width: 110,
+        readOnly: true,
+        renderDisplay: (row) => (
+          <span className="inline-flex items-center">
+            <SyncAggregateIcon status={row.syncStatusAggregate} />
+          </span>
+        ),
+      };
     case '__price':
       return {
         key: 'priceDisplay',
@@ -121,6 +132,7 @@ export function toExcelColumns(
     if (column.source === 'attribute' && !column.key.startsWith('__')) {
       out.push({
         key: `${EXCEL_ATTR_KEY_PREFIX}${column.key}`,
+        modelKey: column.key,
         label,
         type: 'text',
         width: column.width ?? EXCEL_WIDTH_BY_TYPE[column.type] ?? 170,
@@ -139,6 +151,7 @@ export function toExcelColumns(
     if (system === null) continue;
     out.push({
       key: system.key,
+      modelKey: column.key,
       label,
       type: system.type,
       width: column.width ?? system.width,
@@ -169,6 +182,7 @@ export function toExcelRow(
         : '',
     categoriesDisplay: (row.categories ?? []).join(', '),
     priceDisplay: row.price !== null ? `${row.price.amount} ${row.price.currency}` : '',
+    syncDisplay: row.syncStatusAggregate,
   };
   const attrs = (row as ExcelObjectRow).attributesIndexed as
     | Record<string, unknown>

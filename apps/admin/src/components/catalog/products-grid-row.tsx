@@ -34,6 +34,9 @@ interface RowViewProps {
   showMediaColumn: boolean;
   template: string;
   locale: string;
+  density: 'normal' | 'compact';
+  stickyCodeLeft: number;
+  stickyImgLeft: number;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   isExpanded: boolean;
@@ -51,6 +54,9 @@ export function ProductsGridRowView({
   showMediaColumn,
   template,
   locale,
+  density,
+  stickyCodeLeft,
+  stickyImgLeft,
   isSelected,
   onToggleSelect,
   isExpanded,
@@ -66,7 +72,7 @@ export function ProductsGridRowView({
   const style: CSSProperties = { gridTemplateColumns: template };
 
   const identifierCell = (
-    <div className="px-3 py-2 font-mono text-[12px] flex items-center gap-1.5">
+    <div className="gcell px-3 py-2 font-mono text-[12px] flex items-center gap-1.5">
       {hasVariants ? (
         <button
           type="button"
@@ -107,7 +113,7 @@ export function ProductsGridRowView({
   );
 
   const nameCell = (
-    <div className="px-3 py-2.5 min-w-0 flex items-center gap-2">
+    <div className="gcell px-3 py-2.5 min-w-0 flex items-center gap-2">
       {variant ? (
         <span className="text-[13.5px] font-medium tracking-tight truncate text-left text-zinc-700">
           {row.name}
@@ -143,7 +149,7 @@ export function ProductsGridRowView({
         return nameCell;
       case '__categories':
         return (
-          <div className="px-3 py-2 flex items-center gap-1 flex-wrap">
+          <div className="gcell px-3 py-2 flex items-center gap-1 flex-wrap">
             {row.categories !== null && row.categories.length > 0 ? (
               <>
                 {row.categories.slice(0, 2).map((cat) => (
@@ -165,13 +171,13 @@ export function ProductsGridRowView({
         );
       case 'completeness':
         return (
-          <div className="px-3 py-2.5">
+          <div className="gcell px-3 py-2.5">
             <CompletenessBadge pct={row.completenessPct} />
           </div>
         );
       case '__sync':
         return (
-          <div className="px-3 py-2 flex items-center gap-2.5">
+          <div className="gcell px-3 py-2 flex items-center gap-2.5">
             <SyncAggregateIcon status={row.syncStatusAggregate} />
             <span
               className={cn('text-[10.5px] font-medium', SYNC_LABEL_TONE[row.syncStatusAggregate])}
@@ -184,7 +190,7 @@ export function ProductsGridRowView({
         );
       case '__price':
         return (
-          <div className="px-3 py-2 text-[13px] font-medium tabular-nums">
+          <div className="gcell px-3 py-2 text-[13px] font-medium tabular-nums">
             {row.price !== null ? (
               <>
                 {row.price.amount.toLocaleString(locale, { maximumFractionDigits: 2 })}
@@ -197,13 +203,13 @@ export function ProductsGridRowView({
         );
       case '__variant':
         return (
-          <div className="px-3 py-2 text-[11px] font-mono text-zinc-500">
+          <div className="gcell px-3 py-2 text-[11px] font-mono text-zinc-500">
             {row.variantAxis ?? '—'}
           </div>
         );
       case 'status':
         return (
-          <div className="px-3 py-2 text-[12px] text-zinc-600">
+          <div className="gcell px-3 py-2 text-[12px] text-zinc-600">
             {row.status !== null
               ? t(`products.status.${row.status}`, { defaultValue: row.status })
               : '—'}
@@ -211,7 +217,7 @@ export function ProductsGridRowView({
         );
       case 'updatedAt':
         return (
-          <div className="px-3 py-2 text-[12px] text-zinc-500 whitespace-nowrap">
+          <div className="gcell px-3 py-2 text-[12px] text-zinc-500 whitespace-nowrap">
             {formatDate(row.updatedAt, locale)}
           </div>
         );
@@ -219,7 +225,7 @@ export function ProductsGridRowView({
         return (
           <div
             className={cn(
-              'px-3 py-2 min-w-0 text-[12.5px] text-zinc-700 flex items-center',
+              'gcell px-3 py-2 min-w-0 text-[12.5px] text-zinc-700 flex items-center',
               gridCellAlignment(column) === 'right' && 'justify-end',
             )}
             data-testid={`grid-cell-${column.key}`}
@@ -238,12 +244,13 @@ export function ProductsGridRowView({
     <div
       data-testid={`products-grid-row-${row.sku}`}
       className={cn(
-        'group relative grid items-center text-[13px] border-b border-zinc-50 last:border-b-0 transition',
+        'group relative grid items-center text-[13px] border-b border-zinc-50 last:border-b-0 transition bg-white',
         isSelected ? 'bg-zinc-200/70' : variant ? 'bg-zinc-50/40' : 'hover:bg-zinc-50/60',
+        density === 'compact' && 'text-[12px] [&_.gcell]:py-1',
       )}
       style={style}
     >
-      <div className="px-3 py-2.5 pl-4">
+      <div className="gcell sticky left-0 z-10 bg-inherit px-3 py-2.5 pl-4">
         {variant ? (
           <span className="inline-block size-4" />
         ) : (
@@ -263,18 +270,29 @@ export function ProductsGridRowView({
       </div>
 
       {showMediaColumn ? (
-        <div className="px-3 py-2 flex items-center gap-1">
+        <div
+          className="gcell sticky z-10 bg-inherit px-3 py-2 flex items-center gap-1"
+          style={{ left: stickyImgLeft }}
+        >
           {variant ? <span className="ml-1 text-zinc-300">└</span> : null}
         </div>
       ) : null}
 
-      {columns.map((column) => (
-        <div key={column.key} className="contents">
+      {columns.map((column, index) => (
+        <div
+          key={column.key}
+          className={cn(
+            index === 0
+              ? 'sticky z-10 min-w-0 bg-inherit shadow-[inset_-1px_0_0_0_rgba(228,228,231,1)]'
+              : 'contents',
+          )}
+          style={index === 0 ? { left: stickyCodeLeft } : undefined}
+        >
           {dataCell(column)}
         </div>
       ))}
 
-      <div className="px-3 py-2 text-zinc-500 hover:text-zinc-900 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+      <div className="gcell px-3 py-2 text-zinc-500 hover:text-zinc-900 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
         {variant ? null : <ProductRowActions productId={row.id} onChanged={onChangedRow} />}
       </div>
     </div>
