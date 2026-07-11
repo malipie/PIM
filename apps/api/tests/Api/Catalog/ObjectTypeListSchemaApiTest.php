@@ -95,11 +95,19 @@ final class ObjectTypeListSchemaApiTest extends CatalogApiTestCase
         $hiddenLoc = new Attribute('grid_full_loc', ['en' => 'Localizable'], AttributeType::Text);
         $hiddenLoc->changeLocalizable(true);
 
+        // Constructor args are (requiredForCompleteness, sortOrder) —
+        // the list flags go through the ULV-10 setters.
+        $listedJunction = new ObjectTypeAttribute($productType, $listed);
+        $listedJunction->setShowInList(true);
+        $listedJunction->setListPosition(5);
+        $hiddenJunction = new ObjectTypeAttribute($productType, $hiddenLoc);
+        $hiddenJunction->setShowInList(false);
+
         $em = $this->em();
         $em->persist($listed);
         $em->persist($hiddenLoc);
-        $em->persist(new ObjectTypeAttribute($productType, $listed, true, 5));
-        $em->persist(new ObjectTypeAttribute($productType, $hiddenLoc, false, 6));
+        $em->persist($listedJunction);
+        $em->persist($hiddenJunction);
         $em->flush();
         $tenantContext->clear();
 
