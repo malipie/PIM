@@ -268,10 +268,21 @@ export function UniversalListPage({
     return has('name') ? seeds.filter((seed) => seed.key !== '__name') : seeds;
   }, [schemaQuery.data, isCategorizable, isProduct, hasVariants]);
 
-  const { visibleColumns } = useGridColumns(objectTypeId, {
+  const { visibleColumns: modelColumns } = useGridColumns(objectTypeId, {
     viewColumns: gridViewColumns,
     defaultOverrides: DEFAULT_COLUMN_OVERRIDES,
   });
+  // Visual parity: the schema labels the identifier column generically
+  // ("Identyfikator"), but the products list has always shown "SKU".
+  const visibleColumns = useMemo(
+    () =>
+      isProduct
+        ? modelColumns.map((column) =>
+            column.key === 'code' ? { ...column, label: { pl: 'SKU', en: 'SKU' } } : column,
+          )
+        : modelColumns,
+    [modelColumns, isProduct],
+  );
   const optionLabels = useAttributeOptionLabels(visibleColumns);
   const excelColumns = useMemo(
     () => toExcelColumns(visibleColumns, uiLocale, optionLabels),

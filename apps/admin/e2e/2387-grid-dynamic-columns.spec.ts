@@ -80,6 +80,17 @@ test('custom ObjectType renders its own attribute column with values in both vie
   );
   expect(attachGroup.status()).toBe(204);
 
+  // Group attachment does NOT create the object_type_attributes junction
+  // the ULV-10 list-config endpoint mutates — attach directly too.
+  const attachJunction = await page.request.post(
+    `/api/object_types/${objectTypeId}/attributes/bulk-attach`,
+    {
+      data: { attributeIds: [attributeId] },
+      headers: { ...bearer, accept: 'application/json', 'content-type': 'application/json' },
+    },
+  );
+  expect(attachJunction.status(), await attachJunction.text()).toBeLessThan(300);
+
   // 3. Flag the attribute as a list column (ULV-10 junction config).
   const listConfig = await page.request.patch(
     `/api/object_types/${objectTypeId}/attributes/${attributeId}/list-config`,
