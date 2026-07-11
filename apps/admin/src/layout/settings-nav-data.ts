@@ -1,6 +1,7 @@
 import {
   Building2,
   CreditCard,
+  GitBranch,
   Globe,
   Key,
   KeyRound,
@@ -22,6 +23,10 @@ export interface SettingsNavItem {
   primary?: boolean;
   /** TENANT scope items only Tenant Owner can manage — renders amber `owner` badge. */
   ownerOnly?: boolean;
+  /** Hide the entry unless the identity holds this permission code. */
+  permission?: string;
+  /** Hide the entry unless this runtime feature flag is enabled (WFL-P5-03). */
+  featureFlag?: string;
 }
 
 export interface SettingsNavGroup {
@@ -59,6 +64,15 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
       // DP-03 (#2033): Locales + Channels moved to Modeling (/modeling/locales,
       // /modeling/channels) — they are data-model dimensions, not settings.
       { to: '/settings/ai', icon: Sparkles, labelKey: 'settings.nav.ai' },
+      // WFL-P5-03 (#2433) — definition builder; deployment-flagged and
+      // gated by workflow.manage_definitions (Owner/Admin).
+      {
+        to: '/settings/workflow',
+        icon: GitBranch,
+        labelKey: 'settings.nav.workflow',
+        permission: 'workflow.manage_definitions',
+        featureFlag: 'workflow_custom_definitions',
+      },
     ],
   },
   {

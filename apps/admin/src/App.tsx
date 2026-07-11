@@ -279,6 +279,14 @@ const MenuSettingsPage = lazyPage(() => import('@/features/settings/menu'), 'Men
 const RolesSettingsPage = lazyPage(() => import('@/features/settings/roles'), 'RolesSettingsPage');
 const RolesEditorRoute = lazyPage(() => import('@/features/settings/roles'), 'RolesEditorRoute');
 const SsoSettingsPage = lazyPage(() => import('@/features/settings/sso'), 'SsoSettingsPage');
+const WorkflowSettingsPage = lazyPage(
+  () => import('@/features/settings/workflow'),
+  'WorkflowSettingsPage',
+);
+const WorkflowDefinitionEditorRoute = lazyPage(
+  () => import('@/features/settings/workflow'),
+  'WorkflowDefinitionEditorRoute',
+);
 const SettingsIndex = lazyPage(() => import('@/features/settings/SettingsIndex'), 'SettingsIndex');
 const SecuritySettingsPage = lazyPage(
   () => import('@/features/settings/security'),
@@ -620,6 +628,7 @@ function App() {
                           'settings.tenant.manage',
                           'settings.integrations.manage',
                           'settings.billing.manage',
+                          'workflow.manage_definitions',
                         ]}
                       >
                         <SettingsLayout />
@@ -649,6 +658,33 @@ function App() {
                     <Route path="tenant" element={<TenantSettingsPage />} />
                     <Route path="ai" element={<AiSettingsPage />} />
                     <Route path="sso" element={<SsoSettingsPage />} />
+                    {/* WFL-P5-03 (#2433) — definition builder; the page is
+                      additionally hidden by the workflow_custom_definitions
+                      feature flag (sidebar + FeatureRoute below). */}
+                    <Route
+                      path="workflow"
+                      element={
+                        <PermissionRoute anyOf={['workflow.manage_definitions']}>
+                          <WorkflowSettingsPage />
+                        </PermissionRoute>
+                      }
+                    />
+                    <Route
+                      path="workflow/new"
+                      element={
+                        <PermissionRoute anyOf={['workflow.manage_definitions']}>
+                          <WorkflowDefinitionEditorRoute />
+                        </PermissionRoute>
+                      }
+                    />
+                    <Route
+                      path="workflow/:id/edit"
+                      element={
+                        <PermissionRoute anyOf={['workflow.manage_definitions']}>
+                          <WorkflowDefinitionEditorRoute />
+                        </PermissionRoute>
+                      }
+                    />
                   </Route>
                   {/* RBAC-P5-019 (#709) — Super Admin operator panel.
                     Lives under /admin/* inside the existing app until

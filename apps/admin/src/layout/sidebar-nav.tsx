@@ -24,7 +24,7 @@ import { NavLink, useLocation } from 'react-router';
 
 import { MockBadge } from '@/components/ui/mock-badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { isMenuRefVisible, useIdentity } from '@/lib/identity';
+import { hasFeature, hasPermission, isMenuRefVisible, useIdentity } from '@/lib/identity';
 import { type EffectiveMenuItem, useEffectiveMenu } from '@/lib/use-effective-menu';
 import { cn } from '@/lib/utils';
 
@@ -348,45 +348,51 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
                 <div className="mt-1.5 mb-0.5 px-2 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
                   {t(group.labelKey)}
                 </div>
-                {group.items.map((sub) => (
-                  <NavLink
-                    key={sub.to}
-                    to={sub.to}
-                    onClick={onNavigate}
-                    className={({ isActive }) =>
-                      cn(
-                        'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] transition',
-                        isActive
-                          ? 'bg-zinc-100 font-semibold text-zinc-900'
-                          : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900',
-                      )
-                    }
-                    end={false}
-                  >
-                    {({ isActive }) => (
-                      <>
-                        <span className="flex-1 truncate">{t(sub.labelKey)}</span>
-                        {sub.primary && !isActive ? (
-                          <span className="size-1.5 rounded-full bg-zinc-300" aria-hidden />
-                        ) : null}
-                        {sub.ownerOnly ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-[9.5px] font-medium text-amber-700">
-                                {t('settings.owner_only_badge', { defaultValue: 'owner' })}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">
-                              {t('settings.owner_only_tooltip', {
-                                defaultValue: 'Tenant Owner only',
-                              })}
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : null}
-                      </>
-                    )}
-                  </NavLink>
-                ))}
+                {group.items
+                  .filter(
+                    (sub) =>
+                      (sub.permission === undefined || hasPermission(identity, sub.permission)) &&
+                      (sub.featureFlag === undefined || hasFeature(identity, sub.featureFlag)),
+                  )
+                  .map((sub) => (
+                    <NavLink
+                      key={sub.to}
+                      to={sub.to}
+                      onClick={onNavigate}
+                      className={({ isActive }) =>
+                        cn(
+                          'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] transition',
+                          isActive
+                            ? 'bg-zinc-100 font-semibold text-zinc-900'
+                            : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900',
+                        )
+                      }
+                      end={false}
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <span className="flex-1 truncate">{t(sub.labelKey)}</span>
+                          {sub.primary && !isActive ? (
+                            <span className="size-1.5 rounded-full bg-zinc-300" aria-hidden />
+                          ) : null}
+                          {sub.ownerOnly ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-[9.5px] font-medium text-amber-700">
+                                  {t('settings.owner_only_badge', { defaultValue: 'owner' })}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="right">
+                                {t('settings.owner_only_tooltip', {
+                                  defaultValue: 'Tenant Owner only',
+                                })}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : null}
+                        </>
+                      )}
+                    </NavLink>
+                  ))}
               </div>
             ))}
             <SettingsAuditCard />

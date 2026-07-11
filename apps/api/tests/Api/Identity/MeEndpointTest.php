@@ -74,6 +74,11 @@ final class MeEndpointTest extends ApiTestCase
         // constants on Tenant).
         self::assertSame('starter', $body['tenant']['plan'] ?? null);
         self::assertArrayHasKey('last_login_at', $body);
+        // WFL-P5-03 (#2433) — runtime feature flags for the SPA. The test
+        // env runs with WORKFLOW_CUSTOM_DEFINITIONS=false, so the flag is
+        // present and off.
+        self::assertIsArray($body['feature_flags'] ?? null);
+        self::assertFalse($body['feature_flags']['workflow_custom_definitions'] ?? null);
     }
 
     #[Test]

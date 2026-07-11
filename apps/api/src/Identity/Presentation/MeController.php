@@ -47,6 +47,7 @@ final readonly class MeController
     public function __construct(
         private Security $security,
         private PermissionResolverInterface $resolver,
+        private bool $workflowCustomDefinitionsEnabled = false,
     ) {
     }
 
@@ -99,6 +100,12 @@ final readonly class MeController
             'locale_scope' => $permissions->getLocaleScope(),
             'channel_scope' => $permissions->getChannelScope(),
             'attribute_group_scope' => $permissions->getAttributeGroupScope(),
+            // WFL-P5-03 (#2433) — runtime feature flags the SPA cannot learn
+            // at build time. Only tenant-agnostic deployment toggles belong
+            // here; per-tenant entitlements stay on their own endpoints.
+            'feature_flags' => [
+                'workflow_custom_definitions' => $this->workflowCustomDefinitionsEnabled,
+            ],
         ]);
     }
 }

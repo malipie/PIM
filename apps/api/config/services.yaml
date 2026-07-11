@@ -116,6 +116,13 @@ services:
         arguments:
             $customDefinitionsEnabled: '%pim.workflow.custom_definitions%'
 
+    # WFL-P5-03 (#2433) — the identity bootstrap carries runtime feature
+    # flags so the SPA can hide the Settings -> Workflow section when the
+    # deployment runs with custom definitions off.
+    App\Identity\Presentation\MeController:
+        arguments:
+            $workflowCustomDefinitionsEnabled: '%pim.workflow.custom_definitions%'
+
     App\Shared\Infrastructure\Http\Rfc7807ExceptionListener:
         arguments:
             $debug: '%kernel.debug%'

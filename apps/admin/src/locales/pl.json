@@ -258,7 +258,8 @@
       "security": "Bezpieczeństwo",
       "tenant": "Konfiguracja tenant",
       "billing": "Rozliczenia i plan",
-      "ai": "Konfiguracja AI"
+      "ai": "Konfiguracja AI",
+      "workflow": "Workflow"
     },
     "placeholder": {
       "title": "W przygotowaniu",
@@ -960,6 +961,58 @@
             "unpublish": "Cofnięcie publikacji (auto)"
           }
         }
+      }
+    },
+    "workflow": {
+      "title": "Workflow — definicje",
+      "intro": "Własny proces edytorski per tenant: stany, przejścia, uprawnienia i bramki kompletności — bez deployu.",
+      "create_cta": "Nowa definicja",
+      "empty_title": "Brak definicji",
+      "empty_body": "Dopóki nie włączysz własnej definicji, obiekty przechodzą przez wbudowany proces (szkic → przegląd → publikacja).",
+      "state_enabled": "Włączona",
+      "state_disabled": "Wyłączona",
+      "scope_global": "Wszystkie typy obiektów",
+      "scope_object_type": "Jeden typ obiektu",
+      "shape_summary": "{{places}} stanów · {{transitions}} przejść",
+      "enable": "Włącz",
+      "disable": "Wyłącz",
+      "enabled_toast": "Definicja włączona.",
+      "disabled_toast": "Definicja wyłączona.",
+      "toggle_failed": "Nie udało się zmienić stanu.",
+      "saved": "Definicja zapisana.",
+      "invalid": "Definicja zawiera błędy — popraw pola.",
+      "save_failed": "Zapis nie powiódł się.",
+      "not_found": "Nie znaleziono definicji.",
+      "edit_title": "Edytuj definicję",
+      "new_title": "Nowa definicja",
+      "field_name": "Nazwa definicji",
+      "field_object_type": "Typ obiektu (puste = wszystkie)",
+      "object_type_all": "Wszystkie typy",
+      "places_title": "Stany",
+      "place_add": "Dodaj stan",
+      "place_name": "Nazwa (snake_case)",
+      "place_label_pl": "Etykieta (pl)",
+      "place_label_en": "Etykieta (en)",
+      "place_color": "Kolor",
+      "place_remove": "Usuń stan",
+      "transitions_title": "Przejścia",
+      "transition_add": "Dodaj przejście",
+      "transition_name": "Nazwa (snake_case)",
+      "transition_from": "Ze stanów",
+      "transition_to": "Do stanu",
+      "transition_permission": "Wymagane uprawnienie (opcjonalne)",
+      "transition_comment_required": "Komentarz wymagany",
+      "transition_gate": "Min. kompletność % (puste = brak)",
+      "transition_remove": "Usuń przejście",
+      "confirm_title": "Definicja jest włączona",
+      "confirm_body": "Ta definicja steruje żywymi obiektami — zapis zmienia dostępne przejścia od razu. Kontynuować?",
+      "confirm_cta": "Zapisz mimo to",
+      "violation": {
+        "required": "Pole wymagane.",
+        "snake_case": "Użyj snake_case (litery, cyfry, podkreślenia).",
+        "duplicate": "Nazwa się powtarza.",
+        "missing_draft": "Definicja musi zawierać stan początkowy „draft”.",
+        "pct_range": "Podaj liczbę całkowitą 0–100."
       }
     }
   },
