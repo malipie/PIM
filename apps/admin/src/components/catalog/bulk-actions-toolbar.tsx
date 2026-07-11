@@ -1,10 +1,20 @@
-import { CheckCircle2, Download, FolderTree, MinusCircle, Pencil, Trash2, X } from 'lucide-react';
+import {
+  CheckCircle2,
+  Download,
+  FolderTree,
+  GitBranch,
+  MinusCircle,
+  Pencil,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { MockBadge } from '@/components/ui/mock-badge';
 import { jsonFetch } from '@/lib/http';
+import { BulkChangeStatusDialog } from './bulk-change-status-dialog';
 
 import { BulkEditModal } from './bulk-edit-modal';
 
@@ -47,6 +57,7 @@ export function BulkActionsToolbar({
   const [isPending, setIsPending] = useState(false);
   const [lastJob, setLastJob] = useState<BulkEditJobResponse | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
 
   if (ids.length === 0) return null;
 
@@ -150,6 +161,19 @@ export function BulkActionsToolbar({
           <MinusCircle className="size-4" />
           {t('products.bulk.disable', { defaultValue: 'Disable' })}
         </Button>
+        {/* WFL-P3-04 (#2426) — transitions per row through the state
+            machine (guards + gate evaluated backend-side). */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowStatusModal(true)}
+          disabled={isPending}
+          data-testid="bulk-change-status"
+        >
+          <GitBranch className="size-4" />
+          {t('products.bulk.change_status', { defaultValue: 'Zmień status' })}
+        </Button>
         {/* MOCK: bulk category change — wymaga rozszerzenia POST /api/products/bulk-edit
             o operation 'change_category' (#TBD). Patrz Project Plan/UI/Wdrozenie_grafiki/produkty-do-oprogramowania.md. */}
         <span className="inline-flex items-center gap-1.5">
@@ -211,6 +235,12 @@ export function BulkActionsToolbar({
         </Button>
       </div>
 
+      <BulkChangeStatusDialog
+        ids={ids}
+        open={showStatusModal}
+        onOpenChange={setShowStatusModal}
+        onApplied={onCleared}
+      />
       {showEditModal ? (
         <BulkEditModal
           productIds={ids}
