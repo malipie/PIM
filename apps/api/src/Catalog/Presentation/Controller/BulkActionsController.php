@@ -6,6 +6,7 @@ namespace App\Catalog\Presentation\Controller;
 
 use App\Catalog\Application\Bulk\BulkAddCategoryHandler;
 use App\Catalog\Application\Bulk\BulkAppendValueHandler;
+use App\Catalog\Application\Bulk\BulkChangeStatusHandler;
 use App\Catalog\Application\Bulk\BulkClearAttributeHandler;
 use App\Catalog\Application\Bulk\BulkDeleteHandler;
 use App\Catalog\Application\Bulk\BulkDuplicateHandler;
@@ -16,15 +17,16 @@ use App\Catalog\Application\Bulk\BulkPublishChannelsHandler;
 use App\Catalog\Application\Bulk\BulkRemoveCategoryHandler;
 use App\Catalog\Application\Bulk\BulkRemoveValueHandler;
 use App\Catalog\Application\Bulk\BulkSetAttributeHandler;
+use App\Catalog\Application\Bulk\StateEditabilityPartitioner;
 use App\Catalog\Domain\Entity\BulkSession;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Contracts\Policy\PermissionCheckerInterface;
-use App\Identity\Contracts\Policy\WorkflowStateEditPolicyInterface;
 use App\Shared\Application\BulkOperationLock;
 use App\Shared\Application\TenantContext;
 use App\Shared\Application\UserIdentityAware;
+use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use DateTimeInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -94,9 +96,10 @@ final class BulkActionsController
         private readonly TenantContext $tenantContext,
         private readonly Security $security,
         private readonly PermissionCheckerInterface $permissionChecker,
-        private readonly WorkflowStateEditPolicyInterface $statePolicy,
+        private readonly StateEditabilityPartitioner $statePartitioner,
         private readonly CatalogObjectRepositoryInterface $catalogObjects,
         private readonly BulkSetAttributeHandler $setAttributeHandler,
+        private readonly BulkChangeStatusHandler $changeStatusHandler,
         private readonly BulkClearAttributeHandler $clearAttributeHandler,
         private readonly BulkAppendValueHandler $appendValueHandler,
         private readonly BulkRemoveValueHandler $removeValueHandler,
@@ -349,7 +352,7 @@ final class BulkActionsController
         // actionType can become a state-policy bypass (lekcja #2129).
         $lockedIds = [];
         if (\in_array($actionType, self::STATE_LOCKED_ACTIONS, true)) {
-            [$targetIds, $lockedIds] = $this->partitionByStateEditability($targetIds);
+            [$targetIds, $lockedIds] = $this->statePartitioner->partition($targetIds);
             // Early return only when the lock explains the empty set —
             // unknown ids keep flowing to the session path (and its 409
             // bulk-lock semantics) exactly as before.
@@ -438,6 +441,14 @@ final class BulkActionsController
                     $this->extractChannelCodes($payload),
                     false,
                 ),
+                // WFL-P1-05 (#2419) — transitions via the state machine;
+                // per-object authorization happens inside can() (guards),
+                // NOT via a coarse bulk permission.
+                'change_status' => $this->changeStatusHandler->handle(
+                    $session,
+                    $this->requireTransition($payload),
+                    $this->optionalComment($payload),
+                ),
                 'delete' => $this->dispatchDelete($session, $body, $targetIds),
                 'duplicate' => $this->duplicateHandler->handle($session),
                 default => throw new NotFoundHttpException(\sprintf('Bulk action "%s" not implemented.', $actionType)),
@@ -461,40 +472,42 @@ final class BulkActionsController
     }
 
     /**
-     * Splits target ids into [editable, locked] against the workflow
-     * state policy (one grouped status query, no per-row hydration).
-     * The policy is per-principal, so each distinct state is evaluated
-     * once, not per row.
-     *
-     * @param list<string> $targetIds
-     *
-     * @return array{0: list<string>, 1: list<string>}
+     * @param array<string, mixed> $payload
      */
-    private function partitionByStateEditability(array $targetIds): array
+    private function requireTransition(array $payload): string
     {
-        /** @var list<array{id: Uuid, status: string}> $rows */
-        $rows = $this->em->createQueryBuilder()
-            ->select('o.id AS id', 'o.status AS status')
-            ->from(CatalogObject::class, 'o')
-            ->where('o.id IN (:ids)')
-            ->setParameter('ids', $targetIds)
-            ->getQuery()
-            ->getArrayResult();
-
-        $editableByState = [];
-        $editable = [];
-        $locked = [];
-        foreach ($rows as $row) {
-            $state = $row['status'];
-            $editableByState[$state] ??= $this->statePolicy->canEditInState($state);
-            if ($editableByState[$state]) {
-                $editable[] = $row['id']->toRfc4122();
-            } else {
-                $locked[] = $row['id']->toRfc4122();
-            }
+        $transition = $payload['transition'] ?? null;
+        if (!\is_string($transition) || !\in_array($transition, ObjectEditorialWorkflow::TRANSITIONS, true)) {
+            throw new BadRequestHttpException(\sprintf(
+                'payload.transition must be one of: %s.',
+                \implode(', ', ObjectEditorialWorkflow::TRANSITIONS),
+            ));
         }
 
-        return [$editable, $locked];
+        return $transition;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function optionalComment(array $payload): ?string
+    {
+        $comment = $payload['comment'] ?? null;
+        if (null === $comment) {
+            return null;
+        }
+        if (!\is_string($comment)) {
+            throw new BadRequestHttpException('payload.comment must be a string.');
+        }
+        $comment = \trim($comment);
+        if ('' === $comment) {
+            return null;
+        }
+        if (\mb_strlen($comment) > 2000) {
+            throw new BadRequestHttpException('payload.comment must not exceed 2000 characters.');
+        }
+
+        return $comment;
     }
 
     /**
