@@ -20,8 +20,7 @@ test('system header click sorts via order[code] and cycles to desc', async ({ pa
   // here (Mercure SSE keeps a connection open).
   const ascResponse = page.waitForResponse(
     (r) =>
-      r.url().includes('/api/objects') &&
-      decodeURIComponent(r.url()).includes('order[code]=asc'),
+      r.url().includes('/api/objects') && decodeURIComponent(r.url()).includes('order[code]=asc'),
   );
   await page.getByTestId('grid-sort-code').click();
   await ascResponse;
@@ -49,15 +48,25 @@ test('revealed attribute column sorts via order[attribute.{code}]', async ({ pag
   await page.goto('/products');
   await expect(page.getByTestId('grid-header-code')).toBeVisible();
 
-  // Reveal the first hidden attribute column from the full catalogue.
+  // Reveal the first hidden ATTRIBUTE column from the full catalogue —
+  // status/updatedAt are hidden system columns (order[status], not
+  // order[attribute.*]) and view columns are __-prefixed.
   await page.getByTestId('column-manager-trigger').click();
-  const hiddenRow = page
+  const hiddenRows = page
     .locator('[data-testid^="column-manager-row-"]')
-    .filter({ has: page.getByRole('checkbox', { checked: false }) })
-    .first();
-  const rowTestId = await hiddenRow.getAttribute('data-testid');
-  test.skip(rowTestId === null, 'No hidden attribute columns in this environment seed');
-  const attrCode = (rowTestId ?? '').replace('column-manager-row-', '');
+    .filter({ has: page.getByRole('checkbox', { checked: false }) });
+  const count = await hiddenRows.count();
+  let attrCode = '';
+  for (let i = 0; i < count; i += 1) {
+    const testId = (await hiddenRows.nth(i).getAttribute('data-testid')) ?? '';
+    const key = testId.replace('column-manager-row-', '');
+    if (key !== 'status' && key !== 'updatedAt' && !key.startsWith('__')) {
+      attrCode = key;
+      break;
+    }
+  }
+  test.skip(attrCode === '', 'No hidden attribute columns in this environment seed');
+  const hiddenRow = page.getByTestId(`column-manager-row-${attrCode}`);
   await hiddenRow.getByRole('checkbox').click();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId(`grid-header-${attrCode}`)).toBeVisible();
