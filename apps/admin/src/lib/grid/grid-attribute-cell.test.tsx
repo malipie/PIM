@@ -17,6 +17,7 @@ function column(overrides: Partial<GridColumn>): GridColumn {
     type: 'text',
     label: { pl: 'Atrybut' },
     sortable: false,
+    editable: false,
     position: 0,
     hidden: false,
     ...overrides,

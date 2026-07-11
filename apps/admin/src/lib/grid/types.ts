@@ -26,6 +26,8 @@ export interface GridColumn {
   /** Localized label map (`{pl: ..., en: ...}`) straight from the schema. */
   label: Record<string, string>;
   sortable: boolean;
+  /** GRID-P6-01 — inline-editable in the Excel view. */
+  editable: boolean;
   /** Resolved display order (0-based, contiguous). */
   position: number;
   hidden: boolean;

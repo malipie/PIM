@@ -130,7 +130,7 @@ final readonly class GetObjectTypeListSchemaHandler
      * @param list<ObjectTypeAttribute>                                                                   $listJunctions
      * @param array<string, array{id: string, code: string, label: array<string, string>, position: int}> $groupsByAttributeId
      *
-     * @return list<array{key: string, type: string, label: array<string, string>, position: int, sortable: bool, system: bool, default?: bool, group?: array{id: string, code: string, label: array<string, string>, position: int}|null}>
+     * @return list<array{key: string, type: string, label: array<string, string>, position: int, sortable: bool, editable: bool, system: bool, default?: bool, group?: array{id: string, code: string, label: array<string, string>, position: int}|null}>
      */
     private function buildColumns(array $listJunctions, bool $full = false, array $groupsByAttributeId = []): array
     {
@@ -142,6 +142,7 @@ final readonly class GetObjectTypeListSchemaHandler
                 'position' => 0,
                 'sortable' => true,
                 'system' => true,
+                'editable' => false,
             ],
             [
                 'key' => 'status',
@@ -150,6 +151,7 @@ final readonly class GetObjectTypeListSchemaHandler
                 'position' => 1,
                 'sortable' => true,
                 'system' => true,
+                'editable' => false,
             ],
             [
                 'key' => 'completeness',
@@ -158,6 +160,7 @@ final readonly class GetObjectTypeListSchemaHandler
                 'position' => 2,
                 'sortable' => true,
                 'system' => true,
+                'editable' => false,
             ],
             [
                 'key' => 'updatedAt',
@@ -166,6 +169,7 @@ final readonly class GetObjectTypeListSchemaHandler
                 'position' => 3,
                 'sortable' => true,
                 'system' => true,
+                'editable' => false,
             ],
         ];
 
@@ -181,6 +185,10 @@ final readonly class GetObjectTypeListSchemaHandler
                 // non-scopable types; enforced independently by the
                 // list endpoint in GRID-P5-02.
                 'sortable' => $this->isSortableAttribute($attribute),
+                // GRID-P6-01 (#2400) — inline-editable = user may edit
+                // (3-state RBAC) AND the type has an inline editor. Media /
+                // relation / multiselect stay read-only in the grid (MVP).
+                'editable' => $this->isEditableAttribute($attribute),
                 'system' => false,
             ];
             if ($full) {
@@ -213,6 +221,34 @@ final readonly class GetObjectTypeListSchemaHandler
         return \in_array($attribute->getType(), self::SORTABLE_TYPES, true)
             && !$attribute->isLocalizable()
             && !$attribute->isScopable();
+    }
+
+    /**
+     * GRID-P6-01 — types with a typed inline editor in the Excel view
+     * (GRID-P6-02). Media/relation/multiselect/wysiwyg edit through the
+     * detail page, not the grid, so they stay read-only here.
+     */
+    private const array INLINE_EDITABLE_TYPES = [
+        AttributeType::Text,
+        AttributeType::Textarea,
+        AttributeType::Identifier,
+        AttributeType::Number,
+        AttributeType::Metric,
+        AttributeType::Date,
+        AttributeType::Datetime,
+        AttributeType::Boolean,
+        AttributeType::Select,
+        AttributeType::Price,
+        AttributeType::Email,
+        AttributeType::Color,
+    ];
+
+    private function isEditableAttribute(Attribute $attribute): bool
+    {
+        return \in_array($attribute->getType(), self::INLINE_EDITABLE_TYPES, true)
+            && !$attribute->isLocalizable()
+            && !$attribute->isScopable()
+            && $this->attributePermissions->canEditAttribute($attribute->getId());
     }
 
     /**

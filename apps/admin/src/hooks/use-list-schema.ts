@@ -27,6 +27,8 @@ export interface ListSchemaColumn {
   label: Record<string, string>;
   position: number;
   sortable: boolean;
+  /** GRID-P6-01 — inline-editable in the Excel view (type + edit permission). */
+  editable?: boolean;
   system: boolean;
   /** GRID-P3-01 — full mode only: `show_in_list` default flag. */
   default?: boolean;
