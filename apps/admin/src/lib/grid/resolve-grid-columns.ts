@@ -1,6 +1,6 @@
 import type { ListSchemaResponse } from '@/hooks/use-list-schema';
 
-import type { GridColumn, GridColumnOverride } from './types';
+import type { GridColumn, GridColumnOverride, ViewColumnSeed } from './types';
 
 /**
  * GRID-P1-01 (#2385) — pure resolver: list-schema × user overrides →
@@ -68,10 +68,14 @@ export const FALLBACK_GRID_COLUMNS: GridColumn[] = [
  *   order. `position` in the result is re-numbered to be contiguous.
  * - `hidden` defaults to false — the schema only carries columns meant
  *   to be shown (`system` + `show_in_list=true`).
+ * - `viewColumns` (GRID-P1-03) are view-owned derived columns inserted
+ *   after their `after` anchor; a seed whose key collides with a schema
+ *   column is skipped (the schema wins).
  */
 export function resolveGridColumns(
   schema: ListSchemaResponse | undefined | null,
   overrides: GridColumnOverride[] = [],
+  viewColumns: ViewColumnSeed[] = [],
 ): GridColumn[] {
   const schemaColumns = schema?.columns;
   if (!Array.isArray(schemaColumns) || schemaColumns.length === 0) {
@@ -91,6 +95,28 @@ export function resolveGridColumns(
       position: base.size,
       hidden: false,
     });
+  }
+
+  for (const seed of viewColumns) {
+    if (typeof seed?.key !== 'string' || seed.key.length === 0 || base.has(seed.key)) continue;
+    const column: GridColumn = {
+      key: seed.key,
+      source: 'system',
+      type: seed.type,
+      label: seed.label ?? {},
+      sortable: Boolean(seed.sortable),
+      position: 0, // re-numbered below
+      hidden: false,
+    };
+    const entries = [...base.values()];
+    const anchor = seed.after !== undefined ? entries.findIndex((c) => c.key === seed.after) : -1;
+    if (anchor === -1) {
+      base.set(column.key, column);
+    } else {
+      entries.splice(anchor + 1, 0, column);
+      base.clear();
+      for (const entry of entries) base.set(entry.key, entry);
+    }
   }
 
   const ordered: GridColumn[] = [];

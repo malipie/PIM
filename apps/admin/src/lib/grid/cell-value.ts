@@ -94,3 +94,26 @@ export function extractGridCellValue(entry: unknown, locale: string): GridCellVa
   // No canonical marker → localizable/scopable map keyed by locale/channel.
   return fromKeyedMap(entry, locale);
 }
+
+/**
+ * Plain-text reading for clipboard/TSV and title attributes. Option
+ * codes can be mapped to labels via `labelFor` (falls back to the code).
+ */
+export function stringifyGridCellValue(
+  cell: GridCellValue,
+  labelFor?: (code: string) => string,
+): string {
+  switch (cell.kind) {
+    case 'empty':
+      return '';
+    case 'text':
+      return cell.value;
+    case 'number':
+    case 'boolean':
+      return String(cell.value);
+    case 'options':
+      return cell.codes.map((code) => labelFor?.(code) ?? code).join(', ');
+    case 'price':
+      return `${cell.amount} ${cell.currency}`.trim();
+  }
+}

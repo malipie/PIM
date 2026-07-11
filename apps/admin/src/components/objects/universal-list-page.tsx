@@ -38,7 +38,7 @@ import { Link, useNavigate } from 'react-router';
 
 import { BulkBar } from '@/components/catalog/bulk-bar';
 import { DeletePresetDialog } from '@/components/catalog/delete-preset-dialog';
-import { type ExcelColumn, ExcelLikeGrid } from '@/components/catalog/excel-like-grid';
+import { ExcelLikeGrid } from '@/components/catalog/excel-like-grid';
 import { FilterChipsBar } from '@/components/catalog/filter-chips-bar';
 import {
   PAGE_SIZE_OPTIONS,
@@ -61,12 +61,17 @@ import {
   type CatalogSearchHit,
   useCatalogSearch,
 } from '@/features/catalog/search/use-catalog-search';
+import { useListSchema } from '@/hooks/use-list-schema';
 import { unwrapAttributesIndexed } from '@/lib/attributes-indexed';
 import { dslToFlatConditions, type FilterDsl } from '@/lib/filters/filter-dsl';
 import { readInitialFilterDsl } from '@/lib/filters/list-url-seed';
 import { dslToBase64 } from '@/lib/filters/url-serializer';
 import { useFilterDslState } from '@/lib/filters/use-filter-dsl-state';
 import { type SmartFilterPreset, useSmartPresets } from '@/lib/filters/use-smart-presets';
+import { type ExcelObjectRow, toExcelColumns, toExcelRow } from '@/lib/grid/excel-columns';
+import { useAttributeOptionLabels } from '@/lib/grid/grid-attribute-cell';
+import type { GridColumnOverride, ViewColumnSeed } from '@/lib/grid/types';
+import { useGridColumns } from '@/lib/grid/use-grid-columns';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -128,22 +133,18 @@ interface ListResponse {
   'hydra:totalItems'?: number;
 }
 
-type ExcelObjectRow = ProductsGridRow & Record<string, unknown>;
-
 const DEFAULT_FACETS = ['status'];
 const PRODUCT_FACETS = ['status', 'brand'];
 
-const DEFAULT_EXCEL_COLUMNS: ExcelColumn<ExcelObjectRow>[] = [
-  { key: 'sku', label: 'Kod', type: 'text', width: 160, readOnly: true },
-  { key: 'name', label: 'Nazwa', type: 'text', width: 280 },
-  { key: 'completenessPct', label: 'Kompletność', type: 'number', width: 110, readOnly: true },
-];
-
-const PRODUCT_EXCEL_COLUMNS: ExcelColumn<ExcelObjectRow>[] = [
-  { key: 'sku', label: 'SKU', type: 'text', width: 160, readOnly: true },
-  { key: 'name', label: 'Nazwa', type: 'text', width: 280 },
-  { key: 'completenessPct', label: 'Kompletność', type: 'number', width: 110, readOnly: true },
-  { key: 'variantAxis', label: 'Wariant', type: 'text', width: 120, readOnly: true },
+/**
+ * GRID-P1-03 — visual parity with the pre-GRID list: the schema always
+ * emits `status`/`updatedAt` system columns, but the legacy grid never
+ * showed them. Hidden by default until the user opts in (column manager,
+ * GRID-P2-01); stored prefs override this.
+ */
+const DEFAULT_COLUMN_OVERRIDES: GridColumnOverride[] = [
+  { key: 'status', hidden: true },
+  { key: 'updatedAt', hidden: true },
 ];
 
 export interface UniversalListPageProps {
@@ -164,6 +165,8 @@ export interface UniversalListPageProps {
   hasVariants: boolean;
   /** Capability flag from the list-schema response. */
   isCategorizable: boolean;
+  /** Capability flag from the list-schema response — hides the thumbnail slot when false. */
+  hasMultimedia?: boolean;
   /** Where the Create CTA / empty-state CTA navigates. */
   createPath: string;
   /** Builder for the detail-page route per row. */
@@ -199,10 +202,12 @@ export function UniversalListPage({
   searchKind,
   hasVariants,
   isCategorizable,
+  hasMultimedia = true,
   createPath,
   detailPathFor,
 }: UniversalListPageProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const uiLocale = i18n.language.split('-')[0] ?? i18n.language;
   const isProduct = searchKind === 'products';
   const isCustomKind = searchKind === undefined;
   const exportNavigate = useNavigate();
@@ -219,8 +224,75 @@ export function UniversalListPage({
       },
     });
   };
-  const excelColumns = isProduct ? PRODUCT_EXCEL_COLUMNS : DEFAULT_EXCEL_COLUMNS;
   const facets = isProduct ? PRODUCT_FACETS : DEFAULT_FACETS;
+
+  // GRID-P1-03/04 — the single column model for both views. View-owned
+  // derived columns (name fallback, categories, sync, price, variant
+  // axis) fill the gaps the list-schema cannot know about; seeds whose
+  // key already exists as a schema column are skipped by the resolver.
+  const schemaQuery = useListSchema(objectTypeId);
+  const gridViewColumns = useMemo<ViewColumnSeed[]>(() => {
+    const schemaColumns = schemaQuery.data?.columns ?? [];
+    const has = (key: string): boolean => schemaColumns.some((column) => column.key === key);
+    const seeds: ViewColumnSeed[] = [
+      { key: '__name', type: 'view_name', label: { pl: 'Nazwa', en: 'Name' }, after: 'code' },
+    ];
+    if (isCategorizable) {
+      seeds.push({
+        key: '__categories',
+        type: 'view_categories',
+        label: { pl: 'Kategorie', en: 'Categories' },
+        after: has('name') ? 'name' : '__name',
+      });
+    }
+    if (isProduct) {
+      seeds.push({
+        key: '__sync',
+        type: 'view_sync',
+        label: { pl: 'Kanały', en: 'Channels' },
+        after: 'completeness',
+      });
+      if (!has('price')) {
+        seeds.push({
+          key: '__price',
+          type: 'view_price',
+          label: { pl: 'Cena', en: 'Price' },
+          after: '__sync',
+        });
+      }
+    }
+    if (hasVariants) {
+      seeds.push({
+        key: '__variant',
+        type: 'view_variant',
+        label: { pl: 'Wariant', en: 'Variant' },
+      });
+    }
+    // '__name' seed is skipped by the resolver when the schema exposes a
+    // `name` attribute column — the seed list stays static either way.
+    return has('name') ? seeds.filter((seed) => seed.key !== '__name') : seeds;
+  }, [schemaQuery.data, isCategorizable, isProduct, hasVariants]);
+
+  const { visibleColumns: modelColumns } = useGridColumns(objectTypeId, {
+    viewColumns: gridViewColumns,
+    defaultOverrides: DEFAULT_COLUMN_OVERRIDES,
+  });
+  // Visual parity: the schema labels the identifier column generically
+  // ("Identyfikator"), but the products list has always shown "SKU".
+  const visibleColumns = useMemo(
+    () =>
+      isProduct
+        ? modelColumns.map((column) =>
+            column.key === 'code' ? { ...column, label: { pl: 'SKU', en: 'SKU' } } : column,
+          )
+        : modelColumns,
+    [modelColumns, isProduct],
+  );
+  const optionLabels = useAttributeOptionLabels(visibleColumns);
+  const excelColumns = useMemo(
+    () => toExcelColumns(visibleColumns, uiLocale, optionLabels),
+    [visibleColumns, uiLocale, optionLabels],
+  );
 
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<Record<string, string | string[]>>({});
@@ -929,7 +1001,7 @@ export function UniversalListPage({
         </div>
       ) : viewMode === 'excel' ? (
         <ExcelLikeGrid<ExcelObjectRow>
-          rows={visible as ExcelObjectRow[]}
+          rows={visible.map((row) => toExcelRow(row, visibleColumns, uiLocale, optionLabels))}
           columns={excelColumns}
           onCommit={(rowIdx, colKey, value) => {
             const row = visible[rowIdx];
@@ -940,6 +1012,9 @@ export function UniversalListPage({
       ) : (
         <ProductsGrid
           rows={visible}
+          columns={visibleColumns}
+          optionLabels={optionLabels}
+          showMediaColumn={hasMultimedia}
           selected={selected}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
@@ -1150,6 +1225,8 @@ function buildRow(entry: CatalogObjectListEntry): ProductsGridRow {
     status: typeof entry.status === 'string' ? entry.status : null,
     parentId,
     variantAxis,
+    updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : null,
+    attributesIndexed: entry.attributesIndexed ?? null,
   };
 }
 

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { jsonFetch } from '@/lib/http';
 
-import { extractGridCellValue } from './cell-value';
+import { extractGridCellValue, stringifyGridCellValue } from './cell-value';
 import type { GridColumn } from './types';
 
 /**
@@ -166,11 +166,13 @@ export function GridAttributeCell({
           : cell.kind === 'text'
             ? Number(cell.value)
             : Number.NaN;
-      if (!Number.isFinite(numeric)) return <span className="truncate">{stringify(cell)}</span>;
+      if (!Number.isFinite(numeric))
+        return <span className="truncate">{stringifyGridCellValue(cell)}</span>;
       return <span className="tabular-nums">{new Intl.NumberFormat(locale).format(numeric)}</span>;
     }
     case 'price': {
-      if (cell.kind !== 'price') return <span className="truncate">{stringify(cell)}</span>;
+      if (cell.kind !== 'price')
+        return <span className="truncate">{stringifyGridCellValue(cell)}</span>;
       const formatted =
         cell.currency.length === 3
           ? new Intl.NumberFormat(locale, { style: 'currency', currency: cell.currency }).format(
@@ -180,7 +182,7 @@ export function GridAttributeCell({
       return <span className="tabular-nums">{formatted}</span>;
     }
     case 'boolean': {
-      const truthy = cell.kind === 'boolean' ? cell.value : stringify(cell) === 'true';
+      const truthy = cell.kind === 'boolean' ? cell.value : stringifyGridCellValue(cell) === 'true';
       return (
         <span
           className={
@@ -197,7 +199,7 @@ export function GridAttributeCell({
     }
     case 'date':
     case 'datetime': {
-      const raw = stringify(cell);
+      const raw = stringifyGridCellValue(cell);
       const parsed = new Date(raw);
       if (Number.isNaN(parsed.getTime())) return <span className="truncate">{raw}</span>;
       const formatted = new Intl.DateTimeFormat(locale, {
@@ -208,7 +210,7 @@ export function GridAttributeCell({
     }
     case 'select':
     case 'multiselect': {
-      const codes = cell.kind === 'options' ? cell.codes : [stringify(cell)];
+      const codes = cell.kind === 'options' ? cell.codes : [stringifyGridCellValue(cell)];
       return (
         <OptionChips codes={codes} column={column} optionLabels={optionLabels} locale={locale} />
       );
@@ -216,7 +218,7 @@ export function GridAttributeCell({
     case 'asset': {
       // No per-row asset fetch in M1: a fixed-size placeholder keeps the
       // layout stable; real thumbnails need the asset preview endpoint.
-      const raw = stringify(cell);
+      const raw = stringifyGridCellValue(cell);
       if (/^https?:\/\//.test(raw)) {
         return (
           <img src={raw} alt="" loading="lazy" className="h-8 w-8 shrink-0 rounded object-cover" />
@@ -232,29 +234,12 @@ export function GridAttributeCell({
     default: {
       // text / textarea / wysiwyg / identifier / email / color / relation
       // and any future type: safe string with a full-value tooltip.
-      const raw = stringify(cell);
+      const raw = stringifyGridCellValue(cell);
       return (
         <span className="truncate" title={raw}>
           {raw}
         </span>
       );
     }
-  }
-}
-
-function stringify(cell: ReturnType<typeof extractGridCellValue>): string {
-  switch (cell.kind) {
-    case 'empty':
-      return '';
-    case 'text':
-      return cell.value;
-    case 'number':
-      return String(cell.value);
-    case 'boolean':
-      return String(cell.value);
-    case 'options':
-      return cell.codes.join(', ');
-    case 'price':
-      return `${cell.amount} ${cell.currency}`.trim();
   }
 }
