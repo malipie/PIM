@@ -98,6 +98,39 @@ describe('resolveGridColumns', () => {
     );
   });
 
+  it('inserts view columns after their anchor and skips schema-key collisions', () => {
+    const columns = resolveGridColumns(
+      SCHEMA,
+      [],
+      [
+        { key: '__name', type: 'view_name', label: { pl: 'Nazwa' }, after: 'code' },
+        { key: '__tail', type: 'view_tail', label: { pl: 'Ogon' } },
+        { key: 'brand', type: 'view_dupe', label: { pl: 'Duplikat' } }, // collides → skipped
+      ],
+    );
+
+    expect(columns.map((column) => column.key)).toEqual([
+      'code',
+      '__name',
+      'status',
+      'brand',
+      '__tail',
+    ]);
+    expect(columns.find((column) => column.key === 'brand')?.type).toBe('select');
+  });
+
+  it('applies overrides to view columns like any other column', () => {
+    const columns = resolveGridColumns(
+      SCHEMA,
+      [{ key: '__name', hidden: true, width: 300 }],
+      [{ key: '__name', type: 'view_name', label: { pl: 'Nazwa' }, after: 'code' }],
+    );
+
+    const nameColumn = columns.find((column) => column.key === '__name');
+    expect(nameColumn?.hidden).toBe(true);
+    expect(nameColumn?.width).toBe(300);
+  });
+
   it('survives malformed schema entries without throwing', () => {
     const malformed = schemaWith([
       // @ts-expect-error deliberate garbage — resolver must not trust the wire

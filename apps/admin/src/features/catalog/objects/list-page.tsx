@@ -134,6 +134,7 @@ export function ObjectListPage() {
       searchKind={searchKind}
       hasVariants={schema.objectType.has_variants}
       isCategorizable={schema.objectType.is_categorizable}
+      hasMultimedia={schema.objectType.has_multimedia}
       createPath={createPath}
       detailPathFor={detailPathFor}
     />

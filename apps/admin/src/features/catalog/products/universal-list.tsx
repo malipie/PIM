@@ -67,6 +67,7 @@ export function ProductsUniversalListPage() {
       searchKind="products"
       hasVariants={schemaQuery.data.objectType.has_variants}
       isCategorizable={schemaQuery.data.objectType.is_categorizable}
+      hasMultimedia={schemaQuery.data.objectType.has_multimedia}
       createPath="/products/new"
       detailPathFor={(id) => `/products/${id}`}
     />

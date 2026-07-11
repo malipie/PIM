@@ -8,6 +8,13 @@ export interface ExcelColumn<T extends Record<string, unknown>> {
   width?: number;
   readOnly?: boolean;
   options?: ReadonlyArray<string>;
+  /**
+   * GRID-P1-04 — rich display renderer (attribute cells: option labels,
+   * chips, Intl formats). Display-only: editing and clipboard TSV keep
+   * reading the flat `row[key]` value, so rows must carry a plain-text
+   * projection under `key` alongside whatever this renders.
+   */
+  renderDisplay?: (row: T) => React.ReactNode;
 }
 
 interface CellAddress {
@@ -242,6 +249,8 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
             }}
             className="w-full bg-background outline-none"
           />
+        ) : col.renderDisplay !== undefined ? (
+          col.renderDisplay(row)
         ) : (
           <span>{String(value ?? '')}</span>
         )}

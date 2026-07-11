@@ -48,3 +48,21 @@ export interface GridColumnOverride {
   width?: number;
   pinned?: boolean;
 }
+
+/**
+ * GRID-P1-03/04 — a view-owned data column that does not exist in the
+ * list-schema (relational/derived data: categories, sync aggregate,
+ * derived price/name fallbacks). Merged into the model right after
+ * `after` (or appended) and treated like any other column by overrides
+ * and the column manager. Keys are `__`-prefixed by convention so they
+ * can never shadow an attribute code.
+ */
+export interface ViewColumnSeed {
+  key: string;
+  /** View-dispatched renderer id, e.g. `view_categories`. */
+  type: string;
+  label: Record<string, string>;
+  /** Insert after this schema/view key; append when absent. */
+  after?: string;
+  sortable?: boolean;
+}

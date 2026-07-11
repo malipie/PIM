@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useListSchema } from '@/hooks/use-list-schema';
 
 import { resolveGridColumns } from './resolve-grid-columns';
-import type { GridColumn, GridColumnOverride } from './types';
+import type { GridColumn, GridColumnOverride, ViewColumnSeed } from './types';
 
 /**
  * GRID-P1-01 (#2385) — single column model for both list views.
@@ -19,13 +19,14 @@ function storageKey(objectTypeId: string): string {
   return `pim.objectList.${objectTypeId}.columns`;
 }
 
-function readOverrides(objectTypeId: string): GridColumnOverride[] {
-  if (typeof window === 'undefined') return [];
+/** `null` = nothing stored (defaults apply); `[]` = user explicitly reset to schema. */
+function readStoredOverrides(objectTypeId: string): GridColumnOverride[] | null {
+  if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(storageKey(objectTypeId));
-    if (raw === null) return [];
+    if (raw === null) return null;
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) return null;
     return parsed.filter(
       (entry): entry is GridColumnOverride =>
         entry !== null &&
@@ -33,9 +34,20 @@ function readOverrides(objectTypeId: string): GridColumnOverride[] {
         typeof (entry as GridColumnOverride).key === 'string',
     );
   } catch {
-    // Corrupt JSON (manual edit, old shape) — fall back to schema defaults.
-    return [];
+    // Corrupt JSON (manual edit, old shape) — fall back to defaults.
+    return null;
   }
+}
+
+export interface UseGridColumnsOptions {
+  /** View-owned derived columns (categories, sync, …) — see {@link ViewColumnSeed}. */
+  viewColumns?: ViewColumnSeed[];
+  /**
+   * Applied only when the user has no stored prefs — lets a view keep
+   * visual parity with its pre-GRID column set (e.g. products hide
+   * `status`/`updatedAt` by default). "Reset" clears back to these.
+   */
+  defaultOverrides?: GridColumnOverride[];
 }
 
 export interface UseGridColumnsResult {
@@ -51,21 +63,27 @@ export interface UseGridColumnsResult {
   resetOverrides: () => void;
 }
 
-export function useGridColumns(objectTypeId: string | undefined): UseGridColumnsResult {
+export function useGridColumns(
+  objectTypeId: string | undefined,
+  options: UseGridColumnsOptions = {},
+): UseGridColumnsResult {
+  const { viewColumns, defaultOverrides } = options;
   const schemaQuery = useListSchema(objectTypeId);
-  const [overrides, setOverridesState] = useState<GridColumnOverride[]>(() =>
-    objectTypeId !== undefined ? readOverrides(objectTypeId) : [],
+  const [stored, setStoredState] = useState<GridColumnOverride[] | null>(() =>
+    objectTypeId !== undefined ? readStoredOverrides(objectTypeId) : null,
   );
 
   // Re-read prefs when navigating between ObjectTypes — the hook instance
   // survives route param changes inside the same list component.
   useEffect(() => {
-    setOverridesState(objectTypeId !== undefined ? readOverrides(objectTypeId) : []);
+    setStoredState(objectTypeId !== undefined ? readStoredOverrides(objectTypeId) : null);
   }, [objectTypeId]);
+
+  const overrides = stored ?? defaultOverrides ?? [];
 
   const setOverrides = useCallback(
     (next: GridColumnOverride[]) => {
-      setOverridesState(next);
+      setStoredState(next);
       if (typeof window === 'undefined' || objectTypeId === undefined) return;
       try {
         window.localStorage.setItem(storageKey(objectTypeId), JSON.stringify(next));
@@ -77,7 +95,7 @@ export function useGridColumns(objectTypeId: string | undefined): UseGridColumns
   );
 
   const resetOverrides = useCallback(() => {
-    setOverridesState([]);
+    setStoredState(null);
     if (typeof window === 'undefined' || objectTypeId === undefined) return;
     try {
       window.localStorage.removeItem(storageKey(objectTypeId));
@@ -87,8 +105,8 @@ export function useGridColumns(objectTypeId: string | undefined): UseGridColumns
   }, [objectTypeId]);
 
   const columns = useMemo(
-    () => resolveGridColumns(schemaQuery.data, overrides),
-    [schemaQuery.data, overrides],
+    () => resolveGridColumns(schemaQuery.data, overrides, viewColumns),
+    [schemaQuery.data, overrides, viewColumns],
   );
   const visibleColumns = useMemo(() => columns.filter((column) => !column.hidden), [columns]);
 
