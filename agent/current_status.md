@@ -3,6 +3,27 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-12: Epik GRID — MARATON (dopracowanie grida per ObjectType: column manager + custom columns + sort + inline edit + saved views)
+- **Backlog:** `Project Plan/feature-grid-tickets.md` (23 tickety GRID-P{faza}-{nn}, #2385–#2407, milestone'y #66–#73, label epik-GRID). Strategia PR: 23 tickety → 13 PR-ów (sekcja „Strategia PR" — powód: quality-php na paths-ignore = pełne bramki na każdym PR z kodem).
+- **✅ DOSTARCZONE i zmergowane (11 ticketów, każdy live-smoke proof na pim.localhost):**
+  - **M1** (#2497/#2499) — dynamiczne kolumny z list-schema: `useGridColumns` model, `resolveGridColumns` (RBAC-safe merge overrides), rejestr cell-rendererów per typ atrybutu, oba widoki (grid+Excel) z ViewColumnSeeds; fallback przy braku schemy.
+  - **M2** (#2501) — column manager (show/hide + drag-reorder @dnd-kit + reset), header resize (clamp 60–640, live width + commit na pointerup), sticky identyfikator, density compact/normal. Wszystko persist localStorage per OT.
+  - **ADR-0028** (#2502) — strategia sortu: Postgres JSONB path (benchmark 50k: p95 12–25ms bez indeksu, 20–40× zapasu; Meili odrzucony operacyjnie), NULLS LAST + tie-breaker id, LIMIT/OFFSET dla sortowanych. `docs/perf/grid-attribute-sort-benchmark.md`.
+  - **M3** (#2503) — `?full=1`: dowolny atrybut ObjectType jako kolumna (281 na demo), default→hidden (manager odkrywa), chip AttributeGroup; RBAC 3-state w obu trybach.
+  - **M4-BE** (#2505) — SavedView config: `SavedViewConfigValidator` (unknown key/typ → 400 RFC7807), default per (tenant,object_type_id,user_id), system view (user_id NULL) → PATCH/DELETE 403; owner-scoped przez CurrentUserProvider.
+  - **P5 sort** (#2507) — `AttributeOrderFilter` `?order[attribute.{code}]` wg ADR-0028 (cast per typ, jednolity 400 dla unknown/unsortable/restricted), DQL JSONB_PATH_TEXT/NUMERIC, OrderById + pola systemowe, klikalne nagłówki + URL-persist. Fix: list-url-seed strip sort.
+  - **P6-01** (#2506) — flaga `editable` per kolumna (canEditAttribute + typ inline-editowalny; media/relation/multiselect/localizable → false).
+  - **P6-02** (#2508) — typed inline editors w Excel view (date/number/boolean/select-dropdown z labelkami), commit PATCH atrybutu + optimistic overlay + rollback.
+  - **M4-FE** (#2509) — round-trip config przez saved views (filters+columns+sort+density+variants+page_size); reloadToken refetch; fix pre-existing resource mismatch (rail 'products' vs save 'product').
+  - **P6-03** (#2510 merged) — typed TSV paste + coercion (select label→code) + skip report toast; `coerceExcelValue` współdzielony z single-cell commit.
+- **⏸ ODŁOŻONE do świeżego kontekstu (świadomy quality-stop, EPIK MARATHON RULE — decyzja bliska architektonicznej):**
+  - **M7 grid-export (#2403 P7-01 + #2404 P7-02)** — endpoint `POST /api/objects/grid-export` reużywający ExportBuilder/ColumnResolver/ValueSerializer + async job + MinIO + przycisk FE. Duża integracja silnika Export (model sesji/async) — wymaga dokładnego studium, żeby nie dostarczyć zepsutego eksportu.
+  - **M8-P8-01 wirtualizacja wierszy (#2405)** — restrukturyzacja render grida (page-scroll → kontener stałej wysokości) zderza się ze sticky columns (P2-02) + variant tree + selekcją (świeżo dostarczone). Paginacja i tak cappuje 200 wierszy — potrzeba umiarkowana. Ryzyko regresji > wartość przy tej długości sesji.
+  - **M8-P8-02 journey E2E (#2406)** + **P8-03 closeout+screencast (#2407)** — po M7 i P8-01.
+- **Gotchas maratonu → sekcje niżej + memory `grid-epic-backlog`:** biome-ignore w JSX = 1 linia; inline @var ginie przez cs-fixer (użyj typowanego helpera); PR-head desync po force-pushu → close+nowy PR; stale FrankenPHP worker → cache:clear+restart przed live-E2E; toast paste fire'uje przed async PATCH (waitForResponse w E2E); paste wymaga focusu tabeli (stopEditing restore).
+
+## 2026-07-11 (wieczór): 3 bug-fixy po smoke operatora WFL
+
 ## 2026-07-11 (wieczór): 3 bug-fixy po smoke operatora WFL (#2491/#2493/#2495 — wszystkie merged + closed z proofem)
 - **Kontekst:** operator manualnie smoke-testował workflow po zamknięciu epiku; zgłosił 3 niezależne problemy → 3 osobne issues/PR-y (SKILL-BUG-FIX-TICKET, plan `~/.claude/plans/graceful-gathering-scott.md`).
 - **#2491 (PR #2492) — edytor roli 500:** schema drift `role_attribute_permissions` (composite PK bez `id`; migracja `CREATE TABLE IF NOT EXISTS` z `id` była no-opem) → `GET/PUT /api/roles/{id}/attribute-permissions` 500 → mylący toast „Operacja na roli nie powiodła się". Fix: defensywna migracja `Version20260711150000` (ADD id + swap PK, guard na `information_schema`). CI zielone bo testowa DB z mappingów. Smoke: GET/PUT→200, dev DB zmigrowana.

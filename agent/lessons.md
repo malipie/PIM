@@ -3077,3 +3077,28 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 - **ViewColumnSeeds** — kolumny widokowe spoza schemy (kategorie, sync, cena, fallback nazwy) wchodzą do modelu kolumn jako seedy (`resolveGridColumns(schema, overrides, viewColumns)`) zamiast żyć obok modelu; column manager (M2) zarządza nimi jak każdą kolumną, a seed kolidujący z kluczem schemy jest pomijany (schema wygrywa). Klucze `__`-prefiksowane nie zderzą się z kodami atrybutów.
 - **Parity przez `defaultOverrides`** — schema zawsze emituje `status`/`updatedAt`, legacy grid ich nie pokazywał; hook `useGridColumns(id, {defaultOverrides})` aplikuje ukrycia tylko gdy brak stored prefs (null-vs-[] rozróżnia „brak prefsów" od „user zresetował").
 - **Excel: rich display bez łamania TSV** — `ExcelColumn.renderDisplay` renderuje bogatą komórkę, a wiersz niesie płaską projekcję tekstową pod tym samym kluczem (`attr:{code}`), więc clipboard `String(row[key])` działa bez zmian w gridzie.
+
+## Lessons z epiku GRID — maraton 2026-07-12 (M1–M6 + M4 + P5)
+
+### Toolchain / CI gotchas (kosztowały najwięcej czasu)
+- **`biome-ignore` w JSX MUSI być pojedynczą linią** bezpośrednio nad węzłem. Multi-line `//` komentarz → biome czyta tylko komentarz najbliższy węzłowi; dyrektywa na pierwszej z kilku linii = nie działa. ZAWSZE re-run `biome check` po dodaniu ignore (build/tsc NIE łapią tego).
+- **Inline `/** @var array<string,mixed> */` ginie przez cs-fixer** → degradowany do jednogwiazdkowego `/* */`, który PHPStan ignoruje → typ pozostaje `array<mixed,mixed>`. Zamiast inline @var użyj typowanego helpera (`asConfigArray(mixed): array<string,mixed>`).
+- **PR-head desync po `git push -f` rebase'a**: GitHub PR utyka na STARYM SHA (`gh pr view --json headRefOid` ≠ remote head), nowe pushe nie odpalają `synchronize`, PR w kółko pokazuje stary czerwony run. Fix: **zamknij + utwórz NOWY PR** z tego samego brancha. Retarget PR na `main` PRZED merge bazy stackowanego PR-a unika auto-close przez `--delete-branch`.
+- **Rebase stacked brancha po squash-merge bazy:** `git rebase --onto origin/main <ostatni-commit-bazy> <branch>` — zwykły `git rebase origin/main` zderza oryginalne commity ze squashem (konflikt).
+- **Pusty commit / commit poza `apps/admin/**` nie odpala frontend workflow** (paths whitelist) → re-trigger = realna zmiana w apps/admin.
+- **Dodanie zależności do konstruktora** → poprawić WSZYSTKIE `new Handler(...)` w unit testach (PHPStan „N parameters, M required").
+- **Nowy AP filter** (`api_platform.filter`) surface'uje się w OpenAPI → regeneruj `docs/api-spec/v0.json`; manualny `?query` param (`$request->query`) NIE surface'uje.
+- **PHPStan/cs-fixer w worktree bez kontenera:** `docker run --rm -v $PWD:/app -v pim_api_vendor:/app/vendor -w /app php:8.4-cli php -d memory_limit=2G vendor/bin/phpstan analyse <pliki>` — WYMAGA skopiowania `var/cache/dev/App_KernelDevDebugContainer.xml` z głównego drzewa. Analiza podzbioru plików daje false-positive „Ignored error pattern not matched" — to NIE realne błędy.
+
+### Live-E2E na dev-stacku (worktree pattern)
+- **Serwowane drzewo = główny `~/dev/PIM`, nie worktree.** By live-testować branch: `git -C ~/dev/PIM checkout --detach <branch>`, potem **ZAWSZE** `docker compose exec api php bin/console cache:clear --no-warmup && docker compose restart api` (FrankenPHP worker cache'uje stary kod → fałszywe regresje E2E: fallback columns, stary schema). Po teście wróć na `main`.
+- **Toast fire'uje synchronicznie PRZED async PATCH** — E2E asertujący skutek edycji/paste musi `waitForResponse(PATCH)` zamiast sprawdzać licznik zaraz po toaście.
+- **Single-click-edit gubi focus tabeli** (input usuwany z DOM) → Ctrl+V/Ctrl+C nie dochodzi do grid keydown. Fix: `stopEditing()` z `requestAnimationFrame(() => gridRef.current?.focus())`.
+- **Schema-load timing:** paste/interakcja przed załadowaniem list-schema trafia w fallback columns (SKU/Status/Kompletność/Zmodyfikowano) → E2E czeka na realny nagłówek (`columnheader "Nazwa"`) przed akcją.
+- **INFRA:** baza pada „No space left on device" gdy MinIO volume pełny (osierocone WAL pgBackrest); `docker run --rm -v pim_minio_data:/data alpine du -sh /data/*` → usuń stare archiwa. Rate-limit auth 5/15min → `docker compose restart redis`.
+
+### Decyzje świadome
+- **Custom column = dowolny atrybut** (nie silnik formuł PIMcore) — decyzja operatora.
+- **Sort: Postgres JSONB path, bez indeksów wyrażeniowych w MVP** (ADR-0028, benchmark 50k rozstrzygnął; Meili szybszy w izolacji ale operacyjnie droższy).
+- **P6-01 rozdzielony od P6-02** mimo strategii bundlowania — P6-02 (typed editors) to duży samodzielny kawałek; flaga BE nie jest „martwym kodem".
+- **M7 (grid-export) + P8-01 (wirtualizacja wierszy) odłożone** do świeżego kontekstu — złożone/ryzykowne przy tej długości sesji (quality-stop, nie token-budget excuse).
