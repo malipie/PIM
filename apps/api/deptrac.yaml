@@ -389,6 +389,9 @@ parameters:
             - Workflow_Contracts
             - Catalog_Contracts
             - Identity_Contracts
+            # WFL-P4-02 — task automation emits task_assigned notifications
+            # through the Notification seam.
+            - Notification_Contracts
             - Shared
             - Vendor
         Workflow_Contracts:
