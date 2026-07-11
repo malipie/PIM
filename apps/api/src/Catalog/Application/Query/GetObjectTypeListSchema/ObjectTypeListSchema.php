@@ -26,7 +26,9 @@ namespace App\Catalog\Application\Query\GetObjectTypeListSchema;
  *     label: array<string, string>,
  *     position: int,
  *     sortable: bool,
- *     system: bool
+ *     system: bool,
+ *     default?: bool,
+ *     group?: array{id: string, code: string, label: array<string, string>, position: int}|null
  * }
  */
 final readonly class ObjectTypeListSchema

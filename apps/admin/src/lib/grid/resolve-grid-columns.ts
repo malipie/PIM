@@ -93,7 +93,15 @@ export function resolveGridColumns(
       label: column.label ?? {},
       sortable: Boolean(column.sortable),
       position: base.size,
-      hidden: false,
+      // GRID-P3-01 full-schema mode: non-default attributes (no
+      // `show_in_list`) start hidden — the manager reveals them.
+      hidden: column.default === false,
+      ...(column.group !== undefined
+        ? {
+            group:
+              column.group === null ? null : { code: column.group.code, label: column.group.label },
+          }
+        : {}),
     });
   }
 

@@ -33,6 +33,8 @@ export interface GridColumn {
   width?: number;
   /** Reserved for GRID-P2-02 — only the identifier column pins in MVP. */
   pinned?: boolean;
+  /** GRID-P3-02 — owning AttributeGroup (full-schema mode), for the manager. */
+  group?: { code: string; label: Record<string, string> } | null;
 }
 
 /**

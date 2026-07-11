@@ -131,6 +131,54 @@ describe('resolveGridColumns', () => {
     expect(nameColumn?.width).toBe(300);
   });
 
+  it('starts full-schema non-default attribute columns hidden (manager reveals them)', () => {
+    const full = schemaWith([
+      {
+        key: 'code',
+        type: 'system_identifier',
+        label: {},
+        position: 0,
+        sortable: true,
+        system: true,
+      },
+      {
+        key: 'brand',
+        type: 'select',
+        label: {},
+        position: 4,
+        sortable: true,
+        system: false,
+        default: true,
+        group: null,
+      },
+      {
+        key: 'ean',
+        type: 'text',
+        label: {},
+        position: 5,
+        sortable: true,
+        system: false,
+        default: false,
+        group: { id: 'g1', code: 'basics', label: { pl: 'Podstawowe' }, position: 0 },
+      },
+    ]);
+
+    const columns = resolveGridColumns(full);
+    expect(columns.find((c) => c.key === 'brand')?.hidden).toBe(false);
+    expect(columns.find((c) => c.key === 'ean')?.hidden).toBe(true);
+    expect(columns.find((c) => c.key === 'ean')?.group).toEqual({
+      code: 'basics',
+      label: { pl: 'Podstawowe' },
+    });
+    // reveal via override — like the manager checkbox
+    const revealed = resolveGridColumns(full, [
+      { key: 'code' },
+      { key: 'ean', hidden: false },
+      { key: 'brand' },
+    ]);
+    expect(revealed.find((c) => c.key === 'ean')?.hidden).toBe(false);
+  });
+
   it('survives malformed schema entries without throwing', () => {
     const malformed = schemaWith([
       // @ts-expect-error deliberate garbage — resolver must not trust the wire

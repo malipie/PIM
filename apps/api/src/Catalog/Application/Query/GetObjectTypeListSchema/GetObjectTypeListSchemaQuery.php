@@ -17,6 +17,13 @@ final readonly class GetObjectTypeListSchemaQuery
 {
     public function __construct(
         public Uuid $objectTypeId,
+        /**
+         * GRID-P3-01 (#2392) — full catalogue mode: columns include EVERY
+         * attribute attached to the ObjectType (not only `show_in_list`),
+         * each flagged with `default` and its AttributeGroup projection,
+         * so the column manager can offer any attribute as a column.
+         */
+        public bool $full = false,
     ) {
     }
 }

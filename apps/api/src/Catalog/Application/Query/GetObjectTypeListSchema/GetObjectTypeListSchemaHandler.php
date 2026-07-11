@@ -6,10 +6,12 @@ namespace App\Catalog\Application\Query\GetObjectTypeListSchema;
 
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
+use App\Catalog\Domain\Entity\AttributeGroup;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectTypeAttribute;
 use App\Catalog\Domain\Repository\ObjectTypeAttributeRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
+use App\Catalog\Domain\Service\EffectiveAttributeGroupResolver;
 use App\Identity\Contracts\Policy\AttributePermissionReader;
 
 /**
@@ -44,6 +46,7 @@ final readonly class GetObjectTypeListSchemaHandler
         private ObjectTypeRepositoryInterface $objectTypes,
         private ObjectTypeAttributeRepositoryInterface $junctions,
         private AttributePermissionReader $attributePermissions,
+        private EffectiveAttributeGroupResolver $groupResolver,
     ) {
     }
 
@@ -78,9 +81,27 @@ final readonly class GetObjectTypeListSchemaHandler
             },
         );
 
+        // GRID-P3-01 (#2392) — full mode: every (RBAC-permitted) attached
+        // attribute becomes a column; defaults (`show_in_list`) first in
+        // their list order, the rest alphabetically by code.
+        $columnJunctions = $listJunctions;
+        $groupsByAttributeId = [];
+        if ($query->full) {
+            $rest = array_values(array_filter(
+                $junctions,
+                static fn (ObjectTypeAttribute $j): bool => !$j->isShownInList(),
+            ));
+            usort(
+                $rest,
+                static fn (ObjectTypeAttribute $a, ObjectTypeAttribute $b): int => $a->getAttribute()->getCode() <=> $b->getAttribute()->getCode(),
+            );
+            $columnJunctions = [...$listJunctions, ...$rest];
+            $groupsByAttributeId = $this->mapAttributeGroups($objectType);
+        }
+
         return new ObjectTypeListSchema(
             objectType: $this->projectObjectType($objectType),
-            columns: $this->buildColumns($listJunctions),
+            columns: $this->buildColumns($columnJunctions, $query->full, $groupsByAttributeId),
             filterableAttributes: $this->filterFiltering($junctions),
             searchableAttributes: $this->filterSearching($junctions),
         );
@@ -106,11 +127,12 @@ final readonly class GetObjectTypeListSchemaHandler
     }
 
     /**
-     * @param list<ObjectTypeAttribute> $listJunctions
+     * @param list<ObjectTypeAttribute>                                                                   $listJunctions
+     * @param array<string, array{id: string, code: string, label: array<string, string>, position: int}> $groupsByAttributeId
      *
-     * @return list<array{key: string, type: string, label: array<string, string>, position: int, sortable: bool, system: bool}>
+     * @return list<array{key: string, type: string, label: array<string, string>, position: int, sortable: bool, system: bool, default?: bool, group?: array{id: string, code: string, label: array<string, string>, position: int}|null}>
      */
-    private function buildColumns(array $listJunctions): array
+    private function buildColumns(array $listJunctions, bool $full = false, array $groupsByAttributeId = []): array
     {
         $columns = [
             [
@@ -150,17 +172,85 @@ final readonly class GetObjectTypeListSchemaHandler
         $position = \count($columns);
         foreach ($listJunctions as $junction) {
             $attribute = $junction->getAttribute();
-            $columns[] = [
+            $column = [
                 'key' => $attribute->getCode(),
                 'type' => $attribute->getType()->value,
                 'label' => $attribute->getLabel(),
                 'position' => $position++,
-                'sortable' => true,
+                // ADR-0028 — sortable = simple, non-localizable,
+                // non-scopable types; enforced independently by the
+                // list endpoint in GRID-P5-02.
+                'sortable' => $this->isSortableAttribute($attribute),
                 'system' => false,
             ];
+            if ($full) {
+                $column['default'] = $junction->isShownInList();
+                $column['group'] = $groupsByAttributeId[$attribute->getId()->toRfc4122()] ?? null;
+            }
+            $columns[] = $column;
         }
 
         return $columns;
+    }
+
+    private const array SORTABLE_TYPES = [
+        AttributeType::Text,
+        AttributeType::Textarea,
+        AttributeType::Identifier,
+        AttributeType::Number,
+        AttributeType::Metric,
+        AttributeType::Date,
+        AttributeType::Datetime,
+        AttributeType::Boolean,
+        AttributeType::Select,
+        AttributeType::Price,
+        AttributeType::Email,
+        AttributeType::Color,
+    ];
+
+    private function isSortableAttribute(Attribute $attribute): bool
+    {
+        return \in_array($attribute->getType(), self::SORTABLE_TYPES, true)
+            && !$attribute->isLocalizable()
+            && !$attribute->isScopable();
+    }
+
+    /**
+     * attributeId → projekcja grupy. Groups resolve through the same
+     * service the form surfaces use; an attribute living in several
+     * groups reports the first (lowest-position) one.
+     *
+     * @return array<string, array{id: string, code: string, label: array<string, string>, position: int}>
+     */
+    private function mapAttributeGroups(ObjectType $objectType): array
+    {
+        $groups = $this->groupResolver->resolveForCategoryList($objectType, []);
+        $byGroup = $this->groupResolver->loadGroupAttributes($groups);
+
+        $map = [];
+        foreach ($groups as $group) {
+            foreach ($byGroup[$group->getId()->toRfc4122()] ?? [] as $groupJunction) {
+                $attributeId = $groupJunction->getAttribute()->getId()->toRfc4122();
+                if (!isset($map[$attributeId])) {
+                    $map[$attributeId] = $this->projectGroup($group);
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return array{id: string, code: string, label: array<string, string>, position: int}
+     */
+    private function projectGroup(AttributeGroup $group): array
+    {
+        return [
+            'id' => $group->getId()->toRfc4122(),
+            'code' => $group->getCode(),
+            'label' => $group->getLabel(),
+            'position' => $group->getPosition(),
+        ];
     }
 
     /**

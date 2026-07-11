@@ -8,6 +8,7 @@ use App\Catalog\Application\Query\GetObjectTypeListSchema\GetObjectTypeListSchem
 use App\Catalog\Application\Query\GetObjectTypeListSchema\GetObjectTypeListSchemaQuery;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -51,9 +52,16 @@ final class ObjectTypeListSchemaController
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     #[RequiresPermission(module: 'object_type', action: 'read')]
-    public function __invoke(string $id): JsonResponse
+    public function __invoke(string $id, Request $request): JsonResponse
     {
-        $schema = ($this->handler)(new GetObjectTypeListSchemaQuery(Uuid::fromString($id)));
+        // GRID-P3-01 (#2392) — `?full=1` returns the complete attribute
+        // catalogue (all attached attributes with `default` + `group`),
+        // powering the column manager. RBAC filtering is identical in
+        // both modes; without the flag the response is unchanged.
+        $schema = ($this->handler)(new GetObjectTypeListSchemaQuery(
+            Uuid::fromString($id),
+            full: $request->query->getBoolean('full'),
+        ));
         if (null === $schema) {
             throw new NotFoundHttpException(\sprintf('ObjectType "%s" was not found.', $id));
         }

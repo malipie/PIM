@@ -11,9 +11,12 @@ use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectTypeAttribute;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeAttributeRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
+use App\Catalog\Domain\Service\EffectiveAttributeGroupResolver;
 use App\Identity\Contracts\Policy\AttributePermissionReader;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
@@ -33,6 +36,7 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             $this->repositoryReturning(null),
             $this->junctionRepositoryReturning([]),
             $this->permissionsAllow(),
+            $this->groupResolver(),
         );
 
         $result = $handler(new GetObjectTypeListSchemaQuery(Uuid::v7()));
@@ -48,6 +52,7 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             $this->repositoryReturning($objectType),
             $this->junctionRepositoryReturning([]),
             $this->permissionsAllow(),
+            $this->groupResolver(),
         );
 
         $schema = $handler(new GetObjectTypeListSchemaQuery($objectType->getId()));
@@ -78,6 +83,7 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             $this->repositoryReturning($objectType),
             $this->junctionRepositoryReturning([$name, $sku, $hidden, $color, $brand]),
             $this->permissionsAllow(),
+            $this->groupResolver(),
         );
 
         $schema = $handler(new GetObjectTypeListSchemaQuery($objectType->getId()));
@@ -101,6 +107,7 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             $this->repositoryReturning($objectType),
             $this->junctionRepositoryReturning([$filterable, $notFilterable]),
             $this->permissionsAllow(),
+            $this->groupResolver(),
         );
 
         $schema = $handler(new GetObjectTypeListSchemaQuery($objectType->getId()));
@@ -121,6 +128,7 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             $this->repositoryReturning($objectType),
             $this->junctionRepositoryReturning([$text, $wysiwyg, $number]),
             $this->permissionsAllow(),
+            $this->groupResolver(),
         );
 
         $schema = $handler(new GetObjectTypeListSchemaQuery($objectType->getId()));
@@ -143,6 +151,7 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             $this->repositoryReturning($objectType),
             $this->junctionRepositoryReturning([$visible, $restricted]),
             $this->permissionsRestrictByCode($restrictedId),
+            $this->groupResolver(),
         );
 
         $schema = $handler(new GetObjectTypeListSchemaQuery($objectType->getId()));
@@ -169,6 +178,7 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             $this->repositoryReturning($objectType),
             $this->junctionRepositoryReturning([]),
             $this->permissionsAllow(),
+            $this->groupResolver(),
         );
 
         $schema = $handler(new GetObjectTypeListSchemaQuery($objectType->getId()));
@@ -324,5 +334,17 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             {
             }
         };
+    }
+
+    /**
+     * GRID-P3-01 — real resolver over mocked ports; only invoked in
+     * `full` mode, which these unit cases do not exercise.
+     */
+    private function groupResolver(): EffectiveAttributeGroupResolver
+    {
+        return new EffectiveAttributeGroupResolver(
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(ObjectCategoryRepositoryInterface::class),
+        );
     }
 }

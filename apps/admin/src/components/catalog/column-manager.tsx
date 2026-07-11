@@ -222,6 +222,11 @@ function ColumnRow({
           className="size-3.5 shrink-0 cursor-pointer accent-zinc-900 disabled:cursor-not-allowed"
         />
         <span className={cn('truncate', column.hidden && 'text-zinc-400')}>{label}</span>
+        {column.group != null ? (
+          <span className="ml-1 shrink-0 rounded bg-zinc-100 px-1 text-[10px] text-zinc-500">
+            {pickLabel(column.group.label, locale, column.group.code)}
+          </span>
+        ) : null}
         {locked ? (
           <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-zinc-400">
             {t('grid.manager.locked', { defaultValue: 'stała' })}
