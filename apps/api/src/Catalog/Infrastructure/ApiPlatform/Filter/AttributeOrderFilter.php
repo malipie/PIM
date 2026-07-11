@@ -97,7 +97,8 @@ final class AttributeOrderFilter implements FilterInterface
         }
 
         $code = array_key_first($attributeSorts);
-        $direction = strtolower((string) $attributeSorts[$code]);
+        $rawDirection = $attributeSorts[$code];
+        $direction = \is_string($rawDirection) ? strtolower($rawDirection) : '';
         if (!\in_array($direction, ['asc', 'desc'], true)) {
             throw new BadRequestHttpException(\sprintf('Invalid sort direction for attribute "%s".', $code));
         }

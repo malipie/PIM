@@ -36,10 +36,7 @@ final class AttributeOrderFilterApiTest extends CatalogApiTestCase
 
         $client = $this->authenticatedClient();
         $asc = $client->request('GET', '/api/objects?order[attribute.'.$code.']=asc&itemsPerPage=50')->toArray();
-        $codes = array_values(array_filter(
-            array_column($asc['member'] ?? $asc['hydra:member'] ?? [], 'code'),
-            static fn (string $c): bool => str_contains($c, $suffix),
-        ));
+        $codes = self::memberCodes($asc, $suffix);
         // 3 < 20 < 100 numerically (lexicographic would be 100 < 20 < 3); null last.
         self::assertSame(
             ['SORTB-'.$suffix, 'SORTA-'.$suffix, 'SORTC-'.$suffix, 'SORTD-'.$suffix],
@@ -47,10 +44,7 @@ final class AttributeOrderFilterApiTest extends CatalogApiTestCase
         );
 
         $desc = $client->request('GET', '/api/objects?order[attribute.'.$code.']=desc&itemsPerPage=50')->toArray();
-        $descCodes = array_values(array_filter(
-            array_column($desc['member'] ?? $desc['hydra:member'] ?? [], 'code'),
-            static fn (string $c): bool => str_contains($c, $suffix),
-        ));
+        $descCodes = self::memberCodes($desc, $suffix);
         self::assertSame(
             ['SORTC-'.$suffix, 'SORTA-'.$suffix, 'SORTB-'.$suffix, 'SORTD-'.$suffix],
             $descCodes,
@@ -59,8 +53,8 @@ final class AttributeOrderFilterApiTest extends CatalogApiTestCase
         // LIMIT/OFFSET pages do not duplicate or drop rows under the sort.
         $page1 = $client->request('GET', '/api/objects?order[attribute.'.$code.']=asc&itemsPerPage=2&page=1')->toArray();
         $page2 = $client->request('GET', '/api/objects?order[attribute.'.$code.']=asc&itemsPerPage=2&page=2')->toArray();
-        $ids1 = array_column($page1['member'] ?? $page1['hydra:member'] ?? [], 'id');
-        $ids2 = array_column($page2['member'] ?? $page2['hydra:member'] ?? [], 'id');
+        $ids1 = self::memberStrings($page1, 'id');
+        $ids2 = self::memberStrings($page2, 'id');
         self::assertSame([], array_intersect($ids1, $ids2));
     }
 
@@ -81,6 +75,61 @@ final class AttributeOrderFilterApiTest extends CatalogApiTestCase
 
         $badDirection = $client->request('GET', '/api/objects?order[attribute.'.$loc.']=sideways');
         self::assertSame(400, $badDirection->getStatusCode());
+    }
+
+    /**
+     * @param array<mixed> $payload
+     *
+     * @return list<string>
+     */
+    private static function memberCodes(array $payload, string $suffix): array
+    {
+        $codes = [];
+        foreach (self::memberRows($payload) as $row) {
+            $code = $row['code'] ?? null;
+            if (\is_string($code) && str_contains($code, $suffix)) {
+                $codes[] = $code;
+            }
+        }
+
+        return $codes;
+    }
+
+    /**
+     * @param array<mixed> $payload
+     *
+     * @return list<string>
+     */
+    private static function memberStrings(array $payload, string $field): array
+    {
+        $values = [];
+        foreach (self::memberRows($payload) as $row) {
+            $value = $row[$field] ?? null;
+            if (\is_string($value)) {
+                $values[] = $value;
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param array<mixed> $payload
+     *
+     * @return list<array<mixed>>
+     */
+    private static function memberRows(array $payload): array
+    {
+        $member = $payload['member'] ?? $payload['hydra:member'] ?? [];
+        self::assertIsArray($member);
+        $rows = [];
+        foreach ($member as $row) {
+            if (\is_array($row)) {
+                $rows[] = $row;
+            }
+        }
+
+        return $rows;
     }
 
     /**
