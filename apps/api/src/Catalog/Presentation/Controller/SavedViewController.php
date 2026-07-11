@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace App\Catalog\Presentation\Controller;
 
+use App\Catalog\Application\SavedView\SavedViewConfigValidator;
+use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\SavedView;
+use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
+use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Shared\Application\TenantContext;
 use DateTimeInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
@@ -31,13 +36,15 @@ use Symfony\Component\Uid\Uuid;
  * any other view of the same `(tenant, resource)` is cleared first so
  * only one default exists per resource.
  *
- * **MVP scope reduction:** per-user owner scoping (the `user_id`
- * column on the entity) is wired through the schema but NOT enforced
- * at the controller layer in this slice. Owner-only writes + system
- * view immutability + Faza 1 ADR-013 permissions land together in
- * the follow-up that introduces the cross-bundle `CurrentUserProvider`
- * contract (Catalog cannot depend on the Identity entity directly per
- * Deptrac rules).
+ * GRID-P4-01 (#2394) — `config` is validated on write against the
+ * canonical grid envelope (unknown keys / wrong types → 400).
+ *
+ * GRID-P4-03 (#2396) — views are owned by `user_id` (resolved from
+ * `CurrentUserProvider`); `user_id IS NULL` marks a seeded SYSTEM view
+ * that PATCH / DELETE refuse with 403. The default flag is unique per
+ * `(tenant, object_type_id, user_id)` so two ObjectTypes keep
+ * independent defaults. Per-user list separation stays out of MVP
+ * (all tenant views are still listed).
  */
 final class SavedViewController
 {
@@ -46,6 +53,9 @@ final class SavedViewController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly TenantContext $tenantContext,
+        private readonly SavedViewConfigValidator $configValidator,
+        private readonly CurrentUserProvider $currentUser,
+        private readonly ObjectTypeRepositoryInterface $objectTypes,
     ) {
     }
 
@@ -99,13 +109,11 @@ final class SavedViewController
         if (!\is_string($resource) || '' === $resource) {
             $resource = 'products';
         }
-        $config = $body['config'] ?? [];
-        if (!\is_array($config)) {
-            throw new BadRequestHttpException('config must be an object.');
-        }
-        /** @var array<string, mixed> $config */
+        $config = $this->asConfigArray($body['config'] ?? []);
+        $this->configValidator->validate($config);
         $isDefault = (bool) ($body['is_default'] ?? false);
         $description = $body['description'] ?? null;
+        $objectType = $this->resolveObjectType($body['object_type_id'] ?? null);
 
         $slug = $this->generateUniqueSlug($name, $tenant->getId());
 
@@ -114,12 +122,16 @@ final class SavedViewController
             name: trim($name),
             resource: $resource,
             config: $config,
+            userId: $this->currentUser->userId(),
         );
+        if (null !== $objectType) {
+            $view->assignObjectType($objectType);
+        }
         if (\is_string($description)) {
             $view->changeDescription($description);
         }
         if ($isDefault) {
-            $this->clearOtherDefaults($tenant->getId(), $resource);
+            $this->clearOtherDefaults($tenant->getId(), $resource, $objectType, $view->getUserId());
             $view->markDefault(true);
         }
 
@@ -135,6 +147,7 @@ final class SavedViewController
     public function patch(string $id, Request $request): JsonResponse
     {
         $view = $this->mustFind($id);
+        $this->assertMutable($view);
 
         /** @var array<string, mixed> $body */
         $body = json_decode($request->getContent(), true) ?? [];
@@ -145,9 +158,9 @@ final class SavedViewController
         if (\array_key_exists('description', $body)) {
             $view->changeDescription(\is_string($body['description']) ? $body['description'] : null);
         }
-        if (\array_key_exists('config', $body) && \is_array($body['config'])) {
-            /** @var array<string, mixed> $cfg */
-            $cfg = $body['config'];
+        if (\array_key_exists('config', $body)) {
+            $cfg = $this->asConfigArray($body['config']);
+            $this->configValidator->validate($cfg);
             $view->updateConfig($cfg);
         }
         if (\array_key_exists('is_default', $body)) {
@@ -155,7 +168,13 @@ final class SavedViewController
             if ($isDefault) {
                 $tenant = $view->getTenant();
                 if (null !== $tenant) {
-                    $this->clearOtherDefaults($tenant->getId(), $view->getResource(), exceptId: $view->getId());
+                    $this->clearOtherDefaults(
+                        $tenant->getId(),
+                        $view->getResource(),
+                        $view->getObjectType(),
+                        $view->getUserId(),
+                        exceptId: $view->getId(),
+                    );
                 }
             }
             $view->markDefault($isDefault);
@@ -172,6 +191,7 @@ final class SavedViewController
     public function delete(string $id): Response
     {
         $view = $this->mustFind($id);
+        $this->assertMutable($view);
         $this->em->remove($view);
         $this->em->flush();
 
@@ -208,8 +228,13 @@ final class SavedViewController
         return trim($ascii, '-');
     }
 
-    private function clearOtherDefaults(Uuid $tenantId, string $resource, ?Uuid $exceptId = null): void
-    {
+    private function clearOtherDefaults(
+        Uuid $tenantId,
+        string $resource,
+        ?ObjectType $objectType,
+        ?Uuid $userId,
+        ?Uuid $exceptId = null,
+    ): void {
         $qb = $this->em->getRepository(SavedView::class)->createQueryBuilder('v')
             ->update()
             ->set('v.isDefault', ':false')
@@ -221,11 +246,72 @@ final class SavedViewController
             ->setParameter('tenant', $tenantId)
             ->setParameter('resource', $resource);
 
+        // GRID-P4-03 — scope the default per ObjectType and owner so two
+        // ObjectTypes (and two users) keep independent defaults.
+        if (null !== $objectType) {
+            $qb->andWhere('v.objectType = :ot')->setParameter('ot', $objectType->getId());
+        } else {
+            $qb->andWhere('v.objectType IS NULL');
+        }
+        if (null !== $userId) {
+            $qb->andWhere('v.userId = :user')->setParameter('user', $userId);
+        } else {
+            $qb->andWhere('v.userId IS NULL');
+        }
+
         if (null !== $exceptId) {
             $qb->andWhere('v.id != :except')->setParameter('except', $exceptId);
         }
 
         $qb->getQuery()->execute();
+    }
+
+    /**
+     * GRID-P4-03 — a seeded system view (`user_id IS NULL`) is a shared
+     * template; users cannot rename, reconfigure or delete it.
+     */
+    private function assertMutable(SavedView $view): void
+    {
+        if ($view->isSystem()) {
+            throw new AccessDeniedHttpException('System views cannot be modified.');
+        }
+    }
+
+    /**
+     * JSON objects decode to string-keyed arrays, but PHPStan sees
+     * array<mixed, mixed>; this narrows (and rejects non-objects) so the
+     * validator and entity keep their array<string, mixed> contract
+     * without a fragile inline @var (cs-fixer downgrades those).
+     *
+     * @return array<string, mixed>
+     */
+    private function asConfigArray(mixed $config): array
+    {
+        if (!\is_array($config)) {
+            throw new BadRequestHttpException('config must be an object.');
+        }
+        $out = [];
+        foreach ($config as $key => $value) {
+            $out[(string) $key] = $value;
+        }
+
+        return $out;
+    }
+
+    private function resolveObjectType(mixed $objectTypeId): ?ObjectType
+    {
+        if (null === $objectTypeId) {
+            return null;
+        }
+        if (!\is_string($objectTypeId) || !Uuid::isValid($objectTypeId)) {
+            throw new BadRequestHttpException('object_type_id must be a valid UUID.');
+        }
+        $objectType = $this->objectTypes->findById(Uuid::fromString($objectTypeId));
+        if (null === $objectType) {
+            throw new BadRequestHttpException(\sprintf('ObjectType "%s" was not found.', $objectTypeId));
+        }
+
+        return $objectType;
     }
 
     private function mustFind(string $id): SavedView
@@ -249,6 +335,7 @@ final class SavedViewController
             'name' => $view->getName(),
             'description' => $view->getDescription(),
             'resource' => $view->getResource(),
+            'object_type_id' => $view->getObjectType()?->getId()->toRfc4122(),
             'config' => $view->getConfig(),
             'is_default' => $view->isDefault(),
             'is_system' => $view->isSystem(),
