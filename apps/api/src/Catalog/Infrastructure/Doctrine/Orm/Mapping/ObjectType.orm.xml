@@ -55,6 +55,11 @@
                 <option name="default">{}</option>
             </options>
         </field>
+        <field name="workflowPublishGate" type="json" column="workflow_publish_gate" nullable="true">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
         <field name="validationRules" type="json" column="validation_rules">
             <options>
                 <option name="jsonb">true</option>

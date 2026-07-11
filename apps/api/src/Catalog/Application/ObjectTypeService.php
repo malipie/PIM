@@ -121,6 +121,7 @@ final readonly class ObjectTypeService
      * @param list<string>|null               $allowedParentTypeIds
      * @param array<string, mixed>|null       $completenessRules
      * @param list<array<string, mixed>>|null $validationRules      DP-07 (#2037, ADR-0025) cross-field rules
+     * @param array<string, mixed>|null       $workflowPublishGate  WFL-P1-04 (#2418) completeness gate; applied only when $updateWorkflowPublishGate
      */
     public function update(
         ObjectType $objectType,
@@ -136,6 +137,8 @@ final readonly class ObjectTypeService
         ?bool $exposeToMainMenu = null,
         ?bool $isCategorizable = null,
         ?bool $hasMultimedia = null,
+        bool $updateWorkflowPublishGate = false,
+        ?array $workflowPublishGate = null,
     ): ObjectType {
         $isBuiltIn = $objectType->isBuiltIn();
 
@@ -181,6 +184,13 @@ final readonly class ObjectTypeService
                 throw BuiltInObjectTypeException::fieldLocked($objectType, 'completenessRules');
             }
             $objectType->updateCompletenessRules($completenessRules);
+        }
+        if ($updateWorkflowPublishGate) {
+            // WFL-P1-04 (#2418) — like validationRules, the gate constrains
+            // OPERATIONS (publishing), not the entity model, so it stays
+            // editable on built-in ObjectTypes; merge-patch semantics: the
+            // controller sets the flag when the key is present, null clears.
+            $objectType->setWorkflowPublishGate($workflowPublishGate);
         }
         if (null !== $validationRules) {
             // DP-07 (#2037, ADR-0025) — deliberately editable on built-in

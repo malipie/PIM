@@ -354,3 +354,33 @@ Legacy odstępstwa (select `{"value": code}` z admina, osie wariantów
 `{"value": x}` z GenerateVariants, price `{"value": n}` bez waluty) migruje
 jednorazowo #1464; do tego czasu readery mogą mieć tolerancyjny fallback,
 po migracji fallbacki znikają.
+
+## 7. `object_types.workflow_publish_gate` — gate completeness na publikacji (WFL-P1-04, ADR-0029)
+
+**Tabela**: `object_types.workflow_publish_gate JSONB NULLABLE` · **NULL = gate wyłączony (default)**.
+
+```json
+{
+  "$id": "pim:jsonb:workflow-publish-gate",
+  "type": ["object", "null"],
+  "required": ["enabled", "min_completeness_pct"],
+  "properties": {
+    "enabled": { "type": "boolean" },
+    "min_completeness_pct": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "scope": { "enum": ["global", "per_channel"], "default": "global" },
+    "channels": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Wymagane (niepuste) gdy scope=per_channel — kody kanałów sprawdzane przeciw completeness.per_channel."
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+### Reguły
+
+- Egzekwowany przez guard na przejściach `publish` i `approve` maszyny `object_editorial` (`CompletenessGateGuard`); odmowa = `TransitionBlocker` code `completeness_gate` + lista brakujących wymaganych atrybutów (409 / discovery).
+- `scope=global` czyta mirror `objects.completeness_pct`; `scope=per_channel` czyta `completeness.per_channel[channel]` z fallbackiem do global, gdy kanał nie ma policzonego pct (kontrakt §3: pole opcjonalne).
+- Shape walidowany na write-edge (`ObjectType::setWorkflowPublishGate()` → 422 przez `PATCH /api/object_types/{id}`).
