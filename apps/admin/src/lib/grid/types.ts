@@ -12,6 +12,7 @@
  * the server withheld.
  */
 
+/** GRID epic column model — see feature-grid-tickets.md. */
 export type GridColumnSource = 'system' | 'attribute';
 
 export interface GridColumn {
