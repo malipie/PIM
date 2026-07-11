@@ -109,7 +109,7 @@
                        name="products_get_collection"
                        paginationType="cursor"
                        provider="App\Catalog\Infrastructure\ApiPlatform\State\CatalogObjectCollectionLocaleOverlayProvider"
-                       security="is_granted('READ', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
+                       security="is_granted('READ_PRODUCT', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
                 <extraProperties>
                     <values>
                         <value name="kind">product</value>
@@ -136,7 +136,7 @@
                        uriTemplate="/products/{id}{._format}"
                        name="products_get"
                        provider="App\Catalog\Infrastructure\ApiPlatform\State\CatalogObjectLocaleOverlayProvider"
-                       security="is_granted('READ', object)">
+                       security="is_granted('READ_PRODUCT', object)">
                 <extraProperties>
                     <values>
                         <value name="kind">product</value>
@@ -161,7 +161,7 @@
                        name="products_post"
                        input="App\Catalog\Infrastructure\ApiPlatform\Resource\CatalogObjectInput"
                        processor="App\Catalog\Infrastructure\ApiPlatform\State\CatalogObjectProcessor"
-                       security="is_granted('CREATE', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
+                       security="is_granted('CREATE_PRODUCT', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
                 <extraProperties>
                     <values>
                         <value name="kind">product</value>
