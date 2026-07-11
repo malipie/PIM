@@ -284,6 +284,9 @@ export function UniversalListPage({
   } = useGridColumns(objectTypeId, {
     viewColumns: gridViewColumns,
     defaultOverrides: DEFAULT_COLUMN_OVERRIDES,
+    // GRID-P3-02 — resolve against the full catalogue so any attached
+    // attribute can be revealed as a column by the manager.
+    fullSchema: true,
   });
   // Visual parity: the schema labels the identifier column generically
   // ("Identyfikator"), but the products list has always shown "SKU".
