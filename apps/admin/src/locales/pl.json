@@ -1203,6 +1203,10 @@
         "show_products": "Pokaż produkty",
         "open_log": "Otwórz log"
       }
+    },
+    "my_tasks": {
+      "title": "Moje zadania",
+      "all": "Wszystkie"
     }
   },
   "attributes": {
@@ -4082,6 +4086,27 @@
       "request_title": "Prośba o cofnięcie publikacji",
       "request_body": "Approverzy dostaną powiadomienie z Twoim komentarzem.",
       "request_sent": "Prośba o cofnięcie publikacji wysłana do approverów."
+    },
+    "tabs": {
+      "review": "Do przeglądu",
+      "mine": "Moje zadania",
+      "all": "Wszystkie zadania",
+      "aria": "Sekcje workflow"
+    },
+    "tasks": {
+      "type": {
+        "review": "Przegląd obiektu",
+        "fix": "Poprawka po odrzuceniu",
+        "request_unpublish": "Prośba o cofnięcie publikacji",
+        "custom": "Zadanie"
+      },
+      "empty_title": "Brak otwartych zadań",
+      "empty_body": "Zadania z przepływu review pojawią się tutaj automatycznie.",
+      "open_object": "Otwórz obiekt",
+      "complete": "Ukończ",
+      "cancel": "Anuluj",
+      "completed": "Zadanie ukończone",
+      "cancelled": "Zadanie anulowane"
     }
   }
 }

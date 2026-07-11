@@ -1193,6 +1193,10 @@
         "show_products": "Show products",
         "open_log": "Open log"
       }
+    },
+    "my_tasks": {
+      "title": "My tasks",
+      "all": "View all"
     }
   },
   "attributes": {
@@ -4062,6 +4066,27 @@
       "request_title": "Request unpublish",
       "request_body": "Approvers will get a notification with your comment.",
       "request_sent": "Unpublish request sent to the approvers."
+    },
+    "tabs": {
+      "review": "Review queue",
+      "mine": "My tasks",
+      "all": "All tasks",
+      "aria": "Workflow sections"
+    },
+    "tasks": {
+      "type": {
+        "review": "Object review",
+        "fix": "Fix after rejection",
+        "request_unpublish": "Unpublish request",
+        "custom": "Task"
+      },
+      "empty_title": "No open tasks",
+      "empty_body": "Tasks from the review loop will show up here automatically.",
+      "open_object": "Open object",
+      "complete": "Complete",
+      "cancel": "Cancel",
+      "completed": "Task completed",
+      "cancelled": "Task cancelled"
     }
   }
 }
