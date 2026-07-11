@@ -41,8 +41,6 @@ use Symfony\Component\Uid\Uuid;
  */
 final readonly class WorkflowTaskAutomation
 {
-    private const string REVIEWER_ROLE = 'approver';
-
     public function __construct(
         private WorkflowTaskRepositoryInterface $tasks,
         private TransitionLogPort $transitionLog,
@@ -61,7 +59,7 @@ final readonly class WorkflowTaskAutomation
             title: 'Review request',
             type: WorkflowTaskType::Review,
             objectId: $event->objectId,
-            assigneeRoleCode: self::REVIEWER_ROLE,
+            assigneeRoleCode: ObjectEditorialWorkflow::REVIEWER_ROLE,
             createdBy: $this->currentUser->userId(),
             comment: $event->comment,
             context: ['object_id' => $event->objectId->toRfc4122()],
@@ -118,7 +116,7 @@ final readonly class WorkflowTaskAutomation
             title: 'Unpublish request',
             type: WorkflowTaskType::RequestUnpublish,
             objectId: $event->objectId,
-            assigneeRoleCode: self::REVIEWER_ROLE,
+            assigneeRoleCode: ObjectEditorialWorkflow::REVIEWER_ROLE,
             createdBy: $event->requesterId,
             comment: $event->comment,
             context: ['object_id' => $event->objectId->toRfc4122()],

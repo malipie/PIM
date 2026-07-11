@@ -43,6 +43,7 @@ final readonly class DoctrineWorkflowTaskRepository implements WorkflowTaskRepos
         ?Uuid $objectId = null,
         ?Uuid $mineUserId = null,
         ?DateTimeImmutable $dueBefore = null,
+        array $mineExtraRoleCodes = [],
     ): array {
         $builder = $this->entityManager->createQueryBuilder()
             ->select('t')
@@ -64,7 +65,9 @@ final readonly class DoctrineWorkflowTaskRepository implements WorkflowTaskRepos
                 ->setParameter('dueBefore', $dueBefore);
         }
         if (null !== $mineUserId) {
-            $roleCodes = $this->roleCodesOf($mineUserId);
+            $roleCodes = array_values(array_unique(
+                [...$this->roleCodesOf($mineUserId), ...$mineExtraRoleCodes],
+            ));
             if ([] === $roleCodes) {
                 $builder->andWhere('t.assigneeUserId = :me')->setParameter('me', $mineUserId);
             } else {

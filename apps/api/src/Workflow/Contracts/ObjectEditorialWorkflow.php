@@ -18,6 +18,17 @@ final class ObjectEditorialWorkflow
 {
     public const string NAME = 'object_editorial';
 
+    /**
+     * Role that automation assigns review / request-unpublish tasks to
+     * (WFL-P4-02), and the virtual membership the "my tasks" audience
+     * grants to any holder of {@see self::PERMISSION_APPROVE_REJECT} so
+     * the task inbox matches the notification fan-out (#2495).
+     */
+    public const string REVIEWER_ROLE = 'approver';
+
+    /** Permission gating every reviewer transition (approve/reject/…). */
+    public const string PERMISSION_APPROVE_REJECT = 'workflow.approve_reject';
+
     public const string PLACE_DRAFT = 'draft';
     public const string PLACE_REVIEW = 'review';
     public const string PLACE_PUBLISHED = 'published';

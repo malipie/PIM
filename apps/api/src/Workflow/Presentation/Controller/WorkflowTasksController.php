@@ -7,6 +7,7 @@ namespace App\Workflow\Presentation\Controller;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Identity\Contracts\Policy\PermissionCheckerInterface;
+use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use App\Workflow\Contracts\WorkflowTaskStatus;
 use App\Workflow\Contracts\WorkflowTaskType;
 use App\Workflow\Domain\Entity\WorkflowTask;
@@ -90,7 +91,24 @@ final class WorkflowTasksController
 
         $mine = $request->query->getBoolean('mine') ? $this->requireUserId() : null;
 
-        $rows = $this->tasks->page($limit + 1, $before, $status, $objectId, $mine, $dueBefore);
+        // Review / request-unpublish tasks are assigned to the reviewer
+        // role; a caller who holds workflow.approve_reject can act on them
+        // even without being a member of that role, so widen "mine" to
+        // match the notification fan-out audience (#2495).
+        $mineExtraRoleCodes = null !== $mine
+            && $this->permissions->userHasPermission($mine, ObjectEditorialWorkflow::PERMISSION_APPROVE_REJECT)
+                ? [ObjectEditorialWorkflow::REVIEWER_ROLE]
+                : [];
+
+        $rows = $this->tasks->page(
+            $limit + 1,
+            $before,
+            $status,
+            $objectId,
+            $mine,
+            $dueBefore,
+            $mineExtraRoleCodes,
+        );
         $hasMore = \count($rows) > $limit;
         $rows = \array_slice($rows, 0, $limit);
 

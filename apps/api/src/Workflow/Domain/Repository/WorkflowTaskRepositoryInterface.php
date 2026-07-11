@@ -24,6 +24,12 @@ interface WorkflowTaskRepositoryInterface
     /**
      * Newest-first page (UUIDv7 cursor). `$mineUserId` matches direct
      * assignment OR membership in the assignee role (both role paths).
+     * `$mineExtraRoleCodes` widens that membership with virtual roles the
+     * caller is not a member of but is entitled to act as — e.g. the
+     * reviewer role for a `workflow.approve_reject` holder, so the task
+     * inbox matches the notification fan-out audience (#2495).
+     *
+     * @param list<string> $mineExtraRoleCodes
      *
      * @return list<WorkflowTask>
      */
@@ -34,6 +40,7 @@ interface WorkflowTaskRepositoryInterface
         ?Uuid $objectId = null,
         ?Uuid $mineUserId = null,
         ?DateTimeImmutable $dueBefore = null,
+        array $mineExtraRoleCodes = [],
     ): array;
 
     /**
