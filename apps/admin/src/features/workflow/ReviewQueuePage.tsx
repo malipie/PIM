@@ -14,7 +14,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui-v2/empty-state';
-import { PageHeader } from '@/components/ui-v2/page-header';
 import { jsonFetch } from '@/lib/http';
 import { useIdentity } from '@/lib/identity';
 import { ensureMercureAuthorization, mercureSubscribeUrl, mercureTenantTopic } from '@/lib/mercure';
@@ -180,25 +179,24 @@ export function ReviewQueuePage() {
     if (requiresComment && comment.trim() === '') return;
     setSubmitting(true);
 
+    const singleId = decision.ids.length === 1 ? decision.ids[0] : undefined;
     const run =
-      decision.ids.length === 1
-        ? applyWorkflowTransition(
-            decision.ids[0],
-            decision.transition,
-            comment.trim() || undefined,
-          ).then(() => ({ success: 1, locked: 0 }))
+      singleId !== undefined
+        ? applyWorkflowTransition(singleId, decision.transition, comment.trim() || undefined).then(
+            () => ({ success: 1, locked: 0 }),
+          )
         : jsonFetch<{ success_count: number; skipped_count: number; locked_count?: number }>(
             '/api/objects/bulk-actions/change_status',
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
+              contentType: 'application/json',
+              body: {
                 target_ids: decision.ids,
                 payload: {
                   transition: decision.transition,
                   ...(comment.trim() !== '' ? { comment: comment.trim() } : {}),
                 },
-              }),
+              },
             },
           ).then((result) => ({
             success: result.success_count,
@@ -232,50 +230,42 @@ export function ReviewQueuePage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-6" data-testid="review-queue-page">
-      <PageHeader
-        title={t('workflow.queue.title', { defaultValue: 'Workflow — Do przeglądu' })}
-        subtitle={t('workflow.queue.subtitle', {
-          defaultValue: 'Obiekty czekające na decyzję (approve / reject).',
-        })}
-        actions={
-          <div className="flex items-center gap-2">
-            {canDecide && selected.size > 0 ? (
-              <>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setComment('');
-                    setDecision({ transition: 'approve', ids: selectedIds });
-                  }}
-                  data-testid="queue-bulk-approve"
-                >
-                  {t('workflow.transition.approve', { defaultValue: 'Zatwierdź' })} ({selected.size}
-                  )
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setComment('');
-                    setDecision({ transition: 'reject', ids: selectedIds });
-                  }}
-                  data-testid="queue-bulk-reject"
-                >
-                  {t('workflow.transition.reject', { defaultValue: 'Odrzuć' })} ({selected.size})
-                </Button>
-              </>
-            ) : null}
+      {/* Page title comes from the shell topbar breadcrumb (hub pattern). */}
+      <div className="mb-2 flex items-center justify-end gap-2">
+        {canDecide && selected.size > 0 ? (
+          <>
             <Button
-              variant="ghost"
-              size="icon"
-              onClick={reload}
-              aria-label={t('common.refresh', { defaultValue: 'Odśwież' })}
+              size="sm"
+              onClick={() => {
+                setComment('');
+                setDecision({ transition: 'approve', ids: selectedIds });
+              }}
+              data-testid="queue-bulk-approve"
             >
-              <RefreshCw className="size-4" />
+              {t('workflow.transition.approve', { defaultValue: 'Zatwierdź' })} ({selected.size})
             </Button>
-          </div>
-        }
-      />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setComment('');
+                setDecision({ transition: 'reject', ids: selectedIds });
+              }}
+              data-testid="queue-bulk-reject"
+            >
+              {t('workflow.transition.reject', { defaultValue: 'Odrzuć' })} ({selected.size})
+            </Button>
+          </>
+        ) : null}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={reload}
+          aria-label={t('common.refresh', { defaultValue: 'Odśwież' })}
+        >
+          <RefreshCw className="size-4" />
+        </Button>
+      </div>
 
       {rows.length === 0 && !loading ? (
         <EmptyState
