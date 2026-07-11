@@ -407,6 +407,7 @@ export function UniversalListPage({
 
   const [activeViewSlug, setActiveViewSlug] = useState<string | null>(null);
   const [showSaveViewModal, setShowSaveViewModal] = useState(false);
+  const [savedViewsReloadToken, setSavedViewsReloadToken] = useState(0);
   const [expandedMasters, setExpandedMasters] = useState<Set<string>>(new Set());
   const {
     presets: smartPresets,
@@ -701,6 +702,21 @@ export function UniversalListPage({
     setActiveSmartPresetId(null);
   };
 
+  // GRID-P4-02 (#2395) — the SavedView config the grid round-trips:
+  // filters + columns (order/hidden/width) + sort + density + variants
+  // + page size. Shape matches the BE validator (GRID-P4-01).
+  const buildViewConfig = (): Record<string, unknown> => {
+    const config: Record<string, unknown> = {
+      filters,
+      variants_mode: hasVariants ? variantsMode : 'flat',
+      page_size: pageSize,
+      columns: overridesFromColumns(allColumns),
+    };
+    if (sort !== null) config.sort = sort;
+    if (density !== 'normal') config.density = density;
+    return config;
+  };
+
   const handleApplySavedView = (view: { slug: string; config: Record<string, unknown> }): void => {
     setActiveViewSlug(view.slug);
     const cfg = view.config;
@@ -710,6 +726,36 @@ export function UniversalListPage({
     }
     const mode = cfg.variants_mode;
     if (mode === 'tree' || mode === 'flat') setVariantsMode(mode);
+    if (
+      typeof cfg.page_size === 'number' &&
+      PAGE_SIZE_OPTIONS.includes(cfg.page_size as PageSize)
+    ) {
+      setPageSize(cfg.page_size as PageSize);
+    }
+    // Columns: apply as quick-pref overrides. Keys absent from the schema
+    // (deleted attribute / RBAC) are dropped by the resolver, so a stale
+    // saved column silently disappears instead of breaking the render.
+    if (Array.isArray(cfg.columns)) {
+      const overrides = (cfg.columns as unknown[]).filter(
+        (c): c is GridColumnOverride =>
+          c !== null && typeof c === 'object' && typeof (c as GridColumnOverride).key === 'string',
+      );
+      setOverrides(overrides);
+    }
+    const cfgSort = cfg.sort;
+    if (
+      cfgSort !== null &&
+      typeof cfgSort === 'object' &&
+      typeof (cfgSort as { key?: unknown }).key === 'string' &&
+      ((cfgSort as { dir?: unknown }).dir === 'asc' ||
+        (cfgSort as { dir?: unknown }).dir === 'desc')
+    ) {
+      setSort(cfgSort as { key: string; dir: 'asc' | 'desc' });
+      setPage(1);
+    } else {
+      setSort(null);
+    }
+    setDensity(cfg.density === 'compact' ? 'compact' : 'normal');
   };
 
   const handleExcelCommit = async (
@@ -786,6 +832,8 @@ export function UniversalListPage({
       </div>
 
       <SavedViewsRail
+        resource={objectTypeCode}
+        reloadToken={savedViewsReloadToken}
         activeSlug={activeViewSlug}
         onApply={(view) => {
           handleApplySavedView({ slug: view.slug, config: view.config });
@@ -1235,12 +1283,14 @@ export function UniversalListPage({
       {showSaveViewModal ? (
         <SaveViewModal
           resource={objectTypeCode}
-          config={{ filters, variants_mode: variantsMode }}
+          objectTypeId={objectTypeId}
+          config={buildViewConfig()}
           onClose={() => {
             setShowSaveViewModal(false);
           }}
           onSaved={(slug) => {
             setActiveViewSlug(slug);
+            setSavedViewsReloadToken((n) => n + 1);
           }}
         />
       ) : null}
