@@ -18847,7 +18847,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "products.edit"
+                "x-cortex-permission": "workflow.view"
             }
         },
         "/api/objects/{master_id}/generate-variants": {

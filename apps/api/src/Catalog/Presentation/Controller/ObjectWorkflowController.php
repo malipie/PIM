@@ -77,9 +77,10 @@ final class ObjectWorkflowController
         methods: ['POST'],
     )]
     // Entry-level gate only — the per-transition RBAC permission map
-    // (approve -> workflow.approve_reject etc.) attaches to the workflow
-    // guards in WFL-P1-01 (#2415) and is enforced inside can()/apply().
-    #[RequiresPermission(module: 'products', action: 'edit')]
+    // (WFL-P1-01: approve -> workflow.approve_reject etc.) is enforced
+    // inside can()/apply() by TransitionPermissionGuard and reported
+    // back as 409 blockers carrying the missing permission code.
+    #[RequiresPermission(module: 'workflow', action: 'view')]
     public function apply(string $id, string $transition, Request $request): JsonResponse
     {
         if (!\in_array($transition, ObjectEditorialWorkflow::TRANSITIONS, true)) {

@@ -83,6 +83,7 @@ final class PrdRoleTemplates
                 'imports.view_own', 'imports.view_all', 'imports.run',
                 'exports.view_own', 'exports.view_all', 'exports.run',
                 'workflow.view', 'workflow.approve_reject', 'workflow.edit_any_state',
+                'workflow.edit_in_review', 'workflow.transition.unpublish', 'workflow.manage_definitions',
                 'agent.schema_ops', 'agent.bulk_actions', 'agent.approve_pending',
                 'settings.users.manage', 'settings.roles.manage', 'settings.tenant.manage',
                 'settings.locales.manage',
@@ -109,6 +110,7 @@ final class PrdRoleTemplates
                 'imports.view_own', 'imports.view_all', 'imports.run',
                 'exports.view_own', 'exports.view_all', 'exports.run',
                 'workflow.view', 'workflow.approve_reject', 'workflow.edit_any_state',
+                'workflow.edit_in_review', 'workflow.transition.unpublish', 'workflow.manage_definitions',
                 'agent.schema_ops', 'agent.bulk_actions', 'agent.approve_pending',
                 'settings.users.manage', 'settings.roles.manage', 'settings.tenant.manage',
                 'settings.locales.manage',
@@ -128,7 +130,7 @@ final class PrdRoleTemplates
                 'multimedia.view', 'multimedia.add_edit_own', 'multimedia.add_edit_any', 'multimedia.delete',
                 'imports.view_own', 'imports.view_all', 'imports.run',
                 'exports.view_own', 'exports.view_all', 'exports.run',
-                'workflow.view', 'workflow.approve_reject',
+                'workflow.view', 'workflow.approve_reject', 'workflow.edit_in_review',
                 'agent.bulk_actions',
                 // AICG-P1-03 (#2329) — recipes/voice are content-team
                 // config: read + create (incl. clone); admin stays with
@@ -193,6 +195,7 @@ final class PrdRoleTemplates
                 'modeling.view', 'modeling.approve_schema_ops',
                 'agent.approve_pending',
                 'workflow.view', 'workflow.approve_reject',
+                'workflow.edit_in_review', 'workflow.transition.unpublish',
                 'audit.view_own', 'audit.view_cross_user',
                 'api_tokens.own.crud',
             ],

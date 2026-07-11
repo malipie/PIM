@@ -98,6 +98,11 @@ final class PrdPermissionFixtures extends Fixture
         'workflow.view',
         'workflow.approve_reject',
         'workflow.edit_any_state',
+        // WFL-P1-01 (#2415) — PRD §3.8 state-policy codes, seeded dormant
+        // by RBAC Phase 3 docs and activated by the object_editorial guards.
+        'workflow.edit_in_review',
+        'workflow.transition.unpublish',
+        'workflow.manage_definitions',
 
         // Cmd+K agent
         'agent.schema_ops',
