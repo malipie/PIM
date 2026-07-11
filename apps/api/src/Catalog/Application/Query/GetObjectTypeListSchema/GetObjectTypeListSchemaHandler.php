@@ -6,9 +6,9 @@ namespace App\Catalog\Application\Query\GetObjectTypeListSchema;
 
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
+use App\Catalog\Domain\Entity\AttributeGroup;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectTypeAttribute;
-use App\Catalog\Domain\Entity\AttributeGroup;
 use App\Catalog\Domain\Repository\ObjectTypeAttributeRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Catalog\Domain\Service\EffectiveAttributeGroupResolver;
@@ -127,8 +127,7 @@ final readonly class GetObjectTypeListSchemaHandler
     }
 
     /**
-     * @param list<ObjectTypeAttribute> $listJunctions
-     *
+     * @param list<ObjectTypeAttribute>                                                                   $listJunctions
      * @param array<string, array{id: string, code: string, label: array<string, string>, position: int}> $groupsByAttributeId
      *
      * @return list<array{key: string, type: string, label: array<string, string>, position: int, sortable: bool, system: bool, default?: bool, group?: array{id: string, code: string, label: array<string, string>, position: int}|null}>
