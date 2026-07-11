@@ -26,6 +26,11 @@ export function readInitialFilterDsl(search: string): FilterDsl | null {
   const params = new URLSearchParams(search);
   params.delete('page');
   params.delete('pageSize');
+  // GRID-P5-03 (#2399) — the sort param is list state, not a filter;
+  // without the strip the shorthand fallback turns ?sort=code:desc into
+  // a bogus condition, flipping the page into search mode and silently
+  // disabling the sortable headers on URL-seeded loads.
+  params.delete('sort');
   const dsl = searchStringToDsl(params.toString());
   if (dsl === null) return null;
   return dslToFlatConditions(dsl) === null ? null : dsl;

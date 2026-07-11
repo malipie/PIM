@@ -302,6 +302,35 @@ export function UniversalListPage({
   const visibleColumns = useMemo(() => allColumns.filter((c) => !c.hidden), [allColumns]);
   const [density, setDensity] = useGridDensity(objectTypeId);
 
+  // GRID-P5-03 (#2399) - one sort state for both views. Attribute
+  // columns map to ?order[attribute.{code}] (AttributeOrderFilter,
+  // ADR-0028); system columns to their core fields via OrderById.
+  // Sorted requests ride LIMIT/OFFSET (page), never the id-cursor.
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const raw = new URLSearchParams(window.location.search).get('sort');
+    if (raw === null) return null;
+    const [key, dir] = raw.split(':');
+    return key !== undefined && (dir === 'asc' || dir === 'desc') ? { key, dir } : null;
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (sort === null) params.delete('sort');
+    else params.set('sort', `${sort.key}:${sort.dir}`);
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}?${params.toString()}${window.location.hash}`,
+    );
+  }, [sort]);
+  const handleSortChange = (key: string): void => {
+    setPage(1);
+    setSort((prev) =>
+      prev?.key !== key ? { key, dir: 'asc' } : prev.dir === 'asc' ? { key, dir: 'desc' } : null,
+    );
+  };
+
   // GRID-P2-01/02 — manager mutations + header drag-resize persist as
   // quick-pref overrides (SavedView round-trip lands in M4).
   const applyColumns = (next: GridColumn[]): void => setOverrides(overridesFromColumns(next));
@@ -463,8 +492,9 @@ export function UniversalListPage({
         page,
         pageSize,
         hasVariants ? variantsMode : 'flat',
+        sort === null ? 'nosort' : `${sort.key}:${sort.dir}`,
       ] as const,
-    [objectTypeId, page, pageSize, hasVariants, variantsMode],
+    [objectTypeId, page, pageSize, hasVariants, variantsMode, sort],
   );
   const listQuery = useQuery({
     queryKey: listQueryKey,
@@ -478,6 +508,22 @@ export function UniversalListPage({
       };
       if (hasVariants && variantsMode === 'tree') {
         params.parent_id = 'null';
+      }
+      if (sort !== null) {
+        const systemOrderField: Record<string, string> = {
+          code: 'code',
+          status: 'status',
+          completeness: 'completenessPct',
+          updatedAt: 'updatedAt',
+        };
+        const column = visibleColumns.find((c) => c.key === sort.key);
+        const orderProperty =
+          column?.source === 'attribute'
+            ? `attribute.${sort.key}`
+            : (systemOrderField[sort.key] ?? null);
+        if (orderProperty !== null) {
+          params[`order[${orderProperty}]`] = sort.dir;
+        }
       }
       return jsonFetch<ListResponse>('/api/objects', {
         accept: 'application/ld+json',
@@ -1046,6 +1092,8 @@ export function UniversalListPage({
           showMediaColumn={hasMultimedia}
           density={density}
           onColumnResize={handleColumnResize}
+          sort={isSearchActive ? null : sort}
+          onSortChange={isSearchActive ? undefined : handleSortChange}
           selected={selected}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
