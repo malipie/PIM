@@ -18851,6 +18851,45 @@
                 "x-cortex-permission": "workflow.view"
             }
         },
+        "/api/objects/{id}/workflow/request-unpublish": {
+            "post": {
+                "operationId": "api_objects_id_workflow_request_unpublish_post",
+                "tags": [
+                    "objects"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api objects id workflow request unpublish",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "products.edit"
+            }
+        },
         "/api/objects/{id}/workflow/transitions": {
             "get": {
                 "operationId": "api_objects_id_workflow_transitions_get",

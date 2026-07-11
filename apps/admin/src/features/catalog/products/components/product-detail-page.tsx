@@ -7,6 +7,9 @@ import { DetailNotFoundState } from '@/components/catalog/detail-not-found-state
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useContentRecipes } from '@/features/agent/hooks/use-content-recipes';
+import { useIdentity } from '@/lib/identity';
+import { fetchWorkflowState } from '@/lib/workflow/api';
+import { computeEditLock } from '@/lib/workflow/edit-lock';
 import { AskAiProposal } from './ask-ai-proposal';
 import { ProductDetailContent } from './product-detail-content';
 import { ProductDetailHeader } from './product-detail-header';
@@ -18,6 +21,7 @@ import type { ProductChannel, ProductDetailMode, ProductLocale } from './types';
 import { useAskAi } from './use-ask-ai';
 import { useProductDetailData } from './use-product-detail-data';
 import { useProductDetailForm } from './use-product-detail-form';
+import { WorkflowLockBanner } from './workflow-lock-banner';
 
 export interface ProductDetailPageProps {
   mode: ProductDetailMode;
@@ -103,6 +107,30 @@ export function ProductDetailPage({
   // read-only state anymore. "Zapisz zmiany" is always visible and a
   // "Zapisz i wróć do listy" action saves + returns to the list.
   const isEditing = true;
+
+  // WFL-P3-03 (#2425) — PRD §3.8 edit lock: banner + save gating derive
+  // from the workflow place and the caller's permissions. `null` place
+  // (state still loading / no workflow.view) means no lock UI.
+  const { identity } = useIdentity();
+  const [workflowPlace, setWorkflowPlace] = useState<string | null>(null);
+  useEffect(() => {
+    if (mode !== 'edit') return;
+    let cancelled = false;
+    fetchWorkflowState(id)
+      .then((state) => {
+        if (!cancelled) setWorkflowPlace(state.current_place);
+      })
+      .catch(() => {
+        if (!cancelled) setWorkflowPlace(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, id]);
+  const editLock =
+    workflowPlace !== null && identity !== null
+      ? computeEditLock(workflowPlace, identity.permissions)
+      : null;
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   // #2318 — "Anuluj" returns to the list without saving; if there are unsaved
   // edits it asks for confirmation first.
@@ -406,7 +434,14 @@ export function ProductDetailPage({
         channel={channel}
         locales={locales}
         channels={channels}
-        onSave={(returnToList) => void handleSave(returnToList)}
+        onSave={(returnToList) => {
+          // WFL-P3-03 — locked states never reach the backend 403; the
+          // banner explains, this guard absorbs a stray click.
+          if (editLock?.locked === true) {
+            return;
+          }
+          void handleSave(returnToList);
+        }}
         onCancel={() => {
           // #2318 — guard unsaved edits before leaving to the list.
           if (Object.keys(dirtyFields).length > 0) {
@@ -423,6 +458,11 @@ export function ProductDetailPage({
       />
 
       {/* Body */}
+      {editLock !== null && editLock.reason !== null ? (
+        <div className="px-7 pt-4">
+          <WorkflowLockBanner objectId={id} lock={editLock} />
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-5 px-7 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-3">
           {/* AUD-071 (#1614) — lazy tab chunks (multimedia/categories/variants/

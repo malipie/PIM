@@ -55,7 +55,8 @@
       "workflow": {
         "submitted_for_review": "Zgłoszono do przeglądu",
         "approved": "Twoja zmiana zatwierdzona",
-        "rejected": "Twoja zmiana odrzucona"
+        "rejected": "Twoja zmiana odrzucona",
+        "unpublish_requested": "Prośba o cofnięcie publikacji"
       }
     }
   },
@@ -4066,6 +4067,16 @@
       "col_submitted": "Zgłoszono",
       "select_all": "Zaznacz wszystkie",
       "decided": "Zastosowano: {{count}} (pominięte: {{locked}})"
+    },
+    "lock": {
+      "published": "Produkt opublikowany — edycja wymaga cofnięcia publikacji przez Approvera.",
+      "review": "Produkt w przeglądzie — edycja tylko dla recenzentów.",
+      "archived": "Produkt zarchiwizowany — tylko do odczytu (użyj „Przywróć”).",
+      "auto_unpublish": "Produkt jest opublikowany — zapis automatycznie cofnie publikację (draft).",
+      "request_button": "Poproś o cofnięcie publikacji",
+      "request_title": "Prośba o cofnięcie publikacji",
+      "request_body": "Approverzy dostaną powiadomienie z Twoim komentarzem.",
+      "request_sent": "Prośba o cofnięcie publikacji wysłana do approverów."
     }
   }
 }

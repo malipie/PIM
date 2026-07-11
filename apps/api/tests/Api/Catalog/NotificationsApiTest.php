@@ -130,6 +130,48 @@ final class NotificationsApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function requestUnpublishNotifiesUnpublishGrantees(): void
+    {
+        // WFL-P3-03 (#2425) — the PRD §3.8 "Request unpublish" flow: an
+        // editor without unpublish rights pings the grantees; no state
+        // change happens and drafts are rejected with 409.
+        $this->createUserWithRole('marketing-u@demo.localhost', 'marketing');
+        $id = $this->seedProduct('WFL-N-REQ');
+
+        $marketing = $this->authenticatedClient('marketing-u@demo.localhost');
+        $draftAttempt = $marketing->request('POST', '/api/objects/'.$id.'/workflow/request-unpublish');
+        self::assertSame(409, $draftAttempt->getStatusCode(), 'draft cannot be requested for unpublish');
+
+        $admin = $this->authenticatedClient();
+        $publish = $admin->request('POST', '/api/objects/'.$id.'/workflow/transitions/publish');
+        self::assertSame(200, $publish->getStatusCode());
+        $this->drainAsyncTransport();
+        $admin->request('POST', '/api/notifications/read-all');
+
+        $request = $marketing->request('POST', '/api/objects/'.$id.'/workflow/request-unpublish', [
+            'json' => ['comment' => 'Muszę poprawić cenę'],
+        ]);
+        self::assertSame(200, $request->getStatusCode());
+        $this->drainAsyncTransport();
+
+        // Admin holds workflow.transition.unpublish -> notified with comment.
+        $body = $admin->request('GET', '/api/notifications?unread=1')->toArray();
+        self::assertSame(1, $body['unread_count']);
+        $items = $body['items'];
+        self::assertIsArray($items);
+        $first = $items[0];
+        self::assertIsArray($first);
+        self::assertSame('workflow.unpublish_requested', $first['type']);
+        $payload = $first['payload'];
+        self::assertIsArray($payload);
+        self::assertSame('Muszę poprawić cenę', $payload['comment']);
+
+        // Object state untouched.
+        $state = $admin->request('GET', '/api/objects/'.$id.'/workflow')->toArray();
+        self::assertSame('published', $state['current_place']);
+    }
+
+    #[Test]
     public function anonymousRequestsAreRejected(): void
     {
         $client = static::createClient();
