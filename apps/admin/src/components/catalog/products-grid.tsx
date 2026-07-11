@@ -244,10 +244,7 @@ export function ProductsGrid({
           />
         ) : null}
         {columns.map((column, index) => (
-          // biome-ignore lint/a11y/useAriaPropsSupportedByRole: NUI-13 keeps
-          // this a CSS-grid (no role="grid"/"columnheader" — those mandate
-          // grid keyboard nav / focusability we do not implement); aria-sort
-          // still communicates the active sort direction to assistive tech.
+          // biome-ignore lint/a11y/useAriaPropsSupportedByRole: CSS-grid header cell (NUI-13, no grid role); aria-sort still conveys sort direction to assistive tech
           <div
             key={column.key}
             className={cn(
