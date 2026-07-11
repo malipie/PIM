@@ -162,12 +162,19 @@ test('editorial loop across marketing and approver, plus axe on the hub', async 
   expect(unpublish.status(), 'approver unpublishes').toBe(200);
   expect(((await unpublish.json()) as { current_place: string }).current_place).toBe('draft');
 
-  // --- axe on the tasks tab of the hub. ---
+  // --- axe on the tasks tab of the hub. The loop above closed every
+  //     admin-owned task (unpublish resolved request_unpublish), so the
+  //     tab legitimately renders either rows or the empty state — the
+  //     TasksPanel testid only exists in the non-empty branch. ---
   await admin.page.goto('/workflow');
   await admin.page.getByRole('tab', { name: /moje zadania|my tasks/i }).click();
-  await expect(admin.page.getByTestId('tasks-panel')).toBeVisible();
+  await expect(
+    admin.page
+      .getByTestId('tasks-panel')
+      .or(admin.page.getByText(/brak otwartych zadań|no open tasks/i)),
+  ).toBeVisible();
   const axeTasks = await new AxeBuilder({ page: admin.page })
-    .include('[data-testid="tasks-panel"]')
+    .include('[data-testid="workflow-page"]')
     .analyze();
   expect(
     axeTasks.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical'),
