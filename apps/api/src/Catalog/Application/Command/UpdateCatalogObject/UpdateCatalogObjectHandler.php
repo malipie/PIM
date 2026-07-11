@@ -10,15 +10,14 @@ use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Channel\Contracts\ChannelResolverInterface;
 use App\Identity\Contracts\Policy\WorkflowStateEditPolicyInterface;
 use App\Shared\Domain\Tenant;
+use App\Workflow\Contracts\EditorialWorkflowProviderInterface;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use Doctrine\ORM\OptimisticLockException;
-use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Workflow\WorkflowInterface;
 
 #[AsMessageHandler]
 final readonly class UpdateCatalogObjectHandler
@@ -27,8 +26,7 @@ final readonly class UpdateCatalogObjectHandler
         private CatalogObjectRepositoryInterface $catalogObjects,
         private ObjectAttributesUpserter $attributesUpserter,
         private ChannelResolverInterface $channels,
-        #[Target(ObjectEditorialWorkflow::NAME)]
-        private WorkflowInterface $objectEditorial,
+        private EditorialWorkflowProviderInterface $workflows,
         private WorkflowStateEditPolicyInterface $statePolicy,
     ) {
     }
@@ -75,10 +73,11 @@ final readonly class UpdateCatalogObjectHandler
                     // Same flush as the edit below — transition + content
                     // change land atomically; the transition-log row carries
                     // the audit flag (PRD: AUTO_UNPUBLISH_FOR_EDIT).
-                    $this->objectEditorial->apply($object, ObjectEditorialWorkflow::TRANSITION_UNPUBLISH, [
-                        'auto_unpublish' => true,
-                        'special_flag' => 'AUTO_UNPUBLISH_FOR_EDIT',
-                    ]);
+                    $this->workflows->for($object, $object->getObjectType()->getId()->toRfc4122())
+                        ->apply($object, ObjectEditorialWorkflow::TRANSITION_UNPUBLISH, [
+                            'auto_unpublish' => true,
+                            'special_flag' => 'AUTO_UNPUBLISH_FOR_EDIT',
+                        ]);
                 } else {
                     throw new AccessDeniedHttpException(\sprintf(
                         'workflow_state_locked: object is "%s" — content edits are blocked by the workflow state policy.%s',
@@ -171,9 +170,10 @@ final readonly class UpdateCatalogObjectHandler
      */
     private function applyStatusTransition(CatalogObject $object, string $targetStatus): void
     {
-        foreach ($this->objectEditorial->getEnabledTransitions($object) as $transition) {
+        $workflow = $this->workflows->for($object, $object->getObjectType()->getId()->toRfc4122());
+        foreach ($workflow->getEnabledTransitions($object) as $transition) {
             if (\in_array($targetStatus, $transition->getTos(), true)) {
-                $this->objectEditorial->apply($object, $transition->getName());
+                $workflow->apply($object, $transition->getName());
 
                 return;
             }

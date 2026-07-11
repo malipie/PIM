@@ -38,6 +38,9 @@ parameters:
     # back to `false` per-tenant once role gating ships in Faza 1
     # ADR-013.
     pim.catalog.enable_custom_object_types: '%env(bool:CATALOG_ENABLE_CUSTOM_OBJECT_TYPES)%'
+    # WFL-P5-01 (#2431) — tenant-editable workflow definitions (ADR-0029
+    # pillar 7). Default OFF; the provider falls back to the static YAML.
+    pim.workflow.custom_definitions: '%env(bool:WORKFLOW_CUSTOM_DEFINITIONS)%'
 
     # AUD-050 (W2-11) — free-tier export retention window in days (GDPR / RODO).
     # `pim:exports:cleanup` erases free-tier exports older than this; paid tiers
@@ -109,6 +112,10 @@ services:
     # real exception message in `detail` for 5xx locally while collapsing
     # it to the generic status text in prod. `class`/`trace` are never
     # emitted regardless of env (the FQCN is the information leak).
+    App\Workflow\Application\EditorialWorkflowProvider:
+        arguments:
+            $customDefinitionsEnabled: '%pim.workflow.custom_definitions%'
+
     App\Shared\Infrastructure\Http\Rfc7807ExceptionListener:
         arguments:
             $debug: '%kernel.debug%'

@@ -61,7 +61,15 @@ final readonly class TransitionPermissionGuard implements EventSubscriberInterfa
     public function onGuard(GuardEvent $event): void
     {
         $transition = $event->getTransition()->getName();
-        $permission = self::PERMISSION_MAP[$transition] ?? null;
+
+        // Tenant definitions (WFL-P5-01) carry the permission as
+        // per-transition METADATA; the static YAML machine falls back
+        // to the constant map. No metadata + no map entry = an open
+        // transition (the builder may deliberately leave one ungated).
+        $metadataPermission = $event->getMetadata('permission', $event->getTransition());
+        $permission = \is_string($metadataPermission)
+            ? $metadataPermission
+            : (self::PERMISSION_MAP[$transition] ?? null);
         if (null === $permission) {
             return;
         }
