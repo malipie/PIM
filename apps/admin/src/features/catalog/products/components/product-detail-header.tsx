@@ -24,6 +24,7 @@ import type {
   ProductDetailMode,
   ProductLocale,
 } from './types';
+import { WorkflowStatusControl } from './workflow-status-control';
 
 /**
  * AUD-057 (#1608) — the product-detail sticky header (breadcrumb + action
@@ -295,6 +296,13 @@ export function ProductDetailHeader({
                     <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 soft-shadow">
                       {objectTypeName}
                     </span>
+                  </div>
+                ) : null}
+                {/* WFL-P3-01 (#2423) — editorial state chip + guard-aware
+                    transition buttons + history (self-fetching control). */}
+                {mode === 'edit' ? (
+                  <div className="mt-2.5">
+                    <WorkflowStatusControl objectId={id} />
                   </div>
                 ) : null}
               </>

@@ -4001,5 +4001,40 @@
       "voice_good": "GOOD example",
       "voice_bad": "BAD example"
     }
+  },
+  "workflow": {
+    "place": {
+      "draft": "Draft",
+      "review": "In review",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "transition": {
+      "submit_for_review": "Submit for review",
+      "publish": "Publish",
+      "approve": "Approve",
+      "reject": "Reject",
+      "unpublish": "Unpublish",
+      "archive": "Archive",
+      "restore": "Restore"
+    },
+    "dialog": {
+      "comment_required": "Rejecting requires a comment for the author.",
+      "comment_optional": "You can add a comment (optional).",
+      "comment_placeholder": "Comment…"
+    },
+    "toast": {
+      "applied": "Status changed: {{place}}",
+      "failed": "Transition failed"
+    },
+    "history": {
+      "title": "Workflow history",
+      "open": "Workflow history",
+      "empty": "No transitions.",
+      "older": "Show older",
+      "system": "System",
+      "auto_unpublish": "auto-unpublish",
+      "bulk": "bulk"
+    }
   }
 }

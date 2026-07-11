@@ -8,9 +8,12 @@ framework:
         # this override only relaxes the limit when APP_ENV=dev so the
         # suite can grow without the limiter becoming the gate.
         # Bumped 50 → 200 after #867 surfaced settings-users-list flake.
+        # Bumped 200 → 400 after #2423: the suite crossed 200 logins per
+        # 15-minute window (223 tests, several mint an extra Bearer for
+        # page.request setup calls) and view-13 started 429-looping.
         auth_login:
             policy: 'fixed_window'
-            limit: 200
+            limit: 400
             interval: '15 minutes'
 
         # auth_refresh is the actual bottleneck on CI — every page reload
