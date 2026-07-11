@@ -1,4 +1,13 @@
-import { Copy, Download, FolderTree, MoreHorizontal, Pencil, Sparkles, Trash2 } from 'lucide-react';
+import {
+  Copy,
+  Download,
+  FolderTree,
+  GitBranch,
+  MoreHorizontal,
+  Pencil,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { PermissionGate } from '@/components/identity';
@@ -32,6 +41,13 @@ interface BulkBarProps {
    * agent inbox). Supplied only on product-kind lists.
    */
   onOpenGenerateContent?: () => void;
+  /**
+   * WFL-P3-04 / #2493 — opens the bulk workflow-transition dialog
+   * (`POST /api/products/bulk-actions/change_status`, transitions
+   * evaluated per row by the state machine). Supplied only on
+   * product-kind lists — the endpoint is products-only.
+   */
+  onOpenChangeStatus?: () => void;
 }
 
 /**
@@ -53,6 +69,7 @@ export function BulkBar({
   onOpenCmdK,
   onOpenExportModal,
   onOpenGenerateContent,
+  onOpenChangeStatus,
 }: BulkBarProps) {
   const { t } = useTranslation();
 
@@ -106,6 +123,17 @@ export function BulkBar({
             <FolderTree className="size-3.5" aria-hidden="true" />
             {t('products.bulk.change_category', { defaultValue: 'Zmień kategorię' })}
           </button>
+          {onOpenChangeStatus !== undefined ? (
+            <button
+              type="button"
+              onClick={onOpenChangeStatus}
+              data-testid="bulk-change-status"
+              className="text-[13px] font-medium text-white/90 hover:text-white inline-flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded"
+            >
+              <GitBranch className="size-3.5" aria-hidden="true" />
+              {t('products.bulk.change_status', { defaultValue: 'Zmień status' })}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onOpenExportModal ?? placeholder('VIEW-05.4')}
