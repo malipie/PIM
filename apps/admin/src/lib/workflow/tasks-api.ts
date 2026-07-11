@@ -46,7 +46,7 @@ export function actOnWorkflowTask(
 ): Promise<WorkflowTask> {
   return jsonFetch<WorkflowTask>(`/api/workflow/tasks/${taskId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action }),
+    contentType: 'application/json',
+    body: { action },
   });
 }
