@@ -246,7 +246,7 @@ export function ProductsGridRowView({
       className={cn(
         'group relative grid items-center text-[13px] border-b border-zinc-50 last:border-b-0 transition bg-white',
         isSelected ? 'bg-zinc-200/70' : variant ? 'bg-zinc-50/40' : 'hover:bg-zinc-50/60',
-        density === 'compact' && 'text-[12px] [&_.gcell]:py-1',
+        density === 'compact' && 'text-[12px] [&_.gcell]:py-0.5',
       )}
       style={style}
     >

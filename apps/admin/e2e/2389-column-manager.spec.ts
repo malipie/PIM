@@ -27,13 +27,15 @@ test('column manager: hide, reorder, reset — persisted per ObjectType', async 
   await expect(page.getByTestId('grid-header-code')).toBeVisible();
   await expect(page.getByTestId('grid-header-completeness')).toHaveCount(0);
 
-  // Reorder: move "__categories" down one slot (a11y buttons — drag is
-  // covered by the same handler; buttons are deterministic in CI).
+  // Reorder: move "__sync" down one slot — its neighbour (__price) is
+  // visible, so the change is observable in the header row. (a11y
+  // buttons — drag is covered by the same handler; buttons are
+  // deterministic in CI.)
   const headersBefore = await page
     .locator('[data-testid^="grid-header-"]')
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')));
   await page.getByTestId('column-manager-trigger').click();
-  await page.getByTestId('column-manager-down-__categories').click();
+  await page.getByTestId('column-manager-down-__sync').click();
   await page.keyboard.press('Escape');
   const headersAfter = await page
     .locator('[data-testid^="grid-header-"]')
