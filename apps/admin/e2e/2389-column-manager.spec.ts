@@ -43,6 +43,7 @@ test('column manager: hide, reorder, reset — persisted per ObjectType', async 
   expect(headersAfter).not.toEqual(headersBefore);
 
   await page.reload();
+  await expect(page.getByTestId('grid-header-code')).toBeVisible();
   const headersReloaded = await page
     .locator('[data-testid^="grid-header-"]')
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')));
