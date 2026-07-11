@@ -1,5 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { coerceExcelValue } from './excel-cell-coerce';
 
 export interface ExcelColumn<T extends Record<string, unknown>> {
   key: keyof T & string;
@@ -199,38 +200,8 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
     setEditing({ rowIdx, colKey });
   };
 
-  // GRID-P6-03 — coerce a raw string to the column's value type. Returns
-  // `{ ok: false }` when the input cannot be parsed (paste rejects it and
-  // reports a skip); select maps by option label OR code.
-  const coerceValue = (
-    col: ExcelColumn<T>,
-    raw: string,
-  ): { ok: true; value: unknown } | { ok: false } => {
-    if ('' === raw) return { ok: true, value: null };
-    if (col.type === 'number') {
-      const parsed = Number.parseFloat(raw);
-      return Number.isNaN(parsed) ? { ok: false } : { ok: true, value: parsed };
-    }
-    if (col.type === 'boolean') {
-      const t = raw.trim().toLowerCase();
-      if (['true', '1', 'tak', 'yes', '✓'].includes(t)) return { ok: true, value: true };
-      if (['false', '0', 'nie', 'no', '✗'].includes(t)) return { ok: true, value: false };
-      return { ok: false };
-    }
-    if (col.type === 'select') {
-      const options = col.selectOptions ?? [];
-      const byCode = options.find((o) => o.code === raw.trim());
-      if (byCode !== undefined) return { ok: true, value: byCode.code };
-      const byLabel = options.find((o) => o.label.toLowerCase() === raw.trim().toLowerCase());
-      if (byLabel !== undefined) return { ok: true, value: byLabel.code };
-      return { ok: false };
-    }
-    return { ok: true, value: raw };
-  };
-
   // GRID-P6-03 — exit edit mode AND return focus to the table so the
-  // next Ctrl+V/Ctrl+C reaches the grid keydown handler (single-click
-  // edit otherwise leaves focus in the removed <input>, breaking paste).
+  // next Ctrl+V/Ctrl+C reaches the grid keydown handler.
   const stopEditing = (): void => {
     setEditing(null);
     requestAnimationFrame(() => gridRef.current?.focus());
@@ -246,7 +217,7 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
       stopEditing();
       return;
     }
-    const result = coerceValue(col, newValue);
+    const result = coerceExcelValue(col, newValue);
     if (result.ok) onCommit(editing.rowIdx, editing.colKey, result.value);
     stopEditing();
   };
@@ -290,7 +261,7 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
                 skipped += 1;
                 continue;
               }
-              const result = coerceValue(col, cells[j] ?? '');
+              const result = coerceExcelValue(col, cells[j] ?? '');
               if (!result.ok) {
                 skipped += 1;
                 continue;
