@@ -7,6 +7,7 @@ namespace App\Notification\Infrastructure\Messenger;
 use App\Catalog\Contracts\Event\ObjectApproved;
 use App\Catalog\Contracts\Event\ObjectRejected;
 use App\Catalog\Contracts\Event\ObjectSubmittedForReview;
+use App\Catalog\Contracts\Event\ObjectUnpublishRequested;
 use App\Identity\Contracts\Policy\PermissionGranteesInterface;
 use App\Notification\Contracts\NotifierPort;
 use App\Shared\Application\TenantContext;
@@ -33,6 +34,7 @@ final readonly class WorkflowNotificationFanOut
     public const string TYPE_SUBMITTED = 'workflow.submitted_for_review';
     public const string TYPE_APPROVED = 'workflow.approved';
     public const string TYPE_REJECTED = 'workflow.rejected';
+    public const string TYPE_UNPUBLISH_REQUESTED = 'workflow.unpublish_requested';
 
     public function __construct(
         private NotifierPort $notifier,
@@ -75,6 +77,28 @@ final readonly class WorkflowNotificationFanOut
     public function onRejected(ObjectRejected $event): void
     {
         $this->notifyAuthor($event->objectId, self::TYPE_REJECTED, $event->comment);
+    }
+
+    #[AsMessageHandler]
+    public function onUnpublishRequested(ObjectUnpublishRequested $event): void
+    {
+        $tenant = $this->tenantContext->get();
+        if (null === $tenant) {
+            return;
+        }
+
+        $recipients = [];
+        foreach ($this->grantees->userIdsWithPermission($tenant, 'workflow.transition.unpublish') as $userId) {
+            if (null !== $event->requesterId && $userId->equals($event->requesterId)) {
+                continue;
+            }
+            $recipients[] = $userId;
+        }
+
+        $this->notifier->notifyUsers($recipients, self::TYPE_UNPUBLISH_REQUESTED, [
+            'object_id' => $event->objectId->toRfc4122(),
+            'comment' => $event->comment,
+        ]);
     }
 
     private function notifyAuthor(Uuid $objectId, string $type, ?string $comment): void

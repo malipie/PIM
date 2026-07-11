@@ -15,6 +15,7 @@ use App\Catalog\Contracts\Event\ObjectRejected;
 use App\Catalog\Contracts\Event\ObjectRestored;
 use App\Catalog\Contracts\Event\ObjectSubmittedForReview;
 use App\Catalog\Contracts\Event\ObjectUnpublished;
+use App\Catalog\Contracts\Event\ObjectUnpublishRequested;
 use App\Catalog\Contracts\Workflow\EditorialWorkflowSubject;
 use App\Catalog\Domain\ObjectKind;
 use App\Shared\Application\Blameable;
@@ -384,6 +385,13 @@ class CatalogObject extends AggregateRoot implements TenantScoped, Blameable, Ed
     {
         if (null !== $this->tenant) {
             $this->recordThat(new ObjectUnpublished($this->id, $this->tenant->getId(), $autoUnpublish));
+        }
+    }
+
+    public function recordUnpublishRequested(?Uuid $requesterId, ?string $comment): void
+    {
+        if (null !== $this->tenant) {
+            $this->recordThat(new ObjectUnpublishRequested($this->id, $this->tenant->getId(), $requesterId, $comment));
         }
     }
 

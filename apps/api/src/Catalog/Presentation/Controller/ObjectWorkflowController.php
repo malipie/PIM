@@ -7,6 +7,7 @@ namespace App\Catalog\Presentation\Controller;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
+use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use App\Workflow\Contracts\TransitionLogEntry;
 use App\Workflow\Contracts\TransitionLogPort;
@@ -46,6 +47,7 @@ final class ObjectWorkflowController
     public function __construct(
         private readonly CatalogObjectRepositoryInterface $objects,
         private readonly TransitionLogPort $transitionLog,
+        private readonly CurrentUserProvider $currentUser,
         #[Target(ObjectEditorialWorkflow::NAME)]
         private readonly WorkflowInterface $objectEditorial,
     ) {
@@ -147,6 +149,34 @@ final class ObjectWorkflowController
             'next_cursor' => $hasMore && [] !== $entries
                 ? $entries[\count($entries) - 1]->id->toRfc4122()
                 : null,
+        ]);
+    }
+
+    #[Route(
+        path: '/api/objects/{id}/workflow/request-unpublish',
+        name: 'object_workflow_request_unpublish',
+        requirements: ['id' => self::UUID_REQUIREMENT],
+        methods: ['POST'],
+    )]
+    // WFL-P3-03 (#2425) — PRD §3.8 "Request unpublish": an editor who
+    // cannot unpublish asks the approvers to. No state change — a domain
+    // event fans out to workflow.transition.unpublish grantees (and
+    // becomes a task in WFL-P4-02).
+    #[RequiresPermission(module: 'products', action: 'edit')]
+    public function requestUnpublish(string $id, Request $request): JsonResponse
+    {
+        $object = $this->loadObject($id);
+        if (CatalogObject::STATUS_PUBLISHED !== $object->getStatus()) {
+            throw new ConflictHttpException('Only published objects can be requested for unpublish.');
+        }
+
+        $comment = $this->extractComment($request);
+        $object->recordUnpublishRequested($this->currentUser->userId(), $comment);
+        $this->objects->save($object);
+
+        return new JsonResponse([
+            'object_id' => $object->getId()->toRfc4122(),
+            'requested' => true,
         ]);
     }
 
