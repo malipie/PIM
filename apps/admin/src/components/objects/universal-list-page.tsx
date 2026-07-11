@@ -725,6 +725,23 @@ export function UniversalListPage({
       next.set(row.id, { ...next.get(row.id), [colKey]: value });
       return next;
     });
+    // GRID-P6-02 — attribute column edits carry the `attr:{code}` excel
+    // key; PATCH the attribute and optimistically overlay the raw
+    // envelope so the cell shows the new reading before the refetch.
+    const attrCode = colKey.startsWith('attr:') ? colKey.slice('attr:'.length) : null;
+    if (attrCode !== null) {
+      const column = visibleColumns.find((c) => c.key === attrCode);
+      const envelope = column?.type === 'select' ? { option_code: value } : { value };
+      setOptimisticEdits((prev) => {
+        const next = new Map(prev);
+        const base = next.get(row.id) ?? {};
+        next.set(row.id, {
+          ...base,
+          attributesIndexed: { ...(row.attributesIndexed ?? {}), [attrCode]: envelope },
+        });
+        return next;
+      });
+    }
     try {
       if (colKey === 'enabled') {
         await jsonFetch(`/api/objects/${row.id}`, {
@@ -738,10 +755,28 @@ export function UniversalListPage({
           body: { attributes: { name: value } },
           contentType: 'application/merge-patch+json',
         });
+      } else if (attrCode !== null) {
+        await jsonFetch(`/api/objects/${row.id}`, {
+          method: 'PATCH',
+          body: { attributes: { [attrCode]: value } },
+          contentType: 'application/merge-patch+json',
+        });
       } else {
         return;
       }
-      refetch();
+      if (attrCode !== null) {
+        // The attributesIndexed overlay is an object, so the value-equality
+        // self-clear never fires; await the refetched truth then drop it.
+        await listQuery.refetch();
+        setOptimisticEdits((prev) => {
+          if (!prev.has(row.id)) return prev;
+          const next = new Map(prev);
+          next.delete(row.id);
+          return next;
+        });
+      } else {
+        refetch();
+      }
     } catch (err) {
       setOptimisticEdits((prev) => {
         if (!prev.has(row.id)) return prev;
