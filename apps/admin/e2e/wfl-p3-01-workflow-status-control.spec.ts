@@ -49,13 +49,18 @@ test('workflow control: submit -> approve loop with history on product detail', 
   await expect(control).toBeVisible();
   await expect(control.getByText(/Szkic|Draft/).first()).toBeVisible();
 
+  // #2529 — the transition buttons live in the Workflow modal now, opened
+  // from the breadcrumb "Workflow" chip.
+  await page.getByTestId('workflow-open').click();
+  await expect(page.getByTestId('workflow-modal')).toBeVisible();
+
   // Submit for review with a comment.
   await page.getByTestId('workflow-transition-submit_for_review').click();
   await page.getByTestId('workflow-comment').fill('E2E: proszę o przegląd');
   await page.getByTestId('workflow-confirm').click();
   await expect(control.getByText(/W przeglądzie|In review/).first()).toBeVisible();
 
-  // Approve — admin holds workflow.approve_reject.
+  // Approve — admin holds workflow.approve_reject (modal stays open, reloaded).
   await page.getByTestId('workflow-transition-approve').click();
   await page.getByTestId('workflow-confirm').click();
   await expect(control.getByText(/Opublikowany|Published/).first()).toBeVisible();
