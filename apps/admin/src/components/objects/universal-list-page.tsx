@@ -1045,6 +1045,7 @@ export function UniversalListPage({
           completeness_pct: t('products.fields.completeness', { defaultValue: 'Compl.' }),
           enabled: t('products.fields.enabled', { defaultValue: 'Aktywny' }),
           price: t('products.fields.price', { defaultValue: 'Cena' }),
+          status: t('products.fields.status', { defaultValue: 'Status' }),
         }}
         onRemove={(idx) => {
           const next = panelConditions.filter((_, i) => i !== idx);

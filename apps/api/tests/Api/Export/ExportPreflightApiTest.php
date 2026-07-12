@@ -92,6 +92,30 @@ final class ExportPreflightApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function filterCountIsScopedByEditorialStatus(): void
+    {
+        // #2526 — `status` is a filterable system field, so an export scoped
+        // to `status = published` counts (and later exports) only published
+        // objects. This is the whole point: the operator decides via the
+        // advanced filter what leaves the PIM, per editorial state.
+        $tenant = $this->tenant();
+        $type = $this->customObjectType($tenant, 'status-scoped');
+        $this->object($tenant, $type, 'S-PUB-1', status: CatalogObject::STATUS_PUBLISHED);
+        $this->object($tenant, $type, 'S-PUB-2', status: CatalogObject::STATUS_PUBLISHED);
+        $this->object($tenant, $type, 'S-DRAFT-1', status: CatalogObject::STATUS_DRAFT);
+        $this->em()->flush();
+
+        $body = $this->preflight([
+            'entity_type' => 'custom_module',
+            'object_type_id' => $type->getId()->toRfc4122(),
+            'target_scope' => 'filter',
+            'filter' => ['attr' => 'status', 'op' => '=', 'value' => 'published'],
+        ]);
+
+        self::assertSame(2, $body['count']);
+    }
+
+    #[Test]
     public function rejectsFilterWithInvalidOperatorBeforeRunningSql(): void
     {
         // AUD-031 / W2-3 (C-2) — countFilter previously compiled the DSL
@@ -321,12 +345,20 @@ final class ExportPreflightApiTest extends CatalogApiTestCase
     /**
      * @param array<string, mixed>|null $indexed
      */
-    private function object(Tenant $tenant, ObjectType $objectType, string $code, ?array $indexed = null): void
-    {
+    private function object(
+        Tenant $tenant,
+        ObjectType $objectType,
+        string $code,
+        ?array $indexed = null,
+        ?string $status = null,
+    ): void {
         $object = new CatalogObject($objectType, $code);
         $object->assignTenant($tenant);
         if (null !== $indexed) {
             $object->updateAttributeIndex($indexed);
+        }
+        if (null !== $status) {
+            $object->forceStatus($status);
         }
         $this->em()->persist($object);
     }

@@ -33,6 +33,9 @@ import { cn } from '@/lib/utils';
  *  - `multiselect` → string[]
  */
 
+/** #2526 — editorial states, in lifecycle order, for the `status` filter field. */
+const EDITORIAL_STATUS_CODES = ['draft', 'review', 'published', 'archived'] as const;
+
 export interface BulkValueInputProps {
   attrCode: string;
   attrType: string | undefined;
@@ -152,6 +155,19 @@ export function BulkValueInput({
       setOptions([]);
       return;
     }
+    // #2526 — `status` is the editorial-state system field (a fixed enum),
+    // not an Attribute, so it has no /api/attributes/status/options row.
+    // Serve the four states inline, localised via the existing workflow keys.
+    if (attrCode === 'status') {
+      setOptions(
+        EDITORIAL_STATUS_CODES.map((code) => ({
+          code,
+          label: t(`workflow.place.${code}`, { defaultValue: code }),
+        })),
+      );
+      setOptionsLoading(false);
+      return;
+    }
     let cancelled = false;
     setOptionsLoading(true);
     const load = async (): Promise<void> => {
@@ -171,7 +187,7 @@ export function BulkValueInput({
     return () => {
       cancelled = true;
     };
-  }, [attrCode, isSelect]);
+  }, [attrCode, isSelect, t]);
 
   if (attrType === 'relation') {
     return <BulkRelationValueInput attrCode={attrCode} value={value} onChange={onChange} />;
