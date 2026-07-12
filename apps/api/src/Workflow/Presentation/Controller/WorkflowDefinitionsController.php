@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Workflow\Presentation\Controller;
 
 use App\Identity\Contracts\Attribute\RequiresPermission;
+use App\Shared\Application\TenantContext;
 use App\Workflow\Application\WorkflowDefinitionValidator;
 use App\Workflow\Domain\Entity\WorkflowDefinition;
 use DateTimeInterface;
@@ -34,6 +35,7 @@ final class WorkflowDefinitionsController
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly WorkflowDefinitionValidator $validator,
+        private readonly TenantContext $tenantContext,
     ) {
     }
 
@@ -68,10 +70,10 @@ final class WorkflowDefinitionsController
     #[RequiresPermission(module: 'workflow', action: 'manage_definitions')]
     public function create(Request $request): JsonResponse
     {
-        [$name, $places, $transitions, $objectTypeId] = $this->parseShape($request);
-        $this->assertValid($places, $transitions);
+        [$name, $places, $transitions, $objectTypeId, $reviewer] = $this->parseShape($request);
+        $this->assertValid($places, $transitions, [], $reviewer);
 
-        $definition = new WorkflowDefinition($name, $places, $transitions, $objectTypeId);
+        $definition = new WorkflowDefinition($name, $places, $transitions, $objectTypeId, $reviewer);
         $this->entityManager->persist($definition);
         $this->entityManager->flush();
 
@@ -88,7 +90,7 @@ final class WorkflowDefinitionsController
     public function update(string $id, Request $request): JsonResponse
     {
         $definition = $this->load($id);
-        [$name, $places, $transitions, $objectTypeId] = $this->parseShape($request);
+        [$name, $places, $transitions, $objectTypeId, $reviewer] = $this->parseShape($request);
 
         $previousPlaces = [];
         foreach ($definition->getPlaces() as $place) {
@@ -96,9 +98,9 @@ final class WorkflowDefinitionsController
                 $previousPlaces[] = $place['name'];
             }
         }
-        $this->assertValid($places, $transitions, $definition->isEnabled() ? $previousPlaces : []);
+        $this->assertValid($places, $transitions, $definition->isEnabled() ? $previousPlaces : [], $reviewer);
 
-        $definition->updateShape($name, $places, $transitions, $objectTypeId);
+        $definition->updateShape($name, $places, $transitions, $objectTypeId, $reviewer);
         $this->entityManager->flush();
 
         return new JsonResponse(self::serialize($definition));
@@ -147,7 +149,7 @@ final class WorkflowDefinitionsController
     }
 
     /**
-     * @return array{0: string, 1: list<array<string, mixed>>, 2: list<array<string, mixed>>, 3: ?Uuid}
+     * @return array{0: string, 1: list<array<string, mixed>>, 2: list<array<string, mixed>>, 3: ?Uuid, 4: array<string, mixed>|null}
      */
     private function parseShape(Request $request): array
     {
@@ -167,7 +169,34 @@ final class WorkflowDefinitionsController
             $objectTypeId = Uuid::fromString($body['object_type_id']);
         }
 
-        return [\trim($name), $places, $transitions, $objectTypeId];
+        return [\trim($name), $places, $transitions, $objectTypeId, $this->parseReviewer($body['reviewer'] ?? null)];
+    }
+
+    /**
+     * #2513 — collect the reviewer keys that are actually set. Both keys
+     * are preserved so an ambiguous `{role_code, user_id}` reaches the
+     * validator and is rejected (XOR) rather than silently resolved; an
+     * empty envelope is null (no configured reviewer).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function parseReviewer(mixed $reviewer): ?array
+    {
+        if (!\is_array($reviewer)) {
+            return null;
+        }
+
+        $out = [];
+        $roleCode = $reviewer['role_code'] ?? null;
+        if (\is_string($roleCode) && '' !== $roleCode) {
+            $out['role_code'] = $roleCode;
+        }
+        $userId = $reviewer['user_id'] ?? null;
+        if (\is_string($userId) && '' !== $userId) {
+            $out['user_id'] = $userId;
+        }
+
+        return [] === $out ? null : $out;
     }
 
     /**
@@ -197,10 +226,12 @@ final class WorkflowDefinitionsController
      * @param list<array<string, mixed>> $places
      * @param list<array<string, mixed>> $transitions
      * @param list<string>               $previousPlaces
+     * @param array<string, mixed>|null  $reviewer
      */
-    private function assertValid(array $places, array $transitions, array $previousPlaces = []): void
+    private function assertValid(array $places, array $transitions, array $previousPlaces = [], ?array $reviewer = null): void
     {
-        $errors = $this->validator->validate($places, $transitions, $previousPlaces);
+        $tenantId = $this->tenantContext->get()?->getId()->toRfc4122();
+        $errors = $this->validator->validate($places, $transitions, $previousPlaces, $reviewer, $tenantId);
         if ([] !== $errors) {
             throw new UnprocessableEntityHttpException(\json_encode(['violations' => $errors], JSON_THROW_ON_ERROR));
         }
@@ -217,6 +248,7 @@ final class WorkflowDefinitionsController
             'object_type_id' => $definition->getObjectTypeId()?->toRfc4122(),
             'places' => $definition->getPlaces(),
             'transitions' => $definition->getTransitions(),
+            'reviewer' => $definition->getReviewer(),
             'enabled' => $definition->isEnabled(),
             'updated_at' => $definition->getUpdatedAt()->format(DateTimeInterface::ATOM),
         ];

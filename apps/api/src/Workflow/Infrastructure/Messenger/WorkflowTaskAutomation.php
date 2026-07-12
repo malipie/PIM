@@ -10,7 +10,9 @@ use App\Catalog\Contracts\Event\ObjectSubmittedForReview;
 use App\Catalog\Contracts\Event\ObjectUnpublished;
 use App\Catalog\Contracts\Event\ObjectUnpublishRequested;
 use App\Identity\Contracts\Auth\CurrentUserProvider;
+use App\Workflow\Contracts\EditorialWorkflowProviderInterface;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
+use App\Workflow\Contracts\TaskAssignee;
 use App\Workflow\Contracts\TransitionLogPort;
 use App\Workflow\Contracts\WorkflowTaskType;
 use App\Workflow\Domain\Entity\WorkflowTask;
@@ -45,6 +47,7 @@ final readonly class WorkflowTaskAutomation
         private WorkflowTaskRepositoryInterface $tasks,
         private TransitionLogPort $transitionLog,
         private CurrentUserProvider $currentUser,
+        private EditorialWorkflowProviderInterface $workflows,
     ) {
     }
 
@@ -55,11 +58,13 @@ final readonly class WorkflowTaskAutomation
             return;
         }
 
+        $assignee = $this->resolveReviewer($event->objectTypeId);
         $this->tasks->save(new WorkflowTask(
             title: 'Review request',
             type: WorkflowTaskType::Review,
             objectId: $event->objectId,
-            assigneeRoleCode: ObjectEditorialWorkflow::REVIEWER_ROLE,
+            assigneeUserId: $assignee->userId !== null ? Uuid::fromString($assignee->userId) : null,
+            assigneeRoleCode: $assignee->roleCode,
             createdBy: $this->currentUser->userId(),
             comment: $event->comment,
             context: ['object_id' => $event->objectId->toRfc4122()],
@@ -112,15 +117,29 @@ final readonly class WorkflowTaskAutomation
             return;
         }
 
+        $assignee = $this->resolveReviewer($event->objectTypeId);
         $this->tasks->save(new WorkflowTask(
             title: 'Unpublish request',
             type: WorkflowTaskType::RequestUnpublish,
             objectId: $event->objectId,
-            assigneeRoleCode: ObjectEditorialWorkflow::REVIEWER_ROLE,
+            assigneeUserId: $assignee->userId !== null ? Uuid::fromString($assignee->userId) : null,
+            assigneeRoleCode: $assignee->roleCode,
             createdBy: $event->requesterId,
             comment: $event->comment,
             context: ['object_id' => $event->objectId->toRfc4122()],
         ));
+    }
+
+    /**
+     * #2513 — the configured reviewer for this ObjectType's definition,
+     * or the built-in reviewer role when custom definitions are off / no
+     * reviewer is set. A definition that points at a user routes the task
+     * straight to that person's inbox.
+     */
+    private function resolveReviewer(?Uuid $objectTypeId): TaskAssignee
+    {
+        return $this->workflows->reviewerFor($objectTypeId?->toRfc4122())
+            ?? TaskAssignee::role(ObjectEditorialWorkflow::REVIEWER_ROLE);
     }
 
     private function closeOpen(Uuid $objectId, WorkflowTaskType $type): void

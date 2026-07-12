@@ -29,11 +29,18 @@ final readonly class WorkflowDefinitionValidator
      * @param list<array<string, mixed>> $places
      * @param list<array<string, mixed>> $transitions
      * @param list<string>               $previousPlaceNames places of the stored shape (empty for a new definition)
+     * @param array<string, mixed>|null  $reviewer           #2513 XOR {role_code}|{user_id}|null
+     * @param string|null                $tenantId           scope for reviewer role/user existence checks
      *
      * @return list<array{field: string, message: string}>
      */
-    public function validate(array $places, array $transitions, array $previousPlaceNames = []): array
-    {
+    public function validate(
+        array $places,
+        array $transitions,
+        array $previousPlaceNames = [],
+        ?array $reviewer = null,
+        ?string $tenantId = null,
+    ): array {
         $errors = [];
 
         $placeNames = [];
@@ -128,6 +135,15 @@ final readonly class WorkflowDefinitionValidator
             }
         }
 
+        // #2513 — the configured reviewer must be a real role or user of
+        // this tenant (XOR). A global role (tenant_id NULL, e.g. built-in
+        // `approver`) is accepted too.
+        if (null !== $reviewer) {
+            foreach ($this->reviewerErrors($reviewer, $tenantId) as $error) {
+                $errors[] = $error;
+            }
+        }
+
         // Removing a place with live markings would strand objects.
         $removed = \array_diff($previousPlaceNames, $placeNames);
         foreach ($removed as $place) {
@@ -149,6 +165,56 @@ final readonly class WorkflowDefinitionValidator
         return false !== $this->connection->fetchOne(
             'SELECT 1 FROM permissions WHERE code = :code',
             ['code' => $code],
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $reviewer
+     *
+     * @return list<array{field: string, message: string}>
+     */
+    private function reviewerErrors(array $reviewer, ?string $tenantId): array
+    {
+        $roleCode = $reviewer['role_code'] ?? null;
+        $userId = $reviewer['user_id'] ?? null;
+
+        $hasRole = \is_string($roleCode) && '' !== $roleCode;
+        $hasUser = \is_string($userId) && '' !== $userId;
+
+        if ($hasRole && $hasUser) {
+            return [['field' => 'reviewer', 'message' => 'reviewer is a role OR a user, not both.']];
+        }
+        if (!$hasRole && !$hasUser) {
+            return [['field' => 'reviewer', 'message' => 'reviewer must set role_code or user_id.']];
+        }
+        if (null === $tenantId) {
+            // No tenant scope to check against — accept the shape.
+            return [];
+        }
+
+        if ($hasRole && !$this->reviewerRoleExists($roleCode, $tenantId)) {
+            return [['field' => 'reviewer', 'message' => \sprintf('Unknown role "%s" in this tenant.', $roleCode)]];
+        }
+        if ($hasUser && !$this->reviewerUserExists($userId, $tenantId)) {
+            return [['field' => 'reviewer', 'message' => 'Unknown user in this tenant.']];
+        }
+
+        return [];
+    }
+
+    private function reviewerRoleExists(string $code, string $tenantId): bool
+    {
+        return false !== $this->connection->fetchOne(
+            'SELECT 1 FROM roles WHERE code = :code AND (tenant_id = :tenant OR tenant_id IS NULL)',
+            ['code' => $code, 'tenant' => $tenantId],
+        );
+    }
+
+    private function reviewerUserExists(string $userId, string $tenantId): bool
+    {
+        return false !== $this->connection->fetchOne(
+            "SELECT 1 FROM users WHERE id = :id AND tenant_id = :tenant AND status = 'active'",
+            ['id' => $userId, 'tenant' => $tenantId],
         );
     }
 }

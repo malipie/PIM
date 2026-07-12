@@ -363,7 +363,12 @@ class CatalogObject extends AggregateRoot implements TenantScoped, Blameable, Ed
     public function recordSubmittedForReview(?string $comment): void
     {
         if (null !== $this->tenant) {
-            $this->recordThat(new ObjectSubmittedForReview($this->id, $this->tenant->getId(), $comment));
+            $this->recordThat(new ObjectSubmittedForReview(
+                $this->id,
+                $this->tenant->getId(),
+                $comment,
+                $this->objectType->getId(),
+            ));
         }
     }
 
@@ -391,7 +396,13 @@ class CatalogObject extends AggregateRoot implements TenantScoped, Blameable, Ed
     public function recordUnpublishRequested(?Uuid $requesterId, ?string $comment): void
     {
         if (null !== $this->tenant) {
-            $this->recordThat(new ObjectUnpublishRequested($this->id, $this->tenant->getId(), $requesterId, $comment));
+            $this->recordThat(new ObjectUnpublishRequested(
+                $this->id,
+                $this->tenant->getId(),
+                $requesterId,
+                $comment,
+                $this->objectType->getId(),
+            ));
         }
     }
 

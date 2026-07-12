@@ -10,13 +10,18 @@ use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
+use App\Identity\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use App\Workflow\Contracts\WorkflowTaskType;
+use App\Workflow\Domain\Entity\WorkflowTask;
+use App\Workflow\Domain\Repository\WorkflowTaskRepositoryInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Pakiet F = WFL-P4-01 (#2428) + WFL-P4-02 (#2429) — the task loop:
@@ -113,6 +118,38 @@ final class WorkflowTasksApiTest extends CatalogApiTestCase
         self::assertIsArray($notMineItems);
         $notMineTypes = \array_column(\array_filter($notMineItems, 'is_array'), 'type');
         self::assertNotContains('review', $notMineTypes, 'a non-approver without the permission never sees review tasks in mine');
+    }
+
+    #[Test]
+    public function mineSurfacesUserAssignedReviewTaskForApprovePermissionHolder(): void
+    {
+        // #2513 — a configurable approver can route the review task to a
+        // specific user. An approve_reject holder still sees it in mine
+        // (generalizes #2495 beyond role assignment; the role-code match
+        // would have missed a user-assigned task).
+        $this->createUserWithRole('mkt-ua@demo.localhost', 'marketing');
+        $assignee = self::getContainer()->get(UserRepositoryInterface::class)->findByEmail('mkt-ua@demo.localhost');
+        \assert($assignee instanceof User);
+        $id = $this->seedProduct('WFL-T-UA');
+
+        $tenant = $this->em()->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
+        \assert($tenant instanceof Tenant);
+        self::getContainer()->get(TenantContext::class)->set($tenant);
+        $task = new WorkflowTask(
+            title: 'Review request',
+            type: WorkflowTaskType::Review,
+            objectId: Uuid::fromString($id),
+            assigneeUserId: $assignee->getId(),
+            createdBy: $assignee->getId(),
+        );
+        self::getContainer()->get(WorkflowTaskRepositoryInterface::class)->save($task);
+
+        $admin = $this->authenticatedClient();
+        $mine = $admin->request('GET', '/api/workflow/tasks?mine=1&status=open&object_id='.$id)->toArray();
+        $items = $mine['items'];
+        self::assertIsArray($items);
+        $types = \array_column(\array_filter($items, 'is_array'), 'type');
+        self::assertContains('review', $types, 'approve_reject holder sees a user-assigned review task in mine');
     }
 
     #[Test]

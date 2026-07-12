@@ -21,6 +21,10 @@ final readonly class ObjectSubmittedForReview implements DomainEvent, TenantAwar
         public Uuid $objectId,
         public Uuid $tenantId,
         public ?string $comment = null,
+        // #2513 — lets the task automation resolve the ObjectType-specific
+        // workflow definition (and its configured reviewer). Optional for
+        // backward compatibility with pre-#2513 serialized messages.
+        public ?Uuid $objectTypeId = null,
         public DateTimeImmutable $occurredOn = new DateTimeImmutable(),
     ) {
     }

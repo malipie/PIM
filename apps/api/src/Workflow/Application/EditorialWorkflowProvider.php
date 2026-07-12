@@ -7,6 +7,7 @@ namespace App\Workflow\Application;
 use App\Shared\Application\TenantContext;
 use App\Workflow\Contracts\EditorialWorkflowProviderInterface;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
+use App\Workflow\Contracts\TaskAssignee;
 use App\Workflow\Domain\Entity\WorkflowDefinition;
 use Doctrine\ORM\EntityManagerInterface;
 use SplObjectStorage;
@@ -54,16 +55,7 @@ final class EditorialWorkflowProvider implements EditorialWorkflowProviderInterf
     public function for(object $subject, ?string $objectTypeId = null): WorkflowInterface
     {
         unset($subject);
-        if (!$this->customDefinitionsEnabled) {
-            return $this->staticWorkflow;
-        }
-
-        $tenant = $this->tenantContext->get();
-        if (null === $tenant) {
-            return $this->staticWorkflow;
-        }
-
-        $definition = $this->resolveDefinition($objectTypeId);
+        $definition = $this->governingDefinition($objectTypeId);
         if (null === $definition) {
             return $this->staticWorkflow;
         }
@@ -77,6 +69,39 @@ final class EditorialWorkflowProvider implements EditorialWorkflowProviderInterf
         }
 
         return $this->cache[$cacheKey];
+    }
+
+    public function reviewerFor(?string $objectTypeId): ?TaskAssignee
+    {
+        $definition = $this->governingDefinition($objectTypeId);
+        if (null === $definition) {
+            return null;
+        }
+
+        $reviewer = $definition->getReviewer();
+        if (null === $reviewer) {
+            return null;
+        }
+
+        return TaskAssignee::fromDefinition($reviewer);
+    }
+
+    /**
+     * The enabled tenant definition that governs this ObjectType, or null
+     * when custom definitions are off / there is no tenant / no enabled
+     * definition applies (callers fall back to the static machine).
+     */
+    private function governingDefinition(?string $objectTypeId): ?WorkflowDefinition
+    {
+        if (!$this->customDefinitionsEnabled) {
+            return null;
+        }
+
+        if (null === $this->tenantContext->get()) {
+            return null;
+        }
+
+        return $this->resolveDefinition($objectTypeId);
     }
 
     private function resolveDefinition(?string $objectTypeId): ?WorkflowDefinition

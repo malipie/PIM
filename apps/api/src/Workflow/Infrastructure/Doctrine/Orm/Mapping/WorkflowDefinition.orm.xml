@@ -30,6 +30,11 @@
                 <option name="jsonb">true</option>
             </options>
         </field>
+        <field name="reviewer" type="json" column="reviewer" nullable="true">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
 
         <field name="enabled" type="boolean">
             <options>

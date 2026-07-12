@@ -17,4 +17,14 @@ use Symfony\Component\Workflow\WorkflowInterface;
 interface EditorialWorkflowProviderInterface
 {
     public function for(object $subject, ?string $objectTypeId = null): WorkflowInterface;
+
+    /**
+     * #2513 — the configured recipient of auto-created review /
+     * request-unpublish tasks for the governing definition (same
+     * resolution as {@see self::for()}). Null when custom definitions
+     * are off, no enabled definition applies, or the definition leaves
+     * the reviewer unset — the caller then falls back to the built-in
+     * reviewer role.
+     */
+    public function reviewerFor(?string $objectTypeId): ?TaskAssignee;
 }

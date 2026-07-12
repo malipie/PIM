@@ -24,12 +24,13 @@ interface WorkflowTaskRepositoryInterface
     /**
      * Newest-first page (UUIDv7 cursor). `$mineUserId` matches direct
      * assignment OR membership in the assignee role (both role paths).
-     * `$mineExtraRoleCodes` widens that membership with virtual roles the
-     * caller is not a member of but is entitled to act as — e.g. the
-     * reviewer role for a `workflow.approve_reject` holder, so the task
-     * inbox matches the notification fan-out audience (#2495).
+     * `$mineReviewerTaskTypes` widens "mine" for a caller entitled to act
+     * on reviewer work — a `workflow.approve_reject` holder sees every
+     * task of these types regardless of who it is routed to (role OR a
+     * specific user), so the inbox matches the notification fan-out and
+     * survives a configurable approver (#2513, generalizes #2495).
      *
-     * @param list<string> $mineExtraRoleCodes
+     * @param list<WorkflowTaskType> $mineReviewerTaskTypes
      *
      * @return list<WorkflowTask>
      */
@@ -40,7 +41,7 @@ interface WorkflowTaskRepositoryInterface
         ?Uuid $objectId = null,
         ?Uuid $mineUserId = null,
         ?DateTimeImmutable $dueBefore = null,
-        array $mineExtraRoleCodes = [],
+        array $mineReviewerTaskTypes = [],
     ): array;
 
     /**
