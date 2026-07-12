@@ -78,6 +78,7 @@ describe('draftFromResource -> draftToPayload roundtrip', () => {
           completeness_gate: { min_completeness_pct: 90 },
         },
       ],
+      reviewer: null,
       enabled: true,
       updated_at: '2026-07-11T00:00:00+00:00',
     };
