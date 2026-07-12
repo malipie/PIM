@@ -11,6 +11,7 @@ use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Identity\Contracts\Directory\UserDirectoryInterface;
 use App\Workflow\Contracts\EditorialWorkflowProviderInterface;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
+use App\Workflow\Contracts\TaskAssignee;
 use App\Workflow\Contracts\TransitionLogEntry;
 use App\Workflow\Contracts\TransitionLogPort;
 use DateTimeInterface;
@@ -63,14 +64,38 @@ final class ObjectWorkflowController
     public function state(string $id): JsonResponse
     {
         $object = $this->loadObject($id);
-        $workflow = $this->workflows->for($object, $object->getObjectType()->getId()->toRfc4122());
+        $objectTypeId = $object->getObjectType()->getId()->toRfc4122();
+        $workflow = $this->workflows->for($object, $objectTypeId);
 
         return new JsonResponse([
             'object_id' => $object->getId()->toRfc4122(),
             'workflow' => ObjectEditorialWorkflow::NAME,
             'current_place' => $object->getStatus(),
             'transitions' => $this->describeTransitions($workflow, $object),
+            'reviewer' => $this->resolveReviewer($objectTypeId),
         ]);
+    }
+
+    /**
+     * #2521 — the recipient a review task will land on, so the product
+     * detail can show "Po zgłoszeniu zadanie trafi do: …". Mirrors the
+     * task-automation resolution (configured reviewer, else the built-in
+     * role), enriched with a user display name via the directory seam.
+     *
+     * @return array{type: string, label: string}
+     */
+    private function resolveReviewer(string $objectTypeId): array
+    {
+        $assignee = $this->workflows->reviewerFor($objectTypeId)
+            ?? TaskAssignee::role(ObjectEditorialWorkflow::REVIEWER_ROLE);
+
+        if (null !== $assignee->userId) {
+            $names = $this->userDirectory->resolve([$assignee->userId]);
+
+            return ['type' => 'user', 'label' => $names[$assignee->userId]['name'] ?? $assignee->userId];
+        }
+
+        return ['type' => 'role', 'label' => (string) $assignee->roleCode];
     }
 
     #[Route(

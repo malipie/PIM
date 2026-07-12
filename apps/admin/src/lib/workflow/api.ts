@@ -15,11 +15,18 @@ export interface WorkflowTransitionOption {
   blockers: { code: string; message: string }[];
 }
 
+/** #2521 — the recipient a review task will land on (role or a person). */
+export interface WorkflowReviewer {
+  type: 'role' | 'user';
+  label: string;
+}
+
 export interface WorkflowState {
   object_id: string;
   workflow: string;
   current_place: string;
   transitions: WorkflowTransitionOption[];
+  reviewer?: WorkflowReviewer;
 }
 
 export interface WorkflowLogEntry {
