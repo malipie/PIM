@@ -12,11 +12,20 @@ export interface WorkflowTask {
   type: 'review' | 'fix' | 'request_unpublish' | 'custom';
   status: 'open' | 'done' | 'cancelled';
   object_id: string | null;
+  /** #2518 — object summary resolved server-side for the card. */
+  object_title: string | null;
+  object_sku: string | null;
+  object_kind: string | null;
   assignee_user_id: string | null;
   assignee_role_code: string | null;
+  /** #2518 — display name when the task is routed to a specific user. */
+  assignee_name: string | null;
   due_date: string | null;
   comment: string | null;
   context: Record<string, unknown> | null;
+  created_by: string | null;
+  /** #2518 — submitter display name (from the UserDirectory seam). */
+  created_by_name: string | null;
   created_at: string;
 }
 

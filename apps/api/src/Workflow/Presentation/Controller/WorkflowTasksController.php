@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Workflow\Presentation\Controller;
 
+use App\Catalog\Contracts\Query\ObjectSummary;
+use App\Catalog\Contracts\Query\ObjectSummaryPort;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Contracts\Auth\CurrentUserProvider;
+use App\Identity\Contracts\Directory\UserDirectoryInterface;
 use App\Identity\Contracts\Policy\PermissionCheckerInterface;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use App\Workflow\Contracts\WorkflowTaskStatus;
@@ -45,6 +48,8 @@ final class WorkflowTasksController
         private readonly DoctrineWorkflowTaskRepository $taskQueries,
         private readonly CurrentUserProvider $currentUser,
         private readonly PermissionCheckerInterface $permissions,
+        private readonly ObjectSummaryPort $objectSummaries,
+        private readonly UserDirectoryInterface $userDirectory,
     ) {
     }
 
@@ -113,8 +118,13 @@ final class WorkflowTasksController
         $hasMore = \count($rows) > $limit;
         $rows = \array_slice($rows, 0, $limit);
 
+        [$summaries, $names] = $this->resolveCardData($rows);
+
         return new JsonResponse([
-            'items' => \array_map(self::serialize(...), $rows),
+            'items' => \array_map(
+                static fn (WorkflowTask $task): array => self::serialize($task, $summaries, $names),
+                $rows,
+            ),
             'next_cursor' => $hasMore && [] !== $rows ? $rows[\count($rows) - 1]->getId()->toRfc4122() : null,
         ]);
     }
@@ -168,7 +178,9 @@ final class WorkflowTasksController
         );
         $this->tasks->save($task);
 
-        return new JsonResponse(self::serialize($task), 201);
+        [$summaries, $names] = $this->resolveCardData([$task]);
+
+        return new JsonResponse(self::serialize($task, $summaries, $names), 201);
     }
 
     #[Route(
@@ -211,7 +223,9 @@ final class WorkflowTasksController
 
         $this->tasks->save($task);
 
-        return new JsonResponse(self::serialize($task));
+        [$summaries, $names] = $this->resolveCardData([$task]);
+
+        return new JsonResponse(self::serialize($task, $summaries, $names));
     }
 
     /**
@@ -251,25 +265,72 @@ final class WorkflowTasksController
     }
 
     /**
+     * Batch-resolve the object summaries + user display names a page of
+     * task cards needs (#2518 review-queue seam reused). Keyed by id.
+     *
+     * @param list<WorkflowTask> $tasks
+     *
+     * @return array{0: array<string, ObjectSummary>, 1: array<string, array{name: string, email: string}>}
+     */
+    private function resolveCardData(array $tasks): array
+    {
+        $objectIds = [];
+        $userIds = [];
+        foreach ($tasks as $task) {
+            $objectIds[] = $task->getObjectId()?->toRfc4122();
+            $userIds[] = $task->getCreatedBy()?->toRfc4122();
+            $userIds[] = $task->getAssigneeUserId()?->toRfc4122();
+        }
+        $objectIds = \array_values(\array_filter($objectIds));
+        $userIds = \array_values(\array_filter($userIds));
+
+        return [
+            [] === $objectIds ? [] : $this->objectSummaries->summariesByIds($objectIds),
+            [] === $userIds ? [] : $this->userDirectory->resolve($userIds),
+        ];
+    }
+
+    /**
+     * @param array<string, ObjectSummary>                      $summaries object id → summary
+     * @param array<string, array{name: string, email: string}> $names     user id → display data
+     *
      * @return array<string, mixed>
      */
-    private static function serialize(WorkflowTask $task): array
+    private static function serialize(WorkflowTask $task, array $summaries = [], array $names = []): array
     {
+        $objectId = $task->getObjectId()?->toRfc4122();
+        $summary = null !== $objectId ? ($summaries[$objectId] ?? null) : null;
+        $createdBy = $task->getCreatedBy()?->toRfc4122();
+        $assigneeUserId = $task->getAssigneeUserId()?->toRfc4122();
+
         return [
             'id' => $task->getId()->toRfc4122(),
             'title' => $task->getTitle(),
             'type' => $task->getType()->value,
             'status' => $task->getStatus()->value,
-            'object_id' => $task->getObjectId()?->toRfc4122(),
-            'assignee_user_id' => $task->getAssigneeUserId()?->toRfc4122(),
+            'object_id' => $objectId,
+            'object_title' => null !== $summary ? self::summaryTitle($summary) : null,
+            'object_sku' => $summary?->code,
+            'object_kind' => $summary?->kind->value,
+            'assignee_user_id' => $assigneeUserId,
             'assignee_role_code' => $task->getAssigneeRoleCode(),
+            'assignee_name' => null !== $assigneeUserId ? ($names[$assigneeUserId]['name'] ?? null) : null,
             'due_date' => $task->getDueDate()?->format('Y-m-d'),
             'comment' => $task->getComment(),
             'context' => $task->getContext(),
-            'created_by' => $task->getCreatedBy()?->toRfc4122(),
+            'created_by' => $createdBy,
+            'created_by_name' => null !== $createdBy ? ($names[$createdBy]['name'] ?? null) : null,
             'resolved_by' => $task->getResolvedBy()?->toRfc4122(),
             'resolved_at' => $task->getResolvedAt()?->format(DateTimeInterface::ATOM),
             'created_at' => $task->getCreatedAt()->format(DateTimeInterface::ATOM),
         ];
+    }
+
+    private static function summaryTitle(ObjectSummary $summary): string
+    {
+        $label = $summary->label;
+        $first = \reset($label);
+
+        return $label['pl'] ?? $label['en'] ?? (false !== $first && '' !== $first ? $first : $summary->code);
     }
 }
