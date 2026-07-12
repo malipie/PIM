@@ -61,6 +61,11 @@ final readonly class ApiProfileFilterRequestListener
             return;
         }
 
+        // Mark the request so Catalog's ProfileScopeApplier scopes it (and
+        // leaves admin/JWT requests untouched). String key = query-param-style
+        // contract, no cross-BC type dependency on Catalog.
+        $request->attributes->set('_pim_profile_scoped', true);
+
         // Profile filters win over integrator-supplied params (hard scope).
         foreach ($profile->getFilters() as $key => $value) {
             if ('' !== $key && (\is_scalar($value) || \is_array($value) || null === $value)) {

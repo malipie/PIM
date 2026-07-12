@@ -83,12 +83,6 @@
             -->
             <filter>App\Catalog\Infrastructure\ApiPlatform\Filter\ObjectTypeFilter</filter>
             <!--
-                #2527: `?objectTypeIds[]={uuid}` scopes the collection to a
-                SET of ObjectTypes (IN). Injected from the ApiProfile on the
-                live API so a partner integration sees only its allowed types.
-            -->
-            <filter>App\Catalog\Infrastructure\ApiPlatform\Filter\ObjectTypeIdsFilter</filter>
-            <!--
                 ADR-015: `?categoryTargetObjectType={uuid}` scopes
                 /api/categories to a single ObjectType's tree (per-OT
                 category trees). Required so the modeling UI can isolate

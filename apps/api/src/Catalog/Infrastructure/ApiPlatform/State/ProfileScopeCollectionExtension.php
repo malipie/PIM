@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure\ApiPlatform\State;
 
-use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
+use ApiPlatform\Doctrine\Orm\Extension\QueryCollectionExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
 use App\Catalog\Domain\Entity\CatalogObject;
@@ -12,16 +12,17 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
- * #2527 — item-query counterpart to {@see ProfileScopeCollectionExtension}.
+ * #2527 — narrows `GET /api/products` (and the other CatalogObject sugar
+ * paths) to the resolved ApiProfile's row-scope on the live API.
  *
- * API Platform runs FilterInterface only on collections, so without this a
- * partner scoped to `status=published` could still fetch a draft by its id
- * via `GET /api/products/{id}`. Applies the same profile row-scope via the
- * shared {@see ProfileScopeApplier}, so an out-of-scope object 404s (same
- * shape as {@see KindItemExtension}). Reads the query only — no dependency
- * on the ApiConfigurator BC.
+ * The profile params are injected into the request query by
+ * {@see \App\ApiConfigurator\Infrastructure\ApiPlatform\ApiProfileFilterRequestListener};
+ * because API Platform snapshots `$context['filters']` before that
+ * listener runs, this extension reads the live query via {@see RequestStack}
+ * and applies the canonical scope through {@see ProfileScopeApplier}
+ * (the same applier used on item queries — collection + item stay in sync).
  */
-final readonly class ProfileScopeItemExtension implements QueryItemExtensionInterface
+final readonly class ProfileScopeCollectionExtension implements QueryCollectionExtensionInterface
 {
     public function __construct(
         private RequestStack $requestStack,
@@ -30,14 +31,12 @@ final readonly class ProfileScopeItemExtension implements QueryItemExtensionInte
     }
 
     /**
-     * @param class-string         $resourceClass
-     * @param array<string, mixed> $identifiers
+     * @param class-string $resourceClass
      */
-    public function applyToItem(
+    public function applyToCollection(
         QueryBuilder $queryBuilder,
         QueryNameGeneratorInterface $queryNameGenerator,
         string $resourceClass,
-        array $identifiers,
         ?Operation $operation = null,
         array $context = [],
     ): void {

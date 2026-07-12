@@ -2507,21 +2507,6 @@
                         "explode": false
                     },
                     {
-                        "name": "objectTypeIds[]",
-                        "in": "query",
-                        "description": "Scope the collection to a set of ObjectTypes by UUID. Applied as IN; drives per-profile ObjectType scoping on the live API.",
-                        "required": false,
-                        "deprecated": false,
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        },
-                        "style": "form",
-                        "explode": true
-                    },
-                    {
                         "name": "categoryTargetObjectType",
                         "in": "query",
                         "description": "ADR-015 \u2014 scope categories to one ObjectType tree (UUID).",
@@ -2953,21 +2938,6 @@
                         },
                         "style": "form",
                         "explode": false
-                    },
-                    {
-                        "name": "objectTypeIds[]",
-                        "in": "query",
-                        "description": "Scope the collection to a set of ObjectTypes by UUID. Applied as IN; drives per-profile ObjectType scoping on the live API.",
-                        "required": false,
-                        "deprecated": false,
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        },
-                        "style": "form",
-                        "explode": true
                     },
                     {
                         "name": "categoryTargetObjectType",
@@ -3740,21 +3710,6 @@
                         "explode": false
                     },
                     {
-                        "name": "objectTypeIds[]",
-                        "in": "query",
-                        "description": "Scope the collection to a set of ObjectTypes by UUID. Applied as IN; drives per-profile ObjectType scoping on the live API.",
-                        "required": false,
-                        "deprecated": false,
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        },
-                        "style": "form",
-                        "explode": true
-                    },
-                    {
                         "name": "categoryTargetObjectType",
                         "in": "query",
                         "description": "ADR-015 \u2014 scope categories to one ObjectType tree (UUID).",
@@ -4523,21 +4478,6 @@
                         },
                         "style": "form",
                         "explode": false
-                    },
-                    {
-                        "name": "objectTypeIds[]",
-                        "in": "query",
-                        "description": "Scope the collection to a set of ObjectTypes by UUID. Applied as IN; drives per-profile ObjectType scoping on the live API.",
-                        "required": false,
-                        "deprecated": false,
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            }
-                        },
-                        "style": "form",
-                        "explode": true
                     },
                     {
                         "name": "categoryTargetObjectType",
