@@ -123,8 +123,9 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
         self::assertTrue($byKey['material']['editable']);
         // Media has no inline editor → not editable even with permission.
         self::assertFalse($byKey['gallery']['editable']);
-        // Localizable needs the locale/channel context → not editable in MVP.
-        self::assertFalse($byKey['name']['editable']);
+        // Localizable simple attribute IS inline-editable (writes the base
+        // value) — GRID-P6-02 follow-up relaxed the loc/scop exclusion.
+        self::assertTrue($byKey['name']['editable']);
         // System columns are never inline-editable through this flag.
         self::assertFalse($byKey['code']['editable']);
     }

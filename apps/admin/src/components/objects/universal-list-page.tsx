@@ -146,10 +146,22 @@ const PRODUCT_FACETS = ['status', 'brand'];
  * showed them. Hidden by default until the user opts in (column manager,
  * GRID-P2-01); stored prefs override this.
  */
-const DEFAULT_COLUMN_OVERRIDES: GridColumnOverride[] = [
-  { key: 'status', hidden: true },
-  { key: 'updatedAt', hidden: true },
-];
+/**
+ * GRID-P1-03 / #2401 follow-up — schema always emits `status`/`updatedAt`
+ * (legacy grid hid them). For products we also surface the real, editable
+ * `name` and `price` attribute columns by default (they are `show_in_list`
+ * =false so they start hidden) INSTEAD of the read-only `__name`/`__price`
+ * view-seeds, so the default Nazwa/Cena columns are inline-editable.
+ */
+function defaultColumnOverrides(hasName: boolean, hasPrice: boolean): GridColumnOverride[] {
+  return [
+    { key: 'code' },
+    ...(hasName ? [{ key: 'name', hidden: false }] : []),
+    ...(hasPrice ? [{ key: 'price', hidden: false }] : []),
+    { key: 'status', hidden: true },
+    { key: 'updatedAt', hidden: true },
+  ];
+}
 
 export interface UniversalListPageProps {
   /** ObjectType UUID — drives schema fetch, search scope, and storage keys. */
@@ -234,7 +246,7 @@ export function UniversalListPage({
   // derived columns (name fallback, categories, sync, price, variant
   // axis) fill the gaps the list-schema cannot know about; seeds whose
   // key already exists as a schema column are skipped by the resolver.
-  const schemaQuery = useListSchema(objectTypeId);
+  const schemaQuery = useListSchema(objectTypeId, { full: true });
   const gridViewColumns = useMemo<ViewColumnSeed[]>(() => {
     const schemaColumns = schemaQuery.data?.columns ?? [];
     const has = (key: string): boolean => schemaColumns.some((column) => column.key === key);
@@ -283,7 +295,10 @@ export function UniversalListPage({
     resetOverrides,
   } = useGridColumns(objectTypeId, {
     viewColumns: gridViewColumns,
-    defaultOverrides: DEFAULT_COLUMN_OVERRIDES,
+    defaultOverrides: defaultColumnOverrides(
+      (schemaQuery.data?.columns ?? []).some((c) => c.key === 'name'),
+      isProduct && (schemaQuery.data?.columns ?? []).some((c) => c.key === 'price'),
+    ),
     // GRID-P3-02 — resolve against the full catalogue so any attached
     // attribute can be revealed as a column by the manager.
     fullSchema: true,
@@ -775,9 +790,23 @@ export function UniversalListPage({
     // key; PATCH the attribute and optimistically overlay the raw
     // envelope so the cell shows the new reading before the refetch.
     const attrCode = colKey.startsWith('attr:') ? colKey.slice('attr:'.length) : null;
+    let attrPayload: unknown = value;
     if (attrCode !== null) {
       const column = visibleColumns.find((c) => c.key === attrCode);
-      const envelope = column?.type === 'select' ? { option_code: value } : { value };
+      let envelope: Record<string, unknown>;
+      if (column?.type === 'select') {
+        envelope = { option_code: value };
+      } else if (column?.type === 'price') {
+        // Price is an {amount, currency} envelope — edit the amount,
+        // keep the existing currency (or default PLN).
+        const prev = row.attributesIndexed?.[attrCode] as { currency?: unknown } | undefined;
+        const currency = typeof prev?.currency === 'string' ? prev.currency : 'PLN';
+        const amount = value === null ? null : Number(value);
+        envelope = { amount, currency };
+        attrPayload = value === null ? null : { amount, currency };
+      } else {
+        envelope = { value };
+      }
       setOptimisticEdits((prev) => {
         const next = new Map(prev);
         const base = next.get(row.id) ?? {};
@@ -804,7 +833,7 @@ export function UniversalListPage({
       } else if (attrCode !== null) {
         await jsonFetch(`/api/objects/${row.id}`, {
           method: 'PATCH',
-          body: { attributes: { [attrCode]: value } },
+          body: { attributes: { [attrCode]: attrPayload } },
           contentType: 'application/merge-patch+json',
         });
       } else {

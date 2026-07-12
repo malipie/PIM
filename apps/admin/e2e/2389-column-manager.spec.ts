@@ -15,6 +15,15 @@ import { loginAsAdmin } from './helpers/auth';
 test('column manager: hide, reorder, reset — persisted per ObjectType', async ({ page }) => {
   await loginAsAdmin(page);
   await page.goto('/products');
+  await page.getByTestId('grid-header-code').waitFor();
+  // Clear any column prefs left by earlier tests so we start from the
+  // ObjectType default (localStorage is shared across specs).
+  await page.evaluate(() => {
+    for (const k of Object.keys(localStorage)) {
+      if (/pim\.objectList\..*\.columns$/.test(k)) localStorage.removeItem(k);
+    }
+  });
+  await page.reload();
   await expect(page.getByTestId('grid-header-completeness')).toBeVisible();
 
   // Hide "Kompletność".
@@ -27,29 +36,34 @@ test('column manager: hide, reorder, reset — persisted per ObjectType', async 
   await expect(page.getByTestId('grid-header-code')).toBeVisible();
   await expect(page.getByTestId('grid-header-completeness')).toHaveCount(0);
 
-  // Reorder: move "__sync" down one slot — its neighbour (__price) is
-  // visible, so the change is observable in the header row. (a11y
-  // buttons — drag is covered by the same handler; buttons are
-  // deterministic in CI.)
-  const headersBefore = await page
-    .locator('[data-testid^="grid-header-"]')
-    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')));
+  // Reorder via the manager and verify against the manager's own row
+  // order — deterministic regardless of which columns are hidden (the
+  // manager lists every column; moving one always changes that order,
+  // unlike grid headers where a move past a hidden column is invisible).
+  const managerOrder = async (): Promise<Array<string | null>> => {
+    await page.getByTestId('column-manager-trigger').click();
+    await page.locator('[data-testid^="column-manager-row-"]').first().waitFor();
+    const order = await page
+      .locator('[data-testid^="column-manager-row-"]')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')));
+    await page.keyboard.press('Escape');
+    return order;
+  };
+
+  const orderBefore = await managerOrder();
   await page.getByTestId('column-manager-trigger').click();
-  await page.getByTestId('column-manager-down-__sync').click();
+  await page.getByTestId('column-manager-up-__variant').click();
   await page.keyboard.press('Escape');
-  const headersAfter = await page
-    .locator('[data-testid^="grid-header-"]')
-    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')));
-  expect(headersAfter).not.toEqual(headersBefore);
+  const orderAfter = await managerOrder();
+  expect(orderAfter).not.toEqual(orderBefore);
 
   await page.reload();
   await expect(page.getByTestId('grid-header-code')).toBeVisible();
-  const headersReloaded = await page
-    .locator('[data-testid^="grid-header-"]')
-    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid')));
-  expect(headersReloaded).toEqual(headersAfter);
+  await page.getByTestId('grid-header-__variant').waitFor();
+  const orderReloaded = await managerOrder();
+  expect(orderReloaded).toEqual(orderAfter);
 
-  // Reset → completeness is back, categories back in place.
+  // Reset → completeness is back.
   await page.getByTestId('column-manager-trigger').click();
   await page.getByTestId('column-manager-reset').click();
   await page.keyboard.press('Escape');
@@ -62,9 +76,11 @@ test('header drag-resize persists and the identifier stays sticky', async ({ pag
 
   const header = page.getByTestId('grid-header-__categories');
   await expect(header).toBeVisible();
+  await page.waitForTimeout(300);
   const before = (await header.boundingBox())?.width ?? 0;
 
   const handle = page.getByTestId('grid-resize-__categories');
+  await handle.scrollIntoViewIfNeeded();
   const box = await handle.boundingBox();
   if (box === null) throw new Error('resize handle not visible');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -76,6 +92,7 @@ test('header drag-resize persists and the identifier stays sticky', async ({ pag
   expect(after).toBeGreaterThan(before + 40);
 
   await page.reload();
+  await page.waitForTimeout(300);
   const persisted = (await page.getByTestId('grid-header-__categories').boundingBox())?.width ?? 0;
   expect(Math.abs(persisted - after)).toBeLessThan(4);
 
