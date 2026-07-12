@@ -94,8 +94,9 @@ function HistoryRow({ entry, locale }: { entry: WorkflowLogEntry; locale: string
         {t(`workflow.place.${entry.from}`, { defaultValue: entry.from })}
         {' → '}
         {t(`workflow.place.${entry.to}`, { defaultValue: entry.to })}
-        {entry.actor_user_id === null &&
-          ` · ${t('workflow.history.system', { defaultValue: 'System' })}`}
+      </p>
+      <p className="mt-0.5 text-[11px] text-zinc-500">
+        {entry.actor_name ?? t('workflow.history.system', { defaultValue: 'System' })}
       </p>
       {entry.comment !== null && <p className="mt-1 text-sm">{entry.comment}</p>}
       {(autoUnpublish || bulk) && (

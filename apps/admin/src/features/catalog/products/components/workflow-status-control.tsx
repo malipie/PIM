@@ -1,6 +1,7 @@
 import { History } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -89,61 +90,85 @@ export function WorkflowStatusControl({ objectId }: { objectId: string }) {
       .finally(() => setSubmitting(false));
   };
 
+  const canSubmit = state.transitions.some((transition) => transition.name === 'submit_for_review');
+
   return (
-    <div className="flex flex-wrap items-center gap-2" data-testid="workflow-status-control">
-      <StatusPill
-        variant={placePillVariant(state.current_place)}
-        label={t(`workflow.place.${state.current_place}`, {
-          defaultValue: state.current_place,
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2" data-testid="workflow-status-control">
+        <StatusPill
+          variant={placePillVariant(state.current_place)}
+          label={t(`workflow.place.${state.current_place}`, {
+            defaultValue: state.current_place,
+          })}
+        />
+        {state.transitions.map((transition) => {
+          const label = t(`workflow.transition.${transition.name}`, {
+            defaultValue: transition.name,
+          });
+          const button = (
+            <Button
+              key={transition.name}
+              variant="outline"
+              size="sm"
+              disabled={!transition.enabled || submitting}
+              onClick={() => {
+                setComment('');
+                setPending(transition);
+              }}
+              data-testid={`workflow-transition-${transition.name}`}
+            >
+              {label}
+            </Button>
+          );
+          if (transition.enabled) {
+            return button;
+          }
+          return (
+            <Tooltip key={transition.name}>
+              <TooltipTrigger asChild>
+                {/* span wrapper: disabled buttons swallow pointer events */}
+                <span>{button}</span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                {transition.blockers.map((blocker) => (
+                  <p key={blocker.code} className="text-xs">
+                    {blocker.message}
+                  </p>
+                ))}
+              </TooltipContent>
+            </Tooltip>
+          );
         })}
-      />
-      {state.transitions.map((transition) => {
-        const label = t(`workflow.transition.${transition.name}`, {
-          defaultValue: transition.name,
-        });
-        const button = (
-          <Button
-            key={transition.name}
-            variant="outline"
-            size="sm"
-            disabled={!transition.enabled || submitting}
-            onClick={() => {
-              setComment('');
-              setPending(transition);
-            }}
-            data-testid={`workflow-transition-${transition.name}`}
-          >
-            {label}
-          </Button>
-        );
-        if (transition.enabled) {
-          return button;
-        }
-        return (
-          <Tooltip key={transition.name}>
-            <TooltipTrigger asChild>
-              {/* span wrapper: disabled buttons swallow pointer events */}
-              <span>{button}</span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              {transition.blockers.map((blocker) => (
-                <p key={blocker.code} className="text-xs">
-                  {blocker.message}
-                </p>
-              ))}
-            </TooltipContent>
-          </Tooltip>
-        );
-      })}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setHistoryOpen(true)}
-        aria-label={t('workflow.history.open', { defaultValue: 'Historia workflow' })}
-        data-testid="workflow-history-open"
-      >
-        <History className="size-4" />
-      </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setHistoryOpen(true)}
+          aria-label={t('workflow.history.open', { defaultValue: 'Historia workflow' })}
+          data-testid="workflow-history-open"
+        >
+          <History className="size-4" />
+        </Button>
+      </div>
+
+      {state.reviewer !== undefined && canSubmit ? (
+        <p className="text-[11px] text-zinc-500" data-testid="workflow-reviewer-hint">
+          {t('workflow.control.routes_to', { defaultValue: 'Po zgłoszeniu zadanie trafi do:' })}{' '}
+          <span className="font-medium text-zinc-700">
+            {state.reviewer.type === 'role'
+              ? t('workflow.control.role_label', {
+                  defaultValue: 'Rola: {{label}}',
+                  label: state.reviewer.label,
+                })
+              : state.reviewer.label}
+          </span>
+          {' · '}
+          <Link to="/workflow/settings" className="text-indigo-600 hover:text-indigo-500">
+            {t('workflow.control.change_routing', {
+              defaultValue: 'zmień w Ustawieniach przepływu →',
+            })}
+          </Link>
+        </p>
+      ) : null}
 
       <Dialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <DialogContent>
