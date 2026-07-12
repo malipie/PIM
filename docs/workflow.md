@@ -46,11 +46,11 @@ Przejścia i wymagane uprawnienia (statyczna mapa `TransitionPermissionGuard`; d
 
 Wszystkie trasy są w OpenAPI (`docs/api-spec/v0.json`). Powierzchnia proceduralna (CQRS, custom `#[Route]`):
 
-- `GET /api/objects/{id}/workflow` — discovery: aktualny stan + dostępne przejścia z `blockers[]` (kody: brak uprawnienia, `completeness_gate`, `comment_required`). FE jest źródłem prawdy które przyciski renderować.
+- `GET /api/objects/{id}/workflow` — discovery: aktualny stan + dostępne przejścia z `blockers[]` (kody: brak uprawnienia, `completeness_gate`, `comment_required`) + `reviewer` (`{type: role|user, label}` — rozwiązany akceptant do którego trafi task po zgłoszeniu; §4). FE jest źródłem prawdy które przyciski renderować i pokazuje hint „zadanie trafi do…" pod kontrolką.
 - `POST /api/objects/{id}/workflow/transitions/{transition}` — zastosuj przejście. Body opcjonalne `{comment}` (≤2000 znaków). 409 + `blockers` gdy przejście niedozwolone; 422 gdy `comment_required` a komentarz pusty.
-- `GET /api/objects/{id}/workflow/transitions` — log przejść (kursor UUIDv7, najnowsze pierwsze).
+- `GET /api/objects/{id}/workflow/transitions` — log przejść (kursor UUIDv7, najnowsze pierwsze) + `actor_name` (nazwa autora przejścia z seam `Identity\Contracts\Directory\UserDirectoryInterface`; `null` dla systemu/CLI).
 - `POST /api/objects/{id}/workflow/request-unpublish` — prośba o depublikację (dla użytkownika bez `workflow.transition.unpublish`).
-- `GET/POST/PATCH /api/workflow/tasks` — zadania (lista `mine`/`status`/`object`/`due`; tworzenie custom; complete/cancel/reassign gated assignee-or-approver).
+- `GET/POST/PATCH /api/workflow/tasks` — zadania (lista `mine`/`status`/`object`/`due`; tworzenie custom; complete/cancel/reassign gated assignee-or-approver). Lista wzbogaca każdy task o `object_title/object_sku/object_kind` (batch seam `Catalog\Contracts\Query\ObjectSummaryPort` po `object_id`; `null` dla usuniętych obiektów), `created_by_name` i `assignee_name` (UserDirectory). `mine` matchuje bezpośrednie przypisanie, członkostwo roli-akceptanta **oraz** posiadaczy `workflow.approve_reject` (superset — task widoczny niezależnie od tego czy akceptant to rola czy konkretny user).
 - `GET/PATCH /api/notifications` — powiadomienia in-app (own-data, gated `workflow.view`).
 - `GET/POST/PUT /api/workflow/definitions` + `enable`/`disable` — CRUD definicji (gated `workflow.manage_definitions`, §6).
 
@@ -60,10 +60,16 @@ Bulk: `POST /api/objects/bulk-actions/change_status` — przejście na wielu obi
 
 Przejście generuje zadania automatycznie (`WorkflowTaskAutomation`, idempotentnie — obiekt nigdy nie ma dwóch OPEN tasków jednego typu):
 
-- `submit_for_review` → task `review` dla roli `approver`.
+- `submit_for_review` → task `review` dla **skonfigurowanego akceptanta** (§4a).
 - `reject` → zamknięcie tasku review + task `fix` dla autora submitu z komentarzem recenzenta.
 - `approve` → zamknięcie tasku review.
-- `request-unpublish` → task `request_unpublish` dla roli `approver`.
+- `request-unpublish` → task `request_unpublish` dla **skonfigurowanego akceptanta** (§4a).
+
+### 4a. Konfigurowalny akceptant (routing zadań, ADR-0029)
+
+Akceptant (odbiorca tasków `review` / `request_unpublish`) jest **konfigurowalny per ObjectType**: rola **LUB** konkretny user (XOR). Rozwiązanie: `EditorialWorkflowProvider::reviewerFor(?objectTypeId): ?TaskAssignee` — definicja ObjectType-specific > tenant-global; gdy flaga OFF / brak definicji / brak `reviewer` → `null`, a automatyka spada na wbudowaną rolę `approver` (`ObjectEditorialWorkflow::REVIEWER_ROLE`). VO `Workflow\Contracts\TaskAssignee` trzyma XOR `roleCode`/`userId`.
+
+Ustawiane w UI **Ustawienia przepływu** (§6) — picker akceptanta (rola albo user). Pole `workflow_definitions.reviewer` (JSONB `{role_code}|{user_id}`, migracja `Version20260712100000`) walidowane przez `WorkflowDefinitionValidator` (istnienie roli/usera w tenancie + XOR). Discovery endpoint (§3) zwraca rozwiązanego akceptanta jako `reviewer`, więc kontrolka na karcie produktu pokazuje „Po zgłoszeniu zadanie trafi do: <Rola: X | Imię usera>". Fix-task zawsze idzie do autora submitu (bez zmian).
 
 Powiadomienia (`WorkflowNotificationFanOut`, post-flush pipeline przez Messenger): submit → grantees `workflow.approve_reject` (minus submitter); approve/reject → autor submitu; unpublish_requested → grantees `workflow.transition.unpublish`. Zadania **nie** wysyłają własnego powiadomienia — fan-out zdarzenia już powiadomił tę samą publiczność (unika duplikatu).
 
@@ -75,7 +81,7 @@ Treść obiektu w stanie `published`/`review` jest zablokowana dla użytkownikó
 
 Za flagą `WORKFLOW_CUSTOM_DEFINITIONS` (default OFF). Gdy OFF — statyczna maszyna YAML `object_editorial` (100% jak dotąd). Gdy ON — `EditorialWorkflowProvider` buduje maszynę z rekordu `workflow_definitions` (ObjectType-specific > tenant-global), zachowując tę samą NAZWĘ `object_editorial` i współdzielony dispatcher, więc wszystkie listenery (guard, gate, log, event recorder) działają bez zmian. Metadane per-przejście (`permission`, `comment_required`, `completeness_gate`) czytają guardy przez `InMemoryMetadataStore`.
 
-Builder UI: **Settings → Workflow** (gated `workflow.manage_definitions` + flaga runtime na `GET /api/auth/me` → `feature_flags.workflow_custom_definitions`). Form-based (świadomie NIE canvas-graph): stany z etykietami pl/en i kolorem, przejścia z from/to, permission dropdown, komentarz wymagany, gate kompletności. Walidator (`WorkflowDefinitionValidator`) egzekwuje: snake_case, initial `draft`, osiągalność BFS, istnienie permission code, zakaz usunięcia stanu z żywymi obiektami. Cache workera keyed `definitionId@updatedAt` — edycja definicji invaliduje bez restartu.
+Builder UI: **Workflow → „Ustawienia przepływu"** (CTA w topbarze huba Workflow, trasa `/workflow/settings`, gated `workflow.manage_definitions` + flaga runtime na `GET /api/auth/me` → `feature_flags.workflow_custom_definitions`; stara ścieżka `/settings/workflow` przekierowuje). Form-based (świadomie NIE canvas-graph): legenda ról, karta flagi, selektor definicji per built-in ObjectType, read-only diagram stanów, **picker akceptanta** (rola albo user — §4a), przejścia z permission/komentarzem, gate kompletności (slider %). Walidator (`WorkflowDefinitionValidator`) egzekwuje: snake_case, initial `draft`, osiągalność BFS, istnienie permission code, istnienie akceptanta (rola/user w tenancie) + XOR, zakaz usunięcia stanu z żywymi obiektami. Cache workera keyed `definitionId@updatedAt` — edycja definicji invaliduje bez restartu.
 
 ## 7. Bezpieczeństwo i znane ograniczenia (WFL-P6-01)
 
@@ -89,8 +95,9 @@ Pokryte testami adwersaryjnymi (`WorkflowSecurityApiTest` + suity per-obszar):
 
 ## 8. Skąd co czytać (mapa kodu)
 
-- Kontrakty + statyczna maszyna: `apps/api/src/Workflow/Contracts/`, `apps/api/config/packages/workflow.yaml`.
+- Kontrakty + statyczna maszyna: `apps/api/src/Workflow/Contracts/` (m.in. `TaskAssignee`, `EditorialWorkflowProviderInterface::reviewerFor`), `apps/api/config/packages/workflow.yaml`.
 - Guardy/log/eventy: `apps/api/src/Workflow/Infrastructure/EventSubscriber/`, `apps/api/src/Catalog/Infrastructure/Workflow/`.
-- Provider definicji + walidator: `apps/api/src/Workflow/Application/`.
+- Provider definicji + walidator + routing akceptanta: `apps/api/src/Workflow/Application/` (`EditorialWorkflowProvider`, `WorkflowDefinitionValidator`).
 - Taski + automatyka: `apps/api/src/Workflow/Domain/Entity/WorkflowTask.php`, `.../Infrastructure/Messenger/WorkflowTaskAutomation.php`.
-- FE: `apps/admin/src/features/workflow/`, `.../features/catalog/products/components/workflow-*`, `.../features/settings/workflow/`, `.../lib/workflow/`.
+- Cross-BC seamy do wzbogaceń: `apps/api/src/Identity/Contracts/Directory/UserDirectoryInterface.php` (+ `Application/SqlUserDirectory` — id→imię), `apps/api/src/Catalog/Contracts/Query/ObjectSummaryPort.php` (+ `Application/Query/ObjectSummaryReader` — batch id→{title,sku,kind}).
+- FE: `apps/admin/src/features/workflow/` (hub, `WorkflowTaskCard`, `TasksPanel`, `ReviewQueuePage`, `task-presentation`, `settings/`), `.../features/catalog/products/components/workflow-*` (kontrolka + historia), `.../features/dashboard/components/MyTasksCard.tsx` (widget Pulpitu), `.../lib/workflow/` (`api`, `tasks-api`, `definitions-api`, `directory-api`).
