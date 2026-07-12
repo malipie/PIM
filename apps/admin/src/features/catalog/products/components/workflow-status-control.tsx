@@ -162,7 +162,7 @@ export function WorkflowStatusControl({ objectId }: { objectId: string }) {
               : state.reviewer.label}
           </span>
           {' · '}
-          <Link to="/workflow/settings" className="text-indigo-600 hover:text-indigo-500">
+          <Link to="/workflow/settings" className="text-indigo-600 underline hover:text-indigo-500">
             {t('workflow.control.change_routing', {
               defaultValue: 'zmień w Ustawieniach przepływu →',
             })}
