@@ -170,6 +170,48 @@ final class FilterDslResolverTest extends TestCase
         self::assertStringContainsString('co.completeness_pct < 50', $sql);
     }
 
+    /**
+     * #2526 — the editorial state is a column (`co.status`), NOT a JSONB
+     * attribute, so scoping exports/feeds/lists by status resolves to a
+     * direct column comparison (not `attributes_indexed->>'status'`).
+     */
+    public function testToCountSqlEmitsStatusColumnReference(): void
+    {
+        $sql = $this->resolver->toCountSql(['attr' => 'status', 'op' => '=', 'value' => 'published']);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("co.status = 'published'", $sql);
+        self::assertStringNotContainsString('attributes_indexed', $sql);
+    }
+
+    public function testToCountSqlHandlesStatusInList(): void
+    {
+        $sql = $this->resolver->toCountSql([
+            'attr' => 'status',
+            'op' => 'IN',
+            'value' => ['draft', 'review'],
+        ]);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("co.status IN ('draft', 'review')", $sql);
+    }
+
+    /**
+     * #2526 — on the Meili path the editorial state resolves to the indexed
+     * root facet `status` (CatalogObjectIndexer), not a JSONB dot-path.
+     */
+    public function testToMeilisearchFilterMapsStatusToRootFacet(): void
+    {
+        $filter = $this->resolver->toMeilisearchFilter([
+            'attr' => 'status',
+            'op' => '=',
+            'value' => 'published',
+        ]);
+
+        self::assertStringContainsString('status = "published"', $filter);
+        self::assertStringNotContainsString('attributes_indexed', $filter);
+    }
+
     public function testToCountSqlEscapesStringLiteralsSafely(): void
     {
         $sql = $this->resolver->toCountSql(['attr' => 'brand', 'op' => '=', 'value' => "O'Reilly"]);

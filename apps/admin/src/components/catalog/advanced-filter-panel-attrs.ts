@@ -32,6 +32,11 @@ export const FIRST_PANEL_ATTR: PanelAttr = {
 export const SYSTEM_PANEL_ATTRS: ReadonlyArray<PanelAttr> = [
   { code: 'completeness_pct', name: 'Completeness %', type: 'number', star: true },
   { code: 'enabled', name: 'Aktywny', type: 'boolean', star: true },
+  // #2526 — editorial state (draft/review/published/archived) as a
+  // filterable system field: users scope exports/feeds/lists by status.
+  // `select` gives =, !=, IN, NOT IN; the value picker special-cases the
+  // fixed enum (BulkValueInput) so it needs no /api/attributes options row.
+  { code: 'status', name: 'Status', type: 'select', star: true },
 ];
 
 /**

@@ -172,6 +172,7 @@ final class FilterDslResolver
     private const array COLUMN_MAP = [
         'completeness_pct' => 'co.completeness_pct',
         'enabled' => 'co.enabled',
+        'status' => 'co.status',
         // 'sku' is the UI alias for the natural key; the physical column on
         // objects is 'code' (EXR-16 fix — the wizard's preflight/export SQL
         // path 500'd on any sku condition).

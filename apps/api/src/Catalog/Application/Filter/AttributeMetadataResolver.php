@@ -38,6 +38,10 @@ final class AttributeMetadataResolver
         'sku' => 'text',
         'category' => 'relation',
         'main_image' => 'asset',
+        // #2526 — editorial state enum (draft/review/published/archived).
+        // `select` gives =, !=, IN, NOT IN so users can scope exports/feeds/
+        // lists by status via the advanced filter.
+        'status' => 'select',
     ];
 
     /**
