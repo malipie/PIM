@@ -31,6 +31,16 @@ class WorkflowDefinition implements TenantScoped
     /** @var list<array<string, mixed>> */
     private array $transitions;
 
+    /**
+     * #2513 — configured task recipient (review / request-unpublish),
+     * XOR shape `{role_code}` | `{user_id}` | null. Null = the built-in
+     * reviewer role. Definition-level (one approver per ObjectType), not
+     * per-transition.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $reviewer = null;
+
     private bool $enabled = false;
     private DateTimeImmutable $createdAt;
     private DateTimeImmutable $updatedAt;
@@ -38,14 +48,21 @@ class WorkflowDefinition implements TenantScoped
     /**
      * @param list<array<string, mixed>> $places
      * @param list<array<string, mixed>> $transitions
+     * @param array<string, mixed>|null  $reviewer
      */
-    public function __construct(string $name, array $places, array $transitions, ?Uuid $objectTypeId = null)
-    {
+    public function __construct(
+        string $name,
+        array $places,
+        array $transitions,
+        ?Uuid $objectTypeId = null,
+        ?array $reviewer = null,
+    ) {
         $this->id = Uuid::v7();
         $this->name = $name;
         $this->places = $places;
         $this->transitions = $transitions;
         $this->objectTypeId = $objectTypeId;
+        $this->reviewer = $reviewer;
         $this->createdAt = new DateTimeImmutable();
         $this->updatedAt = $this->createdAt;
     }
@@ -96,15 +113,30 @@ class WorkflowDefinition implements TenantScoped
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function getReviewer(): ?array
+    {
+        return $this->reviewer;
+    }
+
+    /**
      * @param list<array<string, mixed>> $places
      * @param list<array<string, mixed>> $transitions
+     * @param array<string, mixed>|null  $reviewer
      */
-    public function updateShape(string $name, array $places, array $transitions, ?Uuid $objectTypeId): void
-    {
+    public function updateShape(
+        string $name,
+        array $places,
+        array $transitions,
+        ?Uuid $objectTypeId,
+        ?array $reviewer = null,
+    ): void {
         $this->name = $name;
         $this->places = $places;
         $this->transitions = $transitions;
         $this->objectTypeId = $objectTypeId;
+        $this->reviewer = $reviewer;
         $this->touch();
     }
 

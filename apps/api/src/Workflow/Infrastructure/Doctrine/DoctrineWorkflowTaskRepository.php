@@ -43,7 +43,7 @@ final readonly class DoctrineWorkflowTaskRepository implements WorkflowTaskRepos
         ?Uuid $objectId = null,
         ?Uuid $mineUserId = null,
         ?DateTimeImmutable $dueBefore = null,
-        array $mineExtraRoleCodes = [],
+        array $mineReviewerTaskTypes = [],
     ): array {
         $builder = $this->entityManager->createQueryBuilder()
             ->select('t')
@@ -65,16 +65,24 @@ final readonly class DoctrineWorkflowTaskRepository implements WorkflowTaskRepos
                 ->setParameter('dueBefore', $dueBefore);
         }
         if (null !== $mineUserId) {
-            $roleCodes = array_values(array_unique(
-                [...$this->roleCodesOf($mineUserId), ...$mineExtraRoleCodes],
-            ));
-            if ([] === $roleCodes) {
-                $builder->andWhere('t.assigneeUserId = :me')->setParameter('me', $mineUserId);
-            } else {
-                $builder->andWhere('t.assigneeUserId = :me OR t.assigneeRoleCode IN (:roles)')
-                    ->setParameter('me', $mineUserId)
-                    ->setParameter('roles', $roleCodes);
+            // Direct assignment OR membership in the assignee role. A
+            // caller entitled to act on reviewer work additionally sees
+            // every task of $mineReviewerTaskTypes regardless of the
+            // configured assignee (role OR a specific user) — #2513.
+            $clauses = ['t.assigneeUserId = :me'];
+            $builder->setParameter('me', $mineUserId);
+
+            $roleCodes = $this->roleCodesOf($mineUserId);
+            if ([] !== $roleCodes) {
+                $clauses[] = 't.assigneeRoleCode IN (:roles)';
+                $builder->setParameter('roles', $roleCodes);
             }
+            if ([] !== $mineReviewerTaskTypes) {
+                $clauses[] = 't.type IN (:reviewerTypes)';
+                $builder->setParameter('reviewerTypes', $mineReviewerTaskTypes);
+            }
+
+            $builder->andWhere(\implode(' OR ', $clauses));
         }
 
         /** @var list<WorkflowTask> $rows */

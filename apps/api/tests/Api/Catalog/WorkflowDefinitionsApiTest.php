@@ -77,6 +77,85 @@ final class WorkflowDefinitionsApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function reviewerRoleRoundtripsAndUnknownReviewersAreRejected(): void
+    {
+        // #2513 — a definition carries one configurable approver.
+        $admin = $this->authenticatedClient();
+
+        // Role reviewer that exists in the tenant → 201 + serialized back.
+        $shape = $this->validShape('Z akceptantem');
+        $shape['reviewer'] = ['role_code' => 'approver'];
+        $created = $admin->request('POST', '/api/workflow/definitions', ['json' => $shape])->toArray();
+        self::assertSame(['role_code' => 'approver'], $created['reviewer']);
+        $id = $created['id'];
+        self::assertIsString($id);
+        $fetched = $admin->request('GET', '/api/workflow/definitions/'.$id)->toArray();
+        self::assertSame(['role_code' => 'approver'], $fetched['reviewer']);
+
+        // Unknown role → 422.
+        $shape['reviewer'] = ['role_code' => 'no_such_role'];
+        $unknown = $admin->request('POST', '/api/workflow/definitions', ['json' => $shape]);
+        self::assertSame(422, $unknown->getStatusCode());
+        self::assertStringContainsString('reviewer', $unknown->getContent(false));
+
+        // Both role and user (XOR violation) → 422.
+        $shape['reviewer'] = ['role_code' => 'approver', 'user_id' => '019f2bb4-0000-7000-8000-000000000000'];
+        $xor = $admin->request('POST', '/api/workflow/definitions', ['json' => $shape]);
+        self::assertSame(422, $xor->getStatusCode());
+
+        // A user id that is not in this tenant → 422.
+        $shape['reviewer'] = ['user_id' => '019f2bb4-0000-7000-8000-000000000000'];
+        $foreignUser = $admin->request('POST', '/api/workflow/definitions', ['json' => $shape]);
+        self::assertSame(422, $foreignUser->getStatusCode());
+    }
+
+    #[Test]
+    public function providerResolvesReviewerFromDefinition(): void
+    {
+        $em = $this->em();
+        $tenant = $em->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
+        \assert($tenant instanceof Tenant);
+        self::getContainer()->get(TenantContext::class)->set($tenant);
+
+        $object = $this->seedProduct('WFL-DEF-REVIEWER');
+        $productTypeId = $object->getObjectType()->getId()->toRfc4122();
+
+        $definition = new WorkflowDefinition(
+            'Z akceptantem',
+            [['name' => 'draft'], ['name' => 'published']],
+            [['name' => 'publish_direct', 'from' => 'draft', 'to' => 'published']],
+            $object->getObjectType()->getId(),
+            ['role_code' => 'catalog_manager'],
+        );
+        $definition->assignTenant($tenant);
+        $definition->setEnabled(true);
+        $em->persist($definition);
+        $em->flush();
+
+        $provider = new EditorialWorkflowProvider(
+            self::getContainer()->get(Registry::class)->get($object, 'object_editorial'),
+            $em,
+            self::getContainer()->get(TenantContext::class),
+            self::getContainer()->get(EventDispatcherInterface::class),
+            customDefinitionsEnabled: true,
+        );
+        $assignee = $provider->reviewerFor($productTypeId);
+        self::assertNotNull($assignee);
+        self::assertSame('catalog_manager', $assignee->roleCode);
+        self::assertNull($assignee->userId);
+
+        // Flag off → no configured reviewer (caller falls back to approver).
+        $offProvider = new EditorialWorkflowProvider(
+            self::getContainer()->get(Registry::class)->get($object, 'object_editorial'),
+            $em,
+            self::getContainer()->get(TenantContext::class),
+            self::getContainer()->get(EventDispatcherInterface::class),
+            customDefinitionsEnabled: false,
+        );
+        self::assertNull($offProvider->reviewerFor($productTypeId));
+    }
+
+    #[Test]
     public function providerBuildsTheDbMachineWithMetadataWhenFlagIsOn(): void
     {
         $em = $this->em();
