@@ -37,10 +37,15 @@ test('flow settings: pick an approver and save enables the definition', async ({
   await expect(page.getByTestId('workflow-state-diagram')).toBeVisible();
 
   // Product is the default selected type; pick a role approver. The
-  // combobox renders options as buttons behind a search input.
+  // combobox renders options as buttons behind a search input; narrow to
+  // the tenant "Approver" role (unique, unlike Catalog Manager which
+  // exists both global and per-tenant).
   const picker = page.getByTestId('workflow-approver-picker');
   await picker.getByRole('button').first().click();
-  await page.getByRole('button', { name: /Catalog Manager \(rola\)/i }).click();
+  await page
+    .getByRole('button', { name: /^Approver \(rola\)$/i })
+    .first()
+    .click();
 
   await page.getByTestId('workflow-settings-save').click();
 
@@ -49,5 +54,5 @@ test('flow settings: pick an approver and save enables the definition', async ({
 
   // Persisted: reloading keeps the approver selected.
   await page.reload();
-  await expect(page.getByTestId('workflow-approver-picker')).toContainText(/Catalog Manager/i);
+  await expect(page.getByTestId('workflow-approver-picker')).toContainText(/Approver/i);
 });

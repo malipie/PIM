@@ -1,3 +1,4 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { GitBranch, Info, Send } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -5,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { toast } from '@/components/ui/toast';
-import { httpErrorDetail, jsonFetch } from '@/lib/http';
+import { httpErrorDetail } from '@/lib/http';
 import { hasFeature, useIdentity } from '@/lib/identity';
 import {
   createDefinition,
@@ -14,31 +15,12 @@ import {
   fetchDefinitions,
   setDefinitionEnabled,
   updateDefinition,
-  type WorkflowDefinitionResource,
 } from '@/lib/workflow/definitions-api';
+import { fetchApproverDirectory, fetchBuiltInObjectTypes } from '@/lib/workflow/directory-api';
 
 import { editorialPlaces, editorialTransitions, gateFromTransitions } from './editorial-shape';
 import { RoleLegend } from './RoleLegend';
 import { StateDiagram } from './StateDiagram';
-
-interface ObjectTypeOption {
-  id: string;
-  code: string;
-  label: string;
-}
-
-interface RolesResponse {
-  member?: Array<{ id: string; code: string; name: string }>;
-  items?: Array<{ id: string; code: string; name: string }>;
-}
-interface UsersResponse {
-  member?: Array<{ id: string; email: string; display_name: string }>;
-  items?: Array<{ id: string; email: string; display_name: string }>;
-}
-interface ObjectTypesResponse {
-  member?: Array<{ id: string; code: string; label?: Record<string, string> }>;
-  'hydra:member'?: Array<{ id: string; code: string; label?: Record<string, string> }>;
-}
 
 const REVIEWER_ROLE_PREFIX = 'role:';
 const REVIEWER_USER_PREFIX = 'user:';
@@ -56,10 +38,8 @@ export function WorkflowSettingsPage() {
   const { identity } = useIdentity();
   const flagOn = hasFeature(identity, 'workflow_custom_definitions');
 
-  const [objectTypes, setObjectTypes] = useState<ObjectTypeOption[]>([]);
+  const queryClient = useQueryClient();
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
-  const [definitions, setDefinitions] = useState<WorkflowDefinitionResource[]>([]);
-  const [approverOptions, setApproverOptions] = useState<ComboboxOption[]>([]);
 
   const [reviewer, setReviewer] = useState<string>('');
   const [gatePct, setGatePct] = useState<number | null>(80);
@@ -68,57 +48,47 @@ export function WorkflowSettingsPage() {
     gatePct: 80,
   });
   const [saving, setSaving] = useState(false);
-  const [loaded, setLoaded] = useState(false);
 
-  // Catalogue load: built-in ObjectTypes + the role/user picker options.
+  const lang = i18n.language;
+  const objectTypesQuery = useQuery({
+    queryKey: ['workflow-settings', 'object-types', lang],
+    queryFn: () => fetchBuiltInObjectTypes(lang),
+  });
+  const objectTypes = useMemo(() => objectTypesQuery.data ?? [], [objectTypesQuery.data]);
+
+  const approverQuery = useQuery({
+    queryKey: ['workflow-settings', 'approver-options'],
+    queryFn: fetchApproverDirectory,
+  });
+  const approverOptions = useMemo<ComboboxOption[]>(() => {
+    const data = approverQuery.data;
+    if (data === undefined) return [];
+    return [
+      ...data.roles.map((role) => ({
+        value: REVIEWER_ROLE_PREFIX + role.code,
+        label: t('workflow.settings.approver.role_option', {
+          defaultValue: '{{name}} (rola)',
+          name: role.name || role.code,
+        }),
+      })),
+      ...data.users.map((user) => ({
+        value: REVIEWER_USER_PREFIX + user.id,
+        label: `${user.display_name || user.email} (${user.email})`,
+      })),
+    ];
+  }, [approverQuery.data, t]);
+
+  const definitionsQuery = useQuery({
+    queryKey: ['workflow-settings', 'definitions'],
+    queryFn: () => fetchDefinitions().then((body) => body.items),
+  });
+  const definitions = useMemo(() => definitionsQuery.data ?? [], [definitionsQuery.data]);
+  const loaded = definitionsQuery.isSuccess;
+
+  // Default the selected type to the first built-in once types arrive.
   useEffect(() => {
-    const lang = i18n.language;
-    jsonFetch<ObjectTypesResponse>('/api/object_types?itemsPerPage=200')
-      .then((body) => {
-        const members = body['hydra:member'] ?? body.member ?? [];
-        const options = members.map((type) => ({
-          id: type.id,
-          code: type.code,
-          label: type.label?.[lang] ?? type.label?.pl ?? type.code,
-        }));
-        setObjectTypes(options);
-        setSelectedTypeId((current) => current ?? options[0]?.id ?? null);
-      })
-      .catch(() => setObjectTypes([]));
-
-    Promise.all([
-      jsonFetch<RolesResponse>('/api/roles').catch(() => ({}) as RolesResponse),
-      jsonFetch<UsersResponse>('/api/users?itemsPerPage=500').catch(() => ({}) as UsersResponse),
-    ]).then(([rolesBody, usersBody]) => {
-      const roles = rolesBody.member ?? rolesBody.items ?? [];
-      const users = usersBody.member ?? usersBody.items ?? [];
-      setApproverOptions([
-        ...roles.map((role) => ({
-          value: REVIEWER_ROLE_PREFIX + role.code,
-          label: t('workflow.settings.approver.role_option', {
-            defaultValue: '{{name}} (rola)',
-            name: role.name || role.code,
-          }),
-        })),
-        ...users.map((user) => ({
-          value: REVIEWER_USER_PREFIX + user.id,
-          label: `${user.display_name || user.email} (${user.email})`,
-        })),
-      ]);
-    });
-  }, [i18n.language, t]);
-
-  const reloadDefinitions = useMemo(
-    () => () =>
-      fetchDefinitions()
-        .then((body) => setDefinitions(body.items))
-        .catch(() => setDefinitions([]))
-        .finally(() => setLoaded(true)),
-    [],
-  );
-  useEffect(() => {
-    void reloadDefinitions();
-  }, [reloadDefinitions]);
+    setSelectedTypeId((current) => current ?? objectTypes[0]?.id ?? null);
+  }, [objectTypes]);
 
   const currentDefinition = useMemo(
     () => definitions.find((d) => d.object_type_id === selectedTypeId) ?? null,
@@ -165,7 +135,7 @@ export function WorkflowSettingsPage() {
       .then((definition) =>
         definition.enabled ? definition : setDefinitionEnabled(definition.id, true),
       )
-      .then(() => reloadDefinitions())
+      .then(() => queryClient.invalidateQueries({ queryKey: ['workflow-settings', 'definitions'] }))
       .then(() => {
         setOriginal({ reviewer, gatePct });
         toast.success(t('workflow.settings.saved', { defaultValue: 'Definicja zapisana.' }));
