@@ -100,6 +100,10 @@ test('definition builder: custom place shows up on the product without a deploy'
 
     await page.goto(`/products/${created.id}`);
     await expect(page.getByTestId('workflow-status-control')).toBeVisible();
+    // #2529 — transitions live in the Workflow modal (Administrator tab shows
+    // the full set, including this custom machine's renamed transitions).
+    await page.getByTestId('workflow-open').click();
+    await expect(page.getByTestId('workflow-modal')).toBeVisible();
     await expect(page.getByTestId('workflow-transition-to_translation')).toBeVisible();
     // The static machine's submit button is gone under the custom machine.
     await expect(page.getByTestId('workflow-transition-submit_for_review')).toHaveCount(0);

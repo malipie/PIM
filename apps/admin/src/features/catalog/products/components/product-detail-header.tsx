@@ -122,7 +122,7 @@ export function ProductDetailHeader({
               <ArrowLeft className="size-4" />
             </Link>
           </Button>
-          <div className="text-[12px] text-zinc-500">
+          <div className="flex flex-wrap items-center text-[12px] text-zinc-500">
             <span>{objectTypeLabel ?? t('products.title', { defaultValue: 'Produkty' })}</span>
             <span className="mx-1.5 text-zinc-300">/</span>
             <span>{breadcrumbCategory}</span>
@@ -130,6 +130,12 @@ export function ProductDetailHeader({
               <>
                 <span className="mx-1.5 text-zinc-300">/</span>
                 <span className="font-medium text-zinc-900">{skuValue}</span>
+              </>
+            ) : null}
+            {mode === 'edit' && id !== '' ? (
+              <>
+                <span className="mx-1.5 text-zinc-300">·</span>
+                <WorkflowStatusControl objectId={id} />
               </>
             ) : null}
           </div>
@@ -296,13 +302,6 @@ export function ProductDetailHeader({
                     <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-zinc-700 soft-shadow">
                       {objectTypeName}
                     </span>
-                  </div>
-                ) : null}
-                {/* WFL-P3-01 (#2423) — editorial state chip + guard-aware
-                    transition buttons + history (self-fetching control). */}
-                {mode === 'edit' ? (
-                  <div className="mt-2.5">
-                    <WorkflowStatusControl objectId={id} />
                   </div>
                 ) : null}
               </>

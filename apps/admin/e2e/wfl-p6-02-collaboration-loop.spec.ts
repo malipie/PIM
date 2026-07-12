@@ -84,6 +84,8 @@ test('editorial loop across marketing and approver, plus axe on the hub', async 
   await marketing.page.goto(`/products/${objectId}`);
   const marketingControl = marketing.page.getByTestId('workflow-status-control');
   await expect(marketingControl).toBeVisible();
+  // #2529 — transitions live in the Workflow modal (breadcrumb chip).
+  await marketing.page.getByTestId('workflow-open').click();
   await marketing.page.getByTestId('workflow-transition-submit_for_review').click();
   await marketing.page.getByTestId('workflow-comment').fill('Loop: gotowe do przeglądu');
   await marketing.page.getByTestId('workflow-confirm').click();
@@ -122,6 +124,7 @@ test('editorial loop across marketing and approver, plus axe on the hub', async 
   // Fix + resubmit (draft again after reject).
   await marketing.page.goto(`/products/${objectId}`);
   await expect(marketingControl.getByText(/Szkic|Draft/).first()).toBeVisible();
+  await marketing.page.getByTestId('workflow-open').click();
   await marketing.page.getByTestId('workflow-transition-submit_for_review').click();
   await marketing.page.getByTestId('workflow-comment').fill('Loop: poprawione');
   await marketing.page.getByTestId('workflow-confirm').click();

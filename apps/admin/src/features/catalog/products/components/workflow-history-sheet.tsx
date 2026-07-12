@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import { fetchWorkflowLog, type WorkflowLogEntry } from '@/lib/workflow/api';
+import { StatusPill } from '@/components/ui-v2/status-pill';
+import { fetchWorkflowLog, placePillVariant, type WorkflowLogEntry } from '@/lib/workflow/api';
 
 /**
  * Pakiet E (WFL-P3-05 #2427) — transition history timeline (Pimcore
@@ -90,11 +91,19 @@ function HistoryRow({ entry, locale }: { entry: WorkflowLogEntry; locale: string
           {formatTime(entry.created_at, locale)}
         </span>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {t(`workflow.place.${entry.from}`, { defaultValue: entry.from })}
-        {' → '}
-        {t(`workflow.place.${entry.to}`, { defaultValue: entry.to })}
-      </p>
+      <div className="mt-1 flex items-center gap-1.5">
+        <StatusPill
+          variant={placePillVariant(entry.from)}
+          label={t(`workflow.place.${entry.from}`, { defaultValue: entry.from })}
+        />
+        <span className="text-zinc-400" aria-hidden="true">
+          →
+        </span>
+        <StatusPill
+          variant={placePillVariant(entry.to)}
+          label={t(`workflow.place.${entry.to}`, { defaultValue: entry.to })}
+        />
+      </div>
       <p className="mt-0.5 text-[11px] text-zinc-500">
         {entry.actor_name ?? t('workflow.history.system', { defaultValue: 'System' })}
       </p>

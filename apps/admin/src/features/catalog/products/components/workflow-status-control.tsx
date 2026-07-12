@@ -1,46 +1,27 @@
-import { History } from 'lucide-react';
+import { GitBranch, History } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
 
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from '@/components/ui/toast';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { StatusPill } from '@/components/ui-v2/status-pill';
-import {
-  applyWorkflowTransition,
-  fetchWorkflowState,
-  placePillVariant,
-  type WorkflowState,
-  type WorkflowTransitionOption,
-} from '@/lib/workflow/api';
+import { fetchWorkflowState, placePillVariant, type WorkflowState } from '@/lib/workflow/api';
 
 import { WorkflowHistorySheet } from './workflow-history-sheet';
+import { WorkflowModal } from './workflow-modal';
 
 /**
- * Pakiet E (WFL-P3-01 #2423) — editorial state control on the product
- * header (Pimcore pattern: status chip + transition buttons). Buttons
- * mirror the guard-aware discovery endpoint 1:1 — a blocked transition
- * renders disabled with the blocker reasons in a tooltip (missing
- * permission code / completeness gate with the missing attributes), so
- * the FE never re-implements authorization. Reject requires a comment
- * (PRD §3.8 review loop); every other transition takes an optional one.
+ * Pakiet E (WFL-P3-01 #2423) + redesign (#2529) — the editorial workflow
+ * entry point in the product-detail breadcrumb: a status pill mirroring the
+ * machine, a "Workflow" chip that opens the {@link WorkflowModal} (state +
+ * role preview + guard-aware transitions + reviewer routing) and a history
+ * icon that opens the {@link WorkflowHistorySheet}. The transition buttons
+ * themselves moved into the modal (approved design) — this component is now
+ * the compact trigger. Users without `workflow.view` see nothing (the
+ * discovery call fails silently).
  */
 export function WorkflowStatusControl({ objectId }: { objectId: string }) {
   const { t } = useTranslation();
   const [state, setState] = useState<WorkflowState | null>(null);
-  const [pending, setPending] = useState<WorkflowTransitionOption | null>(null);
-  const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const reload = useCallback(() => {
@@ -60,159 +41,43 @@ export function WorkflowStatusControl({ objectId }: { objectId: string }) {
     return null;
   }
 
-  const requiresComment = pending?.name === 'reject';
-
-  const confirm = () => {
-    if (pending === null) return;
-    if (requiresComment && comment.trim() === '') return;
-    setSubmitting(true);
-    applyWorkflowTransition(objectId, pending.name, comment.trim() || undefined)
-      .then((result) => {
-        toast.success(
-          t('workflow.toast.applied', {
-            defaultValue: 'Status zmieniony: {{place}}',
-            place: t(`workflow.place.${result.current_place}`, {
-              defaultValue: result.current_place,
-            }),
-          }),
-        );
-        setPending(null);
-        setComment('');
-        reload();
-      })
-      .catch((error: unknown) => {
-        toast.error(
-          error instanceof Error && error.message !== ''
-            ? error.message
-            : t('workflow.toast.failed', { defaultValue: 'Przejście nie powiodło się' }),
-        );
-      })
-      .finally(() => setSubmitting(false));
-  };
-
-  const canSubmit = state.transitions.some((transition) => transition.name === 'submit_for_review');
-
   return (
-    <div className="space-y-1.5">
-      <div className="flex flex-wrap items-center gap-2" data-testid="workflow-status-control">
-        <StatusPill
-          variant={placePillVariant(state.current_place)}
-          label={t(`workflow.place.${state.current_place}`, {
-            defaultValue: state.current_place,
-          })}
-        />
-        {state.transitions.map((transition) => {
-          const label = t(`workflow.transition.${transition.name}`, {
-            defaultValue: transition.name,
-          });
-          const button = (
-            <Button
-              key={transition.name}
-              variant="outline"
-              size="sm"
-              disabled={!transition.enabled || submitting}
-              onClick={() => {
-                setComment('');
-                setPending(transition);
-              }}
-              data-testid={`workflow-transition-${transition.name}`}
-            >
-              {label}
-            </Button>
-          );
-          if (transition.enabled) {
-            return button;
-          }
-          return (
-            <Tooltip key={transition.name}>
-              <TooltipTrigger asChild>
-                {/* span wrapper: disabled buttons swallow pointer events */}
-                <span>{button}</span>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                {transition.blockers.map((blocker) => (
-                  <p key={blocker.code} className="text-xs">
-                    {blocker.message}
-                  </p>
-                ))}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setHistoryOpen(true)}
-          aria-label={t('workflow.history.open', { defaultValue: 'Historia workflow' })}
-          data-testid="workflow-history-open"
-        >
-          <History className="size-4" />
-        </Button>
-      </div>
+    <span className="inline-flex items-center gap-1.5" data-testid="workflow-status-control">
+      <StatusPill
+        variant={placePillVariant(state.current_place)}
+        label={t(`workflow.place.${state.current_place}`, { defaultValue: state.current_place })}
+      />
+      <button
+        type="button"
+        onClick={() => setModalOpen(true)}
+        data-testid="workflow-open"
+        className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[12px] font-medium text-zinc-600 transition hover:border-zinc-300 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
+      >
+        <GitBranch className="size-3.5" aria-hidden="true" />
+        {t('workflow.modal.title', { defaultValue: 'Workflow' })}
+      </button>
+      <button
+        type="button"
+        onClick={() => setHistoryOpen(true)}
+        aria-label={t('workflow.history.title', { defaultValue: 'Historia workflow' })}
+        data-testid="workflow-history-icon"
+        className="grid size-6 place-items-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
+      >
+        <History className="size-3.5" />
+      </button>
 
-      {state.reviewer !== undefined && canSubmit ? (
-        <p className="text-[11px] text-zinc-500" data-testid="workflow-reviewer-hint">
-          {t('workflow.control.routes_to', { defaultValue: 'Po zgłoszeniu zadanie trafi do:' })}{' '}
-          <span className="font-medium text-zinc-700">
-            {state.reviewer.type === 'role'
-              ? t('workflow.control.role_label', {
-                  defaultValue: 'Rola: {{label}}',
-                  label: state.reviewer.label,
-                })
-              : state.reviewer.label}
-          </span>
-          {' · '}
-          <Link to="/workflow/settings" className="text-indigo-600 underline hover:text-indigo-500">
-            {t('workflow.control.change_routing', {
-              defaultValue: 'zmień w Ustawieniach przepływu →',
-            })}
-          </Link>
-        </p>
-      ) : null}
-
-      <Dialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {t(`workflow.transition.${pending?.name ?? ''}`, {
-                defaultValue: pending?.name ?? '',
-              })}
-            </DialogTitle>
-            <DialogDescription>
-              {requiresComment
-                ? t('workflow.dialog.comment_required', {
-                    defaultValue: 'Odrzucenie wymaga komentarza dla autora.',
-                  })
-                : t('workflow.dialog.comment_optional', {
-                    defaultValue: 'Możesz dodać komentarz (opcjonalnie).',
-                  })}
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={comment}
-            onChange={(event) => setComment(event.target.value)}
-            maxLength={2000}
-            placeholder={t('workflow.dialog.comment_placeholder', {
-              defaultValue: 'Komentarz…',
-            })}
-            data-testid="workflow-comment"
-          />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setPending(null)} disabled={submitting}>
-              {t('common.cancel', { defaultValue: 'Anuluj' })}
-            </Button>
-            <Button
-              onClick={confirm}
-              disabled={submitting || (requiresComment && comment.trim() === '')}
-              data-testid="workflow-confirm"
-            >
-              {t('common.confirm', { defaultValue: 'Potwierdź' })}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      <WorkflowModal
+        objectId={objectId}
+        state={state}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onApplied={reload}
+        onOpenHistory={() => {
+          setModalOpen(false);
+          setHistoryOpen(true);
+        }}
+      />
       <WorkflowHistorySheet objectId={objectId} open={historyOpen} onOpenChange={setHistoryOpen} />
-    </div>
+    </span>
   );
 }
