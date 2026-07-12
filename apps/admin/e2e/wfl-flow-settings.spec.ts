@@ -6,12 +6,15 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, loginAsAdmin } from './helpers/auth';
  * WFL redesign (#2515) — the "Ustawienia przepływu" page, reached from
  * the Workflow hub CTA. Picking an approver and saving creates + enables
  * a tenant definition for the selected ObjectType (the "własny" badge
- * confirms it). Requires WORKFLOW_CUSTOM_DEFINITIONS=true in CI (same as
- * the P5-03 builder spec).
+ * confirms it). Requires WORKFLOW_CUSTOM_DEFINITIONS=true in CI.
+ *
+ * The test configures the ASSET ObjectType on purpose: the other
+ * workflow specs drive product/category submit→approve loops against the
+ * shared CI database, so touching product/category here would leak an
+ * enabled definition (with a completeness gate) into them. Asset is an
+ * island; the created definition is disabled again on teardown.
  */
-test('flow settings: pick an approver and save enables the definition', async ({ page }) => {
-  // Clean slate: drop any pre-existing definitions so the type pill has no
-  // "własny" badge before we save (a Bearer for the setup calls).
+test('flow settings: pick an approver and save enables the asset definition', async ({ page }) => {
   const login = await page.request.post('/api/auth/login', {
     data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
     headers: { accept: 'application/json' },
@@ -19,40 +22,65 @@ test('flow settings: pick an approver and save enables the definition', async ({
   expect(login.status()).toBe(200);
   const { token } = (await login.json()) as { token: string };
   const bearer = { authorization: `Bearer ${token}` };
-  const existing = await page.request.get('/api/workflow/definitions', { headers: bearer });
-  const list = (await existing.json()) as { items: { id: string; enabled: boolean }[] };
-  for (const def of list.items) {
-    if (def.enabled) {
-      await page.request.post(`/api/workflow/definitions/${def.id}/disable`, { headers: bearer });
+
+  const assetTypeId = await assetObjectTypeId(page, bearer);
+
+  try {
+    await loginAsAdmin(page);
+    await page.goto('/workflow');
+
+    await page.getByTestId('workflow-settings-cta').click();
+    await expect(page).toHaveURL(/\/workflow\/settings$/);
+    await expect(page.getByTestId('workflow-settings-page')).toBeVisible();
+    await expect(page.getByTestId('workflow-role-legend')).toBeVisible();
+    await expect(page.getByTestId('workflow-state-diagram')).toBeVisible();
+
+    // Switch to the asset definition and pick the tenant-unique Approver
+    // role (Catalog Manager exists both global and per-tenant → strict mode).
+    await page.getByTestId('workflow-def-type-asset').click();
+    const picker = page.getByTestId('workflow-approver-picker');
+    await picker.getByRole('button').first().click();
+    await page
+      .getByRole('button', { name: /^Approver \(rola\)$/i })
+      .first()
+      .click();
+
+    await page.getByTestId('workflow-settings-save').click();
+
+    // The asset type pill now carries the "własny" badge (enabled def).
+    await expect(page.getByTestId('workflow-def-type-asset').getByText(/własny/i)).toBeVisible();
+
+    // Persisted: reloading keeps the approver selected.
+    await page.reload();
+    await page.getByTestId('workflow-def-type-asset').click();
+    await expect(page.getByTestId('workflow-approver-picker')).toContainText(/Approver/i);
+  } finally {
+    // Teardown: disable any asset definition we enabled so parallel/later
+    // specs see the static machine again.
+    const list = await page.request.get('/api/workflow/definitions', { headers: bearer });
+    const body = (await list.json()) as {
+      items: { id: string; object_type_id: string | null; enabled: boolean }[];
+    };
+    for (const def of body.items) {
+      if (def.object_type_id === assetTypeId && def.enabled) {
+        await page.request.post(`/api/workflow/definitions/${def.id}/disable`, { headers: bearer });
+      }
     }
   }
-
-  await loginAsAdmin(page);
-  await page.goto('/workflow');
-
-  await page.getByTestId('workflow-settings-cta').click();
-  await expect(page).toHaveURL(/\/workflow\/settings$/);
-  await expect(page.getByTestId('workflow-settings-page')).toBeVisible();
-  await expect(page.getByTestId('workflow-role-legend')).toBeVisible();
-  await expect(page.getByTestId('workflow-state-diagram')).toBeVisible();
-
-  // Product is the default selected type; pick a role approver. The
-  // combobox renders options as buttons behind a search input; narrow to
-  // the tenant "Approver" role (unique, unlike Catalog Manager which
-  // exists both global and per-tenant).
-  const picker = page.getByTestId('workflow-approver-picker');
-  await picker.getByRole('button').first().click();
-  await page
-    .getByRole('button', { name: /^Approver \(rola\)$/i })
-    .first()
-    .click();
-
-  await page.getByTestId('workflow-settings-save').click();
-
-  // The product type pill now carries the "własny" badge (enabled def).
-  await expect(page.getByTestId('workflow-def-type-product').getByText(/własny/i)).toBeVisible();
-
-  // Persisted: reloading keeps the approver selected.
-  await page.reload();
-  await expect(page.getByTestId('workflow-approver-picker')).toContainText(/Approver/i);
 });
+
+async function assetObjectTypeId(
+  page: import('@playwright/test').Page,
+  bearer: Record<string, string>,
+): Promise<string> {
+  const response = await page.request.get('/api/object_types?itemsPerPage=200', {
+    headers: { ...bearer, accept: 'application/ld+json' },
+  });
+  const body = (await response.json()) as {
+    'hydra:member'?: { id: string; kind: string }[];
+    member?: { id: string; kind: string }[];
+  };
+  const asset = (body['hydra:member'] ?? body.member ?? []).find((type) => type.kind === 'asset');
+  if (asset === undefined) throw new Error('No asset ObjectType seeded.');
+  return asset.id;
+}
