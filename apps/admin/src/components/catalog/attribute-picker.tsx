@@ -52,6 +52,14 @@ export interface AttributePickerProps {
    * produced a silently-empty result set.
    */
   filterableOnly?: boolean;
+  /**
+   * #2526 — system pseudo-fields (editorial `status`, `enabled`,
+   * `completeness_pct`) that are index-filterable but are NOT Attribute
+   * entities, so the `/api/attributes` fetch never returns them. The filter
+   * panel passes them here so they are selectable alongside real attributes;
+   * BulkWizard omits them (they are not bulk-editable).
+   */
+  systemFields?: ReadonlyArray<{ code: string; name: string; type?: string }>;
   placeholder?: string;
   className?: string;
 }
@@ -67,6 +75,7 @@ export function AttributePicker({
   onChange,
   allowedTypes,
   filterableOnly,
+  systemFields,
   placeholder,
   className,
 }: AttributePickerProps) {
@@ -143,8 +152,25 @@ export function AttributePicker({
     };
   }, [open]);
 
+  // #2526 — system pseudo-fields (status/enabled/completeness_pct) are not
+  // Attribute entities, so they are synthesised here (id = code, always
+  // filterable) and merged ahead of the fetched list. Deduped by code so a
+  // real attribute never collides with a system field.
+  const mergedRows = useMemo<AttributeRow[]>(() => {
+    if (systemFields === undefined || systemFields.length === 0) return attributes;
+    const systemRows: AttributeRow[] = systemFields.map((field) => ({
+      id: field.code,
+      code: field.code,
+      label: field.name,
+      type: field.type,
+      filterable: true,
+    }));
+    const systemCodes = new Set(systemRows.map((row) => row.code));
+    return [...systemRows, ...attributes.filter((row) => !systemCodes.has(row.code))];
+  }, [attributes, systemFields]);
+
   const allowedRows = useMemo(() => {
-    let rows = attributes;
+    let rows = mergedRows;
     // #1354 — strict filterable gate. Applied before the type filter so
     // a consumer can combine both (e.g. filterable numeric attributes).
     if (filterableOnly) {
@@ -152,7 +178,7 @@ export function AttributePicker({
     }
     if (!allowedTypes || allowedTypes.length === 0) return rows;
     return rows.filter((row) => !row.type || allowedTypes.includes(row.type));
-  }, [attributes, allowedTypes, filterableOnly]);
+  }, [mergedRows, allowedTypes, filterableOnly]);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -179,8 +205,8 @@ export function AttributePicker({
   );
 
   const currentRow = useMemo(
-    () => attributes.find((row) => row.id === value || row.code === value),
-    [attributes, value],
+    () => mergedRows.find((row) => row.id === value || row.code === value),
+    [mergedRows, value],
   );
   const triggerLabel = currentRow
     ? `${currentRow.code} · ${attrLabel(currentRow, locale)}`

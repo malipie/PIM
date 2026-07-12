@@ -36,8 +36,13 @@ test('advanced filter offers editorial status with its four states', async ({ pa
   await page.getByText('status', { exact: true }).first().click();
 
   // It resolves to a `select` whose value picker serves the four states
-  // inline (localized via the workflow.place.* keys).
+  // inline (localized via the workflow.place.* keys). The value <select> is
+  // the last select in the row (after the operator select); its option text
+  // proves the inline enum rendered without a /api/attributes/status/options
+  // round-trip. `toContainText` reads the option labels regardless of the
+  // native dropdown's open state.
   await expect(panel.getByText('select', { exact: true })).toBeVisible();
-  await expect(page.getByRole('option', { name: 'Opublikowany (published)' })).toBeVisible();
-  await expect(page.getByRole('option', { name: 'Szkic (draft)' })).toBeVisible();
+  const valueSelect = panel.locator('select').last();
+  await expect(valueSelect).toContainText('Opublikowany');
+  await expect(valueSelect).toContainText('Szkic');
 });

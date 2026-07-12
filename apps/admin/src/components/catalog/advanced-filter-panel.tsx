@@ -283,6 +283,7 @@ export function AdvancedFilterPanel({
                 <AttributePicker
                   value={cond.attr}
                   filterableOnly
+                  systemFields={SYSTEM_PANEL_ATTRS}
                   onChange={(picked) => {
                     if (picked === null) return;
                     const nextAttrMeta = effectivePanelAttrs.find((a) => a.code === picked.code);
