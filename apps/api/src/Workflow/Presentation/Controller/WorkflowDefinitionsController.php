@@ -173,8 +173,10 @@ final class WorkflowDefinitionsController
     }
 
     /**
-     * #2513 — normalize the reviewer envelope to `{role_code}` | `{user_id}`
-     * | null. The validator rejects the XOR / existence violations.
+     * #2513 — collect the reviewer keys that are actually set. Both keys
+     * are preserved so an ambiguous `{role_code, user_id}` reaches the
+     * validator and is rejected (XOR) rather than silently resolved; an
+     * empty envelope is null (no configured reviewer).
      *
      * @return array<string, mixed>|null
      */
@@ -184,17 +186,17 @@ final class WorkflowDefinitionsController
             return null;
         }
 
+        $out = [];
         $roleCode = $reviewer['role_code'] ?? null;
         if (\is_string($roleCode) && '' !== $roleCode) {
-            return ['role_code' => $roleCode];
+            $out['role_code'] = $roleCode;
         }
-
         $userId = $reviewer['user_id'] ?? null;
         if (\is_string($userId) && '' !== $userId) {
-            return ['user_id' => $userId];
+            $out['user_id'] = $userId;
         }
 
-        return null;
+        return [] === $out ? null : $out;
     }
 
     /**
