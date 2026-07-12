@@ -24,12 +24,19 @@ export interface DefinitionTransition {
   completeness_gate?: { min_completeness_pct: number };
 }
 
+/**
+ * #2513 — the configured task recipient (review / request-unpublish),
+ * XOR role OR a specific user. Null = the built-in reviewer role.
+ */
+export type DefinitionReviewer = { role_code: string } | { user_id: string } | null;
+
 export interface WorkflowDefinitionResource {
   id: string;
   name: string;
   object_type_id: string | null;
   places: DefinitionPlace[];
   transitions: DefinitionTransition[];
+  reviewer: DefinitionReviewer;
   enabled: boolean;
   updated_at: string;
 }
@@ -39,6 +46,7 @@ export interface DefinitionPayload {
   object_type_id?: string;
   places: DefinitionPlace[];
   transitions: DefinitionTransition[];
+  reviewer?: DefinitionReviewer;
 }
 
 /** Field-scoped validator violation from the 422 response. */

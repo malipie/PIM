@@ -196,6 +196,10 @@ const ProductShowPage = lazyPage(
 );
 const CatalogsPdfPage = lazyPage(() => import('@/features/catalogs-pdf'), 'CatalogsPdfPage');
 const WorkflowPage = lazyPage(() => import('@/features/workflow/WorkflowPage'), 'WorkflowPage');
+const WorkflowFlowSettingsPage = lazyPage(
+  () => import('@/features/workflow/settings'),
+  'WorkflowSettingsPage',
+);
 const CatalogWizardPage = lazyPage(
   () => import('@/features/catalogs-pdf/wizard/CatalogWizardPage'),
   'CatalogWizardPage',
@@ -593,6 +597,16 @@ function App() {
                     element={
                       <PermissionRoute anyOf={['workflow.view']}>
                         <WorkflowPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  {/* WFL redesign (#2515) — flow settings live in the
+                      Workflow hub (topbar CTA), gated manage_definitions. */}
+                  <Route
+                    path="/workflow/settings"
+                    element={
+                      <PermissionRoute anyOf={['workflow.manage_definitions']}>
+                        <WorkflowFlowSettingsPage />
                       </PermissionRoute>
                     }
                   />
