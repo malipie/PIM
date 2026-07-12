@@ -172,9 +172,6 @@ final class FilterDslResolver
     private const array COLUMN_MAP = [
         'completeness_pct' => 'co.completeness_pct',
         'enabled' => 'co.enabled',
-        // #2526 — editorial state column (draft/review/published/archived),
-        // NOT JSONB. Lets the advanced filter scope by status; the Meili path
-        // resolves `status` to the indexed root facet of the same name.
         'status' => 'co.status',
         // 'sku' is the UI alias for the natural key; the physical column on
         // objects is 'code' (EXR-16 fix — the wizard's preflight/export SQL
