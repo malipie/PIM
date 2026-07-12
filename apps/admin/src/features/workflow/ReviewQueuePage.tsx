@@ -23,6 +23,14 @@ import {
   type WorkflowLogEntry,
 } from '@/lib/workflow/api';
 
+import {
+  avatarInitial,
+  avatarTone,
+  kindLabelDefault,
+  objectHref,
+  relativeTime,
+} from './task-presentation';
+
 /**
  * WFL-P3-02 (#2424) — the review queue: every object waiting for a
  * decision, with the submitter's comment and completeness, decidable
@@ -39,6 +47,7 @@ import {
 interface ReviewRow {
   id: string;
   code: string;
+  kind: string;
   label: string;
   completenessPct: number;
   submitted: WorkflowLogEntry | null;
@@ -69,6 +78,7 @@ export function ReviewQueuePage() {
   const { t, i18n } = useTranslation();
   const { identity } = useIdentity();
   const [rows, setRows] = useState<ReviewRow[]>([]);
+  const [kindFilter, setKindFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [decision, setDecision] = useState<{
@@ -98,6 +108,7 @@ export function ReviewQueuePage() {
             return {
               id: item.id,
               code: item.code ?? item.id,
+              kind: item.kind ?? 'product',
               label: objectLabel(item, i18n.language),
               completenessPct: item.completenessPct ?? 0,
               submitted,
@@ -156,9 +167,20 @@ export function ReviewQueuePage() {
     };
   }, [tenantId, reload]);
 
-  const allSelected = rows.length > 0 && selected.size === rows.length;
+  // #2517 — filter by ObjectType (Produkt / Kategoria / …) with counts.
+  const kindCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const row of rows) counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1);
+    return counts;
+  }, [rows]);
+  const visibleRows = useMemo(
+    () => (kindFilter === 'all' ? rows : rows.filter((row) => row.kind === kindFilter)),
+    [rows, kindFilter],
+  );
+
+  const allSelected = visibleRows.length > 0 && visibleRows.every((row) => selected.has(row.id));
   const toggleAll = () => {
-    setSelected(allSelected ? new Set() : new Set(rows.map((row) => row.id)));
+    setSelected(allSelected ? new Set() : new Set(visibleRows.map((row) => row.id)));
   };
   const toggleOne = (id: string) => {
     setSelected((previous) => {
@@ -230,40 +252,73 @@ export function ReviewQueuePage() {
 
   return (
     <div data-testid="review-queue-page">
-      <div className="mb-2 flex items-center justify-end gap-2">
-        {canDecide && selected.size > 0 ? (
-          <>
-            <Button
-              size="sm"
-              onClick={() => {
-                setComment('');
-                setDecision({ transition: 'approve', ids: selectedIds });
-              }}
-              data-testid="queue-bulk-approve"
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1" data-testid="review-queue-kind-filter">
+          {[
+            {
+              id: 'all',
+              label: t('workflow.queue.kind_all', { defaultValue: 'Wszystkie' }),
+              count: rows.length,
+            },
+            ...[...kindCounts.entries()].map(([kind, count]) => ({
+              id: kind,
+              label: t(`workflow.kind.${kind}`, { defaultValue: kindLabelDefault(kind) }),
+              count,
+            })),
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setKindFilter(tab.id)}
+              data-testid={`review-queue-kind-${tab.id}`}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[13px] font-medium transition ${
+                kindFilter === tab.id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+              }`}
             >
-              {t('workflow.transition.approve', { defaultValue: 'Zatwierdź' })} ({selected.size})
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setComment('');
-                setDecision({ transition: 'reject', ids: selectedIds });
-              }}
-              data-testid="queue-bulk-reject"
-            >
-              {t('workflow.transition.reject', { defaultValue: 'Odrzuć' })} ({selected.size})
-            </Button>
-          </>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={reload}
-          aria-label={t('common.refresh', { defaultValue: 'Odśwież' })}
-        >
-          <RefreshCw className="size-4" />
-        </Button>
+              {tab.label}
+              <span
+                className={`rounded-full px-1.5 text-[11px] ${kindFilter === tab.id ? 'bg-white/20' : 'bg-zinc-200/70'}`}
+              >
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          {canDecide && selected.size > 0 ? (
+            <>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setComment('');
+                  setDecision({ transition: 'approve', ids: selectedIds });
+                }}
+                data-testid="queue-bulk-approve"
+              >
+                {t('workflow.transition.approve', { defaultValue: 'Zatwierdź' })} ({selected.size})
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setComment('');
+                  setDecision({ transition: 'reject', ids: selectedIds });
+                }}
+                data-testid="queue-bulk-reject"
+              >
+                {t('workflow.transition.reject', { defaultValue: 'Odrzuć' })} ({selected.size})
+              </Button>
+            </>
+          ) : null}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={reload}
+            aria-label={t('common.refresh', { defaultValue: 'Odśwież' })}
+          >
+            <RefreshCw className="size-4" />
+          </Button>
+        </div>
       </div>
 
       {rows.length === 0 && !loading ? (
@@ -301,7 +356,7 @@ export function ReviewQueuePage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {visibleRows.map((row) => (
                 <tr key={row.id} className="border-t border-border" data-testid="review-queue-row">
                   <td className="px-3 py-2">
                     <input
@@ -312,22 +367,43 @@ export function ReviewQueuePage() {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <Link to={`/products/${row.id}`} className="font-medium hover:underline">
+                    <Link to={objectHref(row.kind, row.id)} className="font-medium hover:underline">
                       {row.label}
                     </Link>
-                    <div className="text-xs text-muted-foreground">{row.code}</div>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span>{row.code}</span>
+                      <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600">
+                        {t(`workflow.kind.${row.kind}`, {
+                          defaultValue: kindLabelDefault(row.kind),
+                        })}
+                      </span>
+                    </div>
+                    {row.submitted?.comment != null && (
+                      <div className="mt-1 border-l-2 border-zinc-200 pl-2 text-xs italic text-zinc-500">
+                        {row.submitted.comment}
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2">{row.completenessPct}%</td>
                   <td className="px-3 py-2">
                     {row.submitted !== null ? (
-                      <>
-                        <div className="text-xs text-muted-foreground">
-                          {formatTime(row.submitted.created_at, i18n.language)}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold ${avatarTone(row.submitted.actor_name ?? row.id)}`}
+                          aria-hidden="true"
+                        >
+                          {avatarInitial(row.submitted.actor_name)}
+                        </span>
+                        <div className="leading-tight">
+                          <div className="text-[13px] text-zinc-700">
+                            {row.submitted.actor_name ??
+                              t('workflow.queue.system_actor', { defaultValue: 'System' })}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {relativeTime(row.submitted.created_at, i18n.language)}
+                          </div>
                         </div>
-                        {row.submitted.comment !== null && (
-                          <div className="text-xs">{row.submitted.comment}</div>
-                        )}
-                      </>
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
@@ -408,10 +484,4 @@ export function ReviewQueuePage() {
       </Dialog>
     </div>
   );
-}
-
-function formatTime(value: string, locale: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(date);
 }
