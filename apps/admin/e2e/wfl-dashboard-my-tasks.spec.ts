@@ -51,24 +51,37 @@ test('dashboard My Tasks widget: inline approve closes the review task', async (
   const reviewTask = taskList.items.find((task) => task.type === 'review');
   if (reviewTask === undefined) throw new Error('No review task created for the submitted object.');
 
-  await page.goto('/dashboard');
-  const widget = page.getByTestId('my-tasks-card');
-  await expect(widget).toBeVisible();
+  try {
+    await page.goto('/dashboard');
+    const widget = page.getByTestId('my-tasks-card');
+    await expect(widget).toBeVisible();
 
-  // axe on the widget before we mutate it.
-  const axe = await new AxeBuilder({ page }).include('[data-testid="my-tasks-card"]').analyze();
-  expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual(
-    [],
-  );
+    // axe on the widget before we mutate it.
+    const axe = await new AxeBuilder({ page }).include('[data-testid="my-tasks-card"]').analyze();
+    expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual(
+      [],
+    );
 
-  const approve = page.getByTestId(`mytasks-approve-${reviewTask.id}`);
-  await expect(approve).toBeVisible();
-  await approve.click();
-  await page.getByTestId('mytasks-confirm').click();
+    const approve = page.getByTestId(`mytasks-approve-${reviewTask.id}`);
+    await expect(approve).toBeVisible();
+    await approve.click();
+    await page.getByTestId('mytasks-confirm').click();
 
-  // Approving moved the object out of review → the task closed → card gone.
-  await expect(page.getByTestId(`mytasks-card-${reviewTask.id}`)).toBeHidden();
+    // Approving moved the object out of review → the task closed → card gone.
+    await expect(page.getByTestId(`mytasks-card-${reviewTask.id}`)).toBeHidden();
 
-  const state = await page.request.get(`/api/objects/${objectId}/workflow`, { headers: auth });
-  expect(((await state.json()) as { current_place: string }).current_place).toBe('published');
+    const state = await page.request.get(`/api/objects/${objectId}/workflow`, { headers: auth });
+    expect(((await state.json()) as { current_place: string }).current_place).toBe('published');
+  } finally {
+    // The tasks DB is shared across specs — an open review task assigned to
+    // the approver role surfaces in every approver's "mine" view (and any
+    // axe scan of it). If the flow above did not close it (a mid-test
+    // failure or a retry), cancel it so it cannot pollute sibling specs.
+    await page.request
+      .patch(`/api/workflow/tasks/${reviewTask.id}`, {
+        data: { action: 'cancel' },
+        headers: { ...auth, 'content-type': 'application/json' },
+      })
+      .catch(() => undefined);
+  }
 });

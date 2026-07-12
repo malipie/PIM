@@ -76,7 +76,7 @@ export function WorkflowTaskCard({
 
       <h3 className="mt-2 text-[15px] font-semibold text-zinc-900">{title}</h3>
       {task.object_sku !== null ? (
-        <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-zinc-400">
+        <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-zinc-500">
           <span className="font-mono">{task.object_sku}</span>
           <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600">
             {t(`workflow.kind.${kind}`, { defaultValue: kindLabelDefault(kind) })}
@@ -111,7 +111,7 @@ export function WorkflowTaskCard({
             <span>{relativeTime(task.created_at, i18n.language)}</span>
           )}
           {showAssignee ? (
-            <span className="inline-flex items-center gap-1 text-zinc-400">
+            <span className="inline-flex items-center gap-1 text-zinc-500">
               {t('workflow.tasks.assigned_to', { defaultValue: 'przypisano' })}:
               <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600">
                 {task.assignee_name ??
