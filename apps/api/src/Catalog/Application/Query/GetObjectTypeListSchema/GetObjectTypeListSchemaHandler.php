@@ -245,9 +245,14 @@ final readonly class GetObjectTypeListSchemaHandler
 
     private function isEditableAttribute(Attribute $attribute): bool
     {
+        // GRID-P6-02 follow-up — localizable / scopable simple attributes
+        // (name, price, ...) ARE inline-editable in the grid; the edit
+        // writes the base value (default locale / unscoped), the same
+        // behaviour the list already applies to the name column. Only the
+        // type + edit permission gate inline editability; the grid has no
+        // locale/channel switcher yet, so per-locale/channel editing of a
+        // specific dimension stays on the detail page.
         return \in_array($attribute->getType(), self::INLINE_EDITABLE_TYPES, true)
-            && !$attribute->isLocalizable()
-            && !$attribute->isScopable()
             && $this->attributePermissions->canEditAttribute($attribute->getId());
     }
 
