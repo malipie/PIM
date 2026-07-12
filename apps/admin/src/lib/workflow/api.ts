@@ -28,6 +28,8 @@ export interface WorkflowLogEntry {
   from: string;
   to: string;
   actor_user_id: string | null;
+  /** #2517 — display name resolved from the actor id (null for system/CLI). */
+  actor_name: string | null;
   comment: string | null;
   context: Record<string, unknown> | null;
   created_at: string;

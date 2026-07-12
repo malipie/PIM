@@ -8,6 +8,7 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Contracts\Auth\CurrentUserProvider;
+use App\Identity\Contracts\Directory\UserDirectoryInterface;
 use App\Workflow\Contracts\EditorialWorkflowProviderInterface;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use App\Workflow\Contracts\TransitionLogEntry;
@@ -48,6 +49,7 @@ final class ObjectWorkflowController
         private readonly TransitionLogPort $transitionLog,
         private readonly CurrentUserProvider $currentUser,
         private readonly EditorialWorkflowProviderInterface $workflows,
+        private readonly UserDirectoryInterface $userDirectory,
     ) {
     }
 
@@ -162,9 +164,19 @@ final class ObjectWorkflowController
         $hasMore = \count($entries) > $limit;
         $entries = \array_slice($entries, 0, $limit);
 
+        // Batch-resolve the actor names once for the whole page (review
+        // queue "who submitted" + history timeline authorship, #2517).
+        $actorIds = [];
+        foreach ($entries as $entry) {
+            if (null !== $entry->actorUserId) {
+                $actorIds[] = $entry->actorUserId->toRfc4122();
+            }
+        }
+        $names = $this->userDirectory->resolve($actorIds);
+
         return new JsonResponse([
             'object_id' => $object->getId()->toRfc4122(),
-            'items' => \array_map(self::serializeEntry(...), $entries),
+            'items' => \array_map(static fn (TransitionLogEntry $entry): array => self::serializeEntry($entry, $names), $entries),
             'next_cursor' => $hasMore && [] !== $entries
                 ? $entries[\count($entries) - 1]->id->toRfc4122()
                 : null,
@@ -293,14 +305,22 @@ final class ObjectWorkflowController
     /**
      * @return array<string, mixed>
      */
-    private static function serializeEntry(TransitionLogEntry $entry): array
+    /**
+     * @param array<string, array{name: string, email: string}> $names actor id → display data
+     *
+     * @return array<string, mixed>
+     */
+    private static function serializeEntry(TransitionLogEntry $entry, array $names = []): array
     {
+        $actorId = $entry->actorUserId?->toRfc4122();
+
         return [
             'id' => $entry->id->toRfc4122(),
             'transition' => $entry->transition,
             'from' => $entry->fromPlace,
             'to' => $entry->toPlace,
-            'actor_user_id' => $entry->actorUserId?->toRfc4122(),
+            'actor_user_id' => $actorId,
+            'actor_name' => null !== $actorId ? ($names[$actorId]['name'] ?? null) : null,
             'comment' => $entry->comment,
             'context' => $entry->context,
             'created_at' => $entry->createdAt->format(DateTimeInterface::ATOM),
