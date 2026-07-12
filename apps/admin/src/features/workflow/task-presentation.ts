@@ -43,6 +43,80 @@ export function avatarTone(seed: string): string {
   return tones[Math.abs(hash) % tones.length] ?? 'bg-zinc-100 text-zinc-700';
 }
 
+export type WorkflowTaskType = 'review' | 'fix' | 'request_unpublish' | 'custom' | string;
+
+/** Colored badge tone + i18n key/default for a task type. */
+export function taskTypeBadge(type: WorkflowTaskType): {
+  tone: string;
+  key: string;
+  fallback: string;
+} {
+  switch (type) {
+    case 'review':
+      return {
+        tone: 'bg-amber-100 text-amber-700',
+        key: 'workflow.tasks.type.review',
+        fallback: 'Przegląd',
+      };
+    case 'fix':
+      return {
+        tone: 'bg-rose-100 text-rose-700',
+        key: 'workflow.tasks.type.fix',
+        fallback: 'Poprawka',
+      };
+    case 'request_unpublish':
+      return {
+        tone: 'bg-sky-100 text-sky-700',
+        key: 'workflow.tasks.type.request_unpublish',
+        fallback: 'Prośba o depublikację',
+      };
+    default:
+      return {
+        tone: 'bg-violet-100 text-violet-700',
+        key: 'workflow.tasks.type.custom',
+        fallback: 'Własne',
+      };
+  }
+}
+
+export interface DeadlineFraming {
+  overdue: boolean;
+  key: string;
+  fallback: string;
+  date?: string;
+}
+
+/** Frame a due date as dziś / jutro / po terminie / a concrete date. */
+export function deadlineFraming(dueDate: string | null, lang: string): DeadlineFraming | null {
+  if (dueDate === null) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(`${dueDate}T00:00:00`);
+  const diffDays = Math.round((due.getTime() - today.getTime()) / 86_400_000);
+  const shortDate = new Intl.DateTimeFormat(lang, { day: '2-digit', month: '2-digit' }).format(due);
+
+  if (diffDays < 0) {
+    return {
+      overdue: true,
+      key: 'workflow.tasks.overdue',
+      fallback: 'Po terminie: {{date}}',
+      date: shortDate,
+    };
+  }
+  if (diffDays === 0) {
+    return { overdue: false, key: 'workflow.tasks.due_today', fallback: 'Termin: dziś' };
+  }
+  if (diffDays === 1) {
+    return { overdue: false, key: 'workflow.tasks.due_tomorrow', fallback: 'Termin: jutro' };
+  }
+  return {
+    overdue: false,
+    key: 'workflow.tasks.due_on',
+    fallback: 'Termin: {{date}}',
+    date: shortDate,
+  };
+}
+
 /** "2 godz. temu" / "wczoraj" style relative time from an ISO timestamp. */
 export function relativeTime(iso: string, lang: string): string {
   const then = new Date(iso).getTime();

@@ -58,6 +58,10 @@ final class WorkflowTasksApiTest extends CatalogApiTestCase
         self::assertSame('review', $task['type']);
         self::assertSame('approver', $task['assignee_role_code']);
         self::assertSame('Do zadania', $task['comment']);
+        // #2518 — cards carry the resolved object summary + submitter name.
+        self::assertSame('product', $task['object_kind']);
+        self::assertSame('WFL-T-LOOP', $task['object_sku']);
+        self::assertNotNull($task['created_by_name'], 'submitter display name resolved');
 
         // Re-submit does not duplicate the open task.
         $reject = $approver->request('POST', '/api/objects/'.$id.'/workflow/transitions/reject', [

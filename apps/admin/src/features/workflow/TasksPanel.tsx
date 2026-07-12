@@ -1,22 +1,26 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import { EmptyState } from '@/components/ui-v2/empty-state';
 import { actOnWorkflowTask, fetchWorkflowTasks, type WorkflowTask } from '@/lib/workflow/tasks-api';
 
+import { taskTypeBadge } from './task-presentation';
+import { WorkflowTaskCard } from './WorkflowTaskCard';
+
 /**
- * WFL-P4-03 (#2430) — the task inbox (inRiver pattern: "my work" on
- * login): open tasks assigned to me (directly or via my roles) or the
- * tenant-wide list, with type labels, overdue highlighting and inline
+ * WFL-P4-03 (#2430) + redesign (#2518) — the task inbox: open tasks
+ * assigned to me (directly / via role / as an approve_reject holder) or
+ * the tenant-wide list, shown as rich cards (type badge, deadline,
+ * object title + SKU, submitter, assignee) with a type filter and inline
  * complete/cancel. Cursor pages older entries.
  */
 export function TasksPanel({ mine }: { mine: boolean }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -60,6 +64,16 @@ export function TasksPanel({ mine }: { mine: boolean }) {
     });
   };
 
+  const typeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const task of tasks) counts.set(task.type, (counts.get(task.type) ?? 0) + 1);
+    return counts;
+  }, [tasks]);
+  const visibleTasks = useMemo(
+    () => (typeFilter === 'all' ? tasks : tasks.filter((task) => task.type === typeFilter)),
+    [tasks, typeFilter],
+  );
+
   if (tasks.length === 0 && !loading) {
     return (
       <EmptyState
@@ -71,79 +85,69 @@ export function TasksPanel({ mine }: { mine: boolean }) {
     );
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-
   return (
-    <div className="mt-4 flex flex-col gap-2" data-testid="tasks-panel">
-      {tasks.map((task) => {
-        const overdue = task.due_date !== null && task.due_date < today;
-        return (
-          <div
-            key={task.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-4 py-3"
-            data-testid="task-row"
+    <div className="mt-4" data-testid="tasks-panel">
+      <div className="mb-3 flex flex-wrap items-center gap-1" data-testid="tasks-type-filter">
+        {[
+          {
+            id: 'all',
+            label: t('workflow.tasks.filter_all', { defaultValue: 'Wszystkie typy' }),
+            count: tasks.length,
+          },
+          ...[...typeCounts.entries()].map(([type, count]) => {
+            const badge = taskTypeBadge(type);
+            return { id: type, label: t(badge.key, { defaultValue: badge.fallback }), count };
+          }),
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setTypeFilter(tab.id)}
+            data-testid={`tasks-type-${tab.id}`}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[13px] font-medium transition ${
+              typeFilter === tab.id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+            }`}
           >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">
-                  {t(`workflow.tasks.type.${task.type}`, { defaultValue: task.title })}
-                </span>
-                {task.due_date !== null && (
-                  <span
-                    className={
-                      overdue
-                        ? 'rounded bg-brick-50 px-1.5 py-0.5 text-[10px] font-semibold text-brick-700'
-                        : 'rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-600'
-                    }
-                  >
-                    {formatDate(task.due_date, i18n.language)}
-                  </span>
-                )}
-                {task.assignee_role_code !== null && (
-                  <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-600">
-                    {task.assignee_role_code}
-                  </span>
-                )}
-              </div>
-              {task.comment !== null && (
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">{task.comment}</p>
-              )}
-              {task.object_id !== null && (
-                <Link
-                  to={`/products/${task.object_id}`}
-                  className="text-xs text-primary hover:underline"
+            {tab.label}
+            <span
+              className={`rounded-full px-1.5 text-[11px] ${typeFilter === tab.id ? 'bg-white/20' : 'bg-zinc-200/70'}`}
+            >
+              {tab.count}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {visibleTasks.map((task) => (
+          <WorkflowTaskCard
+            key={task.id}
+            task={task}
+            showAssignee={!mine}
+            actions={
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => act(task, 'complete')}
+                  data-testid={`task-complete-${task.id}`}
                 >
-                  {t('workflow.tasks.open_object', { defaultValue: 'Otwórz obiekt' })}
-                </Link>
-              )}
-            </div>
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => act(task, 'complete')}
-                data-testid={`task-complete-${task.id}`}
-              >
-                {t('workflow.tasks.complete', { defaultValue: 'Ukończ' })}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => act(task, 'cancel')}>
-                {t('workflow.tasks.cancel', { defaultValue: 'Anuluj' })}
-              </Button>
-            </div>
-          </div>
-        );
-      })}
+                  {t('workflow.tasks.complete', { defaultValue: 'Ukończ' })}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => act(task, 'cancel')}>
+                  {t('workflow.tasks.cancel', { defaultValue: 'Anuluj' })}
+                </Button>
+              </>
+            }
+          />
+        ))}
+      </div>
+
       {cursor !== null && (
-        <Button variant="outline" size="sm" onClick={loadOlder}>
+        <Button variant="outline" size="sm" className="mt-3" onClick={loadOlder}>
           {t('workflow.history.older', { defaultValue: 'Pokaż starsze' })}
         </Button>
       )}
     </div>
   );
-}
-
-function formatDate(value: string, locale: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'short' }).format(date);
 }
