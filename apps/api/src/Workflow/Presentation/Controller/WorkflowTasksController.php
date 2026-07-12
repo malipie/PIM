@@ -281,8 +281,8 @@ final class WorkflowTasksController
             $userIds[] = $task->getCreatedBy()?->toRfc4122();
             $userIds[] = $task->getAssigneeUserId()?->toRfc4122();
         }
-        $objectIds = \array_values(\array_filter($objectIds));
-        $userIds = \array_values(\array_filter($userIds));
+        $objectIds = \array_values(\array_filter($objectIds, static fn (?string $v): bool => null !== $v));
+        $userIds = \array_values(\array_filter($userIds, static fn (?string $v): bool => null !== $v));
 
         return [
             [] === $objectIds ? [] : $this->objectSummaries->summariesByIds($objectIds),
