@@ -30,7 +30,7 @@
     "@radix-ui/react-tooltip": "^1.2.12",
     "@refinedev/core": "^5.0.12",
     "@tanstack/react-query": "^5.101.2",
-    "@tanstack/react-virtual": "^3.14.5",
+    "@tanstack/react-virtual": "^3.14.6",
     "@udecode/plate": "^49.0.0",
     "@udecode/plate-basic-elements": "^49.0.0",
     "@udecode/plate-basic-marks": "^49.0.0",
