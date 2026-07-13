@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
-import { jsonFetch } from '@/lib/http';
+import { httpErrorDetail, jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 import {
@@ -314,6 +314,10 @@ export function RoleEditorPage() {
     event.preventDefault();
     if (submitting || name.trim().length === 0) return;
     setSubmitting(true);
+    // Track whether the base-permissions PATCH already persisted, so a later
+    // failure in the attribute-permissions PUT can report the partial success
+    // instead of a blanket "everything failed" (the two calls are independent).
+    let baseSaved = false;
     try {
       const permissionCodes = Array.from(selected);
 
@@ -330,6 +334,7 @@ export function RoleEditorPage() {
           accept: 'application/json',
           contentType: 'application/json',
         });
+        baseSaved = true;
 
         const attrPayload = Object.entries(attrDraft)
           .filter(([, level]) => level !== null)
@@ -366,14 +371,22 @@ export function RoleEditorPage() {
     } catch (error: unknown) {
       const status = (error as { status?: number; body?: ApiProblem })?.status;
       const body = (error as { body?: ApiProblem })?.body;
+      // The server's RFC 7807 `detail` (or the synthesized non-JSON message
+      // http.ts builds for HTML fatal pages) is far more useful than a blanket
+      // "operation failed" — surface it wherever we don't have a tailored copy.
+      const detail = httpErrorDetail(error);
       if (status === 409 && body?.code === 'duplicate_code') {
         toast.error(body?.detail ?? t('settings.roles.editor.error_duplicate'));
       } else if (status === 400) {
-        toast.error(body?.detail ?? t('settings.roles.editor.error_validation'));
+        toast.error(detail ?? body?.detail ?? t('settings.roles.editor.error_validation'));
       } else if (status === 403) {
         toast.error(t('settings.roles.editor.error_forbidden'));
+      } else if (baseSaved) {
+        // PATCH persisted the base permissions; only the attribute-permissions
+        // PUT failed — tell the operator their core change was NOT lost.
+        toast.error(detail ?? t('settings.roles.editor.error_attribute_permissions'));
       } else {
-        toast.error(t('settings.roles.editor.error_generic'));
+        toast.error(detail ?? t('settings.roles.editor.error_generic'));
       }
     } finally {
       setSubmitting(false);
