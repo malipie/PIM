@@ -20376,6 +20376,32 @@
                 "x-cortex-permission": "api_profile.read"
             }
         },
+        "/api/profiles/preview": {
+            "post": {
+                "operationId": "api_profiles_preview_post",
+                "tags": [
+                    "profiles"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api profiles preview",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "api_profile.read"
+            }
+        },
         "/api/profiles/{code}/openapi.json": {
             "get": {
                 "operationId": "api_profiles_code_openapi_json_get",
