@@ -226,11 +226,21 @@ export function WorkflowModal({
                       <span>{button}</span>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
-                      {transition.blockers.map((blocker) => (
-                        <p key={blocker.code} className="text-xs">
-                          {blocker.message}
-                        </p>
-                      ))}
+                      {transition.blockers.map((blocker) => {
+                        // #2558 — localize by blocker code from the guard's
+                        // structured params; fall back to the raw message for
+                        // codes without a translation (e.g. permission codes).
+                        const missing = blocker.parameters?.missing_required;
+                        return (
+                          <p key={blocker.code} className="text-xs">
+                            {t(`workflow.blocker.${blocker.code}`, {
+                              defaultValue: blocker.message,
+                              ...blocker.parameters,
+                              missing: Array.isArray(missing) ? missing.join(', ') : '',
+                            })}
+                          </p>
+                        );
+                      })}
                     </TooltipContent>
                   </Tooltip>
                 );

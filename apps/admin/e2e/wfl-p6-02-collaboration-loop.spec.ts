@@ -73,8 +73,20 @@ test('editorial loop across marketing and approver, plus axe on the hub', async 
   if (productType === undefined) throw new Error('No product ObjectType seeded.');
 
   const sku = uniqueSku('WFL-LOOP');
+  // #2558 — the product must carry its required attributes (sku/name/
+  // description/price) or submit_for_review is now blocked. Fill them at
+  // creation so the editorial loop can proceed.
   const created = await marketing.page.request.post('/api/products', {
-    data: { code: sku, objectTypeId: productType.id },
+    data: {
+      code: sku,
+      objectTypeId: productType.id,
+      attributes: {
+        sku,
+        name: `Loop ${sku}`,
+        description: 'Opis produktu do przeglądu',
+        price: { amount: 99, currency: 'PLN' },
+      },
+    },
     headers: { ...marketingAuth, 'content-type': 'application/ld+json' },
   });
   expect(created.status(), 'marketing creates draft').toBe(201);

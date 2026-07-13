@@ -37,8 +37,20 @@ test('workflow control: submit -> approve loop with history on product detail', 
   );
   if (productType === undefined) throw new Error('No product ObjectType seeded.');
 
+  // #2558 — required attributes must be present or submit_for_review is
+  // blocked; fill them so the status-control loop can submit.
+  const e2eSku = uniqueSku('WFL-E2E');
   const createResponse = await page.request.post('/api/objects', {
-    data: { code: uniqueSku('WFL-E2E'), objectTypeId: productType.id },
+    data: {
+      code: e2eSku,
+      objectTypeId: productType.id,
+      attributes: {
+        sku: e2eSku,
+        name: `Status ${e2eSku}`,
+        description: 'Opis do przeglądu',
+        price: { amount: 10, currency: 'PLN' },
+      },
+    },
     headers: { ...bearer, 'content-type': 'application/ld+json' },
   });
   expect(createResponse.status()).toBe(201);

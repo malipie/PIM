@@ -4073,6 +4073,10 @@
       "published": "Published",
       "archived": "Archived"
     },
+    "blocker": {
+      "completeness_gate": "Completeness below the publish gate (min {{min_completeness_pct}}%). Fill the required fields: {{missing}}.",
+      "missing_required": "To submit for review, fill the required fields: {{missing}}."
+    },
     "transition": {
       "submit_for_review": "Submit for review",
       "publish": "Publish",

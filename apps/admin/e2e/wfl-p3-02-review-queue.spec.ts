@@ -34,8 +34,19 @@ test('review queue lists a submitted object and approve clears it', async ({ pag
   if (productType === undefined) throw new Error('No product ObjectType seeded.');
 
   const sku = uniqueSku('WFL-Q');
+  // #2558 — required attributes must be present or submit_for_review is
+  // blocked; fill them so the object reaches the review queue.
   const createResponse = await page.request.post('/api/objects', {
-    data: { code: sku, objectTypeId: productType.id },
+    data: {
+      code: sku,
+      objectTypeId: productType.id,
+      attributes: {
+        sku,
+        name: `Queue ${sku}`,
+        description: 'Opis do przeglądu',
+        price: { amount: 20, currency: 'PLN' },
+      },
+    },
     headers: { ...bearer, 'content-type': 'application/ld+json' },
   });
   expect(createResponse.status()).toBe(201);

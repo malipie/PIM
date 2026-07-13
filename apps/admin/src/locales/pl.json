@@ -4093,6 +4093,10 @@
       "published": "Opublikowany",
       "archived": "Zarchiwizowany"
     },
+    "blocker": {
+      "completeness_gate": "Kompletność poniżej progu publikacji (min. {{min_completeness_pct}}%). Uzupełnij wymagane pola: {{missing}}.",
+      "missing_required": "Aby zgłosić do przeglądu, uzupełnij wymagane pola: {{missing}}."
+    },
     "transition": {
       "submit_for_review": "Zgłoś do przeglądu",
       "publish": "Opublikuj",

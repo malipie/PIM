@@ -27,6 +27,13 @@ final readonly class CompletenessGateGuard implements EventSubscriberInterface
     public const string BLOCKER_CODE = 'completeness_gate';
 
     /**
+     * #2558 — submit-time required-fields blocker. Distinct from the numeric
+     * publish gate: a product missing required attributes cannot be published,
+     * so it must not enter the review queue.
+     */
+    public const string BLOCKER_MISSING_REQUIRED = 'missing_required';
+
+    /**
      * @var list<string>
      */
     private const array GATED_TRANSITIONS = [
@@ -45,6 +52,24 @@ final readonly class CompletenessGateGuard implements EventSubscriberInterface
     {
         $subject = $event->getSubject();
         if (!$subject instanceof CatalogObject) {
+            return;
+        }
+
+        // #2558 — a product missing its ObjectType's required attributes cannot
+        // be published, so it must not be submittable for review either (else
+        // it strands a reviewer who can never approve it). This required-fields
+        // rule is independent of the numeric publish gate below and applies
+        // whenever the type declares required attributes.
+        if (ObjectEditorialWorkflow::TRANSITION_SUBMIT_FOR_REVIEW === $event->getTransition()->getName()) {
+            $missing = $this->missingRequiredCodes($subject);
+            if ([] !== $missing) {
+                $event->addTransitionBlocker(new TransitionBlocker(
+                    \sprintf('Fill the required fields before review: %s.', \implode(', ', $missing)),
+                    self::BLOCKER_MISSING_REQUIRED,
+                    ['missing_required' => $missing],
+                ));
+            }
+
             return;
         }
 
@@ -103,6 +128,12 @@ final readonly class CompletenessGateGuard implements EventSubscriberInterface
                 [] === $missing ? '' : ' Missing required: '.\implode(', ', $missing).'.',
             ),
             self::BLOCKER_CODE,
+            // #2558 — structured params so the SPA can render a localized
+            // message instead of the raw English blocker text.
+            [
+                'min_completeness_pct' => $minPct,
+                'missing_required' => $missing,
+            ],
         ));
     }
 
