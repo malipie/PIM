@@ -83,7 +83,6 @@ test('APIC-P4-07 — profile builder: new profile create', async ({ page }) => {
   await page.getByRole('button', { name: /utwórz profil|create profile/i }).click();
   await expect.poll(() => posted).not.toBeNull();
   expect(posted?.code).toBe('public-catalog');
-  expect(Array.isArray(posted?.objectTypeIds) && (posted?.objectTypeIds as unknown[]).length).toBe(
-    1,
-  );
+  const objectTypeIds = posted?.objectTypeIds;
+  expect(Array.isArray(objectTypeIds) && (objectTypeIds as unknown[]).length).toBe(1);
 });
