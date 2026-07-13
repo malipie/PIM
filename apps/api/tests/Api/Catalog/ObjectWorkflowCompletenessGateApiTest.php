@@ -108,6 +108,57 @@ final class ObjectWorkflowCompletenessGateApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function submitForReviewBlockedWhenRequiredFieldsMissing(): void
+    {
+        // #2558 — a product missing required attributes must not enter review.
+        $this->setRequired(['ean']);
+        $id = $this->seedProduct('WFL-SUBMIT-BLOCK', completenessPct: 40);
+
+        $client = $this->authenticatedClient();
+        $response = $client->request('POST', '/api/objects/'.$id.'/workflow/transitions/submit_for_review');
+        self::assertResponseStatusCodeSame(409);
+        self::assertStringContainsString('ean', $response->getContent(false), '409 lists the missing required attribute');
+
+        // Discovery mirrors the blocker with its machine code + structured
+        // params (for the localized tooltip).
+        $body = $client->request('GET', '/api/objects/'.$id.'/workflow')->toArray();
+        $submit = null;
+        $transitions = $body['transitions'] ?? [];
+        self::assertIsArray($transitions);
+        foreach ($transitions as $transition) {
+            self::assertIsArray($transition);
+            if ('submit_for_review' === $transition['name']) {
+                $submit = $transition;
+            }
+        }
+        self::assertNotNull($submit);
+        self::assertFalse($submit['enabled']);
+        $blockers = $submit['blockers'];
+        self::assertIsArray($blockers);
+        $first = $blockers[0] ?? null;
+        self::assertIsArray($first);
+        self::assertSame('missing_required', $first['code'] ?? null);
+        $parameters = $first['parameters'] ?? null;
+        self::assertIsArray($parameters);
+        $missing = $parameters['missing_required'] ?? [];
+        self::assertIsArray($missing);
+        self::assertContains('ean', $missing);
+    }
+
+    #[Test]
+    public function submitForReviewAllowedWhenRequiredFieldsPresent(): void
+    {
+        // Same required rule, but the product now carries the value — submit
+        // proceeds (the numeric publish gate still applies later, at approve).
+        $this->setRequired(['ean']);
+        $id = $this->seedProduct('WFL-SUBMIT-OK', completenessPct: 40, indexed: ['ean' => '5901234123457']);
+
+        $client = $this->authenticatedClient();
+        $client->request('POST', '/api/objects/'.$id.'/workflow/transitions/submit_for_review');
+        self::assertResponseIsSuccessful();
+    }
+
+    #[Test]
     public function malformedGateConfigIsRejectedWith422(): void
     {
         $client = $this->authenticatedClient();
@@ -159,13 +210,15 @@ final class ObjectWorkflowCompletenessGateApiTest extends CatalogApiTestCase
     }
 
     /**
-     * @param array<string, int> $perChannel
+     * @param array<string, int>   $perChannel
+     * @param array<string, mixed> $indexed    #2558 — denormalised attribute values to pin
      */
     private function seedProduct(
         string $code,
         int $completenessPct,
         array $perChannel = [],
         string $status = CatalogObject::STATUS_DRAFT,
+        array $indexed = [],
     ): string {
         $em = $this->em();
         $object = new CatalogObject($this->productType(), $code);
@@ -177,14 +230,20 @@ final class ObjectWorkflowCompletenessGateApiTest extends CatalogApiTestCase
 
         // The sync rebuild listener recomputes completeness on flush, so
         // the fixture value is pinned with raw SQL AFTER the flush (same
-        // pattern as the DASH attributes_indexed lesson).
+        // pattern as the DASH attributes_indexed lesson). The attribute
+        // index is pinned the same way so the required-fields guard sees it.
         $completeness = ['global' => $completenessPct];
         if ([] !== $perChannel) {
             $completeness['per_channel'] = $perChannel;
         }
         $em->getConnection()->executeStatement(
-            'UPDATE objects SET completeness = :c, completeness_pct = :pct WHERE id = :id',
-            ['c' => \json_encode($completeness, JSON_THROW_ON_ERROR), 'pct' => $completenessPct, 'id' => $object->getId()->toRfc4122()],
+            'UPDATE objects SET completeness = :c, completeness_pct = :pct, attributes_indexed = :ai WHERE id = :id',
+            [
+                'c' => \json_encode($completeness, JSON_THROW_ON_ERROR),
+                'pct' => $completenessPct,
+                'ai' => \json_encode($indexed, JSON_THROW_ON_ERROR),
+                'id' => $object->getId()->toRfc4122(),
+            ],
         );
         $em->clear();
 

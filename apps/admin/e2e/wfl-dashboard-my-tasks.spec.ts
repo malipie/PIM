@@ -31,8 +31,19 @@ test('dashboard My Tasks widget: inline approve closes the review task', async (
   if (productType === undefined) throw new Error('No product ObjectType seeded.');
 
   const sku = uniqueSku('WFL-DASH');
+  // #2558 — required attributes must be present or submit_for_review is
+  // blocked; fill them so the review task can be created.
   const created = await page.request.post('/api/products', {
-    data: { code: sku, objectTypeId: productType.id },
+    data: {
+      code: sku,
+      objectTypeId: productType.id,
+      attributes: {
+        sku,
+        name: `Dashboard ${sku}`,
+        description: 'Opis do przeglądu',
+        price: { amount: 49, currency: 'PLN' },
+      },
+    },
     headers: { ...auth, 'content-type': 'application/ld+json' },
   });
   expect(created.status(), 'create draft product').toBe(201);

@@ -261,7 +261,14 @@ final class ObjectWorkflowController
 
             $blockers = [];
             foreach ($workflow->buildTransitionBlockerList($object, $transition->getName()) as $blocker) {
-                $blockers[] = ['code' => $blocker->getCode(), 'message' => $blocker->getMessage()];
+                // #2558 — expose the guard's structured parameters (e.g.
+                // missing_required, min_completeness_pct) so the SPA renders a
+                // localized tooltip instead of the raw English message.
+                $blockers[] = [
+                    'code' => $blocker->getCode(),
+                    'message' => $blocker->getMessage(),
+                    'parameters' => $blocker->getParameters(),
+                ];
             }
 
             $described[] = [

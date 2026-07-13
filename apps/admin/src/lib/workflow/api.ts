@@ -12,7 +12,12 @@ export interface WorkflowTransitionOption {
   name: string;
   to: string;
   enabled: boolean;
-  blockers: { code: string; message: string }[];
+  /**
+   * #2558 — `parameters` carries the guard's structured data (e.g.
+   * `missing_required`, `min_completeness_pct`) so the UI can render a
+   * localized tooltip instead of the raw English `message`.
+   */
+  blockers: { code: string; message: string; parameters?: Record<string, unknown> }[];
 }
 
 /** #2521 — the recipient a review task will land on (role or a person). */
