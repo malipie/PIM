@@ -160,7 +160,7 @@ export function BulkBar({
             type="button"
             onClick={onOpenCmdK ?? placeholder('VIEW-05.5')}
             className={cn(
-              'text-[13px] font-medium px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-400 inline-flex items-center gap-1.5',
+              'text-[13px] font-medium px-3 py-1.5 rounded-xl bg-cta text-cta-foreground hover:bg-accent-hover inline-flex items-center gap-1.5',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60',
             )}
           >

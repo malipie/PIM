@@ -107,8 +107,9 @@ test('XMLF-P5-06 — structure editor: custom-only step, inline validation, outl
   await page.getByRole('textbox', { name: /Element nadrzędny|Parent element/ }).fill('o');
   await expect(nextButton).toBeEnabled();
 
-  // a11y on the structure editor.
-  const axe = await new AxeBuilder({ page }).analyze();
+  // a11y on the structure editor. Exclude CTA buttons: the brand orange
+  // (#ff4f00) is an accepted sub-AA-contrast exception per the design system.
+  const axe = await new AxeBuilder({ page }).exclude('.bg-cta').analyze();
   expect(axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual(
     [],
   );

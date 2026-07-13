@@ -423,7 +423,7 @@ export function FeedWizardPage() {
             className={cn(
               'flex h-10 items-center gap-1.5 rounded-xl px-5 text-[13px] font-bold soft-shadow',
               stepAllowed && !saving
-                ? 'bg-orange-500 text-zinc-900 hover:bg-orange-600'
+                ? 'bg-cta text-cta-foreground hover:bg-accent-hover'
                 : 'cursor-not-allowed bg-zinc-200 text-zinc-500',
             )}
           >

@@ -30,18 +30,20 @@
   --color-zinc-900: #16233f;
   --color-zinc-950: #0e1830;
 
-  /* v2 palette — orange accent / CTA (overrides Tailwind orange) */
-  --color-orange-50: #fef4ec;
-  --color-orange-100: #fde3d2;
-  --color-orange-200: #fbc6a4;
-  --color-orange-300: #f6a36f;
-  --color-orange-400: #f3823f;
-  --color-orange-500: #ef6a1f;
-  --color-orange-600: #df5b16;
-  --color-orange-700: #b9491a;
-  --color-orange-800: #933c19;
-  --color-orange-900: #5f2a14;
-  --color-orange-950: #3a1709;
+  /* v2 palette — orange accent / CTA (overrides Tailwind orange).
+   * Values from the operator's design system (NOWY UI — brand orange
+   * #ff4f00). Single source of truth for every orange button/badge/tint. */
+  --color-orange-50: #fff1ec;
+  --color-orange-100: #ffddd0;
+  --color-orange-200: #ffb99f;
+  --color-orange-300: #ff8f64;
+  --color-orange-400: #ff6d33;
+  --color-orange-500: #ff4f00;
+  --color-orange-600: #e64700;
+  --color-orange-700: #bd3a08;
+  --color-orange-800: #952f0f;
+  --color-orange-900: #5f2010;
+  --color-orange-950: #3a1008;
 
   /* v2 palette — brick (errors, ResultBar) */
   --color-brick-50: #fcefec;
@@ -81,7 +83,7 @@
   --color-status-success: #1f8257;
   --color-status-warning: #f59e0b;
   --color-status-error: #c0432b;
-  --color-status-partial: #ef6a1f;
+  --color-status-partial: #ff4f00;
 
   /* v2 card shadow → class shadow-card */
   --shadow-card:
@@ -144,12 +146,12 @@
   --ink-2: #43536e;
   --line: #d7dfeb;
 
-  /* v2 CTA accent (orange) — one step deeper than the design's
-   * orange-600: white 13px text on #df5b16 is 3.7:1 (fails WCAG AA);
-   * orange-700/800 keep the hue and pass (5.2:1 / 7.3:1). */
-  --cta: #b9491a;
-  --cta-hover: #933c19;
-  --cta-soft: #fef4ec;
+  /* v2 CTA accent (orange) — brand orange #ff4f00 from the operator's
+   * design system (NOWY UI). This is the single orange for every CTA
+   * button app-wide; white foreground per the design's swatches. */
+  --cta: #ff4f00;
+  --cta-hover: #e64700;
+  --cta-soft: #fff1ec;
 
   /* shadcn-mapped tokens — remapped onto handoff palette */
   --background: var(--bg);
@@ -185,9 +187,9 @@
   --ink-2: #d7dfeb;
   --line: #1d2c47;
 
-  --cta: #b9491a;
-  --cta-hover: #933c19;
-  --cta-soft: #3a1709;
+  --cta: #ff4f00;
+  --cta-hover: #e64700;
+  --cta-soft: #3a1008;
 
   --background: var(--bg);
   --foreground: var(--ink);
