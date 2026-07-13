@@ -13,7 +13,7 @@ import { expect, test } from '@playwright/test';
 import { loginAsAdmin } from './helpers/auth';
 
 const CRITICAL_VIEWS: Array<{ name: string; path: string; expect: RegExp }> = [
-  { name: 'dashboard', path: '/dashboard', expect: /pulpit|dashboard|witaj|welcome/i },
+  { name: 'dashboard', path: '/dashboard', expect: /workspace|pulpit|dashboard|witaj|welcome/i },
   { name: 'products', path: '/products', expect: /produkt|product/i },
   { name: 'modeling', path: '/modeling', expect: /modelowanie|modeling|atrybut|attribute/i },
   { name: 'imports', path: '/integrations/imports', expect: /import/i },

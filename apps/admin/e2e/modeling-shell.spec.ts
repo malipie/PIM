@@ -54,7 +54,7 @@ test('Modeling shell + Dashboard mock — full handoff smoke', async ({ page }) 
   await expect(sidebar).toBeVisible();
 
   for (const label of [
-    /^dashboard$|^pulpit$/i,
+    /^workspace$/i,
     /^products$|^produkty$/i,
     /^pdf catalogs$|^katalogi pdf$/i,
     /^multimedia$/i,
@@ -63,7 +63,10 @@ test('Modeling shell + Dashboard mock — full handoff smoke', async ({ page }) 
     /^settings$|^ustawienia$/i,
     /^modeling$|^modelowanie$/i,
   ]) {
-    await expect(sidebar.getByText(label)).toBeVisible();
+    // `.first()` — after the Pulpit→Workspace rename (#2561) the sidebar has
+    // both a "Workspace" section header and the "Workspace" dashboard leaf;
+    // the loop only needs to confirm the entry renders.
+    await expect(sidebar.getByText(label).first()).toBeVisible();
   }
 
   // VIEW-08 (#427): Services removed from default sidebar seed (operator
@@ -231,7 +234,7 @@ test('Modeling shell + Dashboard mock — full handoff smoke', async ({ page }) 
   await expect(settingsRow.getByRole('button', { name: /ukryj|hide/i })).toHaveCount(0);
   const dashboardRow = visibleList
     .locator('> div')
-    .filter({ has: page.locator('span.flex-1', { hasText: /^(pulpit|dashboard)$/i }) });
+    .filter({ has: page.locator('span.flex-1', { hasText: /^workspace$/i }) });
   await expect(dashboardRow.getByRole('button', { name: /ukryj|hide/i })).toBeVisible();
 
   // Asset toggle is locked on its detail page.
