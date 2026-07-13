@@ -1,7 +1,5 @@
-import { History } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { type BreadcrumbItem, PageHeader } from '@/components/ui-v2/page-header';
 
 import { BulkSessionsPopover } from './bulk-sessions-popover';
@@ -34,7 +32,6 @@ const ROUTE_CRUMBS: RouteCrumb[] = [
     segments: [{ key: 'nav.integrations', href: '/integrations' }, { key: 'nav.api_configurator' }],
   },
   { match: /^\/integrations/, segments: [{ key: 'nav.integrations' }] },
-  { match: /^\/dashboard/, segments: [{ key: 'nav.dashboard' }] },
   { match: /^\/products/, segments: [{ key: 'nav.products' }] },
   { match: /^\/modeling/, segments: [{ key: 'nav.modeling' }] },
   { match: /^\/assets/, segments: [{ key: 'nav.multimedia' }] },
@@ -45,8 +42,10 @@ const ROUTE_CRUMBS: RouteCrumb[] = [
 /**
  * Global topbar v2 (EXR-03): ui-v2 PageHeader breadcrumb + per-page
  * action slot (PageActionsContext) + fixed actions (language switcher,
- * disabled history icon, notifications). The audit-log status pill was
- * removed in VIEW-13 (#2143) per operator decision.
+ * bulk-sessions rollback, notifications). The audit-log status pill was
+ * removed in VIEW-13 (#2143) per operator decision; the disabled
+ * "history soon" placeholder icon was removed once BulkSessionsPopover
+ * covered the same rollback/history surface.
  */
 export function TopbarV2() {
   const { t } = useTranslation();
@@ -67,19 +66,6 @@ export function TopbarV2() {
         <>
           {pageActions}
           <LanguageSwitcher />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                disabled
-                aria-label={t('topbar.history', { defaultValue: 'Historia' })}
-                className="grid h-9 w-9 cursor-not-allowed place-items-center rounded-xl text-zinc-300"
-              >
-                <History className="size-4" aria-hidden />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{t('ui_v2.soon_tooltip')}</TooltipContent>
-          </Tooltip>
           <BulkSessionsPopover />
           <NotificationsBell />
         </>
