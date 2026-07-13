@@ -3140,3 +3140,14 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 ### Decyzje świadome
 - **Bug2: reviewer-persona przez fallback `approver`, NIE seedowana definicja.** Operator chciał „włącz flagę + przypisz reviewera". Konfigurowalny akceptant (DB-routing) demonstruje się na LIVE stacku operatora (ich runtime definicja catalog_manager) + w odblokowanym flagą UI; na świeżej DB seed daje reviewer-persona przez fallback. Per-tenant writable toggle flagi = follow-up.
 - **Flaga `WORKFLOW_CUSTOM_DEFINITIONS` ON domyślnie globalnie** (`.env`+`docker-compose`), bo feature w pełni zmergowany (#2514–#2524) + provider-fallback (brak definicji → statyczna maszyna) czyni flip bezpiecznym.
+
+## Lessons z gate submitu + tłumaczenia blockera (2026-07-13, #2558)
+
+### Patterns to Follow
+- **Blocker z guarda = code + message + PARAMETERS.** Symfony `TransitionBlocker($message, $code, $parameters)` niesie strukturalne dane; serializuj `$blocker->getParameters()` w discovery (`ObjectWorkflowController`), a FE renderuje `t('workflow.blocker.{code}', {defaultValue: message, ...parameters, missing: arr.join(', ')})`. i18n przez code z fallbackiem na `message` (dla permission-blockerów bez klucza). Nie parsuj angielskiego message na FE.
+- **Gate „shift-left": jeśli obiekt nie przejdzie publikacji, nie pozwól go submitować.** Bramka completeness była tylko na `approve`/`publish` → pusty produkt wchodził do recenzji i zakleszczał reviewera. Dodanie required-fields checku na `submit_for_review` (niezależnego od % gate) łapie problem u źródła. Guard fałszywie NIE blokuje typów bez required rules (missingRequiredCodes=[]).
+
+### Patterns to Avoid (blast radius)
+- **Gate na `submit_for_review` łamie KAŻDY spec/test tworzący pusty produkt i submitujący.** Sweep: `grep -rln submit_for_review apps/admin/e2e apps/api/tests`. Znalazłem 6 FE specy + ~5 BE ApiTestów. **Rozróżnienie kluczowe:** required rules `[sku,name,description,price]` są tylko z `DemoCatalogSeeder` (demo fixtures = FE e2e stack), NIE z `BuiltInObjectTypeSeeder` (CI ApiTest stack). Więc **BE ApiTesty nie pękają** (built-in typ bez required), tylko FE e2e (4 specy uzupełniają required przed submitem). `wfl-p3-04` mockuje endpoint, `wfl-p5-03` nie submituje → bezpieczne. Zawsze sprawdź KTÓRY seeder ustawia required na typie zanim oszacujesz blast radius.
+- **POST `/api/products` `attributes` = raw values, nie envelope `{value}`.** text→string, price→`{amount, currency}`, select→`{option_code}` (envelope `{value: x}` jest tylko w warstwie seedera/ObjectValue, nie w API POST).
+- **cs-fixer zamienia `/** @var */` na `/* @var */` (single-star) → PHPStan traci narrowing.** Inline `@var` w środku metody bywa zjadany; zamiast helpera z generycznym returnem lepiej zinline'ować lookup (wzorzec z istniejącego testu, który PHPStan akceptuje).
