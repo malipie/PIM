@@ -891,6 +891,7 @@
         "error_delete_forbidden": "Only custom roles can be deleted.",
         "error_in_use": "Cannot delete — {{count}} user(s) still hold this role.",
         "error_generic": "Role operation failed.",
+        "error_attribute_permissions": "Role permissions saved, but saving attribute permissions failed. Refresh and try again.",
         "group": {
           "products": "Products",
           "categories": "Categories",

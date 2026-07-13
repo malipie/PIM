@@ -901,6 +901,7 @@
         "error_delete_forbidden": "Tylko role customowe można usunąć.",
         "error_in_use": "Nie można usunąć — rolę nadal posiada {{count}} użytkownik(ów).",
         "error_generic": "Operacja na roli nie powiodła się.",
+        "error_attribute_permissions": "Uprawnienia roli zapisane, ale zapis uprawnień atrybutów nie powiódł się. Odśwież i spróbuj ponownie.",
         "group": {
           "products": "Produkty",
           "categories": "Kategorie",
