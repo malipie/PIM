@@ -159,16 +159,23 @@ test('editorial loop across marketing and approver, plus axe on the hub', async 
   await marketing.page.getByTestId('request-unpublish-confirm').click();
 
   // --- Approver gets the request-unpublish task and unpublishes. ---
-  const tasksResponse = await admin.page.request.get(`/api/workflow/tasks?object_id=${objectId}`, {
-    headers: adminAuth,
-  });
-  const taskList = (await tasksResponse.json()) as {
-    items: { type: string; status: string }[];
-  };
-  expect(
-    taskList.items.some((task) => task.type === 'request_unpublish' && task.status === 'open'),
-    'approver has an open request_unpublish task',
-  ).toBe(true);
+  // `.click()` on the confirm button resolves when the click dispatches, not
+  // when the POST that creates the task has persisted — a single immediate GET
+  // races that write (pre-existing flake). Poll until the open task appears.
+  await expect
+    .poll(
+      async () => {
+        const r = await admin.page.request.get(`/api/workflow/tasks?object_id=${objectId}`, {
+          headers: adminAuth,
+        });
+        const list = (await r.json()) as { items: { type: string; status: string }[] };
+        return list.items.some(
+          (task) => task.type === 'request_unpublish' && task.status === 'open',
+        );
+      },
+      { message: 'approver has an open request_unpublish task', timeout: 10_000 },
+    )
+    .toBe(true);
 
   const unpublish = await admin.page.request.post(
     `/api/objects/${objectId}/workflow/transitions/unpublish`,
