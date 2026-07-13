@@ -39,6 +39,12 @@
             </options>
         </field>
 
+        <field name="columns" type="json" column="columns" nullable="true">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
+
         <field name="isBuiltIn" type="boolean" column="is_built_in">
             <options>
                 <option name="default">false</option>

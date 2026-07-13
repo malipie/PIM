@@ -106,6 +106,36 @@ final class SmartFilterPresetsApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function createColumnOnlyPresetWithEmptyFilter(): void
+    {
+        $client = $this->authenticatedClient();
+
+        // PTR-01 — a preset can carry only a column layout with no filter
+        // conditions (an empty AND group); the columns snapshot round-trips.
+        $response = $client->request('POST', '/api/smart-filter-presets', [
+            'json' => [
+                'name' => ['pl' => 'Uklad kolumn', 'en' => 'Column layout'],
+                'icon' => '📊',
+                'query' => ['operator' => 'AND', 'conditions' => []],
+                'columns' => [
+                    ['key' => 'sku', 'position' => 0],
+                    ['key' => 'name', 'hidden' => false, 'width' => 240, 'position' => 1],
+                ],
+            ],
+        ]);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        $body = $response->toArray();
+
+        self::assertFalse($body['is_built_in']);
+        self::assertSame(['operator' => 'AND', 'conditions' => []], $body['query']);
+        self::assertSame([
+            ['key' => 'sku', 'position' => 0],
+            ['key' => 'name', 'hidden' => false, 'width' => 240, 'position' => 1],
+        ], $body['columns']);
+    }
+
+    #[Test]
     public function resourceScopedPresetAppearsOnlyForItsResource(): void
     {
         $client = $this->authenticatedClient();

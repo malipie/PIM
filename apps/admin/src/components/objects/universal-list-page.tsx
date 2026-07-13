@@ -39,7 +39,6 @@ import { Link, useNavigate } from 'react-router';
 import { BulkBar } from '@/components/catalog/bulk-bar';
 import { ColumnManager } from '@/components/catalog/column-manager';
 import { DeletePresetDialog } from '@/components/catalog/delete-preset-dialog';
-import { DensityToggle } from '@/components/catalog/density-toggle';
 import { ExcelLikeGrid } from '@/components/catalog/excel-like-grid';
 import { FilterChipsBar } from '@/components/catalog/filter-chips-bar';
 import {
@@ -50,8 +49,6 @@ import {
 import { ProductsGrid, type ProductsGridRow } from '@/components/catalog/products-grid';
 import { type RollbackSession, RollbackToast } from '@/components/catalog/rollback-toast';
 import { SaveAsSmartPresetModal } from '@/components/catalog/save-as-smart-preset-modal';
-import { SaveViewModal } from '@/components/catalog/save-view-modal';
-import { SavedViewsRail } from '@/components/catalog/saved-views-rail';
 import { SelectionToolbar } from '@/components/catalog/selection-toolbar';
 import { SmartFilterPresetsRow } from '@/components/catalog/smart-filter-presets-row';
 import type { SyncAggregate } from '@/components/catalog/sync-aggregate-icon';
@@ -64,6 +61,7 @@ import {
   useCatalogSearch,
 } from '@/features/catalog/search/use-catalog-search';
 import { useListSchema } from '@/hooks/use-list-schema';
+import { usePageActions } from '@/layout/page-actions-context';
 import { unwrapAttributesIndexed } from '@/lib/attributes-indexed';
 import { dslToFlatConditions, type FilterDsl } from '@/lib/filters/filter-dsl';
 import { readInitialFilterDsl } from '@/lib/filters/list-url-seed';
@@ -74,7 +72,6 @@ import { type ExcelObjectRow, toExcelColumns, toExcelRow } from '@/lib/grid/exce
 import { useAttributeOptionLabels } from '@/lib/grid/grid-attribute-cell';
 import { clampColumnWidth, overridesFromColumns, setColumnWidth } from '@/lib/grid/overrides';
 import type { GridColumn, GridColumnOverride, ViewColumnSeed } from '@/lib/grid/types';
-import { useGridDensity } from '@/lib/grid/use-density';
 import { useGridColumns } from '@/lib/grid/use-grid-columns';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
@@ -315,7 +312,27 @@ export function UniversalListPage({
     [modelColumns, isProduct],
   );
   const visibleColumns = useMemo(() => allColumns.filter((c) => !c.hidden), [allColumns]);
-  const [density, setDensity] = useGridDensity(objectTypeId);
+  // PTR-01 — the Komfort/Kompakt density toggle was removed; rows render at
+  // the default comfortable density everywhere.
+  const density = 'normal' as const;
+
+  // PTR-01 — the "Dodaj" CTA moved from the toolbar into the global topbar
+  // action slot (same pattern as the catalogs/exports hubs), styled as the
+  // brand orange CTA.
+  usePageActions(
+    useMemo(
+      () => (
+        <Link
+          to={createPath}
+          className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-cta px-3.5 text-[13px] font-semibold text-cta-foreground transition hover:bg-accent-hover"
+        >
+          <Plus className="size-4" aria-hidden />
+          {t('products.toolbar.add', { defaultValue: 'Dodaj' })}
+        </Link>
+      ),
+      [t, createPath],
+    ),
+  );
 
   // GRID-P5-03 (#2399) - one sort state for both views. Attribute
   // columns map to ?order[attribute.{code}] (AttributeOrderFilter,
@@ -359,7 +376,9 @@ export function UniversalListPage({
   );
 
   const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState<Record<string, string | string[]>>({});
+  // PTR-01 — `filters` used to be repopulated by the removed saved-view apply;
+  // it stays as the (empty) base for the search request map.
+  const [filters] = useState<Record<string, string | string[]>>({});
   const [page, setPage] = useState<number>(() => readInitialPage());
   const [pageSize, setPageSize] = useState<PageSize>(() => readInitialPageSize(objectTypeId));
 
@@ -420,9 +439,6 @@ export function UniversalListPage({
     }
   };
 
-  const [activeViewSlug, setActiveViewSlug] = useState<string | null>(null);
-  const [showSaveViewModal, setShowSaveViewModal] = useState(false);
-  const [savedViewsReloadToken, setSavedViewsReloadToken] = useState(0);
   const [expandedMasters, setExpandedMasters] = useState<Set<string>>(new Set());
   const {
     presets: smartPresets,
@@ -698,6 +714,20 @@ export function UniversalListPage({
     }
 
     setActiveSmartPresetId(preset.id);
+    // PTR-01 — a preset now also carries a column layout (the merged "saved
+    // view" role). It stores only the columns that were on the list; restore
+    // exactly that set — the saved columns in their order, then every other
+    // schema column hidden — so applying a preset shows precisely what was
+    // visible when it was saved, regardless of each column's default. null =
+    // legacy filter-only preset → leave the current columns untouched. Keys
+    // absent from the schema are dropped by the resolver (stale attribute).
+    if (preset.columns != null) {
+      const savedKeys = new Set(preset.columns.map((c) => c.key));
+      const hiddenRest = allColumns
+        .filter((c) => !savedKeys.has(c.key))
+        .map((c) => ({ key: c.key, hidden: true }));
+      setOverrides([...preset.columns, ...hiddenRest]);
+    }
     const conditions = dslToFlatConditions(preset.query);
     if (conditions === null) {
       toast.info(
@@ -715,62 +745,6 @@ export function UniversalListPage({
   const handleApplyAdvancedPanel = (): void => {
     setAdvancedPanelOpen(false);
     setActiveSmartPresetId(null);
-  };
-
-  // GRID-P4-02 (#2395) — the SavedView config the grid round-trips:
-  // filters + columns (order/hidden/width) + sort + density + variants
-  // + page size. Shape matches the BE validator (GRID-P4-01).
-  const buildViewConfig = (): Record<string, unknown> => {
-    const config: Record<string, unknown> = {
-      filters,
-      variants_mode: hasVariants ? variantsMode : 'flat',
-      page_size: pageSize,
-      columns: overridesFromColumns(allColumns),
-    };
-    if (sort !== null) config.sort = sort;
-    if (density !== 'normal') config.density = density;
-    return config;
-  };
-
-  const handleApplySavedView = (view: { slug: string; config: Record<string, unknown> }): void => {
-    setActiveViewSlug(view.slug);
-    const cfg = view.config;
-    const filt = cfg.filters;
-    if (filt !== null && typeof filt === 'object' && !Array.isArray(filt)) {
-      setFilters(filt as Record<string, string | string[]>);
-    }
-    const mode = cfg.variants_mode;
-    if (mode === 'tree' || mode === 'flat') setVariantsMode(mode);
-    if (
-      typeof cfg.page_size === 'number' &&
-      PAGE_SIZE_OPTIONS.includes(cfg.page_size as PageSize)
-    ) {
-      setPageSize(cfg.page_size as PageSize);
-    }
-    // Columns: apply as quick-pref overrides. Keys absent from the schema
-    // (deleted attribute / RBAC) are dropped by the resolver, so a stale
-    // saved column silently disappears instead of breaking the render.
-    if (Array.isArray(cfg.columns)) {
-      const overrides = (cfg.columns as unknown[]).filter(
-        (c): c is GridColumnOverride =>
-          c !== null && typeof c === 'object' && typeof (c as GridColumnOverride).key === 'string',
-      );
-      setOverrides(overrides);
-    }
-    const cfgSort = cfg.sort;
-    if (
-      cfgSort !== null &&
-      typeof cfgSort === 'object' &&
-      typeof (cfgSort as { key?: unknown }).key === 'string' &&
-      ((cfgSort as { dir?: unknown }).dir === 'asc' ||
-        (cfgSort as { dir?: unknown }).dir === 'desc')
-    ) {
-      setSort(cfgSort as { key: string; dir: 'asc' | 'desc' });
-      setPage(1);
-    } else {
-      setSort(null);
-    }
-    setDensity(cfg.density === 'compact' ? 'compact' : 'normal');
   };
 
   const handleExcelCommit = async (
@@ -895,33 +869,14 @@ export function UniversalListPage({
         </div>
       </div>
 
-      <SavedViewsRail
-        resource={objectTypeCode}
-        reloadToken={savedViewsReloadToken}
-        activeSlug={activeViewSlug}
-        onApply={(view) => {
-          handleApplySavedView({ slug: view.slug, config: view.config });
-        }}
-        onSaveCurrent={() => {
-          setShowSaveViewModal(true);
-        }}
-        currentTotal={totalHits}
-      />
-
       <SmartFilterPresetsRow
         presets={smartPresets}
         activeId={activeSmartPresetId}
         onSelect={handleApplySmartPreset}
         onCreate={() => {
-          if (panelConditions.length === 0) {
-            toast.info(
-              t('products.smart_filters.create_requires_conditions', {
-                defaultValue: 'Najpierw dodaj warunek w panelu zaawansowanym.',
-              }),
-            );
-            setAdvancedPanelOpen(true);
-            return;
-          }
+          // PTR-01 — a preset now snapshots filters + columns, so it can be
+          // saved even with nothing filtered (the modal captures the current
+          // column layout). No more "add a condition first" guard.
           setShowSaveAsPresetModal(true);
         }}
         onDelete={(preset) => {
@@ -998,16 +953,7 @@ export function UniversalListPage({
           onReset={resetOverrides}
           locale={uiLocale}
         />
-        <DensityToggle density={density} onChange={setDensity} />
         <ViewModeToggle mode={viewMode} onChange={handleViewModeChange} />
-
-        <Button asChild className="h-11 rounded-2xl px-4">
-          <Link to={createPath}>
-            <Plus className="size-4" />
-            {t('products.toolbar.add', { defaultValue: 'Dodaj' })}
-            <kbd className="ml-1.5 rounded bg-white/15 px-1 py-0.5 font-mono text-[10px]">⌘N</kbd>
-          </Link>
-        </Button>
       </div>
 
       <div id="advanced-filter-panel">
@@ -1024,9 +970,6 @@ export function UniversalListPage({
               onClear={() => {
                 setPanelConditions([]);
                 setActiveSmartPresetId(null);
-              }}
-              onSaveAsView={() => {
-                setShowSaveViewModal(true);
               }}
               onSaveAsPreset={() => {
                 setShowSaveAsPresetModal(true);
@@ -1363,24 +1306,12 @@ export function UniversalListPage({
         }}
       />
 
-      {showSaveViewModal ? (
-        <SaveViewModal
-          resource={objectTypeCode}
-          objectTypeId={objectTypeId}
-          config={buildViewConfig()}
-          onClose={() => {
-            setShowSaveViewModal(false);
-          }}
-          onSaved={(slug) => {
-            setActiveViewSlug(slug);
-            setSavedViewsReloadToken((n) => n + 1);
-          }}
-        />
-      ) : null}
-
       {showSaveAsPresetModal ? (
         <SaveAsSmartPresetModal
           query={panelDsl}
+          // PTR-01 — snapshot only the columns currently on the list (the
+          // visible set, in order), not the full 200+ attribute catalogue.
+          columns={overridesFromColumns(visibleColumns)}
           create={createSmartPreset}
           onClose={() => setShowSaveAsPresetModal(false)}
           onSaved={(preset) => {

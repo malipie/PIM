@@ -6,19 +6,29 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import type { FilterDsl } from '@/lib/filters/filter-dsl';
 import type { SmartFilterPreset } from '@/lib/filters/use-smart-presets';
+import type { GridColumnOverride } from '@/lib/grid/types';
 import { httpErrorDetail } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 const ICON_CHOICES = ['🔧', '⚙️', '⚡', '🛠️', '🏷️', '📦', '🔍', '🌟', '🚀', '🎯', '💡', '📊'];
 
+/** Empty filter group — a preset can carry columns only, with no conditions. */
+const EMPTY_FILTER: FilterDsl = { operator: 'AND', conditions: [] };
+
 interface SaveAsSmartPresetModalProps {
   query: FilterDsl | null;
+  /**
+   * PTR-01 — the current column layout, snapshotted into the preset so a
+   * saved preset also restores columns (the old "saved view" role).
+   */
+  columns?: GridColumnOverride[];
   onClose: () => void;
   onSaved: (preset: SmartFilterPreset) => void;
   create: (input: {
     name: { pl: string; en: string };
     icon: string;
     query: FilterDsl;
+    columns?: GridColumnOverride[] | null;
   }) => Promise<SmartFilterPreset>;
 }
 
@@ -27,13 +37,14 @@ interface SaveAsSmartPresetModalProps {
  * Advanced filter panel footer + SmartFilterPresetsRow "Własny preset"
  * button.
  *
- * Wymaga niepustego DSL — modal nie pozwoli zapisać presetu bez
- * conditions (Apply button disabled). Nazwa multilingual {pl, en}
- * zgodnie z CLAUDE.md punkt 8. Icon picker z 12 emoji presetów (lucide
- * IconPicker do Fazy 1).
+ * PTR-01 — preset absorbuje rolę "widoku kolumn": zapisuje bieżący filtr
+ * (może być pusty) ORAZ układ kolumn. Można zapisać preset bez żadnego
+ * warunku (sam układ kolumn). Nazwa multilingual {pl, en} zgodnie z
+ * CLAUDE.md punkt 8. Icon picker z 12 emoji presetów.
  */
 export function SaveAsSmartPresetModal({
   query,
+  columns,
   onClose,
   onSaved,
   create,
@@ -45,19 +56,21 @@ export function SaveAsSmartPresetModal({
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit =
-    query !== null && namePl.trim().length >= 3 && nameEn.trim().length >= 3 && icon !== '';
+  // PTR-01 — a preset may carry only a column layout, so an empty filter is
+  // allowed; the name + icon are the only hard requirements.
+  const canSubmit = namePl.trim().length >= 3 && nameEn.trim().length >= 3 && icon !== '';
 
   const handleSubmit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
-    if (!canSubmit || query === null) return;
+    if (!canSubmit) return;
     setIsPending(true);
     setError(null);
     try {
       const preset = await create({
         name: { pl: namePl.trim(), en: nameEn.trim() },
         icon,
-        query,
+        query: query ?? EMPTY_FILTER,
+        columns,
       });
       onSaved(preset);
       onClose();
@@ -155,7 +168,7 @@ export function SaveAsSmartPresetModal({
             {query === null ? (
               <p className="text-muted-foreground">
                 {t('products.smart_filters.preview_empty', {
-                  defaultValue: 'Brak warunków. Dodaj filtr w panelu zaawansowanym.',
+                  defaultValue: 'Brak warunków filtrowania — preset zapisze bieżący układ kolumn.',
                 })}
               </p>
             ) : (
@@ -163,6 +176,14 @@ export function SaveAsSmartPresetModal({
                 {JSON.stringify(query, null, 2)}
               </pre>
             )}
+            {columns && columns.length > 0 ? (
+              <p className="mt-2 text-muted-foreground">
+                {t('products.smart_filters.preview_columns', {
+                  count: columns.length,
+                  defaultValue: 'Zapisze też układ {{count}} kolumn.',
+                })}
+              </p>
+            ) : null}
           </div>
 
           {error !== null ? <p className="text-sm text-rose-600">{error}</p> : null}
