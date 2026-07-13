@@ -186,9 +186,9 @@ services:
       AWS_ASSETS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       AWS_ASSETS_SECRET: ${MINIO_ROOT_PASSWORD:-minioadmin}
       # WFL-P5-01/P5-03 - tenant-editable workflow definitions (ADR-0029).
-      # Default OFF; the Playwright CI job and local builder smoke flip it
-      # per-run without editing apps/api/.env.
-      WORKFLOW_CUSTOM_DEFINITIONS: ${WORKFLOW_CUSTOM_DEFINITIONS:-false}
+      # Default ON (#2555): configurable-approver routing. With no enabled
+      # definition the provider falls back to the static YAML machine.
+      WORKFLOW_CUSTOM_DEFINITIONS: ${WORKFLOW_CUSTOM_DEFINITIONS:-true}
       TRUSTED_PROXIES: 127.0.0.1,REMOTE_ADDR
       TRUSTED_HOSTS: '^pim\.localhost$$|^localhost$$|^api$$'
       # CI sentinel — propagated from GitHub Actions so docker-entrypoint.sh
@@ -248,8 +248,8 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       # WFL-P5-01 - the bulk change_status handler resolves the workflow
       # through the same provider as the request path; keep both sides of
-      # the stack on one flag value.
-      WORKFLOW_CUSTOM_DEFINITIONS: ${WORKFLOW_CUSTOM_DEFINITIONS:-false}
+      # the stack on one flag value (default ON, #2555).
+      WORKFLOW_CUSTOM_DEFINITIONS: ${WORKFLOW_CUSTOM_DEFINITIONS:-true}
       # The worker is a headless background consumer (import/export/reindex) —
       # it never serves the web profiler. APP_DEBUG=1 (the dev default) makes
       # Symfony's debug caches (DoctrineBundle DebugDataHolder, the profiler's
