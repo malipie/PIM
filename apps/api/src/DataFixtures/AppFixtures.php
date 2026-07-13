@@ -198,6 +198,39 @@ class AppFixtures extends Fixture implements DependentFixtureInterface
             $manager->persist($admin);
         }
 
+        // #2555 — a dedicated non-owner REVIEWER persona holding the built-in
+        // `approver` role. Review tasks route to the per-ObjectType definition
+        // reviewer when one is enabled, otherwise to `approver` (the fallback);
+        // without any user holding it, review tasks are visible only to Owners
+        // via the `workflow.approve_reject` override. Seeding this reviewer
+        // makes the flow demonstrable end-to-end on a fresh DB via the fallback
+        // path. We deliberately do NOT seed an enabled product WorkflowDefinition
+        // here: an enabled product definition in the shared fixtures would leak
+        // into the product-driving workflow e2e specs (wfl-p5-03 / wfl-p6-02),
+        // which build/drive their own product definitions. Per-ObjectType
+        // reviewers are configured through the (now unhidden) flow-settings UI.
+        $demoTenant = null;
+        foreach ($tenants as $tenant) {
+            if ('demo' === $tenant->getCode()) {
+                $demoTenant = $tenant;
+                break;
+            }
+        }
+        \assert(null !== $demoTenant, 'The demo tenant must exist.');
+
+        $reviewerRole = $this->roleRepository->findByCode('approver', $demoTenant);
+        \assert(null !== $reviewerRole, 'SeedTenantPrdRolesService must create approver per tenant.');
+        $reviewerEmail = 'reviewer@demo.localhost';
+        $reviewerStub = new User($demoTenant, $reviewerEmail, '', []);
+        $reviewer = new User(
+            $demoTenant,
+            $reviewerEmail,
+            $this->passwordHasher->hashPassword($reviewerStub, self::DEFAULT_ADMIN_PASSWORD),
+            [],
+        );
+        $reviewer->addRole($reviewerRole);
+        $manager->persist($reviewer);
+
         // AUD-003 (#1575): the platform operator (operator panel + break-glass)
         // is a SEPARATE principal from any tenant Owner. It holds ONLY the
         // global `platform_operator` role (the `platform.*` grants) and no
