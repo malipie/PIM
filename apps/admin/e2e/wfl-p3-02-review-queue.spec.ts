@@ -60,6 +60,9 @@ test('review queue lists a submitted object and approve clears it', async ({ pag
 
   await page.goto('/workflow');
   await expect(page.getByTestId('review-queue-page')).toBeVisible();
+  // #2575 — the topbar breadcrumb reads "Workflow" on /workflow (was the bare
+  // "Workspace" root before the route crumb was added).
+  await expect(page.getByRole('navigation', { name: 'breadcrumb' })).toContainText('Workflow');
 
   const row = page.getByTestId('review-queue-row').filter({ hasText: sku });
   await expect(row).toBeVisible();
