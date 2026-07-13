@@ -37,7 +37,9 @@ export function KonfiguratorApiLayout() {
         ariaLabel={t('api_configurator.shell.tabs_aria')}
         activeId={activeId}
         onChange={(id) => {
-          void navigate(id === 'producer' ? BASE : `${BASE}/${id}`);
+          // #2576 — the configurator landing (BASE) redirects to the
+          // connections tab, so the producer face has its own /producer path.
+          void navigate(`${BASE}/${id}`);
         }}
         items={[
           { id: 'connections', label: t('api_configurator.shell.tabs.connections') },
