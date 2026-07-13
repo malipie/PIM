@@ -42,6 +42,9 @@
         <attribute name="cursor">
             <group>admin:read</group>
         </attribute>
+        <attribute name="outboundFilter">
+            <group>admin:read</group>
+        </attribute>
         <attribute name="isEnabled">
             <group>admin:read</group>
         </attribute>

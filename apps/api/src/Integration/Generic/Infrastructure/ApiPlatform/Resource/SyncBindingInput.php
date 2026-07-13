@@ -55,4 +55,14 @@ final class SyncBindingInput
 
     #[Groups(['sync_binding:create'])]
     public bool $enabled = true;
+
+    /**
+     * #2549 — FilterDsl snapshot scoping the OUTBOUND push (null = send all).
+     * Applies only to the write flow; the FE builder emits a valid DSL and the
+     * Export reader compiles it at run time.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[Groups(['sync_binding:create'])]
+    public ?array $outboundFilter = null;
 }

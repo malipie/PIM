@@ -100,6 +100,29 @@ final class OutboundSyncRunnerTest extends KernelTestCase
     }
 
     #[Test]
+    public function outboundFilterPushesOnlyMatchingObjects(): void
+    {
+        // #2549 — a binding scoped to `status = published` pushes only the
+        // published object; the draft is never sent to the remote.
+        $this->seedObject('PUB-1', 'Published', CatalogObject::STATUS_PUBLISHED);
+        $this->seedObject('DRAFT-1', 'Draft');
+        $binding = $this->seedBinding();
+        $binding->setOutboundFilter(['attr' => 'status', 'op' => '=', 'value' => 'published']);
+        $this->em()->flush();
+
+        $requester = new RecordingRequester(default: new GenericRestResponse(201, [], '{}', 1, 2));
+        $run = $this->runner($requester)->run($binding);
+        $this->em()->flush();
+
+        self::assertSame(SyncRunStatus::Success, $run->getStatus());
+        self::assertSame(1, $run->getCreatedCount());
+        self::assertCount(1, $requester->calls);
+        $body = json_decode((string) $requester->calls[0]['body'], true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($body);
+        self::assertSame('PUB-1', $body['sku']);
+    }
+
+    #[Test]
     public function dryRunBuildsPayloadsWithoutCallingRemote(): void
     {
         $this->seedObject('A-1', 'Widget');
@@ -116,10 +139,13 @@ final class OutboundSyncRunnerTest extends KernelTestCase
         self::assertSame(SyncRunStatus::Success, $run->getStatus());
     }
 
-    private function seedObject(string $sku, string $name): void
+    private function seedObject(string $sku, string $name, ?string $status = null): void
     {
         $em = $this->em();
         $object = new CatalogObject($this->productType, $sku);
+        if (null !== $status) {
+            $object->forceStatus($status);
+        }
         $em->persist($object);
         $em->persist(new ObjectValue($object, $this->sku, ['value' => $sku]));
         $em->persist(new ObjectValue($object, $this->name, ['value' => $name]));

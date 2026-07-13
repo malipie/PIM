@@ -28129,6 +28129,19 @@
                         "default": "lww",
                         "type": "string"
                     },
+                    "outboundFilter": {
+                        "description": "#2549 \u2014 rule-based OUTBOUND scope: a FilterDsl snapshot narrowing which\nobjects PIM sends to the remote (e.g. only `status = published`). null /\nempty = send every object of the type (backward-compat). Applies only to\nthe write (outbound) flow; inbound reads ignore it. Compiled at run time\nvia the Catalog FilterDslResolver in the Export reader, so a malformed\nDSL fails the run rather than the save (the FE builder emits valid DSL).",
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
+                    },
                     "matchKeyMapping": {
                         "maxLength": 255,
                         "description": "The PIM target acting as the upsert match key; null until mappings are set.",
@@ -28262,6 +28275,19 @@
                     "enabled": {
                         "default": true,
                         "type": "boolean"
+                    },
+                    "outboundFilter": {
+                        "description": "#2549 \u2014 FilterDsl snapshot scoping the OUTBOUND push (null = send all).",
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
                     }
                 }
             },
@@ -28340,6 +28366,19 @@
                             "boolean",
                             "null"
                         ]
+                    },
+                    "outboundFilter": {
+                        "description": "#2549 \u2014 FilterDsl snapshot scoping the OUTBOUND push. Present-and-empty\n(`[]`) clears the scope (send all); absent = leave unchanged.",
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "null"
+                            ]
+                        }
                     }
                 }
             },
@@ -28395,6 +28434,19 @@
                             "conflictPolicy": {
                                 "default": "lww",
                                 "type": "string"
+                            },
+                            "outboundFilter": {
+                                "description": "#2549 \u2014 rule-based OUTBOUND scope: a FilterDsl snapshot narrowing which\nobjects PIM sends to the remote (e.g. only `status = published`). null /\nempty = send every object of the type (backward-compat). Applies only to\nthe write (outbound) flow; inbound reads ignore it. Compiled at run time\nvia the Catalog FilterDslResolver in the Export reader, so a malformed\nDSL fails the run rather than the save (the FE builder emits valid DSL).",
+                                "type": [
+                                    "object",
+                                    "null"
+                                ],
+                                "additionalProperties": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
                             },
                             "matchKeyMapping": {
                                 "maxLength": 255,

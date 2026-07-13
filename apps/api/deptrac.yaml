@@ -752,9 +752,13 @@ parameters:
         # serializer/runner above (the implementation is Catalog-data-bound).
         App\Export\Application\Integration\ExportOutboundRecordReader:
             - App\Catalog\Domain\Entity\CatalogObject
+            - App\Catalog\Domain\Entity\ObjectType
             - App\Catalog\Domain\Entity\ObjectValue
             - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
             - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
+            # #2549 — outbound scope reuses the Catalog filter DSL compiler
+            # (same Export → Catalog\Application\Filter reach as SyncExportRunner).
+            - App\Catalog\Application\Filter\FilterDslResolver
         App\Export\Presentation\Controller\ExportPreflightController:
             - App\Catalog\Application\Filter\FilterDslResolver
             - App\Catalog\Domain\Entity\ObjectType

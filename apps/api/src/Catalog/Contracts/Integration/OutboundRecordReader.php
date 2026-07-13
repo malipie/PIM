@@ -19,9 +19,11 @@ use Symfony\Component\Uid\Uuid;
 interface OutboundRecordReader
 {
     /**
-     * @param list<string> $codes the attribute codes to serialise per object
+     * @param list<string>              $codes  the attribute codes to serialise per object
+     * @param array<string, mixed>|null $filter #2549 — a FilterDsl snapshot scoping which
+     *                                          objects are emitted (null/empty = all)
      *
      * @return iterable<OutboundRecord>
      */
-    public function read(Uuid $objectTypeId, array $codes): iterable;
+    public function read(Uuid $objectTypeId, array $codes, ?array $filter = null): iterable;
 }
