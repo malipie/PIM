@@ -73,7 +73,9 @@ test('APIC-P4-06 — producer hub: profiles / keys / webhooks tabs', async ({ pa
     }),
   );
 
-  await page.goto('/integrations/api-configurator');
+  // #2576 — the producer hub moved off the configurator landing (which now
+  // redirects to the Połączenia tab) to its own /producer path.
+  await page.goto('/integrations/api-configurator/producer');
 
   await expect(page.getByRole('heading', { name: /moje api|my api/i })).toBeVisible();
 

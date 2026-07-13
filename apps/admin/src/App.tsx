@@ -766,7 +766,16 @@ function App() {
                   <Route path="/integrations/imports/new" element={<ImportWizardPage />} />
                   <Route path="/integrations/imports/:id" element={<ImportShowPage />} />
                   <Route element={<KonfiguratorApiLayout />}>
-                    <Route path="/integrations/api-configurator" element={<ProducerHubPage />} />
+                    {/* #2576 — the configurator opens on the Połączenia
+                        (connections) tab; the producer hub gets its own path. */}
+                    <Route
+                      path="/integrations/api-configurator"
+                      element={<Navigate to="/integrations/api-configurator/connections" replace />}
+                    />
+                    <Route
+                      path="/integrations/api-configurator/producer"
+                      element={<ProducerHubPage />}
+                    />
                     <Route
                       path="/integrations/api-configurator/create"
                       element={<ApiProfileCreatePage />}

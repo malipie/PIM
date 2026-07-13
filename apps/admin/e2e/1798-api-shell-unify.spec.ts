@@ -31,19 +31,21 @@ test('APIC-P4-08 — unified shell: navigate across producer / consumer / monito
     );
   }
 
-  // Producer hub is the configurator landing.
+  // #2576 — the configurator landing redirects to the Połączenia (connections)
+  // tab, the configured first face.
   await page.goto('/integrations/api-configurator');
-  await expect(page.getByRole('heading', { name: /moje api|my api/i })).toBeVisible();
+  await expect(page).toHaveURL(/\/connections$/);
+  await expect(page.getByRole('heading', { name: /^połączenia$|^connections$/i })).toBeVisible();
 
   // a11y on the unified shell at rest (each face is audited in its own E2E;
   // here we check the shell landing before exercising cross-face navigation).
   const a11y = await new AxeBuilder({ page }).analyze();
   expect(a11y.violations).toEqual([]);
 
-  // → Consumer side (Połączenia).
-  await page.getByRole('tab', { name: /^połączenia$|^connections$/i }).click();
-  await expect(page).toHaveURL(/\/connections$/);
-  await expect(page.getByRole('heading', { name: /^połączenia$|^connections$/i })).toBeVisible();
+  // → Producer face (Moje API), now on its own /producer path.
+  await page.getByRole('tab', { name: /^moje api$|^my api$/i }).click();
+  await expect(page).toHaveURL(/\/producer$/);
+  await expect(page.getByRole('heading', { name: /moje api|my api/i })).toBeVisible();
 
   // → Monitor.
   await page.getByRole('tab', { name: /^monitor$/i }).click();
@@ -52,8 +54,8 @@ test('APIC-P4-08 — unified shell: navigate across producer / consumer / monito
     page.getByRole('heading', { name: /monitor synchronizacji|sync monitor/i }),
   ).toBeVisible();
 
-  // → back to the producer face.
-  await page.getByRole('tab', { name: /^moje api$|^my api$/i }).click();
-  await expect(page).toHaveURL(/\/api-configurator$/);
-  await expect(page.getByRole('heading', { name: /moje api|my api/i })).toBeVisible();
+  // → back to Połączenia.
+  await page.getByRole('tab', { name: /^połączenia$|^connections$/i }).click();
+  await expect(page).toHaveURL(/\/connections$/);
+  await expect(page.getByRole('heading', { name: /^połączenia$|^connections$/i })).toBeVisible();
 });
