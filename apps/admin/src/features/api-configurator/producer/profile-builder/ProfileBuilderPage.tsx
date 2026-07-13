@@ -16,6 +16,7 @@ import {
   type ProfileDetail,
   slugify,
 } from './builder-helpers';
+import { ProfilePreviewPanel } from './ProfilePreviewPanel';
 
 const HUB = '/integrations/api-configurator';
 
@@ -270,6 +271,14 @@ export function ProfileBuilderPage() {
           onSelectNone={() => setSelectedAttrs(new Set())}
         />
       </div>
+
+      {/* #2550 — live preview of what the integrator receives for this config. */}
+      <ProfilePreviewPanel
+        apiUrl={apiUrl}
+        includedAttributes={[...selectedAttrs]}
+        objectTypeIds={[...selectedTypes]}
+        filters={parseFilters() ?? {}}
+      />
 
       {saveError !== null ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3 text-[12.5px] text-rose-800">

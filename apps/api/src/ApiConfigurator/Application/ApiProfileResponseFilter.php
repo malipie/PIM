@@ -45,4 +45,23 @@ final readonly class ApiProfileResponseFilter
 
         return $row;
     }
+
+    /**
+     * #2550 — prune a bare attribute map to the allow-list (empty = keep all).
+     * Used by the live preview, which projects a draft config's attribute set
+     * before a profile is saved.
+     *
+     * @param array<string, mixed> $attributes
+     * @param list<string>         $included
+     *
+     * @return array<string, mixed>
+     */
+    public function projectAttributes(array $attributes, array $included): array
+    {
+        if ([] === $included) {
+            return $attributes;
+        }
+
+        return array_intersect_key($attributes, array_flip($included));
+    }
 }

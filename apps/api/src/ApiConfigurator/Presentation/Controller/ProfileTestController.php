@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\ApiConfigurator\Presentation\Controller;
 
 use ApiPlatform\OpenApi\Factory\OpenApiFactoryInterface;
+use App\ApiConfigurator\Application\ApiProfileResponseFilter;
 use App\ApiConfigurator\Domain\Entity\ApiProfile;
 use App\ApiConfigurator\Domain\Repository\ApiProfileRepositoryInterface;
+use App\Catalog\Contracts\Query\ObjectSamplePort;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use stdClass;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -20,11 +23,14 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * - `GET /api/profiles/{code}/test` — returns a deterministic
  *   sample shape derived from the profile's `includedAttributes`.
  *   The integrator can see the response contract before any real
- *   `CatalogObject` exists. Live data preview (fetch a real row +
- *   project per profile) ships in a follow-up — it requires a
- *   read-only `Catalog` contract that ApiConfigurator does not own
- *   today (Deptrac: ApiConfigurator → only Catalog_Contracts /
- *   Channel_Contracts).
+ *   `CatalogObject` exists.
+ *
+ * - `POST /api/profiles/preview` (#2550) — the LIVE preview: takes the
+ *   current (possibly-unsaved) profile config in the body, fetches a bounded
+ *   sample of real objects scoped by its filters + ObjectType list via the
+ *   {@see ObjectSamplePort} Catalog contract, and projects each row to the
+ *   profile's attribute allow-list — so the admin sees exactly what an
+ *   integrator would receive, without minting an API key.
  *
  * - `GET /api/profiles/{code}/openapi.json` — emits the AP4
  *   OpenAPI document narrowed to the sugar paths the profile
@@ -40,6 +46,8 @@ final class ProfileTestController
     public function __construct(
         private readonly ApiProfileRepositoryInterface $profiles,
         private readonly OpenApiFactoryInterface $openApiFactory,
+        private readonly ObjectSamplePort $objectSamples,
+        private readonly ApiProfileResponseFilter $responseFilter,
     ) {
     }
 
@@ -64,6 +72,34 @@ final class ProfileTestController
         ]);
     }
 
+    #[Route('/api/profiles/preview', name: 'pim_api_profiles_preview', methods: ['POST'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[RequiresPermission(module: 'api_profile', action: 'read')]
+    public function preview(Request $request): JsonResponse
+    {
+        $content = $request->getContent();
+        $decoded = json_decode('' === $content ? '{}' : $content, true);
+        $body = \is_array($decoded) ? $decoded : [];
+
+        $included = $this->stringList($body['includedAttributes'] ?? null);
+        $objectTypeIds = $this->stringList($body['objectTypeIds'] ?? null);
+        /** @var array<string, mixed> $filters */
+        $filters = \is_array($body['filters'] ?? null) ? $body['filters'] : [];
+        $limit = \is_int($body['limit'] ?? null) ? $body['limit'] : 5;
+
+        $items = [];
+        foreach ($this->objectSamples->sample($objectTypeIds, $filters, $limit) as $sample) {
+            $items[] = [
+                'id' => $sample->id,
+                'code' => $sample->code,
+                'kind' => $sample->kind,
+                'attributes' => $this->responseFilter->projectAttributes($sample->attributes, $included),
+            ];
+        }
+
+        return new JsonResponse(['items' => $items, 'count' => \count($items)]);
+    }
+
     #[Route(
         '/api/profiles/{code}/openapi.json',
         name: 'pim_api_profiles_openapi',
@@ -86,6 +122,25 @@ final class ProfileTestController
         $payload = $this->narrowOpenApiToProfile($payload, $profile);
 
         return new JsonResponse($payload);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $value): array
+    {
+        if (!\is_array($value)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($value as $item) {
+            if (\is_string($item)) {
+                $out[] = $item;
+            }
+        }
+
+        return $out;
     }
 
     private function loadProfile(string $code): ApiProfile
