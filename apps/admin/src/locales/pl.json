@@ -91,7 +91,7 @@
     "dashboard": "Workspace",
     "products": "Produkty",
     "services": "Usługi",
-    "catalogsPdf": "Katalogi PDF",
+    "catalogsPdf": "Web To Print",
     "multimedia": "Multimedia",
     "workflow": "Workflow",
     "integrations": "Integracje",
@@ -1018,7 +1018,7 @@
     }
   },
   "catalogs_pdf": {
-    "page_title": "Katalogi PDF",
+    "page_title": "Web To Print",
     "placeholder_title": "W przygotowaniu",
     "placeholder_description": "Generowanie katalogów PDF jest na liście backlogu. Scope ustalimy w osobnym tickecie.",
     "tabs_aria": "Sekcje katalogów PDF",

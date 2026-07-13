@@ -91,7 +91,7 @@
     "dashboard": "Workspace",
     "products": "Products",
     "services": "Services",
-    "catalogsPdf": "PDF Catalogs",
+    "catalogsPdf": "Web To Print",
     "multimedia": "Multimedia",
     "workflow": "Workflow",
     "integrations": "Integrations",
@@ -1008,7 +1008,7 @@
     }
   },
   "catalogs_pdf": {
-    "page_title": "PDF Catalogs",
+    "page_title": "Web To Print",
     "placeholder_title": "Coming soon",
     "placeholder_description": "PDF catalog generation is in the backlog. Scope will be defined in a separate ticket.",
     "tabs_aria": "PDF catalog sections",

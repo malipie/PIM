@@ -56,7 +56,7 @@ test('Modeling shell + Dashboard mock — full handoff smoke', async ({ page }) 
   for (const label of [
     /^workspace$/i,
     /^products$|^produkty$/i,
-    /^pdf catalogs$|^katalogi pdf$/i,
+    /^web to print$/i,
     /^multimedia$/i,
     /^workflow$/i,
     /^integrations$|^integracje$/i,
