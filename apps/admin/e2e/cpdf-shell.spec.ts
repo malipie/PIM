@@ -25,7 +25,7 @@ test('CPDF-P5-01 — catalogs shell: tabs, empty state, templates, a11y', async 
   await page.goto('/catalogs-pdf');
 
   // Header + both pill tabs render (bilingual-tolerant).
-  await expect(page.getByRole('heading', { name: /katalogi pdf|pdf catalogs/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /web to print/i })).toBeVisible();
   const catalogsTab = page.getByRole('tab', { name: /^katalogi$|^catalogs$/i });
   const templatesTab = page.getByRole('tab', { name: /^szablony$|^templates$/i });
   await expect(catalogsTab).toBeVisible();
