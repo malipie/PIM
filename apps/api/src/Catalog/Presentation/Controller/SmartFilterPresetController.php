@@ -46,6 +46,7 @@ final class SmartFilterPresetController
     private const int MAX_USER_PRESETS = 50;
     private const int MAX_NAME_LEN = 60;
     private const int MIN_NAME_LEN = 3;
+    private const int MAX_COLUMNS = 200;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -134,6 +135,9 @@ final class SmartFilterPresetController
         // backward compatibility with the legacy product list.
         $resourceRaw = $body['resource'] ?? 'products';
         $resource = \is_string($resourceRaw) && '' !== $resourceRaw ? $resourceRaw : 'products';
+        // PTR-01 — optional column snapshot merged into the preset (the old
+        // "saved view" role); null keeps the legacy filter-only shape.
+        $columns = $this->parseColumns($body['columns'] ?? null);
 
         $slug = $this->generateUniqueSlug($name['pl'], $tenant->getId(), $userId);
 
@@ -146,6 +150,7 @@ final class SmartFilterPresetController
             isBuiltIn: false,
             sortOrder: $sortOrder,
             resource: $resource,
+            columns: $columns,
         );
 
         $this->em->persist($preset);
@@ -172,6 +177,9 @@ final class SmartFilterPresetController
         }
         if (\array_key_exists('query', $body)) {
             $preset->updateQuery($this->parseQuery($body['query']));
+        }
+        if (\array_key_exists('columns', $body)) {
+            $preset->updateColumns($this->parseColumns($body['columns']));
         }
         if (\array_key_exists('sort_order', $body) && is_numeric($body['sort_order'])) {
             $preset->reorder((int) $body['sort_order']);
@@ -277,6 +285,47 @@ final class SmartFilterPresetController
         return $typed;
     }
 
+    /**
+     * PTR-01 — validate the optional column snapshot. Accepts null (no column
+     * preferences) or a list of GridColumnOverride entries
+     * {key: string, hidden?: bool, width?: int, position?: int}. Unknown keys
+     * are dropped; a malformed payload is a 400 rather than silent corruption.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    private function parseColumns(mixed $raw): ?array
+    {
+        if (null === $raw) {
+            return null;
+        }
+        if (!\is_array($raw) || !array_is_list($raw)) {
+            throw new BadRequestHttpException('columns must be a list of {key, hidden?, width?, position?}.');
+        }
+        if (\count($raw) > self::MAX_COLUMNS) {
+            throw new BadRequestHttpException(\sprintf('columns must contain at most %d entries.', self::MAX_COLUMNS));
+        }
+
+        $out = [];
+        foreach ($raw as $entry) {
+            if (!\is_array($entry) || !isset($entry['key']) || !\is_string($entry['key']) || '' === $entry['key']) {
+                throw new BadRequestHttpException('each column entry must include a non-empty string "key".');
+            }
+            $normalized = ['key' => $entry['key']];
+            if (\array_key_exists('hidden', $entry)) {
+                $normalized['hidden'] = (bool) $entry['hidden'];
+            }
+            if (isset($entry['width']) && is_numeric($entry['width'])) {
+                $normalized['width'] = (int) $entry['width'];
+            }
+            if (isset($entry['position']) && is_numeric($entry['position'])) {
+                $normalized['position'] = (int) $entry['position'];
+            }
+            $out[] = $normalized;
+        }
+
+        return $out;
+    }
+
     private function generateUniqueSlug(string $name, Uuid $tenantId, Uuid $userId): string
     {
         $base = $this->slugify($name);
@@ -368,6 +417,7 @@ final class SmartFilterPresetController
             'name' => $preset->getName(),
             'icon' => $preset->getIcon(),
             'query' => $preset->getQuery(),
+            'columns' => $preset->getColumns(),
             'is_built_in' => $preset->isBuiltIn(),
             'is_system' => $preset->isSystem(),
             'sort_order' => $preset->getSortOrder(),

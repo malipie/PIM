@@ -4,18 +4,15 @@ import { loginAsAdmin } from './helpers/auth';
 
 /**
  * NUI-04 (#1423) — products list v2 visual retrofit. Guards the shared
- * surface: the saved-views tab rail, smart-filter row and grid render on
- * BOTH `/products` (built-in) and `/objects/:slug` (custom ObjectType).
+ * surface: the smart-filter row and grid render on BOTH `/products`
+ * (built-in) and `/objects/:slug` (custom ObjectType). The saved-views
+ * rail was merged into smart presets (PTR-01) and no longer exists.
  */
 
 test.describe('NUI-04 — products list v2', () => {
-  test('saved views rail + smart filters + grid render on /products', async ({ page }) => {
+  test('smart filters + grid render on /products', async ({ page }) => {
     await loginAsAdmin(page);
     await page.goto('/products');
-
-    // The saved-views tablist renders only when views exist; the rail's
-    // save-view CTA is the always-present surface marker.
-    await expect(page.getByRole('button', { name: /zapisz widok|save view/i })).toBeVisible();
 
     // The smart-filters row label is always present; the tablist role
     // appears only when presets exist (a11y — empty tablists are hidden).
@@ -45,13 +42,15 @@ test.describe('NUI-04 — products list v2', () => {
     await loginAsAdmin(page);
     await page.goto('/objects/uslugi');
 
-    const saveCta = page.getByRole('button', { name: /zapisz widok|save view/i });
-    const railVisible = await saveCta
+    // The smart-filters label is the always-present marker of the list
+    // surface; absent when the custom ObjectType is not in this env seed.
+    const smartLabel = page.getByText(/smart filtry|smart filters/i).first();
+    const surfaceVisible = await smartLabel
       .waitFor({ state: 'visible', timeout: 15_000 })
       .then(() => true)
       .catch(() => false);
-    test.skip(!railVisible, 'No custom ObjectType `uslugi` in this environment seed');
+    test.skip(!surfaceVisible, 'No custom ObjectType `uslugi` in this environment seed');
 
-    await expect(page.getByText(/smart filtry|smart filters/i).first()).toBeVisible();
+    await expect(smartLabel).toBeVisible();
   });
 });

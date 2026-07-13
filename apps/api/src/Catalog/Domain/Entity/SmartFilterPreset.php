@@ -44,6 +44,16 @@ class SmartFilterPreset implements TenantScoped, SystemShipped
     /** @var array<string, mixed> */
     private array $query;
 
+    /**
+     * PTR-01 — column overrides snapshot merged into the preset (the old
+     * "saved view" role). Each entry mirrors the frontend GridColumnOverride:
+     * {key: string, hidden?: bool, width?: int, position?: int}. NULL = the
+     * preset carries no column preferences (filter-only, legacy shape).
+     *
+     * @var list<array<string, mixed>>|null
+     */
+    private ?array $columns = null;
+
     private bool $isBuiltIn;
     private int $sortOrder;
     /**
@@ -57,8 +67,9 @@ class SmartFilterPreset implements TenantScoped, SystemShipped
     private DateTimeImmutable $updatedAt;
 
     /**
-     * @param array{pl: string, en: string} $name
-     * @param array<string, mixed>          $query
+     * @param array{pl: string, en: string}   $name
+     * @param array<string, mixed>            $query
+     * @param list<array<string, mixed>>|null $columns
      */
     public function __construct(
         string $slug,
@@ -70,6 +81,7 @@ class SmartFilterPreset implements TenantScoped, SystemShipped
         int $sortOrder = 0,
         ?Uuid $id = null,
         ?string $resource = null,
+        ?array $columns = null,
     ) {
         $this->id = $id ?? Uuid::v7();
         $this->slug = $slug;
@@ -80,6 +92,7 @@ class SmartFilterPreset implements TenantScoped, SystemShipped
         $this->isBuiltIn = $isBuiltIn;
         $this->sortOrder = $sortOrder;
         $this->resource = $resource;
+        $this->columns = $columns;
         $this->createdAt = new DateTimeImmutable();
         $this->updatedAt = $this->createdAt;
     }
@@ -178,6 +191,24 @@ class SmartFilterPreset implements TenantScoped, SystemShipped
     {
         $this->guardMutable();
         $this->query = $query;
+        $this->touch();
+    }
+
+    /**
+     * @return list<array<string, mixed>>|null
+     */
+    public function getColumns(): ?array
+    {
+        return $this->columns;
+    }
+
+    /**
+     * @param list<array<string, mixed>>|null $columns
+     */
+    public function updateColumns(?array $columns): void
+    {
+        $this->guardMutable();
+        $this->columns = $columns;
         $this->touch();
     }
 

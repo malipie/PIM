@@ -3,13 +3,14 @@ import { expect, test } from '@playwright/test';
 import { loginAsAdmin } from './helpers/auth';
 
 /**
- * GRID-P2-01/02/03 (#2389/#2390/#2391) — column manager, resize with a
- * sticky identifier, and row density on /products:
+ * GRID-P2-01/02/03 (#2389/#2390/#2391) — column manager + resize with a
+ * sticky identifier on /products:
  *  - hide a column → gone from the grid → survives reload,
  *  - reorder via the explicit a11y buttons → order persists,
  *  - reset restores the default set,
- *  - drag-resize a header → width persists after reload,
- *  - density toggle shrinks rows and persists.
+ *  - drag-resize a header → width persists after reload.
+ *
+ * The Komfort/Kompakt density toggle was removed in PTR-01.
  */
 
 test('column manager: hide, reorder, reset — persisted per ObjectType', async ({ page }) => {
@@ -110,25 +111,4 @@ test('header drag-resize persists and the identifier stays sticky', async ({ pag
   // Cleanup quick-prefs so the spec is re-runnable.
   await page.getByTestId('column-manager-trigger').click();
   await page.getByTestId('column-manager-reset').click();
-});
-
-test('density toggle shrinks rows and persists', async ({ page }) => {
-  await loginAsAdmin(page);
-  await page.goto('/products');
-
-  const firstRow = page.locator('[data-testid^="products-grid-row-"]').first();
-  await expect(firstRow).toBeVisible();
-  const normalHeight = (await firstRow.boundingBox())?.height ?? 0;
-
-  await page.getByTestId('density-compact').click();
-  const compactHeight = (await firstRow.boundingBox())?.height ?? 0;
-  expect(compactHeight).toBeLessThan(normalHeight * 0.8);
-
-  await page.reload();
-  await expect(page.getByTestId('density-compact')).toHaveAttribute('aria-selected', 'true');
-  const reloadedHeight =
-    (await page.locator('[data-testid^="products-grid-row-"]').first().boundingBox())?.height ?? 0;
-  expect(reloadedHeight).toBeLessThan(normalHeight * 0.8);
-
-  await page.getByTestId('density-normal').click();
 });

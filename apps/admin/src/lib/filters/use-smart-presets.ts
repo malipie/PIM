@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import type { GridColumnOverride } from '@/lib/grid/types';
 import { jsonFetch } from '@/lib/http';
 
 import type { FilterDsl } from './filter-dsl';
@@ -19,6 +20,11 @@ export interface SmartFilterPreset {
   name: { pl: string; en: string };
   icon: string;
   query: FilterDsl;
+  /**
+   * PTR-01 — column overrides snapshot merged into the preset (the old
+   * "saved view" role). null/absent = filter-only preset (legacy shape).
+   */
+  columns?: GridColumnOverride[] | null;
   is_built_in: boolean;
   is_system: boolean;
   sort_order: number;
@@ -53,6 +59,7 @@ export interface UseSmartPresetsResult {
     name: { pl: string; en: string };
     icon: string;
     query: FilterDsl;
+    columns?: GridColumnOverride[] | null;
   }) => Promise<SmartFilterPreset>;
   remove: (id: string) => Promise<void>;
 }
