@@ -42,6 +42,11 @@
                 <option name="jsonb">true</option>
             </options>
         </field>
+        <field name="outboundFilter" type="json" column="outbound_filter" nullable="true">
+            <options>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
         <field name="conflictPolicy" type="string" length="16" column="conflict_policy"/>
         <field name="matchKeyMapping" type="string" length="255" column="match_key_mapping" nullable="true"/>
         <field name="enabled" type="boolean">

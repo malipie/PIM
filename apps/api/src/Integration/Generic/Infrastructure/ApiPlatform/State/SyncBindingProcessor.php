@@ -83,6 +83,7 @@ final readonly class SyncBindingProcessor implements ProcessorInterface
         $binding->setConflictPolicy(ConflictPolicy::from($data->conflictPolicy));
         $binding->setMatchKeyMapping($data->matchKeyMapping);
         $binding->setEnabled($data->enabled);
+        $binding->setOutboundFilter([] === $data->outboundFilter ? null : $data->outboundFilter);
 
         // Persist first so the tenant is stamped, then compute the (jittered)
         // next run off the assigned tenant.
@@ -125,6 +126,10 @@ final readonly class SyncBindingProcessor implements ProcessorInterface
         }
         if (null !== $data->matchKeyMapping) {
             $binding->setMatchKeyMapping($data->matchKeyMapping);
+        }
+        if (null !== $data->outboundFilter) {
+            // `[]` is the explicit "clear the scope" signal (send all again).
+            $binding->setOutboundFilter([] === $data->outboundFilter ? null : $data->outboundFilter);
         }
         if (null !== $data->enabled) {
             $binding->setEnabled($data->enabled);

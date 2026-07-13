@@ -45,4 +45,13 @@ final class SyncBindingPatchInput
 
     #[Groups(['sync_binding:patch'])]
     public ?bool $enabled = null;
+
+    /**
+     * #2549 — FilterDsl snapshot scoping the OUTBOUND push. Present-and-empty
+     * (`[]`) clears the scope (send all); absent = leave unchanged.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[Groups(['sync_binding:patch'])]
+    public ?array $outboundFilter = null;
 }

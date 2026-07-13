@@ -89,7 +89,7 @@ final readonly class OutboundSyncRunner
         // and the reader queries each object's values into the unit of work —
         // both accumulate across a 50k push, so clear every CLEAR_EVERY records
         // and reload the entities the loop keeps mutating.
-        foreach ($this->reader->read($binding->getObjectTypeId(), $codes) as $record) {
+        foreach ($this->reader->read($binding->getObjectTypeId(), $codes, $binding->getOutboundFilter()) as $record) {
             $this->push($run, $binding, $writeEndpoint, $record, $mappings, $matchCode, $action, $dryRun);
             $this->em->flush();
 

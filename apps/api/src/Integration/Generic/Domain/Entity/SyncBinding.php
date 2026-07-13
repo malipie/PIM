@@ -59,6 +59,18 @@ class SyncBinding extends AggregateRoot implements TenantScoped
 
     private string $conflictPolicy = ConflictPolicy::Lww->value;
 
+    /**
+     * #2549 — rule-based OUTBOUND scope: a FilterDsl snapshot narrowing which
+     * objects PIM sends to the remote (e.g. only `status = published`). null /
+     * empty = send every object of the type (backward-compat). Applies only to
+     * the write (outbound) flow; inbound reads ignore it. Compiled at run time
+     * via the Catalog FilterDslResolver in the Export reader, so a malformed
+     * DSL fails the run rather than the save (the FE builder emits valid DSL).
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $outboundFilter = null;
+
     /** The PIM target acting as the upsert match key; null until mappings are set. */
     #[Assert\Length(max: 255)]
     private ?string $matchKeyMapping = null;
@@ -209,6 +221,23 @@ class SyncBinding extends AggregateRoot implements TenantScoped
     public function setConflictPolicy(ConflictPolicy $conflictPolicy): void
     {
         $this->conflictPolicy = $conflictPolicy->value;
+        $this->touch();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getOutboundFilter(): ?array
+    {
+        return $this->outboundFilter;
+    }
+
+    /**
+     * @param array<string, mixed>|null $outboundFilter
+     */
+    public function setOutboundFilter(?array $outboundFilter): void
+    {
+        $this->outboundFilter = $outboundFilter;
         $this->touch();
     }
 

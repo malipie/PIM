@@ -7,7 +7,7 @@ import { useNavigate, useParams } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
-
+import type { FilterDsl } from '@/lib/filters/filter-dsl';
 import {
   ApiToggle,
   Field,
@@ -17,6 +17,7 @@ import {
   type SyncDirection,
 } from '../../components/primitives';
 import type { RemoteEndpointRow } from '../wizard/steps/StepEndpoints';
+import { OutboundFilterSection } from './OutboundFilterSection';
 import { DirDiagram, EndpointSelect, ReadonlyValue } from './sync-components';
 
 type ConflictPolicy = 'lww' | 'pim_wins' | 'remote_wins';
@@ -34,6 +35,7 @@ interface SyncBindingRow {
   cursor: { field?: string; type?: string; state?: unknown } | null;
   isEnabled: boolean;
   nextRun: string | null;
+  outboundFilter: FilterDsl | null; // #2549 — outbound scope (null = send all)
 }
 
 interface ObjectTypeRow {
@@ -109,6 +111,7 @@ export function SyncConfigScreen({ embedded = false }: { embedded?: boolean } = 
   const [writeEndpointId, setWriteEndpointId] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [newObjectTypeId, setNewObjectTypeId] = useState('');
+  const [outboundFilterDsl, setOutboundFilterDsl] = useState<FilterDsl | null>(null);
 
   // Hydrate the form from the loaded binding.
   useEffect(() => {
@@ -121,6 +124,7 @@ export function SyncConfigScreen({ embedded = false }: { embedded?: boolean } = 
     setReadEndpointId(binding.readEndpointId ?? '');
     setWriteEndpointId(binding.writeEndpointId ?? '');
     setEnabled(binding.isEnabled);
+    setOutboundFilterDsl(binding.outboundFilter);
   }, [binding]);
 
   const cronHuman =
@@ -174,6 +178,8 @@ export function SyncConfigScreen({ embedded = false }: { embedded?: boolean } = 
           readEndpoint: dir === 'outbound' ? null : readEndpointId === '' ? null : readEndpointId,
           writeEndpoint: dir === 'inbound' ? null : writeEndpointId === '' ? null : writeEndpointId,
           enabled,
+          // #2549 — `[]` clears; inbound never carries a PIM-side filter.
+          outboundFilter: dir === 'inbound' ? [] : (outboundFilterDsl ?? []),
         },
         successNotification: false,
       },
@@ -352,11 +358,8 @@ export function SyncConfigScreen({ embedded = false }: { embedded?: boolean } = 
               <div className="mb-2 text-[10.5px] font-medium uppercase tracking-wider text-zinc-500">
                 {t('api_configurator.sync.schedule.next_run')}
               </div>
-              {/* The API omits `nextRun` entirely when the binding has no
-                  schedule, so the value is `undefined` (not `null`) — a strict
-                  `!== null` would fall through to `new Date(undefined)` →
-                  "Invalid Date". Loose `!= null` catches both, matching
-                  DetailOverview. */}
+              {/* Loose `!= null`: the API omits `nextRun` (undefined) when
+                  unscheduled, so `!== null` would hit `new Date(undefined)`. */}
               {binding.nextRun != null ? (
                 <div className="flex items-center gap-2 text-[12px]">
                   <span className="h-1.5 w-1.5 rounded-full bg-zinc-900" />
@@ -409,6 +412,11 @@ export function SyncConfigScreen({ embedded = false }: { embedded?: boolean } = 
               </SecurityNote>
             </div>
           </section>
+        ) : null}
+
+        {/* #2549 — outbound scope; absent for inbound (no PIM-side import filter). */}
+        {dir !== 'inbound' ? (
+          <OutboundFilterSection dsl={outboundFilterDsl} onDslChange={setOutboundFilterDsl} />
         ) : null}
 
         {/* Conflict — bidirectional only */}
