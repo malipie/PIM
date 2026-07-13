@@ -33,6 +33,7 @@ const ROUTE_CRUMBS: RouteCrumb[] = [
   },
   { match: /^\/integrations/, segments: [{ key: 'nav.integrations' }] },
   { match: /^\/products/, segments: [{ key: 'nav.products' }] },
+  { match: /^\/workflow/, segments: [{ key: 'nav.workflow' }] },
   { match: /^\/modeling/, segments: [{ key: 'nav.modeling' }] },
   { match: /^\/assets/, segments: [{ key: 'nav.multimedia' }] },
   { match: /^\/catalogs-pdf/, segments: [{ key: 'nav.catalogsPdf' }] },
