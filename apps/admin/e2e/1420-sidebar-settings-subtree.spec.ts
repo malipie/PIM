@@ -45,7 +45,8 @@ test.describe('NUI-01 — settings subtree in main sidebar', () => {
     await page.goto('/dashboard');
 
     const nav = page.locator('nav').first();
-    await expect(nav.getByRole('link', { name: /dashboard|pulpit/i })).toBeVisible();
+    // The dashboard entry was renamed "Pulpit" → "Workspace" (#2561).
+    await expect(nav.getByRole('link', { name: 'Workspace', exact: true })).toBeVisible();
 
     // No CUSTOM tag anywhere in the sidebar — holds in every environment.
     await expect(nav.getByText('CUSTOM', { exact: true })).toHaveCount(0);
