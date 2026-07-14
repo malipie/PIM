@@ -1099,8 +1099,8 @@
       "branding_logo_label": "Logo URL",
       "branding_logo_hint": "A direct link to an image file (PNG/SVG).",
       "mapping_title": "Field mapping",
-      "mapping_subtitle": "Map the template slots to attribute codes. Defaults are prefilled — change them if needed.",
-      "mapping_placeholder": "attribute code",
+      "mapping_subtitle": "Map the template slots to attributes. Defaults are prefilled — change them if needed.",
+      "mapping_placeholder": "Choose attribute",
       "mapping_hint": "Empty slots are skipped during rendering.",
       "slot": {
         "title": "Product name",

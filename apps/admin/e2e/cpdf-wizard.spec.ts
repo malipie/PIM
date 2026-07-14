@@ -27,8 +27,21 @@ test('CPDF-P5-02 — catalog wizard: steps, generate, navigate back, a11y', asyn
       json: { member: [{ id: PRODUCT_OT_ID, code: 'product', kind: 'product', builtIn: true }] },
     }),
   );
-  // Attribute catalog for the filter panel — keep it empty + deterministic.
-  await page.route('**/api/attributes**', (route) => route.fulfill({ json: { member: [] } }));
+  // Attribute catalog for the filter panel + the field-mapping pickers (#2570).
+  // Includes the default mapping targets so the prefilled slots resolve.
+  await page.route('**/api/attributes**', (route) =>
+    route.fulfill({
+      json: {
+        member: [
+          { id: 'a-name', code: 'name', label: { pl: 'Nazwa', en: 'Name' } },
+          { id: 'a-sku', code: 'sku', label: { pl: 'SKU', en: 'SKU' } },
+          { id: 'a-image', code: 'main_image', label: { pl: 'Zdjęcie', en: 'Image' } },
+          { id: 'a-desc', code: 'description', label: { pl: 'Opis', en: 'Description' } },
+          { id: 'a-price', code: 'price', label: { pl: 'Cena', en: 'Price' } },
+        ],
+      },
+    }),
+  );
 
   const previewCalls: unknown[] = [];
   await page.route('**/api/catalogs/preview', async (route) => {
@@ -80,8 +93,11 @@ test('CPDF-P5-02 — catalog wizard: steps, generate, navigate back, a11y', asyn
   await page.getByLabel(/nazwa firmy|company name/i).fill('Acme');
   await next.click();
 
-  // Step 4 — mapping: keep the prefilled defaults.
-  await expect(page.getByLabel(/nazwa produktu|product name/i)).toHaveValue('name');
+  // Step 4 — mapping: the attribute picker (#2570) is prefilled with the
+  // template default; the "title" slot resolves to the `name` attribute.
+  await expect(page.getByRole('button', { name: /nazwa produktu|product name/i })).toContainText(
+    'name',
+  );
   await next.click();
 
   // Step 5 — preview: refresh renders the mocked HTML sample.

@@ -1,14 +1,16 @@
 import { useTranslation } from 'react-i18next';
 
+import { AttributePicker } from '@/components/catalog/attribute-picker';
+
 import { SHEET_SLOTS } from '../types';
 import { useCatalogWizard } from '../wizard-store';
 
 /**
  * CPDF-P5-02 step 4 — field mapping. For each `sheet` slot (title/sku/image/
- * description/price) a labelled attribute-code input, prefilled with the
- * template defaults (title→name, sku→sku, image→main_image, …). MVP keeps
- * this as free-text inputs — a full attribute picker is deferred; the BE
- * treats each ref as an attribute code. Empty inputs drop from the payload.
+ * description/price) an attribute picker (#2570 — replaced the free-text code
+ * input), prefilled with the template defaults (title→name, sku→sku,
+ * image→main_image, …). The BE treats each ref as an attribute code; an empty
+ * slot drops from the payload.
  */
 export function StepMapping() {
   const { t } = useTranslation();
@@ -23,24 +25,18 @@ export function StepMapping() {
 
       <div className="mt-5 space-y-3">
         {SHEET_SLOTS.map((slot) => {
-          const inputId = `catalog-mapping-${slot}`;
+          const slotLabel = t(`catalogs_pdf.wizard.slot.${slot}`);
           return (
             <div
               key={slot}
               className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[180px_1fr]"
             >
-              <label htmlFor={inputId} className="text-[13px] font-medium text-ink">
-                {t(`catalogs_pdf.wizard.slot.${slot}`)}
-              </label>
-              <input
-                id={inputId}
-                type="text"
-                value={state.fieldMappings[slot]}
-                onChange={(event) =>
-                  dispatch({ type: 'SET_MAPPING', slot, ref: event.target.value })
-                }
+              <span className="text-[13px] font-medium text-ink">{slotLabel}</span>
+              <AttributePicker
+                value={state.fieldMappings[slot] || null}
+                onChange={(next) => dispatch({ type: 'SET_MAPPING', slot, ref: next?.code ?? '' })}
+                ariaLabel={slotLabel}
                 placeholder={t('catalogs_pdf.wizard.mapping_placeholder')}
-                className="focus-ring h-10 w-full rounded-xl border border-zinc-200 bg-surface px-3 font-mono text-[13px]"
               />
             </div>
           );
