@@ -1094,7 +1094,7 @@
       "scope_locale_default": "Tenant default language",
       "scope_locale_hint": "Controls attribute value resolution during rendering.",
       "archetype_title": "Choose a layout",
-      "archetype_subtitle": "The \"Product sheet\" layout is ready in the MVP. Grid and price list arrive in module M6.",
+      "archetype_subtitle": "Choose a catalog layout: Product sheet, Grid or Price list.",
       "archetype_group_aria": "Catalog layouts",
       "branding_title": "Branding",
       "branding_subtitle": "The brand color, company name and logo appear in the catalog header. All fields are optional.",

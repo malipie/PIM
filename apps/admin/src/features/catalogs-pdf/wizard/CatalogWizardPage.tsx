@@ -82,9 +82,9 @@ function WizardContent() {
     { id: 'generate', label: t('catalogs_pdf.wizard.steps.generate') },
   ];
 
-  // Step 2 (archetype) gates "Dalej" until a renderable archetype is chosen;
-  // only `sheet` is renderable in the MVP.
-  const nextDisabled = state.step === 1 && state.templateKind !== 'sheet';
+  // All three archetypes (sheet / grid / pricelist) are renderable (#2568),
+  // and a kind is always selected — no step gates the wizard here.
+  const nextDisabled = false;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
