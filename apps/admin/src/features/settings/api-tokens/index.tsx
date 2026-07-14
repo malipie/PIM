@@ -81,6 +81,26 @@ export function ApiTokensSettingsPage() {
         </Button>
       </header>
 
+      {/* #2573 — spell out what API tokens are for; the page title alone left
+          operators unsure whether the feature does anything. */}
+      <div className="flex gap-3 rounded-lg border border-zinc-200 bg-zinc-50/70 px-4 py-3 text-[13px] text-zinc-600">
+        <KeyRound className="mt-0.5 size-4 shrink-0 text-zinc-500" aria-hidden="true" />
+        <div className="space-y-1.5">
+          <p>
+            {t('settings.api_tokens.help_purpose', {
+              defaultValue:
+                'Tokeny API pozwalają integracjom, skryptom i systemom zewnętrznym wywoływać to samo API co panel — bez logowania e-mailem. Każdy token ma własne uprawnienia (scopes) i można go w każdej chwili unieważnić.',
+            })}
+          </p>
+          <p className="text-zinc-500">
+            {t('settings.api_tokens.help_usage', { defaultValue: 'Użycie w nagłówku żądania:' })}{' '}
+            <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[12px] text-zinc-700 ring-1 ring-zinc-200">
+              Authorization: Token cortex_…
+            </code>
+          </p>
+        </div>
+      </div>
+
       <div className="inline-flex rounded-md border bg-background p-0.5">
         <ScopeButton
           active={scope === 'own'}

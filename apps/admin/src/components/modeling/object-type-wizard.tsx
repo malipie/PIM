@@ -13,7 +13,6 @@ import { DeclareObjectTypeAttributeGroupDialog } from '@/components/modeling/dec
 import { DisplayModeSegmented } from '@/components/modeling/group-card';
 import { DEFAULT_WIZARD_ICONS } from '@/components/modeling/icon-picker';
 import { LocaleTabsField } from '@/components/modeling/locale-tabs-field';
-import { ObjectTypeIcon } from '@/components/modeling/object-type-icon';
 import { SettingToggleRow } from '@/components/modeling/setting-toggle-row';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -844,21 +843,20 @@ export function ObjectTypeWizard() {
               <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
                 {t('object_type_wizard.preview_label', { defaultValue: 'Podgląd' })}
               </div>
-              <div className="flex items-center gap-3">
-                <ObjectTypeIcon icon={icon} color={color} size="sm" />
-                <div>
-                  <div className="text-[14px] font-semibold tracking-tight">
-                    {namePrimary ||
-                      t('object_type_wizard.preview_default_name', {
-                        defaultValue: 'Nowy typ',
-                      })}
-                  </div>
-                  <div className="font-mono text-[11.5px] text-zinc-500">
-                    {code ||
-                      t('object_type_wizard.preview_default_code', {
-                        defaultValue: 'code…',
-                      })}
-                  </div>
+              {/* #2578 follow-up — no icon/color badge; the preview shows just
+                  the name + code (icon/color are not user-chosen anymore). */}
+              <div>
+                <div className="text-[14px] font-semibold tracking-tight">
+                  {namePrimary ||
+                    t('object_type_wizard.preview_default_name', {
+                      defaultValue: 'Nowy typ',
+                    })}
+                </div>
+                <div className="font-mono text-[11.5px] text-zinc-500">
+                  {code ||
+                    t('object_type_wizard.preview_default_code', {
+                      defaultValue: 'code…',
+                    })}
                 </div>
               </div>
             </CardContent>
