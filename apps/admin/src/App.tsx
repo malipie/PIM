@@ -36,6 +36,12 @@ function lazyPage<K extends string, T extends Record<K, ComponentType<never>>>(
   return lazy(() => loader().then((m) => ({ default: m[exportName] as ComponentType<unknown> })));
 }
 
+/** #2574 — preserve the definition id when redirecting the old settings path. */
+function WorkflowDefinitionEditRedirect(): React.ReactElement {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/workflow/definitions/${id}/edit`} replace />;
+}
+
 const AgentInboxPage = lazyPage(
   () => import('@/features/agent/inbox/AgentInboxPage'),
   'AgentInboxPage',
@@ -610,6 +616,33 @@ function App() {
                       </PermissionRoute>
                     }
                   />
+                  {/* #2574 — custom workflow definitions moved out of Settings
+                      into the Workflow hub. Old /settings/workflow* paths
+                      redirect below. */}
+                  <Route
+                    path="/workflow/definitions"
+                    element={
+                      <PermissionRoute anyOf={['workflow.manage_definitions']}>
+                        <WorkflowSettingsPage />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/workflow/definitions/new"
+                    element={
+                      <PermissionRoute anyOf={['workflow.manage_definitions']}>
+                        <WorkflowDefinitionEditorRoute />
+                      </PermissionRoute>
+                    }
+                  />
+                  <Route
+                    path="/workflow/definitions/:id/edit"
+                    element={
+                      <PermissionRoute anyOf={['workflow.manage_definitions']}>
+                        <WorkflowDefinitionEditorRoute />
+                      </PermissionRoute>
+                    }
+                  />
                   <Route
                     path="/catalogs-pdf"
                     element={
@@ -681,33 +714,17 @@ function App() {
                     <Route path="tenant" element={<TenantSettingsPage />} />
                     <Route path="ai" element={<AiSettingsPage />} />
                     <Route path="sso" element={<SsoSettingsPage />} />
-                    {/* WFL-P5-03 (#2433) — definition builder; the page is
-                      additionally hidden by the workflow_custom_definitions
-                      feature flag (sidebar + FeatureRoute below). */}
+                    {/* #2574 — the definition builder moved to /workflow/
+                      definitions*; keep the old settings paths as redirects. */}
                     <Route
                       path="workflow"
-                      element={
-                        <PermissionRoute anyOf={['workflow.manage_definitions']}>
-                          <WorkflowSettingsPage />
-                        </PermissionRoute>
-                      }
+                      element={<Navigate to="/workflow/definitions" replace />}
                     />
                     <Route
                       path="workflow/new"
-                      element={
-                        <PermissionRoute anyOf={['workflow.manage_definitions']}>
-                          <WorkflowDefinitionEditorRoute />
-                        </PermissionRoute>
-                      }
+                      element={<Navigate to="/workflow/definitions/new" replace />}
                     />
-                    <Route
-                      path="workflow/:id/edit"
-                      element={
-                        <PermissionRoute anyOf={['workflow.manage_definitions']}>
-                          <WorkflowDefinitionEditorRoute />
-                        </PermissionRoute>
-                      }
-                    />
+                    <Route path="workflow/:id/edit" element={<WorkflowDefinitionEditRedirect />} />
                   </Route>
                   {/* RBAC-P5-019 (#709) — Super Admin operator panel.
                     Lives under /admin/* inside the existing app until

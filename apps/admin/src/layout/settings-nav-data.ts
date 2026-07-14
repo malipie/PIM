@@ -1,7 +1,6 @@
 import {
   Building2,
   CreditCard,
-  GitBranch,
   Globe,
   Key,
   KeyRound,
@@ -64,15 +63,9 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
       // DP-03 (#2033): Locales + Channels moved to Modeling (/modeling/locales,
       // /modeling/channels) — they are data-model dimensions, not settings.
       { to: '/settings/ai', icon: Sparkles, labelKey: 'settings.nav.ai' },
-      // WFL-P5-03 (#2433) — definition builder; deployment-flagged and
-      // gated by workflow.manage_definitions (Owner/Admin).
-      {
-        to: '/settings/workflow',
-        icon: GitBranch,
-        labelKey: 'settings.nav.workflow',
-        permission: 'workflow.manage_definitions',
-        featureFlag: 'workflow_custom_definitions',
-      },
+      // WFL-P5-03 (#2433) — definition builder moved out of Settings into the
+      // Workflow hub (#2574): /workflow/definitions, reachable from the
+      // WorkflowPage "Definicje przepływu" CTA.
     ],
   },
   {

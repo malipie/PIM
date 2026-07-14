@@ -27,7 +27,9 @@ test('definition builder: custom place shows up on the product without a deploy'
   const definitionName = `E2E builder ${Date.now().toString(36)}`;
 
   try {
-    await page.goto('/settings/workflow');
+    // #2574 — the definition builder moved out of Settings into the Workflow
+    // hub. The old /settings/workflow path still redirects here.
+    await page.goto('/workflow/definitions');
     await expect(page.getByTestId('workflow-definitions-page')).toBeVisible();
 
     // Accessibility gate on the list page (serious/critical only, per DoD).

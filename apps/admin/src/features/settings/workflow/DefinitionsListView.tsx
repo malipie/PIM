@@ -74,7 +74,7 @@ export function DefinitionsListView() {
           </p>
         </div>
         <Button
-          onClick={() => void navigate('/settings/workflow/new')}
+          onClick={() => void navigate('/workflow/definitions/new')}
           data-testid="definition-create"
         >
           <Plus className="mr-1 size-4" />
@@ -143,7 +143,7 @@ export function DefinitionsListView() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => void navigate(`/settings/workflow/${definition.id}/edit`)}
+                onClick={() => void navigate(`/workflow/definitions/${definition.id}/edit`)}
                 data-testid={`definition-edit-${definition.name}`}
               >
                 <Pencil className="mr-1 size-3.5" />

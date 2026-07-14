@@ -1,11 +1,11 @@
-import { SlidersHorizontal } from 'lucide-react';
+import { GitBranch, SlidersHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
 import { PillTabs } from '@/components/ui-v2/pill-tabs';
 import { usePageActions } from '@/layout/page-actions-context';
-import { useIdentity } from '@/lib/identity';
+import { hasFeature, useIdentity } from '@/lib/identity';
 
 import { ReviewQueuePage } from './ReviewQueuePage';
 import { TasksPanel } from './TasksPanel';
@@ -22,22 +22,38 @@ export function WorkflowPage() {
   const { identity } = useIdentity();
   const canDecide = identity?.permissions.has('workflow.approve_reject') ?? false;
   const canManageDefinitions = identity?.permissions.has('workflow.manage_definitions') ?? false;
+  // #2574 — custom definitions live in the hub now, gated by the same flag the
+  // old Settings entry used.
+  const showDefinitions =
+    canManageDefinitions && hasFeature(identity, 'workflow_custom_definitions');
   const [tab, setTab] = useState('review');
 
   usePageActions(
     useMemo(
       () =>
         canManageDefinitions ? (
-          <Link
-            to="/workflow/settings"
-            data-testid="workflow-settings-cta"
-            className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-zinc-900 px-3.5 text-[13px] font-semibold text-white transition hover:bg-zinc-800"
-          >
-            <SlidersHorizontal className="size-4" aria-hidden="true" />
-            {t('workflow.settings_cta', { defaultValue: 'Ustawienia przepływu' })}
-          </Link>
+          <div className="flex items-center gap-2">
+            {showDefinitions ? (
+              <Link
+                to="/workflow/definitions"
+                data-testid="workflow-definitions-cta"
+                className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 text-[13px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
+              >
+                <GitBranch className="size-4" aria-hidden="true" />
+                {t('workflow.definitions_cta', { defaultValue: 'Definicje przepływu' })}
+              </Link>
+            ) : null}
+            <Link
+              to="/workflow/settings"
+              data-testid="workflow-settings-cta"
+              className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-zinc-900 px-3.5 text-[13px] font-semibold text-white transition hover:bg-zinc-800"
+            >
+              <SlidersHorizontal className="size-4" aria-hidden="true" />
+              {t('workflow.settings_cta', { defaultValue: 'Ustawienia przepływu' })}
+            </Link>
+          </div>
         ) : null,
-      [canManageDefinitions, t],
+      [canManageDefinitions, showDefinitions, t],
     ),
   );
 
