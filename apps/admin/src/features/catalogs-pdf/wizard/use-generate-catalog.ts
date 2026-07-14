@@ -2,7 +2,13 @@ import { useState } from 'react';
 
 import { jsonFetch } from '@/lib/http';
 
-import { type CatalogWizardState, SHEET_SLOTS } from './types';
+import {
+  type CatalogTemplateKind,
+  type CatalogWizardState,
+  INITIAL_CATALOG_WIZARD_STATE,
+  SHEET_SLOTS,
+  type SheetSlot,
+} from './types';
 
 /** One field-mapping entry in the BE contract shape. */
 export interface FieldMappingPayload {
@@ -68,6 +74,45 @@ export function buildCreatePayload(
     payload.locale = state.locale;
   }
   return payload;
+}
+
+/** Shape of GET /api/catalogs/{id} that the edit flow reads (#2566). */
+export interface CatalogResponse {
+  name?: string;
+  template_kind?: string;
+  branding?: { color?: string; company_name?: string; logo?: string } | null;
+  field_mappings?: Array<{ slot?: string; source?: { ref?: string } }> | null;
+  filter?: CatalogWizardState['filterDsl'];
+  locale?: string | null;
+}
+
+/**
+ * #2566 — map a GET /api/catalogs/{id} response back into the wizard draft so
+ * the edit flow opens prefilled. Field mappings come back as {slot, source:
+ * {ref}} and collapse to the store's {slot: ref} shape.
+ */
+export function catalogResponseToWizardState(res: CatalogResponse): CatalogWizardState {
+  const branding = res.branding ?? {};
+  const fieldMappings = { ...INITIAL_CATALOG_WIZARD_STATE.fieldMappings };
+  for (const entry of res.field_mappings ?? []) {
+    if (typeof entry.slot === 'string' && entry.slot in fieldMappings) {
+      fieldMappings[entry.slot as SheetSlot] = entry.source?.ref ?? '';
+    }
+  }
+  return {
+    ...INITIAL_CATALOG_WIZARD_STATE,
+    name: res.name ?? '',
+    templateKind: (res.template_kind as CatalogTemplateKind | undefined) ?? 'sheet',
+    branding: {
+      color: branding.color ?? INITIAL_CATALOG_WIZARD_STATE.branding.color,
+      company_name: branding.company_name ?? '',
+      logo: branding.logo ?? '',
+    },
+    fieldMappings,
+    filterDsl: res.filter ?? null,
+    locale: res.locale ?? null,
+    dirty: false,
+  };
 }
 
 /** Build the POST /api/catalogs/preview body from the wizard draft. */
@@ -144,5 +189,30 @@ export function useGenerateCatalog() {
     }
   };
 
-  return { preview, createAndGenerate, isRunning };
+  /**
+   * #2566 — persist edits to an existing catalog. PATCH the config (name,
+   * template, branding, mappings, filter, locale); regeneration stays a
+   * separate explicit action (the hub's "Regeneruj" button).
+   */
+  const updateCatalog = async (id: string, state: CatalogWizardState): Promise<void> => {
+    setIsRunning(true);
+    try {
+      await jsonFetch(`/api/catalogs/${id}`, {
+        method: 'PATCH',
+        accept: 'application/json',
+        body: {
+          name: state.name.trim(),
+          template_kind: state.templateKind,
+          branding: buildBranding(state),
+          field_mappings: buildFieldMappings(state),
+          filter: state.filterDsl,
+          locale: state.locale !== null && state.locale !== '' ? state.locale : null,
+        },
+      });
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  return { preview, createAndGenerate, updateCatalog, isRunning };
 }
