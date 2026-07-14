@@ -3,6 +3,14 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-14: Follow-up smoke #2 — obrazy w PDF OOM + worker cache + rezydualny flicker (#2599/#2600/#2601)
+- **Kontekst:** po pierwszej rundzie operator retestował i wykrył (a) generacja PDF „trwa 2 min i nic", (b) rezydualny „przeskok" assetów. Oba to follow-upy/regresje z pierwszej rundy.
+- **✅ #2601 (merged) — obrazy w PDF OOM (REGRESJA #2597):** #2597 osadzało wariant medium (800px); Dompdf dekoduje do surowej bitmapy (~1.9 MB/obraz) i trzyma cały doc w pamięci → 305 produktów >> 256 MB → **Fatal OOM → run wisi „pending"**. Fix: inliner preferuje thumb (200px, ~16× mniej pamięci). Live: 305 produktów `done` w ~13 s, 3 MB (było 34 MB/OOM), 185 obrazów osadzonych. Wysoka rozdzielczość → Gotenberg.
+- **✅ #2599 (merged) — worker boot cache:clear (root cause „nic nie generuje"):** worker `APP_DEBUG=0` → Symfony nie przebudowuje kontenera DI przy zmianie kodu; po pull #2597 (nowy arg konstruktora) stały kontener → `TypeError` → dead-letter. Fix: `cache:clear` w boot-command workera (własny `APP_CACHE_DIR`, nie tyka api). Restart workera zawsze podnosi nowy kod. Prod ma własny command.
+- **✅ #2600 (merged) — rezydualny flicker assetów:** skeleton z #2596 miał sztywno 10 kart → wejście do folderu z 102-kartowego widoku kurczyło stronę 102→10→N (double jump). Fix: skeleton rozmiaru wychodzącego gridu (`assets.length` z keepPreviousData, cap 120) → jedno osadzenie.
+- **Recovery dla operatora (po każdym pull zmiany DI):** `docker compose exec worker php bin/console cache:clear && docker compose restart worker`.
+- **Lekcje → lessons.md:** (1) osadzając obrazy w in-memory rendererze użyj NAJMNIEJSZEGO wariantu (surowa bitmapa ≈16× pliku). (2) zmiana konstruktora serwisu workera wymaga worker cache:clear (debug=0 nie auto-rebuild). (3) „run wisi pending" → `messenger:failed:show` + logi na OOM, nie zakładaj infra. (4) cleanup: usuwaj tylko własne dane sesji.
+
 ## 2026-07-14: Runda smoke #2 — operator złapał 4 tickety „done" które nie działały + 2 pytania (#2595/#2596/#2597)
 - **Kontekst:** operator zrobił manual smoke po maratonie i wykrył 6 problemów — **4 z nich to tickety, które oznaczyłem jako „done", a nie działały end-to-end** (złamany CLOSED-MEANS-CLOSED). Naprawa jako 3 PR-y, każdy zweryfikowany na żywo.
 - **✅ #2595 (merged) — UI polish:** (1) bazowy `Button` dostał `cursor-pointer` + `disabled:cursor-not-allowed` (przycisk „Zastosuj filtr" wyglądał na martwy); (2) `/settings/api-tokens` — callout wyjaśniający przeznaczenie (zweryfikowane na żywo: `Authorization: Token cortex_…` → `GET /api/products` 200, feature DZIAŁA → NIE usunięto, tylko objaśniono); (3) usunięty badge ikony z bloczka „Podgląd" wizarda ObjectType.
