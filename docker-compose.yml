@@ -243,7 +243,15 @@ services:
     # fires its daily cron; without a consumer the schedule is inert.
     # APIC-P3-09 — `scheduler_integration_sync` drains the SyncSchedule per-minute
     # tick that fires due sync bindings (integration:sync:dispatch-due).
-    command: php bin/console messenger:consume import scheduler_maintenance scheduler_integration_sync --time-limit=3600 --memory-limit=256M
+    # #2597 follow-up — the worker runs APP_DEBUG=0, so Symfony does NOT rebuild
+    # the compiled container when source changes. After a pull that touches DI
+    # wiring (e.g. a new constructor arg) the stale container instantiates
+    # services with the old signature and every message dead-letters with a
+    # TypeError. A boot-time cache:clear rebuilds the container so a restart
+    # always picks up the new code; it clears only APP_CACHE_DIR
+    # (/app/var/cache-worker), never the api's tree, so it cannot corrupt live
+    # requests (the reason the old boot clear was removed — GOLIVE #2179).
+    command: sh -c "php bin/console cache:clear --no-warmup && php bin/console messenger:consume import scheduler_maintenance scheduler_integration_sync --time-limit=3600 --memory-limit=256M"
     environment:
       APP_ENV: ${APP_ENV:-dev}
       # WFL-P5-01 - the bulk change_status handler resolves the workflow
