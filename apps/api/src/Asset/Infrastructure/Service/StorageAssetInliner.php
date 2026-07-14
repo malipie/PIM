@@ -16,8 +16,15 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Reads an asset's bytes straight from storage and base64-encodes them into a
  * `data:` URI (CPDF #2569/#2570). Mirrors {@see \App\Asset\Presentation\Controller\PreviewAssetController}
- * variant selection, but prefers the medium (800px) variant — a print-friendly
- * size that keeps the PDF small without the thumbnail's loss of detail.
+ * variant selection, but prefers the THUMB (200px) variant.
+ *
+ * Why thumb, not medium: Dompdf (the default in-process renderer) decodes every
+ * embedded image to a raw bitmap and holds the whole document in PHP memory. An
+ * 800px JPEG expands to ~1.9 MB raw; a few hundred of them blow past the worker's
+ * 256 MB ceiling and the render dies with an OOM Fatal — so a catalog with images
+ * would not generate at all. A 200px thumb is ~16× smaller raw, keeping a
+ * full-cap (CATALOG_PDF_MAX_ITEMS) catalog inside the budget. Higher-fidelity
+ * output is the job of the Gotenberg sidecar (streams, no in-memory cap).
  *
  * Resolutions are memoised per instance: a catalog render resolves the same
  * logo once per document instead of once per product row.
@@ -90,10 +97,11 @@ final class StorageAssetInliner implements AssetInliner
             $variants[$variant->getVariantCode()] = [$variant->getStoragePath(), $variant->getMimeType()];
         }
 
-        // Print prefers medium (800) → thumb (200) → original when thumbnails
-        // are ready; falls back to the original blob otherwise.
+        // Memory-first order thumb (200) → medium (800) → original: the smallest
+        // variant that exists keeps the in-process renderer under its budget
+        // (see the class docblock). Only used when thumbnails are ready.
         if (ThumbnailsStatus::Ready === $asset->getThumbnailsStatus()) {
-            foreach ([AssetVariant::CODE_MEDIUM, AssetVariant::CODE_THUMB, AssetVariant::CODE_ORIGINAL] as $code) {
+            foreach ([AssetVariant::CODE_THUMB, AssetVariant::CODE_MEDIUM, AssetVariant::CODE_ORIGINAL] as $code) {
                 if (isset($variants[$code])) {
                     return $variants[$code];
                 }
