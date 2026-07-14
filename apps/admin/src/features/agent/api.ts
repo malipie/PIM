@@ -105,11 +105,12 @@ export type BulkContentMode = 'descriptions' | 'seo';
 export function previewContentCost(
   productCount: number,
   mode: BulkContentMode,
+  recipeId?: string,
 ): Promise<ContentCostEstimate> {
   return jsonFetch<ContentCostEstimate>('/api/agent/content/cost-preview', {
     ...JSON_OPTS,
     method: 'POST',
-    body: { product_count: productCount, mode },
+    body: { product_count: productCount, mode, ...(recipeId ? { recipe_id: recipeId } : {}) },
   });
 }
 
@@ -121,6 +122,7 @@ export function bulkGenerateContent(input: {
   objectTypeCode: string;
   mode: BulkContentMode;
   selectedIds: string[];
+  recipeId?: string;
 }): Promise<BulkGenerateContentResult> {
   return jsonFetch<BulkGenerateContentResult>('/api/agent/content/bulk-generate', {
     ...JSON_OPTS,
@@ -129,6 +131,7 @@ export function bulkGenerateContent(input: {
       object_type_code: input.objectTypeCode,
       mode: input.mode,
       selected_ids: input.selectedIds,
+      ...(input.recipeId ? { recipe_id: input.recipeId } : {}),
     },
   });
 }

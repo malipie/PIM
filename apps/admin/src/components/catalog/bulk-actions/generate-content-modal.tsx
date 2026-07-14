@@ -10,7 +10,17 @@ import {
   previewContentCost,
 } from '@/features/agent/api';
 import { OPEN_AGENT_CHAT_EVENT } from '@/features/agent/chat/AgentChatSheet';
+import { useContentRecipes } from '@/features/agent/hooks/use-content-recipes';
 import { cn } from '@/lib/utils';
+
+/**
+ * The SEO tool (generate_seo_text) applies title/meta length rules; everything
+ * else uses the general description writer. The backend picks the tool from
+ * `mode`, so derive it from the recipe's target attribute.
+ */
+function modeForTarget(targetAttribute: string): BulkContentMode {
+  return targetAttribute === 'meta_description' ? 'seo' : 'descriptions';
+}
 
 /**
  * AICG-P5-03 (#2341) / AICG-P6-03 (#2346) — bulk "Generuj opisy /
@@ -34,21 +44,30 @@ export function BulkGenerateContentModal({
   onStarted: () => void;
 }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<BulkContentMode>('descriptions');
+  const { recipes, isLoading: recipesLoading } = useContentRecipes();
+  // #2603 — the modal offers every content recipe (built-in + custom), not two
+  // hardcoded modes; a custom recipe was invisible here even though it showed
+  // in Settings → AI content. Default to the first recipe once they load.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
   const count = selectedIds.length;
+  const selectedRecipe = recipes.find((recipe) => recipe.id === selectedId) ?? recipes[0] ?? null;
+  const mode: BulkContentMode = selectedRecipe
+    ? modeForTarget(selectedRecipe.targetAttribute)
+    : 'descriptions';
+  const recipeId = selectedRecipe?.id;
 
   const { data: estimate, isLoading: isEstimating } = useQuery({
-    queryKey: ['content-cost-preview', count, mode],
-    queryFn: () => previewContentCost(count, mode),
-    enabled: count > 0,
+    queryKey: ['content-cost-preview', count, mode, recipeId],
+    queryFn: () => previewContentCost(count, mode, recipeId),
+    enabled: count > 0 && recipeId !== undefined,
   });
 
   const start = async () => {
     setIsStarting(true);
     try {
-      const result = await bulkGenerateContent({ objectTypeCode, mode, selectedIds });
+      const result = await bulkGenerateContent({ objectTypeCode, mode, selectedIds, recipeId });
       window.dispatchEvent(
         new CustomEvent(OPEN_AGENT_CHAT_EVENT, { detail: { runId: result.run_id } }),
       );
@@ -104,34 +123,47 @@ export function BulkGenerateContentModal({
             <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
               {t('aicg.bulk.mode_label', { defaultValue: 'Co wygenerować' })}
             </span>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setMode('descriptions')}
-                aria-pressed={mode === 'descriptions'}
-                className={cn(
-                  'h-10 rounded-lg border px-3 text-[12px] font-medium',
-                  mode === 'descriptions'
-                    ? 'border-zinc-900 bg-zinc-900 text-white'
-                    : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300',
-                )}
-              >
-                {t('aicg.bulk.mode_descriptions', { defaultValue: 'Opisy produktów' })}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('seo')}
-                aria-pressed={mode === 'seo'}
-                className={cn(
-                  'h-10 rounded-lg border px-3 text-[12px] font-medium',
-                  mode === 'seo'
-                    ? 'border-zinc-900 bg-zinc-900 text-white'
-                    : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300',
-                )}
-              >
-                {t('aicg.bulk.mode_seo', { defaultValue: 'Meta SEO' })}
-              </button>
-            </div>
+            {recipesLoading ? (
+              <div className="mt-2 text-[12.5px] text-zinc-500">
+                {t('aicg.bulk.recipes_loading', { defaultValue: 'Wczytuję przepisy…' })}
+              </div>
+            ) : recipes.length === 0 ? (
+              <div className="mt-2 text-[12.5px] text-zinc-500">
+                {t('aicg.bulk.recipes_empty', {
+                  defaultValue: 'Brak przepisów treści — dodaj je w Ustawienia → AI content.',
+                })}
+              </div>
+            ) : (
+              <div className="mt-2 grid gap-2" data-testid="bulk-generate-recipes">
+                {recipes.map((recipe) => {
+                  const active = selectedRecipe?.id === recipe.id;
+                  return (
+                    <button
+                      key={recipe.id}
+                      type="button"
+                      onClick={() => setSelectedId(recipe.id)}
+                      aria-pressed={active}
+                      className={cn(
+                        'flex flex-col items-start rounded-lg border px-3 py-2 text-left',
+                        active
+                          ? 'border-zinc-900 bg-zinc-900 text-white'
+                          : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300',
+                      )}
+                    >
+                      <span className="text-[12.5px] font-medium">{recipe.name}</span>
+                      <span
+                        className={cn(
+                          'font-mono text-[11px]',
+                          active ? 'text-zinc-300' : 'text-zinc-500',
+                        )}
+                      >
+                        → {recipe.targetAttribute}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div
@@ -167,7 +199,10 @@ export function BulkGenerateContentModal({
             <Button variant="ghost" onClick={onClose} disabled={isStarting}>
               {t('app.cancel', { defaultValue: 'Anuluj' })}
             </Button>
-            <Button onClick={() => void start()} disabled={isStarting || count === 0}>
+            <Button
+              onClick={() => void start()}
+              disabled={isStarting || count === 0 || recipeId === undefined}
+            >
               {t('aicg.bulk.start', { defaultValue: 'Generuj' })}
             </Button>
           </div>

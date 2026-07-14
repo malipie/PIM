@@ -7,10 +7,37 @@ import { loginAsAdmin } from './helpers/auth';
  * the dedicated bulk path (POST /api/agent/content/bulk-generate, 202).
  * The agent content API is intercepted (CI has no BYOK key — the 2246/P5a
  * convention).
+ *
+ * #2603 — the modal now offers EVERY content recipe (built-in + custom), so a
+ * custom recipe is selectable and its id reaches the backend.
  */
 
 const RUN_ID = '019f0000-0000-7000-8000-0000000b1b1b';
 const BATCH_ID = '019f0000-0000-7000-8000-0000000ba7c1';
+
+const RECIPES = [
+  {
+    id: 'r-seo',
+    code: 'meta_seo',
+    name: 'Meta SEO',
+    targetAttribute: 'meta_description',
+    builtIn: true,
+  },
+  {
+    id: 'r-custom',
+    code: 'ext_desc',
+    name: 'Opis Rozbudowany',
+    targetAttribute: 'description_html',
+    builtIn: false,
+  },
+  {
+    id: 'r-desc',
+    code: 'product_description',
+    name: 'Opis produktu',
+    targetAttribute: 'description',
+    builtIn: true,
+  },
+];
 
 function estimateBody(count: number) {
   return {
@@ -28,9 +55,16 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('i18nextLng', 'pl');
   });
+  await page.route('**/api/content-recipes', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ member: RECIPES }),
+    }),
+  );
 });
 
-test('bulk generate previews the cost and starts one run via the bulk path', async ({ page }) => {
+test('bulk generate offers every recipe and sends the chosen recipe id', async ({ page }) => {
   let capturedPreview: Record<string, unknown> | null = null;
   let capturedGenerate: Record<string, unknown> | null = null;
 
@@ -94,22 +128,30 @@ test('bulk generate previews the cost and starts one run via the bulk path', asy
 
   await page.getByTestId('bulk-generate-content').click();
   await expect(page.getByTestId('bulk-generate-count')).toContainText('2');
-  // The backend preview drives the estimate line.
-  await expect(page.getByTestId('bulk-generate-estimate')).toContainText('USD');
-  await expect.poll(() => capturedPreview !== null).toBeTruthy();
-  expect((capturedPreview as { product_count?: number })?.product_count).toBe(2);
 
-  // Switch to SEO mode and start via the bulk-generate endpoint.
-  await page.getByRole('button', { name: /meta seo/i }).click();
+  // #2603 — the custom recipe is now a selectable option (was invisible before).
+  const recipes = page.getByTestId('bulk-generate-recipes');
+  await expect(recipes.getByRole('button', { name: /Opis Rozbudowany/ })).toBeVisible();
+  await expect(recipes.getByRole('button', { name: /Meta SEO/ })).toBeVisible();
+  await expect(recipes.getByRole('button', { name: /Opis produktu/ })).toBeVisible();
+
+  // Pick the custom recipe; the cost preview refetches with its id.
+  await recipes.getByRole('button', { name: /Opis Rozbudowany/ }).click();
+  await expect(page.getByTestId('bulk-generate-estimate')).toContainText('USD');
+  await expect.poll(() => (capturedPreview as { recipe_id?: string })?.recipe_id).toBe('r-custom');
+
   await page.getByRole('button', { name: /^generuj$/i }).click();
 
   await expect.poll(() => capturedGenerate !== null).toBeTruthy();
   const body = capturedGenerate as unknown as {
     mode: string;
+    recipe_id: string;
     selected_ids: string[];
     object_type_code: string;
   };
-  expect(body.mode).toBe('seo');
+  // A description-target recipe uses the description tool (mode) and carries its id.
+  expect(body.mode).toBe('descriptions');
+  expect(body.recipe_id).toBe('r-custom');
   expect(body.selected_ids).toHaveLength(2);
   expect(body.object_type_code).toBe('product');
 
