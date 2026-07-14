@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Export\Catalog\Application\Preview;
 
+use App\Asset\Contracts\Service\AssetInliner;
 use App\Export\Catalog\Application\HtmlValueSanitizer;
 use App\Export\Catalog\Domain\Enum\CatalogTemplateKind;
 use App\Export\Catalog\Domain\HtmlSlotPolicy;
@@ -44,6 +45,7 @@ final class CatalogPreviewService
         private readonly CatalogTemplateCatalog $templates,
         private readonly HtmlValueSanitizer $sanitizer,
         private readonly Environment $twig,
+        private readonly AssetInliner $imageInliner,
     ) {
     }
 
@@ -96,9 +98,14 @@ final class CatalogPreviewService
                     continue; // built below from the leftover attributes
                 }
                 $value = $slots[$name] ?? '';
-                if ('richtext' === ($slotFormats[$name] ?? '')) {
+                $format = $slotFormats[$name] ?? '';
+                if ('richtext' === $format) {
                     // Template prints this slot with `|raw` — sanitise here.
                     $value = $this->sanitizer->sanitize($value, HtmlSlotPolicy::RichText);
+                } elseif ('url' === $format && '' !== $value) {
+                    // #2570 — inline image-slot assets as data: URIs (mirrors
+                    // CatalogRenderService so the preview matches the PDF).
+                    $value = $this->imageInliner->toDataUri($value) ?? $value;
                 }
                 // Text / url slots stay raw strings; Twig autoescape handles them.
                 $product[$name] = $value;
@@ -113,7 +120,7 @@ final class CatalogPreviewService
         }
 
         $html = $this->twig->render($template->twig, [
-            'branding' => $branding,
+            'branding' => $this->inlineBrandingLogo($branding),
             'products' => $products,
         ]);
 
@@ -121,6 +128,24 @@ final class CatalogPreviewService
             'sample_count' => \count($products),
             'html' => $html,
         ];
+    }
+
+    /**
+     * Inline the branding logo as a data: URI (mirrors
+     * {@see \App\Export\Catalog\Application\CatalogRenderService::inlineBrandingLogo()}).
+     *
+     * @param array<mixed, mixed> $branding
+     *
+     * @return array<mixed, mixed>
+     */
+    private function inlineBrandingLogo(array $branding): array
+    {
+        $logo = $branding['logo'] ?? null;
+        if (\is_string($logo) && '' !== $logo) {
+            $branding['logo'] = $this->imageInliner->toDataUri($logo) ?? $logo;
+        }
+
+        return $branding;
     }
 
     /**

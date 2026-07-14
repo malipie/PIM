@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Export\Catalog\Application;
 
+use App\Asset\Contracts\Service\AssetInliner;
 use App\Export\Catalog\Domain\Entity\CatalogProfile;
 use App\Export\Catalog\Domain\HtmlSlotPolicy;
 use App\Export\Catalog\Domain\Mapping\CatalogFieldMapping;
@@ -31,9 +32,13 @@ use Twig\Environment;
  * so renderers that answer false to {@see PdfRenderer::supportsLargeDocuments()}
  * get a product cap ($maxInMemoryItems, env CATALOG_PDF_MAX_ITEMS — decision A,
  * CPDF-P6-04): exceeding it raises {@see CatalogTooLargeException} with an
- * actionable "enable Gotenberg" message instead of an OOM'd worker. Image
- * embedding stays URL-based (decision B, CPDF-P6-03) — the resolved image
- * value is passed straight through and the sidecar fetches it itself.
+ * actionable "enable Gotenberg" message instead of an OOM'd worker.
+ *
+ * Images (#2569/#2570): the default Dompdf renderer runs with remote fetching
+ * off, so image-slot values (a bare asset UUID) and the branding logo (a
+ * `/api/assets/{id}/preview` URL) are inlined as `data:` URIs through the
+ * {@see AssetInliner} seam before rendering — otherwise the renderer silently
+ * drops every image. Non-asset URLs pass through untouched.
  */
 final class CatalogRenderService
 {
@@ -47,6 +52,7 @@ final class CatalogRenderService
         private readonly HtmlValueSanitizer $sanitizer,
         private readonly Environment $twig,
         private readonly PdfRenderer $renderer,
+        private readonly AssetInliner $imageInliner,
         private readonly int $maxInMemoryItems = 500,
     ) {
     }
@@ -95,9 +101,14 @@ final class CatalogRenderService
                     continue; // built below from the leftover attributes
                 }
                 $value = $slots[$name] ?? '';
-                if ('richtext' === ($slotFormats[$name] ?? '')) {
+                $format = $slotFormats[$name] ?? '';
+                if ('richtext' === $format) {
                     // Template prints this slot with `|raw` — sanitise here.
                     $value = $this->sanitizer->sanitize($value, HtmlSlotPolicy::RichText);
+                } elseif ('url' === $format && '' !== $value) {
+                    // #2570 — image slots hold a bare asset UUID; inline the bytes
+                    // as a data: URI so the offline renderer embeds them.
+                    $value = $this->imageInliner->toDataUri($value) ?? $value;
                 }
                 // Text / url slots stay raw strings; Twig autoescape handles them.
                 $product[$name] = $value;
@@ -113,7 +124,7 @@ final class CatalogRenderService
         }
 
         $html = $this->twig->render($template->twig, [
-            'branding' => $profile->getBranding(),
+            'branding' => $this->inlineBrandingLogo($profile->getBranding()),
             'products' => $products,
             // Grid cover/TOC heading; sheet and pricelist ignore it.
             'title' => $profile->getName(),
@@ -127,6 +138,24 @@ final class CatalogRenderService
             byteSize: \strlen($pdf),
             itemCount: \count($products),
         );
+    }
+
+    /**
+     * Inline the branding logo (a `/api/assets/{id}/preview` URL) as a data:
+     * URI so the offline renderer embeds it; a non-asset value passes through.
+     *
+     * @param array<mixed, mixed> $branding
+     *
+     * @return array<mixed, mixed>
+     */
+    private function inlineBrandingLogo(array $branding): array
+    {
+        $logo = $branding['logo'] ?? null;
+        if (\is_string($logo) && '' !== $logo) {
+            $branding['logo'] = $this->imageInliner->toDataUri($logo) ?? $logo;
+        }
+
+        return $branding;
     }
 
     /**

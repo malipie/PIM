@@ -414,6 +414,14 @@ services:
         arguments:
             $assetsStorage: '@assets.storage'
 
+    # CPDF #2569/#2570 — the catalog PDF inliner reads asset bytes from the
+    # named storage (same reason as the uploader: multiple FilesystemOperator
+    # services, autowire can't pick) and is the AssetInliner seam impl.
+    App\Asset\Infrastructure\Service\StorageAssetInliner:
+        arguments:
+            $assetsStorage: '@assets.storage'
+    App\Asset\Contracts\Service\AssetInliner: '@App\Asset\Infrastructure\Service\StorageAssetInliner'
+
     # IMP-02 (#443) — rules-based mapping dictionary loader. Cached for
     # 5 min in `cache.app` (see MappingDictionaryService). The dictionary
     # path lives under config/ so it ships with the container and never

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Export\Catalog;
 
+use App\Asset\Contracts\Service\AssetInliner;
 use App\Catalog\Application\Filter\FilterDslResolver;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
@@ -244,6 +245,7 @@ final class CatalogRenderServiceTest extends KernelTestCase
             // PdfRenderer alias has no consumer yet (DI removes it) — the default
             // in-process Dompdf adapter is constructor-less, use it directly.
             $renderer ?? new DompdfRenderer(),
+            $container->get(AssetInliner::class),
             $maxInMemoryItems,
         );
     }
