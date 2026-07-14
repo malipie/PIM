@@ -40,7 +40,8 @@ test('CPDF-P5-01 — catalogs shell: tabs, empty state, templates, a11y', async 
   // Switch to the Szablony tab — the sheet archetype is available.
   await templatesTab.click();
   await expect(page.getByRole('radio', { name: /karta produktu|product sheet/i })).toBeVisible();
-  // The grid/pricelist archetypes are disabled "Wkrótce" cards.
+  // Grid/pricelist are selectable in the wizard (#2568) but stay muted in this
+  // informational shell tab.
   await expect(
     page.getByRole('radio', { name: /katalog \(grid\)|catalog \(grid\)/i }),
   ).toHaveAttribute('aria-disabled', 'true');

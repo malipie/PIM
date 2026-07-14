@@ -1106,7 +1106,7 @@
       "scope_locale_default": "Domyślny języka tenanta",
       "scope_locale_hint": "Steruje rozwiązywaniem wartości atrybutów podczas renderowania.",
       "archetype_title": "Wybierz układ",
-      "archetype_subtitle": "Układ „Karta produktu” jest gotowy w MVP. Grid i cennik dochodzą w module M6.",
+      "archetype_subtitle": "Wybierz układ katalogu: Karta produktu, Grid lub Cennik.",
       "archetype_group_aria": "Układy katalogu",
       "branding_title": "Branding",
       "branding_subtitle": "Kolor marki, nazwa firmy i logo pojawią się w nagłówku katalogu. Wszystkie pola są opcjonalne.",

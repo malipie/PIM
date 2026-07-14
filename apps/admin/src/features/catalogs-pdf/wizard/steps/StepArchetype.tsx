@@ -7,9 +7,11 @@ import type { CatalogTemplateKind } from '../types';
 import { useCatalogWizard } from '../wizard-store';
 
 /**
- * CPDF-P5-02 step 2 — archetype pick. Only `sheet` is renderable in the MVP
- * (CatalogTemplateCatalog); `grid` and `pricelist` show as disabled "Wkrótce"
- * cards (module M6). Mirrors the shell's TemplatesTab card set.
+ * CPDF-P5-02 step 2 — archetype pick. All three archetypes are renderable
+ * (CatalogTemplateCatalog: sheet / grid / pricelist, backends CPDF-P6-01/02).
+ * The mapping step exposes the shared sheet slots; kind-specific slots (e.g.
+ * the grid `specs`) fall back to the template defaults — a per-kind mapping UI
+ * is a follow-up (#2568). Mirrors the shell's TemplatesTab card set.
  */
 export function StepArchetype() {
   const { t } = useTranslation();
@@ -43,13 +45,15 @@ export function StepArchetype() {
           icon={<LayoutGrid className="size-5" aria-hidden />}
           title={t('catalogs_pdf.template_grid_name')}
           description={t('catalogs_pdf.template_grid_description')}
-          disabled
+          selected={state.templateKind === 'grid'}
+          onSelect={() => select('grid')}
         />
         <SelectableCard
           icon={<Table className="size-5" aria-hidden />}
           title={t('catalogs_pdf.template_pricelist_name')}
           description={t('catalogs_pdf.template_pricelist_description')}
-          disabled
+          selected={state.templateKind === 'pricelist'}
+          onSelect={() => select('pricelist')}
         />
       </SelectableCardGroup>
     </div>

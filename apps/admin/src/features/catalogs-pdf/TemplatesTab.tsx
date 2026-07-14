@@ -5,11 +5,11 @@ import { SelectableCard, SelectableCardGroup } from '@/components/ui-v2/selectab
 import { StatusPill } from '@/components/ui-v2/status-pill';
 
 /**
- * CPDF-P5-01 — Templates tab. Lists the built-in catalog archetypes. The
- * `sheet` archetype (CatalogTemplateCatalog #2370) is the only one shipped in
- * the MVP; `grid` and `pricelist` render as disabled "Wkrótce" cards (module
- * M6). The cards are informational for the shell — selection is wired into the
- * create wizard in CPDF-P5-02.
+ * CPDF-P5-01 — Templates tab. Lists the built-in catalog archetypes. Cards are
+ * informational here; all three (sheet / grid / pricelist) are selectable in
+ * the create wizard (#2568). Grid/pricelist stay visually muted in this tab
+ * (aligning the shell display is a follow-up — see the SelectableCard
+ * enabled-state contrast).
  */
 export function TemplatesTab() {
   const { t } = useTranslation();
