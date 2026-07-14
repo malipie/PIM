@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Export\Catalog;
 
+use App\Asset\Contracts\Service\AssetInliner;
 use App\Catalog\Application\Filter\FilterDslResolver;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
@@ -138,6 +139,7 @@ final class GenerateCatalogHandlerTest extends KernelTestCase
             new HtmlValueSanitizer(),
             $container->get('twig'),
             new DompdfRenderer(),
+            $container->get(AssetInliner::class),
         );
 
         $regenerator = new CatalogRegenerator(
