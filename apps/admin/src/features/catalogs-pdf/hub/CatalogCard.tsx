@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, Download, FileText, Link2, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, Download, FileText, Link2, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router';
 import { useToast } from '@/components/ui/toast';
 import { StatusPill } from '@/components/ui-v2/status-pill';
 import { httpErrorDetail } from '@/lib/http';
@@ -194,6 +195,13 @@ export function CatalogCard({ catalog }: { catalog: CatalogProfileRow }) {
           />
           {t('catalogs_pdf.card.regenerate')}
         </button>
+        <Link
+          to={`/catalogs-pdf/${catalog.id}/edit`}
+          className="flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-[12px] font-medium text-zinc-700 transition hover:bg-zinc-50"
+        >
+          <Pencil className="h-3.5 w-3.5" aria-hidden />
+          {t('catalogs_pdf.card.edit', { defaultValue: 'Edytuj' })}
+        </Link>
         <button
           type="button"
           onClick={onShare}

@@ -626,6 +626,15 @@ function App() {
                       </PermissionRoute>
                     }
                   />
+                  {/* #2566 — edit an existing catalog (wizard prefilled). */}
+                  <Route
+                    path="/catalogs-pdf/:id/edit"
+                    element={
+                      <PermissionRoute anyOf={['exports.view_own', 'exports.view_all']}>
+                        <CatalogWizardPage />
+                      </PermissionRoute>
+                    }
+                  />
                   {/* AUD-076 (W3-5.5) — gate the whole settings tree with the
                     same permission set the sidebar uses to show the entry
                     (MENU_PERMISSIONS.settings). A user with no settings

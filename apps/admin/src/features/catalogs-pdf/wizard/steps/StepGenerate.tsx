@@ -22,12 +22,15 @@ interface StepGenerateProps {
 export function StepGenerate({ objectTypeId }: StepGenerateProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { state, dispatch } = useCatalogWizard();
-  const { createAndGenerate, isRunning } = useGenerateCatalog();
+  const { state, dispatch, editCatalogId } = useCatalogWizard();
+  const { createAndGenerate, updateCatalog, isRunning } = useGenerateCatalog();
   const [error, setError] = useState<string | null>(null);
+  const isEdit = editCatalogId !== null;
 
   const nameValid = state.name.trim() !== '';
-  const canSubmit = nameValid && objectTypeId !== null && !isRunning;
+  // Editing PATCHes the existing catalog and does not need the product
+  // ObjectType id (that seam is only used to POST a new catalog + generate).
+  const canSubmit = nameValid && (isEdit || objectTypeId !== null) && !isRunning;
 
   const summaryRows: Array<{ label: string; value: string }> = [
     { label: t('catalogs_pdf.wizard.summary_name'), value: state.name.trim() || '—' },
@@ -53,13 +56,19 @@ export function StepGenerate({ objectTypeId }: StepGenerateProps) {
   ];
 
   const handleFinish = async () => {
-    if (objectTypeId === null) {
-      setError(t('catalogs_pdf.wizard.error_no_object_type'));
-      return;
-    }
     setError(null);
     try {
-      await createAndGenerate(state, objectTypeId);
+      // #2566 — edit mode PATCHes the config (regeneration stays a separate
+      // hub action); create mode POSTs a new catalog + generates.
+      if (editCatalogId !== null) {
+        await updateCatalog(editCatalogId, state);
+      } else {
+        if (objectTypeId === null) {
+          setError(t('catalogs_pdf.wizard.error_no_object_type'));
+          return;
+        }
+        await createAndGenerate(state, objectTypeId);
+      }
       void navigate('/catalogs-pdf');
     } catch (err) {
       setError(httpErrorDetail(err) ?? t('catalogs_pdf.wizard.generate_error'));
@@ -135,7 +144,9 @@ export function StepGenerate({ objectTypeId }: StepGenerateProps) {
       >
         {isRunning
           ? t('catalogs_pdf.wizard.generate_running')
-          : t('catalogs_pdf.wizard.generate_cta')}
+          : isEdit
+            ? t('catalogs_pdf.wizard.edit_save_cta', { defaultValue: 'Zapisz zmiany' })
+            : t('catalogs_pdf.wizard.generate_cta')}
       </button>
     </div>
   );

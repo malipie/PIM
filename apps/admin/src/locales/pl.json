@@ -1062,6 +1062,7 @@
     "card": {
       "download": "Pobierz",
       "regenerate": "Regeneruj",
+      "edit": "Edytuj",
       "share": "Udostępnij",
       "share_copied": "Skopiowano",
       "delete": "Usuń",
@@ -1078,6 +1079,9 @@
     "wizard": {
       "title": "Nowy katalog PDF",
       "lead": "Zbuduj i wygeneruj katalog w sześciu krokach: zakres, układ, branding, mapowanie pól, podgląd, generowanie.",
+      "edit_title": "Edytuj katalog",
+      "edit_save_cta": "Zapisz zmiany",
+      "edit_load_error": "Nie udało się wczytać katalogu.",
       "step_indicator": "krok {{step}} z {{total}} · {{title}}",
       "cancel": "Anuluj",
       "back": "Wstecz",

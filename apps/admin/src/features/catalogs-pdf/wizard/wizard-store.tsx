@@ -45,14 +45,28 @@ export function catalogWizardReducer(
 interface CatalogWizardContextValue {
   state: CatalogWizardState;
   dispatch: Dispatch<CatalogWizardAction>;
+  /** #2566 — the catalog id being edited, or null when creating. */
+  editCatalogId: string | null;
 }
 
 const CatalogWizardContext = createContext<CatalogWizardContextValue | null>(null);
 
-export function CatalogWizardProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(catalogWizardReducer, INITIAL_CATALOG_WIZARD_STATE);
+export function CatalogWizardProvider({
+  children,
+  initialState,
+  editCatalogId = null,
+}: {
+  children: ReactNode;
+  /** #2566 — prefilled state for the edit flow; defaults to a blank draft. */
+  initialState?: CatalogWizardState;
+  editCatalogId?: string | null;
+}) {
+  const [state, dispatch] = useReducer(
+    catalogWizardReducer,
+    initialState ?? INITIAL_CATALOG_WIZARD_STATE,
+  );
   return (
-    <CatalogWizardContext.Provider value={{ state, dispatch }}>
+    <CatalogWizardContext.Provider value={{ state, dispatch, editCatalogId }}>
       {children}
     </CatalogWizardContext.Provider>
   );
