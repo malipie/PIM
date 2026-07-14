@@ -3,6 +3,11 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-14/15: Fixy agenta content-generation (#2604 recipe picker, #2606 czat awaiting_input)
+- **✅ #2604 (merged, Closes #2603) — bulk modal oferuje wszystkie przepisy:** modal „Generuj treść AI" hardkodował 2 tryby (descriptions/seo) — custom przepis („Opis Rozbudowany" → description_html) był niewidoczny. Backend JUŻ wspierał `recipe_id` (resolveMode + tool używa targetAttribute). Fix FE: `useContentRecipes` → przycisk per przepis → wysyłka `recipe_id` + mode z target attribute.
+- **✅ #2606 (merged, Closes #2605) — czat awaiting_input wyjaśniony:** operator „run zawiesza się". Diagnoza live: bulk generuje (3× → awaiting_approval + pending change ~30-60s; propozycje w `/agent/inbox`, 13 oczekujących). Czat mylący — bulk z 0 propozycji → `awaiting_input` → pusty body + badge „Czekam na odpowiedź". Fix: relabel →„Twoja kolej"; wyjaśnienie stanu (bulk: brak danych źródłowych / interaktywny: twoja kolej).
+- **Kluczowe dla operatora:** propozycje AI trafiają do **skrzynki `/agent/inbox`**, nie do czatu; bulk trwa ~30-60s.
+
 ## 2026-07-14: Follow-up smoke #2 — obrazy w PDF OOM + worker cache + rezydualny flicker (#2599/#2600/#2601)
 - **Kontekst:** po pierwszej rundzie operator retestował i wykrył (a) generacja PDF „trwa 2 min i nic", (b) rezydualny „przeskok" assetów. Oba to follow-upy/regresje z pierwszej rundy.
 - **✅ #2601 (merged) — obrazy w PDF OOM (REGRESJA #2597):** #2597 osadzało wariant medium (800px); Dompdf dekoduje do surowej bitmapy (~1.9 MB/obraz) i trzyma cały doc w pamięci → 305 produktów >> 256 MB → **Fatal OOM → run wisi „pending"**. Fix: inliner preferuje thumb (200px, ~16× mniej pamięci). Live: 305 produktów `done` w ~13 s, 3 MB (było 34 MB/OOM), 185 obrazów osadzonych. Wysoka rozdzielczość → Gotenberg.
