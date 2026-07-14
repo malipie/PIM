@@ -158,6 +158,12 @@ export function AssetsListPage() {
   // (folder/filter change) is shown; render a skeleton then instead of the
   // wrong cards. Background thumbnail polls (same query key) don't trip it.
   const isSwitching = query.isPlaceholderData;
+  // #2572 — size the skeleton to the OUTGOING grid so switching a folder does
+  // not collapse the page height the instant the skeleton appears (a 102→10→N
+  // double jump). While `isPlaceholderData` is true `assets` still holds the
+  // previous folder's set (keepPreviousData), so its length is the height to
+  // hold until the new content settles in one motion.
+  const skeletonCount = isSwitching && assets.length > 0 ? Math.min(assets.length, 120) : 12;
   const showFolderTiles = currentFolder === null && !debouncedSearch;
   const currentFolderEntry =
     currentFolder !== null && currentFolder !== 'root'
@@ -373,7 +379,7 @@ export function AssetsListPage() {
         </div>
 
         {isLoading || isSwitching ? (
-          <AssetGridSkeleton view={view} />
+          <AssetGridSkeleton view={view} count={skeletonCount} />
         ) : assets.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-200 px-6 py-16 text-center text-[13px] text-zinc-500">
             {t('assets.empty')}
@@ -626,17 +632,20 @@ function FolderRow({ name, count, warning = false, onOpen }: FolderTileProps) {
 
 /**
  * #2572 — stable placeholder shown while a folder switch is in flight, so the
- * previous folder's thumbnails never flash on screen. Mirrors the real grid /
- * list dimensions to avoid a layout jump.
+ * previous folder's thumbnails never flash on screen. `count` sizes it to the
+ * outgoing grid so the page height is held until the new content settles,
+ * avoiding the residual layout jump.
  */
-// Stable keys for the fixed-length placeholder grid (biome noArrayIndexKey).
-const SKELETON_KEYS = Array.from({ length: 10 }, (_, i) => `asset-skeleton-${i}`);
+// Stable keys for the placeholder grid (biome noArrayIndexKey); sliced to count.
+const MAX_SKELETON = 120;
+const SKELETON_KEYS = Array.from({ length: MAX_SKELETON }, (_, i) => `asset-skeleton-${i}`);
 
-function AssetGridSkeleton({ view }: { view: 'grid' | 'list' }) {
+function AssetGridSkeleton({ view, count = 12 }: { view: 'grid' | 'list'; count?: number }) {
+  const keys = SKELETON_KEYS.slice(0, Math.max(1, Math.min(count, MAX_SKELETON)));
   if (view === 'grid') {
     return (
       <ul aria-hidden="true" className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
-        {SKELETON_KEYS.map((key) => (
+        {keys.map((key) => (
           <li
             key={key}
             className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm"
@@ -657,7 +666,7 @@ function AssetGridSkeleton({ view }: { view: 'grid' | 'list' }) {
       className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm"
     >
       <div className="divide-y divide-zinc-50">
-        {SKELETON_KEYS.map((key) => (
+        {keys.map((key) => (
           <div key={key} className="flex items-center gap-3 px-4 py-2.5">
             <div className="size-8 animate-pulse rounded-md bg-zinc-100" />
             <div className="h-3 flex-1 animate-pulse rounded bg-zinc-100" />
