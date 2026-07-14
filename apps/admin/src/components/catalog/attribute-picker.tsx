@@ -61,6 +61,11 @@ export interface AttributePickerProps {
    */
   systemFields?: ReadonlyArray<{ code: string; name: string; type?: string }>;
   placeholder?: string;
+  /**
+   * Accessible name for the trigger button when several pickers share the
+   * same placeholder (e.g. the catalog field-mapping step, #2570).
+   */
+  ariaLabel?: string;
   className?: string;
 }
 
@@ -77,6 +82,7 @@ export function AttributePicker({
   filterableOnly,
   systemFields,
   placeholder,
+  ariaLabel,
   className,
 }: AttributePickerProps) {
   const { t, i18n } = useTranslation();
@@ -219,6 +225,7 @@ export function AttributePicker({
         onClick={() => setOpen((prev) => !prev)}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={ariaLabel}
         className="h-9 w-full inline-flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 text-[12.5px] hover:border-zinc-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
       >
         <span className="truncate text-left">{triggerLabel}</span>

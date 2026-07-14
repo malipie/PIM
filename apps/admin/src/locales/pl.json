@@ -1109,8 +1109,8 @@
       "branding_logo_label": "URL logo",
       "branding_logo_hint": "Bezpośredni odnośnik do pliku graficznego (PNG/SVG).",
       "mapping_title": "Mapowanie pól",
-      "mapping_subtitle": "Przypisz sloty szablonu do kodów atrybutów. Wartości domyślne są uzupełnione — możesz je zmienić.",
-      "mapping_placeholder": "kod atrybutu",
+      "mapping_subtitle": "Przypisz sloty szablonu do atrybutów. Wartości domyślne są uzupełnione — możesz je zmienić.",
+      "mapping_placeholder": "Wybierz atrybut",
       "mapping_hint": "Puste sloty zostaną pominięte podczas renderowania.",
       "slot": {
         "title": "Nazwa produktu",
