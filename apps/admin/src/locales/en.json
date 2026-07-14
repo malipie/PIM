@@ -3924,7 +3924,7 @@
     },
     "status": {
       "planning": "Planning…",
-      "awaiting_input": "Awaiting your reply",
+      "awaiting_input": "Your turn",
       "awaiting_approval": "Awaiting approval",
       "committing": "Committing…",
       "done": "Done",
