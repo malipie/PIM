@@ -1,4 +1,5 @@
 import { useList } from '@refinedev/core';
+import { keepPreviousData } from '@tanstack/react-query';
 import {
   ArrowUp,
   Check,
@@ -136,6 +137,10 @@ export function AssetsListPage() {
     pagination: { mode: 'off' },
     filters: filterParams,
     queryOptions: {
+      // #2572 — keep the previous folder's thumbnails on screen while the new
+      // folder loads instead of flashing an empty grid (the "icons slide up
+      // and disappear, then reappear" flicker when entering a folder).
+      placeholderData: keepPreviousData,
       refetchInterval: (q) => {
         const data = q.state.data?.data as AssetEntry[] | undefined;
         return data?.some((item) => toAssetMeta(item).thumbnailsPending) ? POLL_INTERVAL_MS : false;
