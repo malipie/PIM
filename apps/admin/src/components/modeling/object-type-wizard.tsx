@@ -6,12 +6,12 @@ import { Link, useNavigate } from 'react-router';
 
 import { AddAttributesToObjectTypeDialog } from '@/components/modeling/add-attributes-to-object-type-dialog';
 import { AuditLogIndicator } from '@/components/modeling/audit-log-indicator';
-import { ColorPicker, DEFAULT_WIZARD_COLORS } from '@/components/modeling/color-picker';
+import { DEFAULT_WIZARD_COLORS } from '@/components/modeling/color-picker';
 import { CreateAttributeForObjectTypeDialog } from '@/components/modeling/create-attribute-for-object-type-dialog';
 import { CreateGroupInlineDialog } from '@/components/modeling/create-group-inline-dialog';
 import { DeclareObjectTypeAttributeGroupDialog } from '@/components/modeling/declare-object-type-attribute-group-dialog';
 import { DisplayModeSegmented } from '@/components/modeling/group-card';
-import { DEFAULT_WIZARD_ICONS, IconPicker } from '@/components/modeling/icon-picker';
+import { DEFAULT_WIZARD_ICONS } from '@/components/modeling/icon-picker';
 import { LocaleTabsField } from '@/components/modeling/locale-tabs-field';
 import { ObjectTypeIcon } from '@/components/modeling/object-type-icon';
 import { SettingToggleRow } from '@/components/modeling/setting-toggle-row';
@@ -80,8 +80,10 @@ export function ObjectTypeWizard() {
   const [step, setStep] = useState<number>(1);
   const [label, setLabel] = useState<Record<string, string>>({});
   const [code, setCode] = useState<string>('');
-  const [icon, setIcon] = useState<string>(DEFAULT_WIZARD_ICONS[0]);
-  const [color, setColor] = useState<string>(DEFAULT_WIZARD_COLORS[0]);
+  // #2578 — icon/color are no longer user-pickable; keep sensible defaults so
+  // the badge stays consistent and the payload contract is unchanged.
+  const icon = DEFAULT_WIZARD_ICONS[0];
+  const color = DEFAULT_WIZARD_COLORS[0];
   const [hasVariants, setHasVariants] = useState(false);
   const [hasMultimedia, setHasMultimedia] = useState(false);
   const [isCategorizable, setIsCategorizable] = useState(false);
@@ -463,32 +465,18 @@ export function ObjectTypeWizard() {
                     onChange={setLabel}
                   />
                 </div>
-                <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
-                  <div>
-                    <div className="mb-1.5 text-[11.5px] font-medium text-zinc-500">
-                      {t('object_type_wizard.field_code', { defaultValue: 'Code' })}
-                    </div>
-                    <Input
-                      value={code}
-                      onChange={(e) =>
-                        setCode(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))
-                      }
-                      placeholder="subscription"
-                      className="font-mono"
-                    />
+                <div>
+                  <div className="mb-1.5 text-[11.5px] font-medium text-zinc-500">
+                    {t('object_type_wizard.field_code', { defaultValue: 'Code' })}
                   </div>
-                  <div>
-                    <div className="mb-1.5 text-[11.5px] font-medium text-zinc-500">
-                      {t('object_type_wizard.field_icon', { defaultValue: 'Ikona' })}
-                    </div>
-                    <IconPicker selected={icon} onSelect={setIcon} />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <div className="mb-1.5 text-[11.5px] font-medium text-zinc-500">
-                      {t('object_type_wizard.field_color', { defaultValue: 'Kolor' })}
-                    </div>
-                    <ColorPicker selected={color} onSelect={setColor} />
-                  </div>
+                  <Input
+                    value={code}
+                    onChange={(e) =>
+                      setCode(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))
+                    }
+                    placeholder="subscription"
+                    className="font-mono"
+                  />
                 </div>
               </>
             ) : null}
@@ -775,18 +763,6 @@ export function ObjectTypeWizard() {
                       {t('object_type_wizard.field_code', { defaultValue: 'Code' })}:
                     </span>{' '}
                     <span className="font-mono">{code || '—'}</span>
-                  </div>
-                  <div>
-                    <span className="text-zinc-500">
-                      {t('object_type_wizard.field_icon', { defaultValue: 'Ikona' })}:
-                    </span>{' '}
-                    {icon}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-zinc-500">
-                      {t('object_type_wizard.field_color', { defaultValue: 'Kolor' })}:
-                    </span>
-                    <span aria-hidden className="size-4 rounded" style={{ background: color }} />
                   </div>
                   <div className="sm:col-span-2">
                     <span className="text-zinc-500">
