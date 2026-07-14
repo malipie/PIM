@@ -17,20 +17,21 @@ use Symfony\Component\Uid\Uuid;
 final class StorageAssetInlinerTest extends TestCase
 {
     #[Test]
-    public function inlinesBareUuidAsDataUriPreferringMediumVariant(): void
+    public function inlinesBareUuidAsDataUriPreferringThumbVariant(): void
     {
         $id = Uuid::v7();
         $repo = $this->createStub(AssetRepositoryInterface::class);
         $repo->method('findById')->willReturn($this->readyAssetWithVariants($id));
 
         $storage = $this->createMock(FilesystemOperator::class);
-        // Medium (800) is preferred over thumb/original for print.
-        $storage->expects(self::once())->method('read')->with('demo/medium.jpg')->willReturn('MEDIUM-BYTES');
+        // Thumb (200) is preferred over medium/original to keep the in-process
+        // renderer under its memory budget (a full catalog of 800px images OOMs).
+        $storage->expects(self::once())->method('read')->with('demo/thumb.jpg')->willReturn('THUMB-BYTES');
 
         $inliner = new StorageAssetInliner($repo, $storage);
 
         self::assertSame(
-            'data:image/jpeg;base64,'.base64_encode('MEDIUM-BYTES'),
+            'data:image/jpeg;base64,'.base64_encode('THUMB-BYTES'),
             $inliner->toDataUri($id->toRfc4122()),
         );
     }
