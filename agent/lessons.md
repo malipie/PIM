@@ -3163,3 +3163,19 @@ M4 (P4-01..08) + M5 Hardening (P5-01..05) — wszystkie zmergowane. Epik APIC ko
 ### Toolchain quirks
 - **`tsc -b --noEmit` w kontenerze admin pada OOM (heap ~500MB).** Fix: `docker compose exec -T -e NODE_OPTIONS="--max-old-space-size=4096" admin pnpm --filter admin typecheck`. Bez tego „Mark-Compact allocation failure" / SIGABRT — mylnie wygląda jak błąd kodu.
 - **Route-move + redirect: breadcrumb topbar z regexem prefiksu adaptuje się sam.** Przeniesienie `/settings/workflow`→`/workflow/definitions`: `ROUTE_CRUMBS` matchuje `/^\/workflow/` → nowa ścieżka dostaje breadcrumb „Workflow" bez dodatkowego mapowania. Stare linki: `<Route path="workflow/:id/edit" element={<Redirect/>}>` z komponentem czytającym `useParams` zachowuje `id`.
+
+## Lessons z rundy smoke #2 (2026-07-14, #2595/#2596/#2597 — po manual smoke operatora)
+
+### Patterns to Avoid (najtwardsza lekcja: złamany CLOSED-MEANS-CLOSED)
+- **Oznaczyłem 4 tickety jako „done", a nie działały end-to-end.** #2567 (filtr — dodałem licznik, ale przycisk nadal wyglądał na martwy), #2569/#2570 (obrazy w PDF — „data URI" z docstringu NIGDY nie zaimplementowane), #2572 (flicker — mój `keepPreviousData` POGARSZAŁ). Wspólny root: robiłem component-render + częściowe checki, NIE realny klik na żywym stacku z realnymi danymi. **Reguła wzmocniona:** dla KAŻDEGO ticketu UI/feature wykonaj faktyczną akcję użytkownika na `pim.localhost` (klik → sprawdź response w DevTools → sprawdź widoczny efekt) PRZED „done". Operator złapał wszystkie 4 w jednym smoke.
+
+### Patterns to Follow
+- **Dompdf `isRemoteEnabled=false` → inline obrazów jako `data:` URI.** Obraz produktu = goły asset UUID (ExportBuilder spłaszcza envelope do `asset_id`); logo = `/api/assets/{id}/preview` (za auth). Ani jednego Dompdf nie pobierze. Seam `Asset\Contracts\Service\AssetInliner` czyta bajty ze storage (wariant medium/800 dla druku) → base64. `Export_Catalog_Internals → Asset_Contracts` już dozwolone w deptrac.
+- **`keepPreviousData` pokazuje STALE dane przy zmianie parametru, nie „pusty flash".** Przy zmianie folderu/filtra `query.isPlaceholderData===true` = pokazywane dane z INNEGO zapytania → renderuj skeleton zamiast błędnych kart. Background-refetch (to samo query key) NIE ustawia `isPlaceholderData`, więc nie miga.
+- **Dodajesz WYMAGANY argument konstruktora → pełny `composer phpstan`, nie scoped.** Scoped PHPStan na 4 zmienionych plikach przeszedł; CI whole-codebase złapał `CatalogPdfBenchmarkCommand` konstruujący serwis bez nowego argu. Grep `new ClassName(` w całym src ALBO pełny phpstan przy zmianie sygnatury.
+- **shadcn `Button` bazowo NIE ma `cursor-pointer`** → przyciski pokazują strzałkę, nie łapkę. Dodać `cursor-pointer` + `disabled:cursor-not-allowed` w wariantach bazowych (globalnie, poprawne wg web-norm).
+
+### Toolchain quirks
+- **E2E locator po NAZWIE danych demo pęka w CI** (inny seed). Spec matchujący folder `/produkt|product/i` timeout'ował w CI (brak takich folderów) — `data-testid="folder-tile"` (kafel „Bez przypisania" zawsze istnieje) jest data-independent.
+- **PHPUnit 12 `failOnNotice=true`: mock tylko-stubujący zwroty → `createStub()`, nie `createMock()`.** `createMock()->method()->willReturn()` bez `expects()` triggeruje notice „No expectations were configured... use a test stub" → CI fail. `createMock()` tylko gdy weryfikujesz liczbę wywołań (`expects(once/never)`).
+- **Dev-stack async worker wedge**: wiele `restart api/worker` w sesji + `redeliver_timeout: 14400` (4h) potrafi zawiesić kolejkę `import` — catalog runs zostają `pending`, `messenger:consume import` bierze 0 mimo dostępnej wiadomości. To artefakt sesji (20 historycznych `done` dowodzi że generacja działa), nie kod. Nie da się szybko odblokować (4h in-flight); walidacja renderu przez live-preview HTML.
