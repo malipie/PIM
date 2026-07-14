@@ -95,7 +95,7 @@ export function DefinitionEditorPage() {
           toast.error(
             t('settings.workflow.not_found', { defaultValue: 'Nie znaleziono definicji.' }),
           );
-          void navigate('/settings/workflow');
+          void navigate('/workflow/definitions');
           return;
         }
         setOriginal(found);
@@ -132,7 +132,7 @@ export function DefinitionEditorPage() {
     request
       .then(() => {
         toast.success(t('settings.workflow.saved', { defaultValue: 'Definicja zapisana.' }));
-        void navigate('/settings/workflow');
+        void navigate('/workflow/definitions');
       })
       .catch((error: unknown) => {
         const violations = extractViolations(error);
@@ -172,7 +172,7 @@ export function DefinitionEditorPage() {
   return (
     <div className="space-y-6" data-testid="workflow-definition-editor">
       <header className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => void navigate('/settings/workflow')}>
+        <Button variant="ghost" size="icon" onClick={() => void navigate('/workflow/definitions')}>
           <ArrowLeft className="size-4" />
           <span className="sr-only">{t('common.back', { defaultValue: 'Wstecz' })}</span>
         </Button>

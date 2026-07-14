@@ -29,6 +29,13 @@ test('flow settings: pick an approver and save enables the asset definition', as
     await loginAsAdmin(page);
     await page.goto('/workflow');
 
+    // #2574 — the hub exposes both CTAs to a manager: custom definitions and
+    // the flow-settings page. The definitions CTA points at the moved route.
+    await expect(page.getByTestId('workflow-definitions-cta')).toHaveAttribute(
+      'href',
+      '/workflow/definitions',
+    );
+
     await page.getByTestId('workflow-settings-cta').click();
     await expect(page).toHaveURL(/\/workflow\/settings$/);
     await expect(page.getByTestId('workflow-settings-page')).toBeVisible();
