@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AdvancedFilterPanel } from '@/components/catalog/advanced-filter-panel';
+import { useCatalogSearch } from '@/features/catalog/search/use-catalog-search';
+import { dslToBase64 } from '@/lib/filters/url-serializer';
 import { useFilterDslState } from '@/lib/filters/use-filter-dsl-state';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +16,9 @@ const LOCALE_OPTIONS = ['pl', 'en', 'de'] as const;
  * CPDF-P5-02 step 1 — assortment selection: the AdvancedFilterPanel (shared
  * FilterDSL state) picks which products land in the catalog, plus an optional
  * locale for value resolution. An empty filter means "wszystkie produkty".
+ *
+ * #2567 — a live count of the selected products gives the operator visible
+ * feedback when applying a filter (the panel alone showed nothing happening).
  */
 export function StepScope() {
   const { t } = useTranslation();
@@ -24,6 +29,23 @@ export function StepScope() {
   useEffect(() => {
     dispatch({ type: 'SET_FILTER', filterDsl: filter.dsl });
   }, [filter.dsl, dispatch]);
+
+  // #2567 — count the products the current filter selects (empty = all).
+  const filterBlob = useMemo<string | undefined>(() => {
+    if (filter.dsl === null) return undefined;
+    try {
+      return dslToBase64(filter.dsl);
+    } catch {
+      return undefined;
+    }
+  }, [filter.dsl]);
+  const { result: countResult, isLoading: countLoading } = useCatalogSearch({
+    kind: 'products',
+    query: '',
+    filterBlob,
+    perPage: 1,
+  });
+  const matchCount = countResult?.totalHits;
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-surface p-7 shadow-card">
@@ -43,6 +65,27 @@ export function StepScope() {
           onClose={() => undefined}
           onClear={filter.clear}
         />
+      </div>
+
+      {/* #2567 — live assortment count so applying a filter shows a result. */}
+      <div
+        data-testid="catalog-scope-count"
+        aria-live="polite"
+        className="mt-3 rounded-xl border border-zinc-200 bg-surface-muted px-4 py-2.5 text-[13px]"
+      >
+        {countLoading && matchCount === undefined ? (
+          <span className="text-zinc-500">
+            {t('catalogs_pdf.wizard.scope_count_loading', { defaultValue: 'Liczę produkty…' })}
+          </span>
+        ) : (
+          <span className="text-ink">
+            <strong className="tabular-nums">{(matchCount ?? 0).toLocaleString('pl-PL')}</strong>{' '}
+            {t('catalogs_pdf.wizard.scope_count', {
+              count: matchCount ?? 0,
+              defaultValue: 'produktów trafi do katalogu',
+            })}
+          </span>
+        )}
       </div>
 
       <div className="mt-5 rounded-xl border border-zinc-200 bg-surface-muted p-4">
