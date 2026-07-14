@@ -18,9 +18,10 @@ interface ChannelDetail {
   categoryTreeRootId?: string | null;
 }
 
-type TabKey = 'overview' | 'channelTree' | 'categoryMapping' | 'preview';
+type TabKey = 'overview' | 'channelTree' | 'categoryMapping';
 
-const TABS: TabKey[] = ['overview', 'channelTree', 'categoryMapping', 'preview'];
+// #2577 — the empty "Podgląd" (preview) placeholder tab was removed.
+const TABS: TabKey[] = ['overview', 'channelTree', 'categoryMapping'];
 
 export function ChannelShowPage() {
   const { t } = useTranslation();
@@ -89,11 +90,7 @@ export function ChannelShowPage() {
       ) : (
         <Card>
           <CardContent className="pt-6">
-            {activeTab === 'overview' ? (
-              <OverviewTab channel={channel} />
-            ) : (
-              <PlaceholderTab tab="preview" />
-            )}
+            <OverviewTab channel={channel} />
           </CardContent>
         </Card>
       )}
@@ -115,11 +112,6 @@ function OverviewTab({ channel }: { channel: ChannelDetail }) {
       ) : null}
     </dl>
   );
-}
-
-function PlaceholderTab({ tab }: { tab: 'preview' }) {
-  const { t } = useTranslation();
-  return <p className="text-sm text-muted-foreground">{t(`channels.show.placeholder.${tab}`)}</p>;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
