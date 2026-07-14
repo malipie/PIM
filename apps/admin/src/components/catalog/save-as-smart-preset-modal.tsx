@@ -8,7 +8,6 @@ import type { FilterDsl } from '@/lib/filters/filter-dsl';
 import type { SmartFilterPreset } from '@/lib/filters/use-smart-presets';
 import type { GridColumnOverride } from '@/lib/grid/types';
 import { httpErrorDetail } from '@/lib/http';
-import { cn } from '@/lib/utils';
 
 const ICON_CHOICES = ['🔧', '⚙️', '⚡', '🛠️', '🏷️', '📦', '🔍', '🌟', '🚀', '🎯', '💡', '📊'];
 
@@ -40,7 +39,8 @@ interface SaveAsSmartPresetModalProps {
  * PTR-01 — preset absorbuje rolę "widoku kolumn": zapisuje bieżący filtr
  * (może być pusty) ORAZ układ kolumn. Można zapisać preset bez żadnego
  * warunku (sam układ kolumn). Nazwa multilingual {pl, en} zgodnie z
- * CLAUDE.md punkt 8. Icon picker z 12 emoji presetów.
+ * CLAUDE.md punkt 8. #2578 — bez wyboru ikony; preset dostaje domyślną
+ * ikonę cicho (kontrakt BE wymaga `icon`).
  */
 export function SaveAsSmartPresetModal({
   query,
@@ -52,13 +52,15 @@ export function SaveAsSmartPresetModal({
   const { t } = useTranslation();
   const [namePl, setNamePl] = useState('');
   const [nameEn, setNameEn] = useState('');
-  const [icon, setIcon] = useState(ICON_CHOICES[0] ?? '🔧');
+  // #2578 — the icon is no longer user-pickable; keep a default so the BE
+  // contract (icon required) stays satisfied without any UI.
+  const icon = ICON_CHOICES[0] ?? '🔧';
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // PTR-01 — a preset may carry only a column layout, so an empty filter is
-  // allowed; the name + icon are the only hard requirements.
-  const canSubmit = namePl.trim().length >= 3 && nameEn.trim().length >= 3 && icon !== '';
+  // allowed; the name is the only hard requirement.
+  const canSubmit = namePl.trim().length >= 3 && nameEn.trim().length >= 3;
 
   const handleSubmit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
@@ -128,37 +130,6 @@ export function SaveAsSmartPresetModal({
               maxLength={60}
               placeholder="e.g. Festo low stock"
             />
-          </div>
-
-          <div className="space-y-2">
-            <span className="text-sm font-medium">
-              {t('products.smart_filters.save_as_preset_icon_label', { defaultValue: 'Ikona' })}
-              <span className="ml-1 text-rose-600">*</span>
-            </span>
-            <fieldset className="grid grid-cols-6 gap-2 border-0 p-0">
-              <legend className="sr-only">Icon</legend>
-              {ICON_CHOICES.map((choice) => (
-                <label
-                  key={choice}
-                  className={cn(
-                    'h-10 w-10 rounded-xl border text-[18px] grid place-items-center cursor-pointer focus-within:ring-2 focus-within:ring-zinc-900',
-                    icon === choice
-                      ? 'bg-zinc-900 text-white border-zinc-900'
-                      : 'bg-white text-zinc-700 border-zinc-200 hover:border-zinc-300',
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="smart-preset-icon"
-                    value={choice}
-                    checked={icon === choice}
-                    onChange={() => setIcon(choice)}
-                    className="sr-only"
-                  />
-                  <span aria-hidden="true">{choice}</span>
-                </label>
-              ))}
-            </fieldset>
           </div>
 
           <div className="rounded-md border bg-muted/40 p-3 text-xs">

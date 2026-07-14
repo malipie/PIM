@@ -26,7 +26,6 @@ import { AddAttributesToObjectTypeDialog } from '@/components/modeling/add-attri
 import { AuditLogIndicator } from '@/components/modeling/audit-log-indicator';
 import { AuditTrailCompact } from '@/components/modeling/audit-trail-compact';
 import { BuiltInLockBadge } from '@/components/modeling/built-in-lock-badge';
-import { ColorPicker } from '@/components/modeling/color-picker';
 import { CreateAttributeForObjectTypeDialog } from '@/components/modeling/create-attribute-for-object-type-dialog';
 import { CreateGroupInlineDialog } from '@/components/modeling/create-group-inline-dialog';
 import { DangerZoneCard } from '@/components/modeling/danger-zone-card';
@@ -37,7 +36,6 @@ import {
   GroupCard,
   type GroupDisplayMode,
 } from '@/components/modeling/group-card';
-import { IconPicker } from '@/components/modeling/icon-picker';
 import { LocaleTabsField } from '@/components/modeling/locale-tabs-field';
 import { ObjectTypeIcon } from '@/components/modeling/object-type-icon';
 import { SettingToggleRow } from '@/components/modeling/setting-toggle-row';
@@ -208,7 +206,8 @@ export function ObjectTypeShowPage() {
     staleTime: 30_000,
   });
 
-  const [editingField, setEditingField] = useState<'name' | 'icon' | 'color' | null>(null);
+  // #2578 — icon/color are no longer editable; only the name stays inline-editable.
+  const [editingField, setEditingField] = useState<'name' | null>(null);
   const [draftLabel, setDraftLabel] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [declareGroupOpen, setDeclareGroupOpen] = useState(false);
@@ -541,56 +540,15 @@ export function ObjectTypeShowPage() {
               <div className="mb-1.5 text-[11.5px] font-medium text-zinc-500">
                 {t('object_types.field_icon', { defaultValue: 'Ikona' })}
               </div>
-              {editingField === 'icon' ? (
-                <IconPicker
-                  selected={objectType.icon ?? ''}
-                  onSelect={async (icon) => {
-                    const ok = await handlePatch({ icon });
-                    if (ok) setEditingField(null);
-                  }}
+              {/* #2578 — icon/color are display-only now (no picker). */}
+              <div className="flex h-10 items-center gap-2 rounded-xl border border-zinc-100 bg-zinc-50 px-3 text-[13px]">
+                <ObjectTypeIcon
+                  icon={objectType.icon}
+                  color={objectType.color}
+                  kind={objectType.kind}
+                  size="sm"
                 />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setEditingField('icon')}
-                  className="flex h-10 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-[13px] hover:bg-zinc-50"
-                >
-                  <ObjectTypeIcon
-                    icon={objectType.icon}
-                    color={objectType.color}
-                    kind={objectType.kind}
-                    size="sm"
-                  />
-                  <Pencil className="ml-auto size-3.5 text-zinc-500" />
-                </button>
-              )}
-            </div>
-            <div>
-              <div className="mb-1.5 text-[11.5px] font-medium text-zinc-500">
-                {t('object_types.field_color', { defaultValue: 'Kolor (badge)' })}
               </div>
-              {editingField === 'color' ? (
-                <ColorPicker
-                  selected={objectType.color ?? '#6366f1'}
-                  onSelect={async (color) => {
-                    const ok = await handlePatch({ color });
-                    if (ok) setEditingField(null);
-                  }}
-                />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setEditingField('color')}
-                  className="flex h-10 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-[13px] hover:bg-zinc-50"
-                >
-                  <span
-                    className="size-4 rounded"
-                    style={{ background: objectType.color ?? '#a1a1aa' }}
-                  />
-                  <span className="font-mono text-[12px]">{objectType.color ?? '—'}</span>
-                  <Pencil className="ml-auto size-3.5 text-zinc-500" />
-                </button>
-              )}
             </div>
             <FieldDisplay
               label={t('object_types.field_tenant', { defaultValue: 'Tenant' })}

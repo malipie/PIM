@@ -5,13 +5,11 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 
-import { IconPicker } from '@/components/modeling/icon-picker';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { CATEGORY_ICONS } from '@/lib/category-icons';
 import { HttpError, jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -39,8 +37,6 @@ const CODE_RE = /^[a-z][a-z0-9_]*$/;
  *     for MVP the BE accepts it inside the create payload only when an
  *     `attributes` upserter is wired; here we keep it form-local and
  *     persist after redirect via the Show page)
- *   - Icon (emoji from CATEGORY_ICONS; stored in attributes.icon when
- *     attribute upserter ships)
  *   - Live ltree path preview
  *
  * Pixel-perfect of the Create flow + Save-on-create attributes mirroring
@@ -61,7 +57,6 @@ export function CategoryCreatePage() {
   const [namePl, setNamePl] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [descPl, setDescPl] = useState('');
-  const [icon, setIcon] = useState<string>(CATEGORY_ICONS[0]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -290,17 +285,6 @@ export function CategoryCreatePage() {
               className="rounded-xl"
             />
           </div>
-        </section>
-
-        <section className="space-y-3">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-            {t('categories.fields.section_visualization', { defaultValue: 'Wizualizacja' })}
-          </div>
-          <IconPicker
-            selected={icon}
-            onSelect={(value) => setIcon(value)}
-            options={[...CATEGORY_ICONS]}
-          />
         </section>
 
         <section className="space-y-2 rounded-xl bg-zinc-50 px-4 py-3">
