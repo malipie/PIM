@@ -557,6 +557,7 @@ function FolderTile({ name, count, warning = false, onOpen }: FolderTileProps) {
   return (
     <button
       type="button"
+      data-testid="folder-tile"
       // #2320 — open on double-click (Windows Explorer behaviour); a single
       // click no longer navigates. Keyboard users still open with Enter/Space.
       onDoubleClick={onOpen}

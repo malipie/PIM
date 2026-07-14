@@ -28,11 +28,10 @@ test('entering a folder shows a skeleton, not the previous folder cards', async 
   });
   armed = true;
 
-  // Double-click the first folder tile (Explorer semantics, #2320).
-  const firstFolder = page
-    .locator('button[title]')
-    .filter({ hasText: /produkt|product/i })
-    .first();
+  // Double-click the first folder tile (Explorer semantics, #2320). The
+  // "Bez przypisania" tile is always present, so this is data-independent.
+  const firstFolder = page.getByTestId('folder-tile').first();
+  await expect(firstFolder).toBeVisible();
   await firstFolder.dblclick();
 
   // While the folder loads the skeleton is shown (proves stale cards are hidden).
