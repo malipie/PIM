@@ -42,6 +42,19 @@ test('CPDF-P5-02 — catalog wizard: steps, generate, navigate back, a11y', asyn
       },
     }),
   );
+  // #2567 — the scope step counts the selected products via the search route.
+  await page.route('**/api/search/products**', (route) =>
+    route.fulfill({
+      json: {
+        hits: [],
+        totalHits: 42,
+        facetDistribution: {},
+        processingTimeMs: 1,
+        page: 1,
+        perPage: 1,
+      },
+    }),
+  );
 
   const previewCalls: unknown[] = [];
   await page.route('**/api/catalogs/preview', async (route) => {
@@ -81,7 +94,10 @@ test('CPDF-P5-02 — catalog wizard: steps, generate, navigate back, a11y', asyn
 
   const next = page.getByRole('button', { name: /^dalej$|^next$/i });
 
-  // Step 1 — scope. Continue with an empty (all products) filter.
+  // Step 1 — scope. The live assortment count (#2567) shows how many products
+  // the filter selects — visible feedback that applying a filter does something.
+  await expect(page.getByTestId('catalog-scope-count')).toContainText('42');
+  // Continue with an empty (all products) filter.
   await next.click();
 
   // Step 2 — archetype: pick the sheet card, then continue.
