@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Benchmark\Export;
 
+use App\Asset\Contracts\Service\AssetInliner;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Export\Catalog\Application\CatalogRenderService;
@@ -158,6 +159,14 @@ final class CatalogPdfBenchmarkCommand extends Command
                 new HtmlValueSanitizer(),
                 $this->twig,
                 new DompdfRenderer(),
+                // Synthetic products carry no real assets — a no-op inliner keeps
+                // the benchmark measuring the render path only.
+                new class implements AssetInliner {
+                    public function toDataUri(string $reference): ?string
+                    {
+                        return null;
+                    }
+                },
                 maxInMemoryItems: PHP_INT_MAX, // the benchmark measures past the cap on purpose
             );
 
