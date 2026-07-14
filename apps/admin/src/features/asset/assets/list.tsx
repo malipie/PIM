@@ -151,6 +151,13 @@ export function AssetsListPage() {
 
   const assets = useMemo(() => (result?.data ?? []).map(toAssetMeta), [result?.data]);
   const isLoading = query.isLoading;
+  // #2572 — `keepPreviousData` keeps the grid mounted across a folder switch,
+  // but it also keeps the PREVIOUS folder's thumbnails on screen until the new
+  // set lands — the "all files outside the folder flash up then vanish" bug.
+  // `isPlaceholderData` is true exactly while stale data from a different query
+  // (folder/filter change) is shown; render a skeleton then instead of the
+  // wrong cards. Background thumbnail polls (same query key) don't trip it.
+  const isSwitching = query.isPlaceholderData;
   const showFolderTiles = currentFolder === null && !debouncedSearch;
   const currentFolderEntry =
     currentFolder !== null && currentFolder !== 'root'
@@ -365,7 +372,9 @@ export function AssetsListPage() {
           ) : null}
         </div>
 
-        {assets.length === 0 && !isLoading ? (
+        {isLoading || isSwitching ? (
+          <AssetGridSkeleton view={view} />
+        ) : assets.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-200 px-6 py-16 text-center text-[13px] text-zinc-500">
             {t('assets.empty')}
           </div>
@@ -548,6 +557,7 @@ function FolderTile({ name, count, warning = false, onOpen }: FolderTileProps) {
   return (
     <button
       type="button"
+      data-testid="folder-tile"
       // #2320 — open on double-click (Windows Explorer behaviour); a single
       // click no longer navigates. Keyboard users still open with Enter/Space.
       onDoubleClick={onOpen}
@@ -611,6 +621,51 @@ function FolderRow({ name, count, warning = false, onOpen }: FolderTileProps) {
           : ''}
       </span>
     </button>
+  );
+}
+
+/**
+ * #2572 — stable placeholder shown while a folder switch is in flight, so the
+ * previous folder's thumbnails never flash on screen. Mirrors the real grid /
+ * list dimensions to avoid a layout jump.
+ */
+// Stable keys for the fixed-length placeholder grid (biome noArrayIndexKey).
+const SKELETON_KEYS = Array.from({ length: 10 }, (_, i) => `asset-skeleton-${i}`);
+
+function AssetGridSkeleton({ view }: { view: 'grid' | 'list' }) {
+  if (view === 'grid') {
+    return (
+      <ul aria-hidden="true" className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
+        {SKELETON_KEYS.map((key) => (
+          <li
+            key={key}
+            className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm"
+          >
+            <div className="aspect-square animate-pulse bg-zinc-100" />
+            <div className="space-y-1.5 px-2.5 py-2">
+              <div className="h-3 w-3/4 animate-pulse rounded bg-zinc-100" />
+              <div className="h-2.5 w-1/2 animate-pulse rounded bg-zinc-100" />
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return (
+    <div
+      aria-hidden="true"
+      className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm"
+    >
+      <div className="divide-y divide-zinc-50">
+        {SKELETON_KEYS.map((key) => (
+          <div key={key} className="flex items-center gap-3 px-4 py-2.5">
+            <div className="size-8 animate-pulse rounded-md bg-zinc-100" />
+            <div className="h-3 flex-1 animate-pulse rounded bg-zinc-100" />
+            <div className="h-3 w-16 animate-pulse rounded bg-zinc-100" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
