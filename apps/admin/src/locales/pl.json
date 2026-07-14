@@ -3946,7 +3946,7 @@
     },
     "status": {
       "planning": "Planuję…",
-      "awaiting_input": "Czekam na odpowiedź",
+      "awaiting_input": "Twoja kolej",
       "awaiting_approval": "Czeka na akceptację",
       "committing": "Zapisuję…",
       "done": "Zakończony",

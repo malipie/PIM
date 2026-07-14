@@ -256,6 +256,36 @@ export function AgentChatSheet() {
               </Link>
             </div>
           )}
+          {/* #2605 — awaiting_input with no assistant message is a dead-end for a
+              bulk run (it proposed nothing): explain instead of a blank panel
+              that reads like a hang. Interactive runs just get the "your turn"
+              nudge; the composer below is enabled either way. */}
+          {run?.status === 'awaiting_input' &&
+            run.messages.filter((message) => message.role !== 'user').length === 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                {run.context.bulk_content ? (
+                  <>
+                    <p className="font-medium">
+                      {t('agent.chat.bulk_no_proposals_title', {
+                        defaultValue: 'Agent nie przygotował żadnych propozycji.',
+                      })}
+                    </p>
+                    <p className="mt-1 text-amber-800">
+                      {t('agent.chat.bulk_no_proposals_hint', {
+                        defaultValue:
+                          'Wybrane produkty prawdopodobnie nie mają danych źródłowych (nazwa, opis, marka…) wymaganych przez przepis. Uzupełnij je i spróbuj ponownie.',
+                      })}
+                    </p>
+                  </>
+                ) : (
+                  <p>
+                    {t('agent.chat.awaiting_input_hint', {
+                      defaultValue: 'Twoja kolej — napisz poniżej, co agent ma zrobić dalej.',
+                    })}
+                  </p>
+                )}
+              </div>
+            )}
           {run?.status === 'error' && run.error_message !== null && (
             <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
               {run.error_message}
