@@ -3,6 +3,25 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-14: MARATON „testy-całości pt.2" — 14 ticketów UI/UX (#2565–#2578) wszystkie merged + live-smoke proof
+- **Kontekst:** operator rozpisał docx `docs/Tests/calosciowe - od 8072026/testy-calosci - pt 2.docx` na 14 ticketów i autoryzował marathon bez pytań. Każdy = własny branch+PR+CI+merge+live-smoke+proof w issue-close comment. Poprzedziła seria zmian home/produkty (#2562/#2564/#2580) — nowy brand-orange `#ff4f00` (biały tekst, a11y rozluźniona przez `.exclude('.bg-cta')`), merge Column Views+Presety, „Dodaj" w topbarze.
+- **✅ DOSTARCZONE (14/14, każdy merged + proof):**
+  - **#2565** — rename „Katalogi PDF" → „Web To Print".
+  - **#2566** — edycja istniejącego katalogu (EditCatalogWizard, GET prefill, PATCH config; regeneracja osobno).
+  - **#2567** — „Zastosuj filtr" na `/catalogs-pdf/new` (StepScope licznik `useCatalogSearch` „N produktów trafi do katalogu").
+  - **#2568** — typy katalogu „grid" + „cennik" (BE renderery CPDF-P6-01/02 już były; wizard udostępnia kafle; preview grid/pricelist→200). PR #2591.
+  - **#2569** — branding: wgraj logo z Multimediów (`AssetLogoPicker` Sheet, `onSelect(previewUrl)`).
+  - **#2570** — mapowanie pól przez `AttributePicker` zamiast wpisywania kodu (ariaLabel prop).
+  - **#2571** — rename „Archetyp" → trafniejsza polska nazwa.
+  - **#2572** — fix migotania ikon assetów przy wejściu w katalog (`placeholderData: keepPreviousData`).
+  - **#2573** — investigation `/settings/api-tokens`: funkcjonalny → zostaje (bez zmian kodu, wyjaśnienie w issue).
+  - **#2574** (PR #2592) — przeniesienie edytora definicji workflow ze Settings do huba `/workflow/definitions` + CTA „Definicje przepływu" na WorkflowPage; redirecty starych `/settings/workflow*`; usunięty wpis z settings-nav.
+  - **#2575** — nagłówek `/workflow` „Workspace" → „Workflow".
+  - **#2576** — API-configurator domyślnie otwiera zakładkę „Połączenia".
+  - **#2577** — usunięty nieużywany „Podgląd" na detalu kanału.
+  - **#2578** (PR #2593) — usunięcie wyboru ikon/kolorów z 4 powierzchni (kreator ObjectType, tworzenie kategorii, detal ObjectType, modal Smart Preset); defaulty wysyłane cicho, kontrakty API bez zmian. Kluczowe: `icon` w categories/new **nigdy nie był persystowany** (capture-only), preset icon default `ICON_CHOICES[0]` spełnia wymóg BE.
+- **Gotchas → lessons:** (1) rename współdzielonej etykiety `nav.*` łamie specy z case-insensitive regexem starej etykiety (`/dashboard|pulpit/i`) — grep literalny nie łapie; grep case-insensitive PL+EN przed pushem. (2) brand-orange `#ff4f00` biały tekst = 3.29:1 (sub-AA) — świadomy wyjątek operatora, `.exclude('.bg-cta')` w każdym axe-specu. (3) `page.request`/apiLogin pada lokalnie na DNS `pim.localhost` (Node) → smoke tylko browser-flow (loginAsAdmin form). (4) typecheck admin OOM w kontenerze → `NODE_OPTIONS=--max-old-space-size=4096`. (5) picker bez data-testid → asercja braku przez tekst etykiety scoped regexem.
+
 ## 2026-07-13: API-filters follow-up (#2549/#2550) + 3 bug-fixy po smoke operatora (Bug1/Bug2/Bug3)
 - **Kontekst:** kontynuacja wątku filtrów API (po #2527/#2530 scoping live-API) + operator zgłosił 3 problemy po smoke-teście. Każdy = własny branch+PR+CI+merge+live-smoke+proof.
 - **✅ #2549 (PR #2551) — outbound-sync filter „Z PIM":** `SyncBinding.outboundFilter` (FilterDsl JSONB, migracja `Version20260713100000` idempotentna) scopuje które produkty PIM WYSYŁA do kanału. Nowy `OutboundRecordReader` seam (Export impl kompiluje DSL przez `FilterDslResolver::toCountSql`), `SyncBindingProcessor`/Input/serializer, FE `OutboundFilterSection` (reużywa `AdvancedFilterPanel`, ukryty dla inbound). Live-proof: POST binding+filter→201, persist round-trip, DELETE→204.
