@@ -88,9 +88,13 @@ test('CPDF-P5-02 — catalog wizard: steps, generate, navigate back, a11y', asyn
   await page.getByRole('radio', { name: /karta produktu|product sheet/i }).click();
   await next.click();
 
-  // Step 3 — branding: set a brand colour + company name.
+  // Step 3 — branding: set a brand colour + company name. The logo can be
+  // picked from Multimedia (#2569) — assert the picker entry point renders.
   await page.getByLabel(/^kolor marki$|^brand color$/i).fill('#0055aa');
   await page.getByLabel(/nazwa firmy|company name/i).fill('Acme');
+  await expect(
+    page.getByRole('button', { name: /wybierz z multimediów|choose from multimedia/i }),
+  ).toBeVisible();
   await next.click();
 
   // Step 4 — mapping: the attribute picker (#2570) is prefilled with the
