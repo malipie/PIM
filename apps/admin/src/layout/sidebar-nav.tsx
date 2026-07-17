@@ -213,6 +213,15 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
     }
   }, [integrationsRouteActive]);
 
+  const settingsRouteActive = pathname.startsWith('/settings');
+  const [settingsOpen, setSettingsOpen] = useState(settingsRouteActive);
+  useEffect(() => {
+    // Deep link onto /settings/users etc. opens the parent (#2616).
+    if (settingsRouteActive) {
+      setSettingsOpen(true);
+    }
+  }, [settingsRouteActive]);
+
   const countSources: NavCountSource[] = [
     ...items
       .filter((item) => item.kind === 'object_type' && item.route !== null)
@@ -315,31 +324,45 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
 
   /**
    * NUI-01 (#1420) — settings sub-navigation lives in the MAIN sidebar as an
-   * indented subtree under "Ustawienia" (design `settings/page.jsx`), shown
-   * while any /settings/* route is active. Replaces the second sidebar that
-   * `SettingsLayout` used to render.
+   * indented subtree under "Ustawienia" (design `settings/page.jsx`). Since
+   * #2616 the parent is a toggle button mirroring "Integracje": click
+   * expands/collapses, a deep link onto /settings/* opens it automatically.
    */
   const renderSettingsParent = (item: EffectiveMenuItem) => {
     const Icon = ICON_MAP[item.icon] ?? Cog;
     const labelText = renderLabel(item);
-    const settingsActive = pathname.startsWith('/settings');
     return (
       <div key={item.id}>
-        <NavLink
-          to={item.route ?? '/settings'}
-          onClick={onNavigate}
-          className={leafLinkClass}
-          end={false}
-        >
-          {({ isActive }) => (
-            <>
-              <Icon className={cn('size-4', isActive ? 'text-white/90' : 'text-zinc-500')} />
-              <span className="flex-1">{labelText}</span>
-            </>
+        <button
+          type="button"
+          aria-expanded={settingsOpen}
+          aria-controls="nav-settings-children"
+          onClick={() => setSettingsOpen((open) => !open)}
+          className={cn(
+            baseLeafClass,
+            settingsRouteActive && !settingsOpen
+              ? 'bg-zinc-900 text-white'
+              : 'text-zinc-700 hover:bg-zinc-100',
           )}
-        </NavLink>
-        {settingsActive && (
+        >
+          <Icon
+            className={cn(
+              'size-4',
+              settingsRouteActive && !settingsOpen ? 'text-white/90' : 'text-zinc-500',
+            )}
+          />
+          <span className="flex-1 text-left">{labelText}</span>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn(
+              'size-3.5 text-zinc-500 transition-transform',
+              settingsOpen && 'rotate-180',
+            )}
+          />
+        </button>
+        {settingsOpen && (
           <div
+            id="nav-settings-children"
             className="my-1 ml-[18px] space-y-2.5 border-l border-zinc-200 pb-1 pl-3"
             data-testid="nav-settings-subtree"
           >
