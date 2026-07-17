@@ -27,15 +27,16 @@ test('entering a folder shows a target-sized skeleton, not the previous cards', 
   await expect(skeleton).toHaveCount(0);
   await expect(realGrid.locator('> li').first()).toBeVisible();
 
-  // Read the target folder's element count from its tile ("N elem."). The
-  // first tile is a real folder (the "Bez przypisania" tile has no count and
-  // is appended last).
+  // Read the target folder's element count from the tile's count element
+  // ("N elem." / "N items" — the `.num` div holds only the count, so this is
+  // locale-agnostic and immune to digits in the folder name). The first tile
+  // is a real folder (the "Bez przypisania" tile has no count and is last).
   const firstFolder = page.getByTestId('folder-tile').first();
   await expect(firstFolder).toBeVisible();
-  const tileText = (await firstFolder.innerText()).replace(/\s+/g, ' ');
-  const countMatch = tileText.match(/(\d+)\s*elem/i);
-  expect(countMatch).not.toBeNull();
-  const targetCount = Number(countMatch?.[1]);
+  const countText = (await firstFolder.locator('.num').innerText()).trim();
+  const countMatch = countText.match(/\d+/);
+  expect(countMatch, `folder tile count text: "${countText}"`).not.toBeNull();
+  const targetCount = Number(countMatch?.[0]);
   const expectedSkeleton = Math.min(Math.max(targetCount, 1), 120);
 
   // Hold the next assets request so the switch stays visible long enough.
