@@ -70,6 +70,10 @@ export function AssetsListPage() {
   const [duplicate, setDuplicate] = useState<DuplicateState | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+  // #2612 — expected file count at the navigation target (folder assetCount),
+  // null when unknown (up-navigation, "Bez przypisania"). Sizes the switch
+  // skeleton and the files-header count to the DESTINATION layout.
+  const [targetCount, setTargetCount] = useState<number | null>(null);
   const [folders, setFolders] = useState<FolderEntry[]>([]);
   const [drawerAsset, setDrawerAsset] = useState<AssetMeta | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -158,12 +162,18 @@ export function AssetsListPage() {
   // (folder/filter change) is shown; render a skeleton then instead of the
   // wrong cards. Background thumbnail polls (same query key) don't trip it.
   const isSwitching = query.isPlaceholderData;
-  // #2572 — size the skeleton to the OUTGOING grid so switching a folder does
-  // not collapse the page height the instant the skeleton appears (a 102→10→N
-  // double jump). While `isPlaceholderData` is true `assets` still holds the
-  // previous folder's set (keepPreviousData), so its length is the height to
-  // hold until the new content settles in one motion.
-  const skeletonCount = isSwitching && assets.length > 0 ? Math.min(assets.length, 120) : 12;
+  // #2612 — size the skeleton to the TARGET folder (assetCount is already in
+  // `folders` state), not to the outgoing grid. #2600 sized it to the outgoing
+  // set to hold the page height, but that made a pseudo-grid shaped like the
+  // previous view's files slide to the top and collapse — the exact flicker it
+  // was meant to remove. With the destination size the transitional layout
+  // matches the final one, so the switch settles without a flash-and-collapse.
+  // Unknown targets (up-navigation, "Bez przypisania") fall back to 12.
+  const skeletonCount =
+    isSwitching && targetCount !== null ? Math.min(Math.max(targetCount, 1), 120) : 12;
+  // While switching, show the destination count instead of the stale
+  // placeholder length ("PLIKI 10" flashing on entry into a 1-file folder).
+  const filesCount = isSwitching && targetCount !== null ? targetCount : assets.length;
   const showFolderTiles = currentFolder === null && !debouncedSearch;
   const currentFolderEntry =
     currentFolder !== null && currentFolder !== 'root'
@@ -196,8 +206,9 @@ export function AssetsListPage() {
     });
   };
 
-  const enterFolder = (code: string | null) => {
+  const enterFolder = (code: string | null, expectedCount: number | null = null) => {
     setCurrentFolder(code);
+    setTargetCount(expectedCount);
     setSelected(new Set());
   };
 
@@ -331,7 +342,7 @@ export function AssetsListPage() {
                   key={folder.code}
                   name={folder.displayName}
                   count={folder.assetCount}
-                  onOpen={() => enterFolder(folder.code)}
+                  onOpen={() => enterFolder(folder.code, folder.assetCount)}
                 />
               ))}
               <FolderTile
@@ -349,7 +360,7 @@ export function AssetsListPage() {
                     key={folder.code}
                     name={folder.displayName}
                     count={folder.assetCount}
-                    onOpen={() => enterFolder(folder.code)}
+                    onOpen={() => enterFolder(folder.code, folder.assetCount)}
                   />
                 ))}
                 <FolderRow
@@ -371,7 +382,9 @@ export function AssetsListPage() {
             {t('assets.files_label', { defaultValue: 'Pliki' })}
           </div>
           <div className="text-[11.5px] text-zinc-500">
-            <span className="num font-semibold text-zinc-600">{assets.length}</span>
+            <span data-testid="files-count" className="num font-semibold text-zinc-600">
+              {filesCount}
+            </span>
           </div>
           {isLoading ? (
             <Loader2 className="size-3.5 animate-spin text-zinc-500" aria-hidden />
@@ -631,10 +644,11 @@ function FolderRow({ name, count, warning = false, onOpen }: FolderTileProps) {
 }
 
 /**
- * #2572 — stable placeholder shown while a folder switch is in flight, so the
- * previous folder's thumbnails never flash on screen. `count` sizes it to the
- * outgoing grid so the page height is held until the new content settles,
- * avoiding the residual layout jump.
+ * #2572/#2612 — stable placeholder shown while a folder switch is in flight,
+ * so the previous folder's thumbnails never flash on screen. `count` sizes it
+ * to the navigation TARGET (the folder's assetCount) so the transitional
+ * layout already matches the destination and settles without a
+ * flash-and-collapse.
  */
 // Stable keys for the placeholder grid (biome noArrayIndexKey); sliced to count.
 const MAX_SKELETON = 120;
