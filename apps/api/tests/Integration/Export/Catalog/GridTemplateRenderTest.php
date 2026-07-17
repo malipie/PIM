@@ -91,6 +91,32 @@ final class GridTemplateRenderTest extends KernelTestCase
     }
 
     #[Test]
+    public function fullSizeTocChunksIntoPageSizedTables(): void
+    {
+        // Live-smoke regression (#2608) — Dompdf clips a table cell taller
+        // than one page, so a 305-product TOC must chunk into ceil(305/72) = 5
+        // two-column tables (max 36 entries per cell) instead of one giant cell.
+        $products = [];
+        for ($i = 1; $i <= 305; ++$i) {
+            $products[] = [
+                'title' => \sprintf('Produkt %d', $i),
+                'sku' => \sprintf('SKU-%03d', $i),
+                'image' => '',
+                'price' => '9,00 zł',
+            ];
+        }
+
+        $html = $this->twig()->render('catalog/grid.html.twig', self::context($products));
+
+        self::assertSame(5, substr_count($html, 'class="toc-columns"'));
+        self::assertSame(305, substr_count($html, 'href="#product-'));
+        self::assertSame(305, substr_count($html, 'class="card" id="product-'));
+        // Anchor numbering stays global across batches.
+        self::assertStringContainsString('href="#product-305"', $html);
+        self::assertStringContainsString('id="product-305"', $html);
+    }
+
+    #[Test]
     public function premiumPagedMediaIsGatedBehindTheFlag(): void
     {
         $twig = $this->twig();

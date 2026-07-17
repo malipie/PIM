@@ -55,6 +55,10 @@
         .toc-columns {
             width: 100%;
             border-collapse: collapse;
+            margin-bottom: 14px;
+            {# One single-row table per TOC batch — keep it atomic: a row
+               split near the page edge makes Dompdf emit blank pages. #}
+            page-break-inside: avoid;
         }
         .toc-columns > tr > td,
         .toc-columns td.toc-col {
@@ -153,31 +157,39 @@
     {% include 'catalog/_chrome/footer.html.twig' %}
     {% include 'catalog/_chrome/cover.html.twig' %}
 
-    {% set half = ((products|length + 1) / 2)|round(0, 'ceil') %}
+    {# The TOC is chunked into comfortably sub-page two-column tables: Dompdf
+       CLIPS a table cell taller than one page (an unchunked 150-entry column
+       vanished on a 305-product catalog) and emits blank pages when a
+       single-row table lands too close to the page height — 36 entries per
+       column (~700px) keeps every batch safely inside one page. #}
     <div class="toc">
         <div class="eyebrow">{{ branding.company_name|default('') }}</div>
         <h2 class="toc-heading">{{ l.toc|default('Contents') }}</h2>
         <div class="toc-rule"></div>
-        <table class="toc-columns">
-            <tr>
-                <td class="toc-col toc-col-left">
-                    {% for product in products[:half] %}
-                        <div class="toc-entry">
-                            <a href="#product-{{ loop.index }}">{{ product.title|default('') }}<span class="toc-page"></span></a>
-                            <span class="toc-sku">{{ product.sku|default('') }}</span>
-                        </div>
-                    {% endfor %}
-                </td>
-                <td class="toc-col toc-col-right">
-                    {% for product in products[half:] %}
-                        <div class="toc-entry">
-                            <a href="#product-{{ half + loop.index }}">{{ product.title|default('') }}<span class="toc-page"></span></a>
-                            <span class="toc-sku">{{ product.sku|default('') }}</span>
-                        </div>
-                    {% endfor %}
-                </td>
-            </tr>
-        </table>
+        {% for batch in products|batch(72) %}
+            {% set batch_offset = loop.index0 * 72 %}
+            {% set batch_half = ((batch|length + 1) / 2)|round(0, 'ceil') %}
+            <table class="toc-columns">
+                <tr>
+                    <td class="toc-col toc-col-left">
+                        {% for product in batch[:batch_half] %}
+                            <div class="toc-entry">
+                                <a href="#product-{{ batch_offset + loop.index }}">{{ product.title|default('') }}<span class="toc-page"></span></a>
+                                <span class="toc-sku">{{ product.sku|default('') }}</span>
+                            </div>
+                        {% endfor %}
+                    </td>
+                    <td class="toc-col toc-col-right">
+                        {% for product in batch[batch_half:] %}
+                            <div class="toc-entry">
+                                <a href="#product-{{ batch_offset + batch_half + loop.index }}">{{ product.title|default('') }}<span class="toc-page"></span></a>
+                                <span class="toc-sku">{{ product.sku|default('') }}</span>
+                            </div>
+                        {% endfor %}
+                    </td>
+                </tr>
+            </table>
+        {% endfor %}
     </div>
 
     <table class="grid">
