@@ -35,6 +35,18 @@ final class DompdfRenderer implements PdfRenderer
         $dompdfOptions = new Options();
         $dompdfOptions->set('isRemoteEnabled', false);
         $dompdfOptions->set('isHtml5ParserEnabled', true);
+        // #2608 — the templates embed data-URI @font-face fonts; Dompdf writes
+        // their derived metrics into fontCache, which defaults to the vendored
+        // lib dir. Point it (and tempDir) at the system temp dir so vendor/
+        // stays read-only and the metrics survive per container lifetime.
+        $fontCache = sys_get_temp_dir().'/pim-dompdf-cache';
+        if (!is_dir($fontCache)) {
+            @mkdir($fontCache, 0o775, true);
+        }
+        if (is_dir($fontCache) && is_writable($fontCache)) {
+            $dompdfOptions->set('fontCache', $fontCache);
+            $dompdfOptions->set('tempDir', $fontCache);
+        }
         if ($options->basePath !== null) {
             $dompdfOptions->set('chroot', $options->basePath);
         }

@@ -1,0 +1,10 @@
+{#
+  Catalog PDF chrome — the fixed page footer (#2608): hairline, company name
+  on the left, localised "Page N" on the right (CSS 2.1 counter(page), which
+  Dompdf repeats on every page). Fixed elements print on the cover too — the
+  footer sits in the white margin band, where it reads as a running foot.
+#}
+<div class="page-footer">
+    <span class="pf-right">{{ labels.page|default('Page') }} <span class="pagenum"></span></span>
+    {{ branding.company_name|default('') }}
+</div>

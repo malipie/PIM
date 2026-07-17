@@ -31,7 +31,7 @@ use Symfony\Component\Uid\Uuid;
  */
 final class StorageAssetInliner implements AssetInliner
 {
-    /** @var array<string, string|null> reference => data URI (or null miss) */
+    /** @var array<string, string|null> "variant|reference" => data URI (or null miss) */
     private array $cache = [];
 
     public function __construct(
@@ -40,16 +40,17 @@ final class StorageAssetInliner implements AssetInliner
     ) {
     }
 
-    public function toDataUri(string $reference): ?string
+    public function toDataUri(string $reference, ?string $preferredVariant = null): ?string
     {
-        if (\array_key_exists($reference, $this->cache)) {
-            return $this->cache[$reference];
+        $key = ($preferredVariant ?? '').'|'.$reference;
+        if (\array_key_exists($key, $this->cache)) {
+            return $this->cache[$key];
         }
 
-        return $this->cache[$reference] = $this->resolve($reference);
+        return $this->cache[$key] = $this->resolve($reference, $preferredVariant);
     }
 
-    private function resolve(string $reference): ?string
+    private function resolve(string $reference, ?string $preferredVariant): ?string
     {
         $assetId = $this->extractId($reference);
         if (null === $assetId) {
@@ -61,7 +62,7 @@ final class StorageAssetInliner implements AssetInliner
             return null;
         }
 
-        [$path, $mime] = $this->resolveVariant($asset);
+        [$path, $mime] = $this->resolveVariant($asset, $preferredVariant);
 
         try {
             $bytes = $this->assetsStorage->read($path);
@@ -90,7 +91,7 @@ final class StorageAssetInliner implements AssetInliner
     /**
      * @return array{0: string, 1: string} [storagePath, mimeType]
      */
-    private function resolveVariant(Asset $asset): array
+    private function resolveVariant(Asset $asset, ?string $preferredVariant): array
     {
         $variants = [];
         foreach ($asset->getVariants() as $variant) {
@@ -99,9 +100,15 @@ final class StorageAssetInliner implements AssetInliner
 
         // Memory-first order thumb (200) → medium (800) → original: the smallest
         // variant that exists keeps the in-process renderer under its budget
-        // (see the class docblock). Only used when thumbnails are ready.
+        // (see the class docblock). A caller-preferred variant (#2608 — sheet
+        // catalogs under the HQ cap ask for medium) jumps the queue; the
+        // fallback chain stays memory-first. Only used when thumbnails are ready.
         if (ThumbnailsStatus::Ready === $asset->getThumbnailsStatus()) {
-            foreach ([AssetVariant::CODE_THUMB, AssetVariant::CODE_MEDIUM, AssetVariant::CODE_ORIGINAL] as $code) {
+            $order = [AssetVariant::CODE_THUMB, AssetVariant::CODE_MEDIUM, AssetVariant::CODE_ORIGINAL];
+            if (null !== $preferredVariant) {
+                array_unshift($order, $preferredVariant);
+            }
+            foreach (array_unique($order) as $code) {
                 if (isset($variants[$code])) {
                     return $variants[$code];
                 }

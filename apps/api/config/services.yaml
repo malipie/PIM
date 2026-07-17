@@ -106,6 +106,14 @@ services:
     App\Export\Catalog\Application\CatalogRenderService:
         arguments:
             $maxInMemoryItems: '%env(int:CATALOG_PDF_MAX_ITEMS)%'
+            $hqImageMaxItems: '%env(int:CATALOG_PDF_HQ_IMAGE_MAX_ITEMS)%'
+
+    # #2608 — catalog PDF chrome: the print fonts are vendored TTF subsets
+    # embedded as data: URIs (the one src both Dompdf and Gotenberg resolve);
+    # the provider memoises them per worker process.
+    App\Export\Catalog\Infrastructure\Template\CatalogPdfFontProvider:
+        arguments:
+            $fontDir: '%kernel.project_dir%/assets/pdf-fonts'
 
     # W2-7 / AUD-042 — single RFC 7807 contract for custom controllers.
     # `$debug` is bound to the kernel flag so the listener can keep the

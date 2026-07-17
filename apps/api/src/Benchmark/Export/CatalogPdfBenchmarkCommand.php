@@ -7,6 +7,7 @@ namespace App\Benchmark\Export;
 use App\Asset\Contracts\Service\AssetInliner;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
+use App\Export\Catalog\Application\CatalogPdfChromeFactory;
 use App\Export\Catalog\Application\CatalogRenderService;
 use App\Export\Catalog\Application\HtmlValueSanitizer;
 use App\Export\Catalog\Domain\Entity\CatalogProfile;
@@ -71,6 +72,7 @@ final class CatalogPdfBenchmarkCommand extends Command
         private readonly TenantFilterConfigurator $tenantFilter,
         private readonly RlsTenantGuard $rlsGuard,
         private readonly Environment $twig,
+        private readonly CatalogPdfChromeFactory $chromeFactory,
         #[Autowire(param: 'kernel.project_dir')]
         private readonly string $projectDir,
     ) {
@@ -162,11 +164,12 @@ final class CatalogPdfBenchmarkCommand extends Command
                 // Synthetic products carry no real assets — a no-op inliner keeps
                 // the benchmark measuring the render path only.
                 new class implements AssetInliner {
-                    public function toDataUri(string $reference): ?string
+                    public function toDataUri(string $reference, ?string $preferredVariant = null): ?string
                     {
                         return null;
                     }
                 },
+                $this->chromeFactory,
                 maxInMemoryItems: PHP_INT_MAX, // the benchmark measures past the cap on purpose
             );
 

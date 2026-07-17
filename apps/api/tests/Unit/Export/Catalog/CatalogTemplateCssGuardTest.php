@@ -28,12 +28,19 @@ use PHPUnit\Framework\TestCase;
 final class CatalogTemplateCssGuardTest extends TestCase
 {
     /**
+     * Every archetype plus the shared `_chrome` partials (#2608) — the chrome
+     * CSS renders on the Dompdf path of all three archetypes, so it must obey
+     * the same subset.
+     *
      * @return iterable<string, array{0: string}>
      */
     public static function templates(): iterable
     {
-        $paths = glob(self::templatesDir().'/*.html.twig');
-        foreach (false === $paths ? [] : $paths as $path) {
+        $paths = array_merge(
+            self::globTemplates(self::templatesDir().'/*.html.twig'),
+            self::globTemplates(self::templatesDir().'/_chrome/*.html.twig'),
+        );
+        foreach ($paths as $path) {
             yield basename($path) => [$path];
         }
     }
@@ -41,13 +48,20 @@ final class CatalogTemplateCssGuardTest extends TestCase
     #[Test]
     public function everyArchetypeIsCovered(): void
     {
-        $found = array_map(
-            static fn (array $args): string => basename($args[0]),
-            iterator_to_array(self::templates()),
-        );
+        $found = array_map(basename(...), self::globTemplates(self::templatesDir().'/*.html.twig'));
         sort($found);
 
         self::assertSame(['grid.html.twig', 'pricelist.html.twig', 'sheet.html.twig'], $found);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function globTemplates(string $pattern): array
+    {
+        $paths = glob($pattern);
+
+        return false === $paths ? [] : $paths;
     }
 
     #[Test]

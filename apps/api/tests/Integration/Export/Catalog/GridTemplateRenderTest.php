@@ -4,35 +4,45 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Export\Catalog;
 
+use App\Export\Catalog\Application\CatalogPdfChromeFactory;
+use App\Export\Catalog\Infrastructure\Template\CatalogPdfFontProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Clock\MockClock;
 use Twig\Environment;
 
 /**
- * CPDF-P6-02 — renders the grid archetype through the real Twig environment
- * (strict_variables ON): the cover carries the brand tokens + catalog title,
- * the TOC links every product to an anchored card, the cards are chunked into
- * 3-per-row table rows, and the premium paged-media bits (target-counter TOC
- * page numbers) only appear when the `premium` flag is set — the graceful
- * Dompdf degradation demanded by the ticket.
+ * CPDF-P6-02 / #2608 — renders the grid archetype through the real Twig
+ * environment (strict_variables ON): the framed cover carries the brand
+ * palette + catalog title, the TWO-column TOC links every product to an
+ * anchored card, the cards are chunked into 3-per-row table rows, and the
+ * premium paged-media bits (target-counter TOC page numbers) only appear when
+ * the `premium` flag is set — the graceful Dompdf degradation demanded by the
+ * ticket.
  */
 final class GridTemplateRenderTest extends KernelTestCase
 {
     /**
      * @param list<array<string, string>> $products
      *
-     * @return array{branding: array<string, string|null>, products: list<array<string, string>>, title: string}
+     * @return array<string, mixed>
      */
     private static function context(array $products): array
     {
+        $branding = [
+            'color' => '#0ea5e9',
+            'company_name' => 'ACME',
+            'logo' => null,
+        ];
+        $chrome = new CatalogPdfChromeFactory(
+            new CatalogPdfFontProvider(\dirname(__DIR__, 4).'/assets/pdf-fonts'),
+            new MockClock('2026-07-17T12:00:00+00:00'),
+        );
+
         return [
-            'branding' => [
-                'color' => '#0ea5e9',
-                'company_name' => 'ACME',
-                'logo' => null,
-            ],
+            'branding' => $branding,
             'products' => $products,
-            'title' => 'Katalog wiosna',
+            ...$chrome->chrome($branding, null, \count($products), 'Katalog wiosna'),
         ];
     }
 
@@ -46,7 +56,7 @@ final class GridTemplateRenderTest extends KernelTestCase
     }
 
     #[Test]
-    public function rendersCoverTocAndChunkedCardRows(): void
+    public function rendersCoverTwoColumnTocAndAnchoredCards(): void
     {
         $products = [];
         for ($i = 1; $i <= 7; ++$i) {
@@ -60,19 +70,24 @@ final class GridTemplateRenderTest extends KernelTestCase
 
         $html = $this->twig()->render('catalog/grid.html.twig', self::context($products));
 
-        // Cover: brand colour in <style>, company + catalog title + count.
+        // Cover: palette accent in <style>, catalog title + localised count.
         self::assertStringContainsString('#0ea5e9', $html);
         self::assertStringContainsString('Katalog wiosna', $html);
         self::assertStringContainsString('7 products', $html);
-        // TOC: one anchor per product, pointing at the card ids.
+        self::assertStringContainsString('@font-face', $html);
+        // TOC: one anchor per product (split across two columns), pointing at
+        // the card ids — ceil(7/2) = 4 left + 3 right.
         self::assertSame(7, substr_count($html, 'href="#product-'));
         self::assertSame(7, substr_count($html, 'id="product-'));
         self::assertStringContainsString('href="#product-7"', $html);
         self::assertStringContainsString('id="product-7"', $html);
-        // Grid: 7 cards chunk into ceil(7/3) = 3 table rows.
-        self::assertSame(3, substr_count($html, '<tr>'));
+        self::assertSame(2, substr_count($html, 'class="toc-col toc-col-'));
+        // Grid: every product renders one borderless card.
+        self::assertSame(7, substr_count($html, 'class="card" id="product-'));
         // Page footer counter (CSS 2.1, Dompdf-supported).
         self::assertStringContainsString('counter(page)', $html);
+        // No image mapped — the tinted panels carry the placeholder.
+        self::assertStringContainsString('no image', $html);
     }
 
     #[Test]

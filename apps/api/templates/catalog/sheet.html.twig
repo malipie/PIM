@@ -1,123 +1,177 @@
 {#
-  Catalog PDF — "sheet" archetype (ADR-0027, CPDF-P2-01): one branded product
-  data sheet per page. Rendered to HTML here, then to PDF by the Dompdf-backed
-  PdfRenderer (CPDF-P2-03).
+  Catalog PDF — "sheet" archetype (ADR-0027; editorial redesign #2608): a
+  framed brand cover, then one product data sheet per page. Rendered to HTML
+  here, then to PDF by the PdfRenderer port (Dompdf default / Gotenberg).
 
-  Dompdf-safe CSS only: CSS 2.1 subset — no flexbox, no grid, no CSS custom
-  properties (Dompdf does not resolve `var(--x)` reliably). Brand colours are
-  injected by interpolating Twig values straight into the <style> block below,
-  NOT via `var()`.
+  Page anatomy: small-caps company eyebrow, title row (Fraunces serif title
+  left, rounded price chip right), letterspaced SKU line, a tinted image panel
+  (vertical centring via a single-cell table — Dompdf-safe), the description,
+  and a zebra specification table with humanised labels. Static chrome strings
+  (specification heading, "no image" placeholder, footer) come from the
+  localised `labels` map; the palette is derived server-side by
+  CatalogPdfPalette — Dompdf has no CSS colour functions.
 
-  The template receives exactly two variables:
-    - branding: map (company_name?, logo?, color?)
-    - products: list of maps keyed by slot name (title/sku/image/description/price/specs)
+  Dompdf-safe CSS only (CSS 2.1 subset + border-radius): no flexbox, no grid,
+  no CSS custom properties (`var(--x)` is not resolved reliably) — brand
+  tokens are interpolated by Twig straight into the <style> block below.
 
-  strict_variables is ON in the test env, so every variable access is guarded
-  with `|default(...)` or `is defined`.
+  The template receives the product list plus the shared chrome context
+  (palette / fonts / labels / generated_at / title / item_count) built by
+  CatalogPdfChromeFactory for BOTH the PDF render and the wizard preview.
+  strict_variables is ON in the test env, so every access is guarded with
+  `|default(...)` or `is defined`.
 #}
+{% set pal = palette|default({}) %}
+{% set c_accent = pal.accent|default('#1d4ed8') %}
+{% set c_accent_dark = pal.accent_dark|default('#143591') %}
+{% set c_on_accent = pal.on_accent|default('#ffffff') %}
+{% set c_on_accent_dark = pal.on_accent_dark|default('#ffffff') %}
+{% set c_zebra = pal.tint_zebra|default('#f2f5fd') %}
+{% set c_panel = pal.tint_panel|default('#f7f9fe') %}
+{% set l = labels|default({}) %}
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <style>
-        body {
-            font-family: DejaVu Sans, sans-serif;
-            color: #111827;
-            margin: 0;
-        }
+        {% include 'catalog/_chrome/fonts.html.twig' %}
+        {% include 'catalog/_chrome/chrome.css.html.twig' %}
         .sheet {
-            padding: 32px;
             page-break-after: always;
         }
         .sheet-last {
             page-break-after: auto;
         }
-        .sheet-header {
-            border-bottom: 3px solid {{ branding.color|default('#1d4ed8') }};
-            padding-bottom: 12px;
-            margin-bottom: 20px;
+        .sheet-head {
+            border-bottom: 0.75px solid #e3e5e9;
+            padding-bottom: 8px;
+            margin-bottom: 22px;
         }
-        .sheet-header .company {
-            font-size: 18px;
-            font-weight: bold;
-            color: {{ branding.color|default('#1d4ed8') }};
-        }
-        .sheet-header .logo {
-            max-height: 48px;
-        }
-        .product-image {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .product-image img {
-            max-width: 100%;
-            max-height: 340px;
+        .title-row {
+            width: 100%;
+            margin-bottom: 4px;
         }
         .product-title {
-            font-size: 24px;
-            font-weight: bold;
-            margin: 0 0 6px 0;
+            font-family: 'Fraunces', 'DejaVu Serif', serif;
+            font-weight: 600;
+            font-size: 28px;
+            line-height: 1.15;
+            margin: 0;
+        }
+        .price-cell {
+            width: 150px;
+            text-align: right;
+            vertical-align: top;
+        }
+        .price-chip {
+            display: inline-block;
+            background-color: {{ c_accent }};
+            color: {{ c_on_accent }};
+            border-radius: 14px;
+            padding: 7px 16px;
+            font-size: 12.5px;
+            font-weight: 700;
+            white-space: nowrap;
         }
         .product-sku {
-            font-size: 12px;
-            color: #6b7280;
-            margin-bottom: 12px;
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #9aa0a8;
+            margin: 6px 0 0 0;
         }
-        .product-price {
-            font-size: 20px;
-            font-weight: bold;
-            color: {{ branding.color|default('#1d4ed8') }};
-            margin-bottom: 16px;
+        .img-panel {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0 22px 0;
+        }
+        .img-panel td {
+            background-color: {{ c_panel }};
+            height: 396px;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .img-panel img {
+            max-width: 92%;
+            max-height: 372px;
+        }
+        .img-placeholder {
+            font-size: 8.5px;
+            font-weight: 600;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            color: #b9bec6;
         }
         .product-description {
-            margin-bottom: 20px;
-            line-height: 1.5;
+            font-size: 11.5px;
+            line-height: 1.6;
+            color: #2a2d34;
+            margin-bottom: 22px;
+        }
+        .specs-heading {
+            font-size: 8.5px;
+            font-weight: 600;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            color: #9aa0a8;
+            border-bottom: 2px solid {{ c_accent }};
+            padding-bottom: 5px;
+            margin-bottom: 2px;
         }
         .specs {
             width: 100%;
             border-collapse: collapse;
         }
         .specs td {
-            border-bottom: 1px solid #e5e7eb;
-            padding: 6px 8px;
-            font-size: 13px;
+            padding: 6px 10px;
+            font-size: 10.5px;
+            border-bottom: 0.75px solid #eef0f3;
+        }
+        .specs tr.alt td {
+            background-color: {{ c_zebra }};
         }
         .specs td.spec-label {
-            font-weight: bold;
-            width: 40%;
-            color: #374151;
-        }
-        .sheet-footer {
-            border-top: 1px solid #e5e7eb;
-            margin-top: 24px;
-            padding-top: 8px;
-            font-size: 11px;
-            color: #9ca3af;
+            width: 38%;
+            font-size: 8.5px;
+            font-weight: 600;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: #7d838c;
         }
     </style>
 </head>
 <body>
+    {% include 'catalog/_chrome/footer.html.twig' %}
+    {% include 'catalog/_chrome/cover.html.twig' %}
+
     {% for product in products %}
         <div class="sheet{% if loop.last %} sheet-last{% endif %}">
-            <div class="sheet-header">
-                {% if branding.logo is defined and branding.logo %}
-                    <img class="logo" src="{{ branding.logo }}" alt="">
-                {% endif %}
-                <span class="company">{{ branding.company_name|default('') }}</span>
+            <div class="sheet-head">
+                <span class="eyebrow">{{ branding.company_name|default('') }}</span>
             </div>
 
-            {% if product.image is defined and product.image %}
-                <div class="product-image">
-                    <img src="{{ product.image }}" alt="">
-                </div>
-            {% endif %}
-
-            <h1 class="product-title">{{ product.title|default('') }}</h1>
+            <table class="title-row">
+                <tr>
+                    <td><h1 class="product-title">{{ product.title|default('') }}</h1></td>
+                    {% if product.price is defined and product.price %}
+                        <td class="price-cell"><span class="price-chip">{{ product.price }}</span></td>
+                    {% endif %}
+                </tr>
+            </table>
             <div class="product-sku">{{ product.sku|default('') }}</div>
 
-            {% if product.price is defined and product.price %}
-                <div class="product-price">{{ product.price }}</div>
-            {% endif %}
+            <table class="img-panel">
+                <tr>
+                    <td>
+                        {% if product.image is defined and product.image %}
+                            <img src="{{ product.image }}" alt="">
+                        {% else %}
+                            <span class="img-placeholder">&mdash; {{ l.no_image|default('no image') }} &mdash;</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
 
             {% if product.description is defined and product.description %}
                 {# Already sanitised upstream by HtmlValueSanitizer — safe to print raw. #}
@@ -125,19 +179,16 @@
             {% endif %}
 
             {% if product.specs is defined and product.specs %}
+                <div class="specs-heading">{{ l.specification|default('Specification') }}</div>
                 <table class="specs">
                     {% for row in product.specs %}
-                        <tr>
-                            <td class="spec-label">{{ row.label|default('') }}</td>
+                        <tr{% if loop.index is odd %} class="alt"{% endif %}>
+                            <td class="spec-label">{{ row.label|default('')|replace({'_': ' ', '-': ' '})|capitalize }}</td>
                             <td class="spec-value">{{ row.value|default('') }}</td>
                         </tr>
                     {% endfor %}
                 </table>
             {% endif %}
-
-            <div class="sheet-footer">
-                {{ branding.company_name|default('') }} &mdash; {{ loop.index }} / {{ loop.length }}
-            </div>
         </div>
     {% endfor %}
 </body>
