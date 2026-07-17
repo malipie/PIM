@@ -75,6 +75,12 @@
             border-bottom: 0.75px dotted #d9dce1;
             padding: 4px 0;
             font-size: 9.5px;
+            {# Exactly ONE line per entry — the batch maths assumes constant
+               row height; long titles are ellipsised in Twig and any residue
+               must clip, not wrap (a wrapped column re-opens the taller-than-
+               a-page cell bug this section works around). #}
+            white-space: nowrap;
+            overflow: hidden;
         }
         .toc-entry a {
             color: #16181d;
@@ -173,17 +179,19 @@
                 <tr>
                     <td class="toc-col toc-col-left">
                         {% for product in batch[:batch_half] %}
+                            {% set toc_title = product.title|default('') %}
                             <div class="toc-entry">
-                                <a href="#product-{{ batch_offset + loop.index }}">{{ product.title|default('') }}<span class="toc-page"></span></a>
                                 <span class="toc-sku">{{ product.sku|default('') }}</span>
+                                <a href="#product-{{ batch_offset + loop.index }}">{{ toc_title|length > 50 ? toc_title[:47] ~ '…' : toc_title }}<span class="toc-page"></span></a>
                             </div>
                         {% endfor %}
                     </td>
                     <td class="toc-col toc-col-right">
                         {% for product in batch[batch_half:] %}
+                            {% set toc_title = product.title|default('') %}
                             <div class="toc-entry">
-                                <a href="#product-{{ batch_offset + batch_half + loop.index }}">{{ product.title|default('') }}<span class="toc-page"></span></a>
                                 <span class="toc-sku">{{ product.sku|default('') }}</span>
+                                <a href="#product-{{ batch_offset + batch_half + loop.index }}">{{ toc_title|length > 50 ? toc_title[:47] ~ '…' : toc_title }}<span class="toc-page"></span></a>
                             </div>
                         {% endfor %}
                     </td>
