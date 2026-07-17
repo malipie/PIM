@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Export\Catalog;
 
+use App\Export\Catalog\Application\CatalogPdfChromeFactory;
 use App\Export\Catalog\Infrastructure\Renderer\DompdfRenderer;
 use App\Export\Catalog\Infrastructure\Renderer\GotenbergRenderer;
+use App\Export\Catalog\Infrastructure\Template\CatalogPdfFontProvider;
 use App\Export\Contracts\PdfRenderOptions;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\HttpClient;
 use Twig\Environment;
 
@@ -34,12 +37,16 @@ final class CatalogRendererParityTest extends KernelTestCase
     private const int PRICELIST_ROWS = 80;
 
     #[Test]
-    public function dompdfSheetBaselineIsOnePagePerProduct(): void
+    public function dompdfSheetBaselineIsOnePagePerProductPlusCover(): void
     {
         $pdf = new DompdfRenderer()->render($this->sheetHtml(), new PdfRenderOptions());
 
         self::assertStringStartsWith('%PDF-', $pdf);
-        self::assertSame(self::SHEET_PRODUCTS, $this->pageCount($pdf), 'sheet renders exactly one page per product');
+        self::assertSame(
+            self::SHEET_PRODUCTS + 1,
+            $this->pageCount($pdf),
+            'sheet renders the framed cover plus exactly one page per product (#2608)',
+        );
     }
 
     #[Test]
@@ -122,6 +129,7 @@ final class CatalogRendererParityTest extends KernelTestCase
         return $this->twig()->render('catalog/sheet.html.twig', [
             'branding' => self::BRANDING,
             'products' => $products,
+            ...$this->chrome(\count($products), 'Parity sheet'),
         ]);
     }
 
@@ -140,7 +148,24 @@ final class CatalogRendererParityTest extends KernelTestCase
         return $this->twig()->render('catalog/pricelist.html.twig', [
             'branding' => self::BRANDING,
             'products' => $products,
+            ...$this->chrome(\count($products), 'Parity pricelist'),
         ]);
+    }
+
+    /**
+     * The real chrome (embedded fonts included) — parity must cover the
+     * engines' font handling, not just bare markup (#2608).
+     *
+     * @return array<string, mixed>
+     */
+    private function chrome(int $itemCount, string $title): array
+    {
+        $factory = new CatalogPdfChromeFactory(
+            new CatalogPdfFontProvider(\dirname(__DIR__, 4).'/assets/pdf-fonts'),
+            new MockClock('2026-07-17T12:00:00+00:00'),
+        );
+
+        return $factory->chrome(self::BRANDING, null, $itemCount, $title);
     }
 
     /**

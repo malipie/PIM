@@ -6,6 +6,7 @@ namespace App\Export\Catalog\Application;
 
 use App\Asset\Contracts\Service\AssetInliner;
 use App\Export\Catalog\Domain\Entity\CatalogProfile;
+use App\Export\Catalog\Domain\Enum\CatalogTemplateKind;
 use App\Export\Catalog\Domain\HtmlSlotPolicy;
 use App\Export\Catalog\Domain\Mapping\CatalogFieldMapping;
 use App\Export\Catalog\Domain\Mapping\CatalogItemMapper;
@@ -15,6 +16,7 @@ use App\Export\Contracts\CatalogProductValues;
 use App\Export\Contracts\PdfRenderer;
 use App\Export\Contracts\PdfRenderOptions;
 use Closure;
+use Symfony\Component\Uid\Uuid;
 use Twig\Environment;
 
 /**
@@ -38,7 +40,18 @@ use Twig\Environment;
  * off, so image-slot values (a bare asset UUID) and the branding logo (a
  * `/api/assets/{id}/preview` URL) are inlined as `data:` URIs through the
  * {@see AssetInliner} seam before rendering — otherwise the renderer silently
- * drops every image. Non-asset URLs pass through untouched.
+ * drops every image. Non-asset URLs pass through untouched; an asset reference
+ * the inliner cannot resolve collapses to '' so the template renders its
+ * styled placeholder instead of a broken-image box (#2608).
+ *
+ * Image sharpness (#2608): inlining happens AFTER the streaming loop (the
+ * product list is buffered in memory anyway), when the item count is known.
+ * Sheet catalogs — one page-filling image per product — upgrade from the
+ * thumb (200px) to the medium (800px) variant when the renderer streams
+ * (Gotenberg) or the count stays within $hqImageMaxItems. Raw-bitmap budget
+ * for the in-process renderer: 48 x 800x800x3 B ~= 92 MB, inside the 256 MB
+ * worker ceiling that OOM'd the medium-everywhere attempt (#2601). Grid and
+ * pricelist render small images, so thumb stays optimal there.
  */
 final class CatalogRenderService
 {
@@ -53,7 +66,9 @@ final class CatalogRenderService
         private readonly Environment $twig,
         private readonly PdfRenderer $renderer,
         private readonly AssetInliner $imageInliner,
+        private readonly CatalogPdfChromeFactory $chromeFactory,
         private readonly int $maxInMemoryItems = 500,
+        private readonly int $hqImageMaxItems = 48,
     ) {
     }
 
@@ -105,12 +120,10 @@ final class CatalogRenderService
                 if ('richtext' === $format) {
                     // Template prints this slot with `|raw` — sanitise here.
                     $value = $this->sanitizer->sanitize($value, HtmlSlotPolicy::RichText);
-                } elseif ('url' === $format && '' !== $value) {
-                    // #2570 — image slots hold a bare asset UUID; inline the bytes
-                    // as a data: URI so the offline renderer embeds them.
-                    $value = $this->imageInliner->toDataUri($value) ?? $value;
                 }
-                // Text / url slots stay raw strings; Twig autoescape handles them.
+                // Text slots stay raw strings; Twig autoescape handles them.
+                // Url (image) slots keep the raw reference here — they are
+                // inlined after the loop, once the item count is known (#2608).
                 $product[$name] = $value;
             }
 
@@ -123,11 +136,19 @@ final class CatalogRenderService
             $this->tickProgress($onChunk, $processed);
         }
 
+        $this->inlineProductImages($products, $slotFormats, $template->kind);
+
         $html = $this->twig->render($template->twig, [
             'branding' => $this->inlineBrandingLogo($profile->getBranding()),
             'products' => $products,
-            // Grid cover/TOC heading; sheet and pricelist ignore it.
-            'title' => $profile->getName(),
+            // Palette / fonts / labels / generated_at / title / item_count —
+            // the same chrome the wizard preview renders (#2608).
+            ...$this->chromeFactory->chrome(
+                $profile->getBranding(),
+                $profile->getLocale(),
+                \count($products),
+                $profile->getName(),
+            ),
         ]);
 
         $pdf = $this->renderer->render($html, new PdfRenderOptions());
@@ -156,6 +177,76 @@ final class CatalogRenderService
         }
 
         return $branding;
+    }
+
+    /**
+     * Inline every url-format slot as a data: URI, choosing the image variant
+     * from the now-known item count (see the class docblock, #2608).
+     *
+     * @param list<array<string, mixed>> $products
+     * @param array<string, string>      $slotFormats slot name => template format
+     */
+    private function inlineProductImages(array &$products, array $slotFormats, CatalogTemplateKind $kind): void
+    {
+        $urlSlots = array_keys(array_filter($slotFormats, static fn (string $format): bool => 'url' === $format));
+        if ([] === $urlSlots) {
+            return;
+        }
+
+        $preferredVariant = $this->imageVariant($kind, \count($products));
+        foreach ($products as &$product) {
+            foreach ($urlSlots as $slot) {
+                $value = $product[$slot] ?? '';
+                $product[$slot] = \is_string($value) ? $this->inlineImage($value, $preferredVariant) : '';
+            }
+        }
+        unset($product);
+    }
+
+    /**
+     * Sheet pages are carried by one large image, so they upgrade to the
+     * medium (800px) variant when memory allows: always for streaming
+     * renderers (Gotenberg), under $hqImageMaxItems (0 disables) for the
+     * in-process one. Null keeps the inliner's memory-first thumb order.
+     */
+    private function imageVariant(CatalogTemplateKind $kind, int $itemCount): ?string
+    {
+        if (CatalogTemplateKind::Sheet !== $kind) {
+            return null;
+        }
+        if ($this->renderer->supportsLargeDocuments()) {
+            return AssetInliner::VARIANT_MEDIUM;
+        }
+        if ($this->hqImageMaxItems > 0 && $itemCount <= $this->hqImageMaxItems) {
+            return AssetInliner::VARIANT_MEDIUM;
+        }
+
+        return null;
+    }
+
+    /**
+     * A resolvable asset reference becomes a data: URI; an unresolvable one
+     * collapses to '' (the template renders its placeholder — no more
+     * broken-image boxes, #2608); anything else (an external URL) passes
+     * through untouched.
+     */
+    private function inlineImage(string $value, ?string $preferredVariant): string
+    {
+        if ('' === $value) {
+            return '';
+        }
+
+        $dataUri = $this->imageInliner->toDataUri($value, $preferredVariant);
+        if (null !== $dataUri) {
+            return $dataUri;
+        }
+
+        return $this->looksLikeAssetReference($value) ? '' : $value;
+    }
+
+    private function looksLikeAssetReference(string $value): bool
+    {
+        return Uuid::isValid($value) || str_contains($value, '/api/assets/');
     }
 
     /**

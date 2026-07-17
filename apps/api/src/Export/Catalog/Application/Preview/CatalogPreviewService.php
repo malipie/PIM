@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Export\Catalog\Application\Preview;
 
 use App\Asset\Contracts\Service\AssetInliner;
+use App\Export\Catalog\Application\CatalogPdfChromeFactory;
 use App\Export\Catalog\Application\HtmlValueSanitizer;
 use App\Export\Catalog\Domain\Enum\CatalogTemplateKind;
 use App\Export\Catalog\Domain\HtmlSlotPolicy;
@@ -13,6 +14,7 @@ use App\Export\Catalog\Domain\Mapping\CatalogItemMapper;
 use App\Export\Catalog\Domain\Template\CatalogTemplateCatalog;
 use App\Export\Contracts\CatalogProductScope;
 use App\Export\Contracts\CatalogProductValues;
+use Symfony\Component\Uid\Uuid;
 use Twig\Environment;
 
 /**
@@ -46,6 +48,7 @@ final class CatalogPreviewService
         private readonly HtmlValueSanitizer $sanitizer,
         private readonly Environment $twig,
         private readonly AssetInliner $imageInliner,
+        private readonly CatalogPdfChromeFactory $chromeFactory,
     ) {
     }
 
@@ -61,6 +64,7 @@ final class CatalogPreviewService
         array $fieldMappings,
         CatalogProductScope $scope,
         int $limit = self::DEFAULT_LIMIT,
+        ?string $title = null,
     ): array {
         $limit = max(1, min($limit, self::MAX_LIMIT));
 
@@ -103,9 +107,15 @@ final class CatalogPreviewService
                     // Template prints this slot with `|raw` — sanitise here.
                     $value = $this->sanitizer->sanitize($value, HtmlSlotPolicy::RichText);
                 } elseif ('url' === $format && '' !== $value) {
-                    // #2570 — inline image-slot assets as data: URIs (mirrors
-                    // CatalogRenderService so the preview matches the PDF).
-                    $value = $this->imageInliner->toDataUri($value) ?? $value;
+                    // #2570/#2608 — inline image-slot assets as data: URIs
+                    // (mirrors CatalogRenderService so the preview matches the
+                    // PDF). Sheet previews prefer the sharper medium variant —
+                    // the sample is <= MAX_LIMIT items, so memory is a non-issue
+                    // — and an unresolvable asset reference collapses to '' so
+                    // the template shows its placeholder, not a broken image.
+                    $preferred = CatalogTemplateKind::Sheet === $kind ? AssetInliner::VARIANT_MEDIUM : null;
+                    $value = $this->imageInliner->toDataUri($value, $preferred)
+                        ?? ($this->looksLikeAssetReference($value) ? '' : $value);
                 }
                 // Text / url slots stay raw strings; Twig autoescape handles them.
                 $product[$name] = $value;
@@ -122,12 +132,20 @@ final class CatalogPreviewService
         $html = $this->twig->render($template->twig, [
             'branding' => $this->inlineBrandingLogo($branding),
             'products' => $products,
+            // Palette / fonts / labels / generated_at / title / item_count —
+            // the same chrome the PDF render feeds the templates (#2608).
+            ...$this->chromeFactory->chrome($branding, $scope->locale, \count($products), $title),
         ]);
 
         return [
             'sample_count' => \count($products),
             'html' => $html,
         ];
+    }
+
+    private function looksLikeAssetReference(string $value): bool
+    {
+        return Uuid::isValid($value) || str_contains($value, '/api/assets/');
     }
 
     /**

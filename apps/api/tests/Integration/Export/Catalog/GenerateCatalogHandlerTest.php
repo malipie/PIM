@@ -17,6 +17,7 @@ use App\Export\Application\Builder\ExportBuilder;
 use App\Export\Application\Catalog\ExportBuilderCatalogValues;
 use App\Export\Catalog\Application\Async\CatalogProgressPublisher;
 use App\Export\Catalog\Application\Async\GenerateCatalogHandler;
+use App\Export\Catalog\Application\CatalogPdfChromeFactory;
 use App\Export\Catalog\Application\CatalogRenderService;
 use App\Export\Catalog\Application\Generator\CatalogRegenerator;
 use App\Export\Catalog\Application\HtmlValueSanitizer;
@@ -32,6 +33,7 @@ use App\Export\Catalog\Domain\Repository\CatalogRunRepositoryInterface;
 use App\Export\Catalog\Domain\Template\CatalogTemplateCatalog;
 use App\Export\Catalog\Infrastructure\Delivery\FlysystemCatalogCacheStorage;
 use App\Export\Catalog\Infrastructure\Renderer\DompdfRenderer;
+use App\Export\Catalog\Infrastructure\Template\CatalogPdfFontProvider;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
@@ -40,6 +42,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemOperator;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Uid\Uuid;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
@@ -140,6 +143,10 @@ final class GenerateCatalogHandlerTest extends KernelTestCase
             $container->get('twig'),
             new DompdfRenderer(),
             $container->get(AssetInliner::class),
+            new CatalogPdfChromeFactory(
+                new CatalogPdfFontProvider(\dirname(__DIR__, 4).'/assets/pdf-fonts'),
+                new MockClock('2026-07-17T12:00:00+00:00'),
+            ),
         );
 
         $regenerator = new CatalogRegenerator(

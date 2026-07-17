@@ -15,6 +15,7 @@ use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Export\Application\Builder\ExportBuilder;
 use App\Export\Application\Catalog\ExportBuilderCatalogValues;
+use App\Export\Catalog\Application\CatalogPdfChromeFactory;
 use App\Export\Catalog\Application\CatalogRenderResult;
 use App\Export\Catalog\Application\CatalogRenderService;
 use App\Export\Catalog\Application\CatalogTooLargeException;
@@ -24,6 +25,7 @@ use App\Export\Catalog\Domain\Enum\CatalogTemplateKind;
 use App\Export\Catalog\Domain\Mapping\CatalogItemMapper;
 use App\Export\Catalog\Domain\Template\CatalogTemplateCatalog;
 use App\Export\Catalog\Infrastructure\Renderer\DompdfRenderer;
+use App\Export\Catalog\Infrastructure\Template\CatalogPdfFontProvider;
 use App\Export\Contracts\PdfRenderer;
 use App\Export\Contracts\PdfRenderOptions;
 use App\Shared\Application\TenantContext;
@@ -32,6 +34,7 @@ use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Uid\Uuid;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
@@ -197,6 +200,54 @@ final class CatalogRenderServiceTest extends KernelTestCase
     }
 
     #[Test]
+    public function sheetUnderTheHqCapPrefersTheMediumImageVariant(): void
+    {
+        // #2608 — sheet pages are carried by one large image, so under the HQ
+        // cap the render asks the inliner for the medium (800px) variant.
+        [, $typeId] = $this->seedObjects(2, 'plain');
+
+        $recorder = $this->recordingInliner();
+        $service = $this->service(inliner: $recorder);
+        $service->render($this->profileWithImage($typeId), $this->target());
+
+        self::assertSame(['medium', 'medium'], $recorder->variants);
+    }
+
+    #[Test]
+    public function sheetOverTheHqCapFallsBackToTheMemoryFirstOrder(): void
+    {
+        [, $typeId] = $this->seedObjects(2, 'plain');
+
+        $recorder = $this->recordingInliner();
+        $service = $this->service(inliner: $recorder, hqImageMaxItems: 1);
+        $service->render($this->profileWithImage($typeId), $this->target());
+
+        // No preferred variant — the inliner keeps its thumb-first order.
+        self::assertSame([null, null], $recorder->variants);
+    }
+
+    #[Test]
+    public function unresolvableAssetReferenceStillRendersAPdf(): void
+    {
+        // #2608 — an image reference the inliner cannot resolve collapses to
+        // the template placeholder instead of a broken <img src="<uuid>">.
+        [, $typeId] = $this->seedObjects(1, 'plain');
+
+        $nullInliner = new class implements AssetInliner {
+            public function toDataUri(string $reference, ?string $preferredVariant = null): ?string
+            {
+                return null;
+            }
+        };
+        $service = $this->service(inliner: $nullInliner);
+        $target = $this->target();
+        $service->render($this->profileWithImage($typeId), $target);
+
+        self::assertStringStartsWith('%PDF-', (string) file_get_contents($target));
+        @unlink($target);
+    }
+
+    #[Test]
     public function renderSurvivesMaliciousDescriptionValue(): void
     {
         [, $typeId] = $this->seedObjects(1, '<script>alert(1)</script>');
@@ -215,8 +266,12 @@ final class CatalogRenderServiceTest extends KernelTestCase
         @unlink($target);
     }
 
-    private function service(?PdfRenderer $renderer = null, int $maxInMemoryItems = 500): CatalogRenderService
-    {
+    private function service(
+        ?PdfRenderer $renderer = null,
+        int $maxInMemoryItems = 500,
+        ?AssetInliner $inliner = null,
+        int $hqImageMaxItems = 48,
+    ): CatalogRenderService {
         // No consumer wires CatalogRenderService yet, so the DI compiler may
         // inline/remove it — build it directly from its (retained) deps, the
         // ExportBuilderCatalogValuesTest pattern. Twig is fetched by the 'twig'
@@ -245,9 +300,57 @@ final class CatalogRenderServiceTest extends KernelTestCase
             // PdfRenderer alias has no consumer yet (DI removes it) — the default
             // in-process Dompdf adapter is constructor-less, use it directly.
             $renderer ?? new DompdfRenderer(),
-            $container->get(AssetInliner::class),
+            $inliner ?? $container->get(AssetInliner::class),
+            new CatalogPdfChromeFactory(
+                new CatalogPdfFontProvider(\dirname(__DIR__, 4).'/assets/pdf-fonts'),
+                new MockClock('2026-07-17T12:00:00+00:00'),
+            ),
             $maxInMemoryItems,
+            $hqImageMaxItems,
         );
+    }
+
+    /**
+     * @return AssetInliner&object{variants: list<string|null>}
+     */
+    private function recordingInliner(): AssetInliner
+    {
+        return new class implements AssetInliner {
+            /** @var list<string|null> */
+            public array $variants = [];
+
+            public function toDataUri(string $reference, ?string $preferredVariant = null): string
+            {
+                $this->variants[] = $preferredVariant;
+
+                return 'data:image/png;base64,iVBORw0KGgo=';
+            }
+        };
+    }
+
+    private function profileWithImage(Uuid $objectTypeId): CatalogProfile
+    {
+        return new CatalogProfile(
+            'sheet-img-cat',
+            'Sheet with images',
+            CatalogTemplateKind::Sheet,
+            $objectTypeId,
+            branding: ['color' => '#0ea5e9', 'company_name' => 'ACME'],
+            fieldMappings: [
+                ['slot' => 'title', 'source' => ['kind' => 'attribute', 'ref' => 'name']],
+                // The seed schema has no media attribute — a static asset-style
+                // reference exercises the same inliner path.
+                ['slot' => 'image', 'source' => ['kind' => 'static', 'value' => '0198aaaa-bbbb-7ccc-8ddd-eeeeffff0000']],
+            ],
+        );
+    }
+
+    private function target(): string
+    {
+        $target = tempnam(sys_get_temp_dir(), 'cpdf-');
+        self::assertNotFalse($target);
+
+        return $target;
     }
 
     private function profile(Uuid $objectTypeId): CatalogProfile

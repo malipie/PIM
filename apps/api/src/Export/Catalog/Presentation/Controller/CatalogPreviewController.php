@@ -72,7 +72,7 @@ final class CatalogPreviewController
             filter: $filter,
         );
 
-        return $this->render($kind, $branding, $fieldMappings, $scope, $this->limit($payload));
+        return $this->render($kind, $branding, $fieldMappings, $scope, $this->limit($payload), $this->optionalString($payload, 'name'));
     }
 
     #[Route(path: '/api/catalogs/{id}/preview', name: 'pim_catalogs_preview_saved', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
@@ -100,6 +100,7 @@ final class CatalogPreviewController
             $catalog->getFieldMappings(),
             $scope,
             $limit,
+            $catalog->getName(),
         );
     }
 
@@ -113,9 +114,10 @@ final class CatalogPreviewController
         array $fieldMappings,
         CatalogProductScope $scope,
         int $limit,
+        ?string $title,
     ): JsonResponse {
         try {
-            $result = $this->preview->preview($kind, $branding, $fieldMappings, $scope, $limit);
+            $result = $this->preview->preview($kind, $branding, $fieldMappings, $scope, $limit, $title);
         } catch (TemplateNotAvailableException $error) {
             // a future template kind whose archetype has not shipped yet.
             throw new HttpException(Response::HTTP_UNPROCESSABLE_ENTITY, $error->getMessage(), $error);

@@ -1,0 +1,17 @@
+{#
+  Catalog PDF chrome — @font-face block (#2608). The faces come from
+  CatalogPdfFontProvider as data: URIs: the one src BOTH engines resolve
+  (Dompdf runs with isRemoteEnabled=false; Gotenberg receives a single
+  index.html with no side files). Dompdf 3.1 registers AND subsets data-URI
+  TrueType faces, so the per-document font cost is a few kilobytes.
+
+  Included inside each archetype's <style> element.
+#}
+{% for face in fonts|default([]) %}
+@font-face {
+    font-family: '{{ face.family }}';
+    font-weight: {{ face.weight }};
+    font-style: {{ face.style }};
+    src: url('{{ face.src }}') format('truetype');
+}
+{% endfor %}

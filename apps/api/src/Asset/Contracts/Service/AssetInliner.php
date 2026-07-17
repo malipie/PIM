@@ -18,10 +18,23 @@ namespace App\Asset\Contracts\Service;
 interface AssetInliner
 {
     /**
-     * @param string $reference a bare asset UUID or a `/api/assets/{id}/preview` URL
+     * Variant codes callers may prefer — string-typed on the contract so
+     * consumers outside the Asset context need no dependency on the
+     * {@see \App\Asset\Domain\Entity\AssetVariant} entity (values match its
+     * CODE_* constants).
+     */
+    public const string VARIANT_THUMB = 'thumb';
+    public const string VARIANT_MEDIUM = 'medium';
+
+    /**
+     * @param string      $reference        a bare asset UUID or a `/api/assets/{id}/preview` URL
+     * @param string|null $preferredVariant variant code tried before the
+     *                                      implementation's memory-first default
+     *                                      order (#2608 — sheet catalogs upgrade
+     *                                      to `medium` for print-sharp images)
      *
      * @return string|null a `data:<mime>;base64,<payload>` URI, or null when the
      *                     reference is not a resolvable tenant asset
      */
-    public function toDataUri(string $reference): ?string;
+    public function toDataUri(string $reference, ?string $preferredVariant = null): ?string;
 }

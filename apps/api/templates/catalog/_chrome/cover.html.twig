@@ -1,0 +1,32 @@
+{#
+  Catalog PDF chrome — the framed cover page every archetype opens with
+  (#2608): brand panel in accent_dark, company small-caps + white logo chip on
+  top, the catalog title in Fraunces in the lower third, a short rule and the
+  item-count / generation-date meta line. Localised strings come from the
+  chrome `labels` map.
+
+  The brand row is a table (Dompdf-safe): company name left, logo chip right.
+#}
+<div class="cover">
+    <div class="cover-panel">
+        <table class="cover-brand">
+            <tr>
+                <td class="cover-company">{{ branding.company_name|default('') }}</td>
+                {% if branding.logo is defined and branding.logo %}
+                    <td style="text-align: right; width: 180px;">
+                        <span class="cover-logo-chip" style="display: inline-block;">
+                            <img src="{{ branding.logo }}" alt="">
+                        </span>
+                    </td>
+                {% endif %}
+            </tr>
+        </table>
+
+        <div class="cover-spacer"></div>
+
+        <div class="cover-kicker">{{ labels.generated|default('Generated') }} {{ generated_at|default('') }}</div>
+        <div class="cover-title">{{ title|default('') }}</div>
+        <div class="cover-rule"></div>
+        <div class="cover-meta">{{ labels.items|default('') }}</div>
+    </div>
+</div>
