@@ -95,11 +95,14 @@ final class GridTemplateRenderTest extends KernelTestCase
     {
         // Live-smoke regression (#2608) — Dompdf clips a table cell taller
         // than one page, so a 305-product TOC must chunk into ceil(305/72) = 5
-        // two-column tables (max 36 entries per cell) instead of one giant cell.
+        // two-column tables (max 36 entries per cell) instead of one giant
+        // cell, and every entry must stay ONE line: long real-world titles
+        // wrapped to two lines and re-opened the oversized-cell clipping.
+        $longTitle = 'Torebka damska na telefon nosowana pikowana z klapą i odpinanym paskiem w kolorze czarnym';
         $products = [];
         for ($i = 1; $i <= 305; ++$i) {
             $products[] = [
-                'title' => \sprintf('Produkt %d', $i),
+                'title' => 0 === $i % 2 ? \sprintf('%s %d', $longTitle, $i) : \sprintf('Produkt %d', $i),
                 'sku' => \sprintf('SKU-%03d', $i),
                 'image' => '',
                 'price' => '9,00 zł',
@@ -114,6 +117,10 @@ final class GridTemplateRenderTest extends KernelTestCase
         // Anchor numbering stays global across batches.
         self::assertStringContainsString('href="#product-305"', $html);
         self::assertStringContainsString('id="product-305"', $html);
+        // TOC entries are ellipsised to a single line (47 chars + '…') — the
+        // full long title never appears inside a TOC anchor.
+        self::assertStringContainsString(mb_substr($longTitle, 0, 47).'…', $html);
+        self::assertSame(0, substr_count($html, 'href="#product-2">'.$longTitle));
     }
 
     #[Test]
