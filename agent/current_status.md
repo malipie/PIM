@@ -3,6 +3,13 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-17: Flicker folderów assetów — iteracja 3, root cause znaleziony (#2612 → PR #2614 merged)
+- **Kontekst:** operator: dwuklik na katalog w `/assets` → „mignięcie plików spod katalogów, podjeżdżają do góry, dopiero potem zawartość". Trzecie podejście po #2572 (PR #2588/#2596/#2600).
+- **Root cause (reprodukcja CDP screencast klatka-po-klatce):** mignięcie to NIE stale'owe miniatury (invariant #2596 działa) — to skeleton z #2600, celowo rozmiarowany do WYCHODZĄCEGO grida: pseudo-siatka w kształcie sekcji plików wjeżdżała na górę i zapadała się do zawartości folderu.
+- **✅ PR #2614 (squash 4e62f099):** skeleton + licznik „PLIKI n" rozmiarowane do CELU nawigacji (`targetCount` z `folder.assetCount`, już obecny w stanie); nieznany cel (nawigacja w górę, „Bez przypisania") → fallback 12. Spec E2E przepisany (2 czerwone rundy CI: EN locale „1 items" + fixtures bez folderów → asercje locale-agnostyczne i warunkowe).
+- **Smoke proof (w #2612):** po fixie klatka przejściowa = „PLIKI 1" + 1 karta skeletonu w miejscu finalnej karty; przed fixem „PLIKI 10" + 10 kart. CI 13/13.
+- **Wykryty przy okazji → #2613 (open):** „Wszystkie zasoby" ucięte do 10 ze 102 plików — Refine `pagination: { mode: 'off' }` i tak wysyła `pageSize=10`, data provider forwarduje `itemsPerPage=10`, pager nie istnieje.
+
 ## 2026-07-17: Redesign „Editorial" PDF katalogów (#2608 → PR #2609/#2610/#2611, wszystkie merged)
 - **Kontekst:** operator: „PDF-y z /catalogs-pdf są brzydkie, mają być piękne, zaskocz mnie". Audyt na żywo: DejaVu, zero kompozycji, krzycząca czerwień, X-boxy zamiast obrazków (goły UUID w src gdy inliner nie rozwiąże), hardcoded angielski, rozmyte thumb 200px na kartach.
 - **✅ PR #2609 (e02897f2) — system designu:** Fraunces + Inter (statyczne TTF subset latin-ext w `apps/api/assets/pdf-fonts/`, data-URI @font-face — Dompdf subsetuje; Playfair odrzucony przez OFL RFN), `CatalogPdfPalette` (paleta z 1 koloru brandu, WCAG), `CatalogPdfChromeFactory` (wspólny kontekst render+preview: etykiety PL/EN wg locale z polską liczbą mnogą, data, tytuł), okładka „w ramce" dla 3 archetypów, redakcyjny pricelist, 2-kolumnowy TOC, karty bez ramek, placeholder „brak zdjęcia", sheet ≤48 itemów embeduje medium 800px (`CATALOG_PDF_HQ_IMAGE_MAX_ITEMS`, budżet bitmap 92 MB — lekcja #2601), `AssetInliner` z `preferredVariant`. ADR-0027 sekcja „System designu Editorial".
