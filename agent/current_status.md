@@ -3,6 +3,12 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-18: Pierwsze logowanie odbijało z powrotem na /login (#2618 → PR #2619 merged)
+- **Kontekst:** operator: „po pierwszym wpisaniu hasła ekran przeładowuje się, ale nie loguje; dopiero drugie wpisanie loguje. Od początku aplikacji". „Przeładowanie" = odbicie /dashboard → /login.
+- **Root cause:** Refine 5 `useLogin` nawiguje na redirectTo PRZED invalidacją auth store (`setTimeout 32ms`); `AuthedRoute` na /dashboard czytał stale cache `{authenticated:false}` (zapisany przy wejściu niezalogowanym) → redirect z powrotem na /login. Druga próba trafiała na odświeżony cache. E2E nie łapało, bo `loginAsAdmin` wchodzi prosto na /login (pusty cache).
+- **✅ PR #2619 (squash e9b7c131):** `AuthedRoute` nie odbija na stale-false gdy `isFetching` (czeka na rewalidację); `login.tsx` invaliduje `IDENTITY_QUERY_KEY` przed nawigacją (stale permissions przy re-loginie, staleTime 5 min). Nowy spec regresyjny w `auth.spec.ts` (seed stale cache wejściem na /dashboard bez sesji → JEDEN submit → zostaje na /dashboard) — zweryfikowany red→green.
+- **Smoke proof (w #2618):** curl login 200; spec na żywym main zielony; auth.spec 10/10; konsola czysta (spec 2199). CI 13/13.
+
 ## 2026-07-17: Sidebar „Ustawienia" toggle jak „Integracje" (#2616 → PR #2617 merged)
 - **Kontekst:** operator: podmenu Ustawień rozwijało się klikiem, ale ponowny klik na „Ustawienia" go NIE zwijał (trzeba było kliknąć inną pozycję).
 - **Root cause:** parent był `NavLink` do `/settings`, widoczność subtree wyliczana wyłącznie z `pathname.startsWith('/settings')` — brak stanu open/close (niedokończony wzorzec z NUI-01 #1420).
