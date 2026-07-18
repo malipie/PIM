@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type AuthActionResponse, useLogin } from '@refinedev/core';
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { IDENTITY_QUERY_KEY } from '@/lib/identity';
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -34,6 +36,7 @@ interface MfaChallengeResult {
 export function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { mutate: login, isPending } = useLogin<LoginVariables>();
 
   // #1141 — once the password step reports `mfa_required`, we hold the
@@ -44,6 +47,10 @@ export function LoginPage() {
   const mfaForm = useForm<MfaValues>({ resolver: zodResolver(mfaSchema) });
 
   const goTo = (response: AuthActionResponse | undefined): void => {
+    // #2618 — the identity cache has a 5-minute staleTime; without this a
+    // re-login (possibly as a different user) would keep serving the previous
+    // session's permissions until the cache expired.
+    queryClient.invalidateQueries({ queryKey: IDENTITY_QUERY_KEY });
     const target = response?.redirectTo ?? '/dashboard';
     navigate(typeof target === 'string' ? target : '/dashboard', { replace: true });
   };

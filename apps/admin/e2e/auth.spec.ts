@@ -54,6 +54,33 @@ test.describe('Authentication', () => {
     await expect(page.getByRole('alert')).toBeVisible();
   });
 
+  // #2618 — regression: visiting a protected route while signed out caches
+  // `{authenticated: false}` in the auth-check query. Refine's useLogin
+  // navigates to /dashboard *before* invalidating that cache, so AuthedRoute
+  // used to read the stale `false` and bounce the user straight back to
+  // /login on their FIRST successful login (the second attempt hit the
+  // refreshed cache and worked). The direct-`/login` helper flow never seeds
+  // the stale entry, which is why the other specs never caught it.
+  test('first login after an unauthenticated bounce lands on dashboard', async ({
+    page,
+    context,
+  }) => {
+    await context.clearCookies();
+    // Seed the stale auth-check cache: protected route → bounce to /login.
+    await page.goto('/dashboard');
+    await expect(page).toHaveURL(/\/login$/);
+
+    await page.getByLabel(/e-?mail/i).fill(ADMIN_EMAIL);
+    await page.getByLabel(/has[lł]o|password/i).fill(ADMIN_PASSWORD);
+    await page.getByRole('button', { name: /zaloguj|sign in/i }).click();
+
+    // One submit must be enough — and the session must stick (a dashboard
+    // element rendering proves we did not bounce back to /login mid-way).
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+
   test('an unauthenticated visit to /products bounces to /login', async ({ page, context }) => {
     // Ensure no token leaks in from a previous test in the same browser context.
     await context.clearCookies();
