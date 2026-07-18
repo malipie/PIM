@@ -9,6 +9,9 @@ import { loginAsAdmin } from './helpers/auth';
  *      active (deep links included), and disappears outside /settings.
  *   2. Custom ObjectTypes render like built-in items — no CUSTOM badge,
  *      no violet dashed treatment.
+ *   3. #2616 — the "Ustawienia" parent is a toggle button (like
+ *      "Integracje"): clicking it collapses/expands the subtree without
+ *      navigating.
  */
 
 test.describe('NUI-01 — settings subtree in main sidebar', () => {
@@ -38,6 +41,34 @@ test.describe('NUI-01 — settings subtree in main sidebar', () => {
     // Outside /settings the subtree unmounts.
     await page.goto('/dashboard');
     await expect(page.getByTestId('nav-settings-subtree')).toHaveCount(0);
+  });
+
+  test('clicking "Ustawienia" toggles the subtree without navigating (#2616)', async ({ page }) => {
+    await loginAsAdmin(page);
+
+    await page.goto('/settings/users');
+    const subtree = page.getByTestId('nav-settings-subtree');
+    await expect(subtree).toBeVisible();
+
+    // Scope to the sidebar nav — topbar/user-menu buttons could also match.
+    const parent = page
+      .locator('nav')
+      .first()
+      .getByRole('button', { name: /^(ustawienia|settings)$/i });
+    await expect(parent).toHaveAttribute('aria-expanded', 'true');
+
+    // First click collapses — the original bug: a second click on the same
+    // entry did nothing because visibility was derived from the route alone.
+    await parent.click();
+    await expect(page.getByTestId('nav-settings-subtree')).toHaveCount(0);
+    await expect(parent).toHaveAttribute('aria-expanded', 'false');
+    await expect(page).toHaveURL(/\/settings\/users/);
+
+    // Second click re-expands, still without navigating.
+    await parent.click();
+    await expect(page.getByTestId('nav-settings-subtree')).toBeVisible();
+    await expect(parent).toHaveAttribute('aria-expanded', 'true');
+    await expect(page).toHaveURL(/\/settings\/users/);
   });
 
   test('custom ObjectType renders without CUSTOM badge or violet treatment', async ({ page }) => {
