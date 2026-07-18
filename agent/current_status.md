@@ -15,6 +15,12 @@
 - **✅ PR #2617 (squash efc5337b):** parent = przycisk toggle z chevronem + `aria-expanded` (wzorzec Integracji 1:1); deep-link `/settings/*` auto-otwiera; zwinięty parent na aktywnym route podświetlony `bg-zinc-900`. Świadome odejście: klik NIE nawiguje na `/settings` (parytet z Integracjami). Nowy test E2E toggle w spec 1420.
 - **Smoke proof (w #2616):** Playwright na żywym stacku (main): klik zwija (`aria-expanded=false`, URL bez zmian), drugi klik rozwija. CI 13/13 (Dependency audit 1× flake timeout packagist → rerun pass).
 
+## 2026-07-19: Flicker sidebar→Multimedia — asymetria cache folderów (#2621 → PR #2622 merged)
+- **Kontekst:** operator (po #2614): „mignięcie jak się kliknie w lewym menu na Multimedia; wcześniej tego nie było". Repro CDP: warm re-entry renderuje pliki z cache RQ natychmiast, foldery (lokalny useState+useEffect, start od []) dojeżdżają ~120 ms później i spychają pliki pod fold. NIE regresja #2614 — bug od NUI-08 #1449, maskowany flickerem dwukliku.
+- **✅ PR #2622 (squash 03af96ed):** foldery przeniesione do cache RQ (nowy hook `use-asset-folders.ts`); cold load gate'uje sekcję plików + `FolderSkeleton` do settle folderów; `refresh()` refetchuje oba. Spec `2621-*` (warm cache <1 s przy opóźnionej sieci + cold gating) — **zweryfikowany falsyfikacją** (failuje pre-fix). CI 13/13, smoke CDP na main czysty (warm t≈160 ms pełna siatka od pierwszej klatki).
+- **Pułapki speców** (do lessons): statyczny kafelek „Bez przypisania" przed fetch'em; URL zmienia się przed unmountem (lazy chunk trzyma stare drzewo — „powrót" bez remountu); falsyfikacja przez cp+checkout, nie stash (pop może wyciągnąć obcy stash z lint-staged backupów).
+- **Follow-up open:** #2613 (lista ucięta do 10 przez pagination mode 'off'); opcjonalnie przepięcie 2 pickerów produktu na wspólny hook folderów.
+
 ## 2026-07-17: Flicker folderów assetów — iteracja 3, root cause znaleziony (#2612 → PR #2614 merged)
 - **Kontekst:** operator: dwuklik na katalog w `/assets` → „mignięcie plików spod katalogów, podjeżdżają do góry, dopiero potem zawartość". Trzecie podejście po #2572 (PR #2588/#2596/#2600).
 - **Root cause (reprodukcja CDP screencast klatka-po-klatce):** mignięcie to NIE stale'owe miniatury (invariant #2596 działa) — to skeleton z #2600, celowo rozmiarowany do WYCHODZĄCEGO grida: pseudo-siatka w kształcie sekcji plików wjeżdżała na górę i zapadała się do zawartości folderu.
