@@ -3,6 +3,12 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-17: Sidebar „Ustawienia" toggle jak „Integracje" (#2616 → PR #2617 merged)
+- **Kontekst:** operator: podmenu Ustawień rozwijało się klikiem, ale ponowny klik na „Ustawienia" go NIE zwijał (trzeba było kliknąć inną pozycję).
+- **Root cause:** parent był `NavLink` do `/settings`, widoczność subtree wyliczana wyłącznie z `pathname.startsWith('/settings')` — brak stanu open/close (niedokończony wzorzec z NUI-01 #1420).
+- **✅ PR #2617 (squash efc5337b):** parent = przycisk toggle z chevronem + `aria-expanded` (wzorzec Integracji 1:1); deep-link `/settings/*` auto-otwiera; zwinięty parent na aktywnym route podświetlony `bg-zinc-900`. Świadome odejście: klik NIE nawiguje na `/settings` (parytet z Integracjami). Nowy test E2E toggle w spec 1420.
+- **Smoke proof (w #2616):** Playwright na żywym stacku (main): klik zwija (`aria-expanded=false`, URL bez zmian), drugi klik rozwija. CI 13/13 (Dependency audit 1× flake timeout packagist → rerun pass).
+
 ## 2026-07-17: Flicker folderów assetów — iteracja 3, root cause znaleziony (#2612 → PR #2614 merged)
 - **Kontekst:** operator: dwuklik na katalog w `/assets` → „mignięcie plików spod katalogów, podjeżdżają do góry, dopiero potem zawartość". Trzecie podejście po #2572 (PR #2588/#2596/#2600).
 - **Root cause (reprodukcja CDP screencast klatka-po-klatce):** mignięcie to NIE stale'owe miniatury (invariant #2596 działa) — to skeleton z #2600, celowo rozmiarowany do WYCHODZĄCEGO grida: pseudo-siatka w kształcie sekcji plików wjeżdżała na górę i zapadała się do zawartości folderu.
