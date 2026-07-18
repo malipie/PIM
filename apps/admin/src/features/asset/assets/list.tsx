@@ -15,7 +15,6 @@ import { useTranslation } from 'react-i18next';
 
 import { usePageActions } from '@/layout/page-actions-context';
 import type { DuplicateAssetError, UploadAssetResult } from '@/lib/asset-upload';
-import { jsonFetch } from '@/lib/http';
 import { useDebouncedCallback } from '@/lib/use-debounced-callback';
 import { cn } from '@/lib/utils';
 import { AssetBulkActionsBar } from './AssetBulkActionsBar';
@@ -23,17 +22,7 @@ import { AssetDrawer } from './AssetDrawer';
 import { AssetDuplicateDialog } from './AssetDuplicateDialog';
 import { AssetUploadModal } from './AssetUploadModal';
 import { type AssetEntry, type AssetMeta, AssetThumb, toAssetMeta } from './asset-meta';
-
-interface FolderEntry {
-  code: string;
-  displayName: string;
-  assetCount: number;
-}
-
-interface FoldersResponse {
-  member: FolderEntry[];
-  totalItems: number;
-}
+import { useAssetFolders } from './use-asset-folders';
 
 interface DuplicateState {
   open: boolean;
@@ -74,7 +63,6 @@ export function AssetsListPage() {
   // null when unknown (up-navigation, "Bez przypisania"). Sizes the switch
   // skeleton and the files-header count to the DESTINATION layout.
   const [targetCount, setTargetCount] = useState<number | null>(null);
-  const [folders, setFolders] = useState<FolderEntry[]>([]);
   const [drawerAsset, setDrawerAsset] = useState<AssetMeta | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
 
@@ -104,24 +92,11 @@ export function AssetsListPage() {
     ),
   );
 
-  // Folder list — cheap GROUP BY; refresh after uploads/deletes.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshTick is an intentional refetch trigger
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await jsonFetch<FoldersResponse>('/api/asset-folders', {
-          accept: 'application/json',
-        });
-        if (!cancelled) setFolders(response.member ?? []);
-      } catch {
-        if (!cancelled) setFolders([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshTick]);
+  // Folder list — cheap GROUP BY, served from the React Query cache (#2621)
+  // so a remount renders folders and files in the same frame; refreshed
+  // explicitly after uploads/deletes via refresh().
+  const foldersQuery = useAssetFolders();
+  const folders = foldersQuery.data?.member ?? [];
 
   const filterParams = useMemo(() => {
     const params: Array<{ field: string; operator: 'eq'; value: string }> = [];
@@ -175,6 +150,11 @@ export function AssetsListPage() {
   // placeholder length ("PLIKI 10" flashing on entry into a 1-file folder).
   const filesCount = isSwitching && targetCount !== null ? targetCount : assets.length;
   const showFolderTiles = currentFolder === null && !debouncedSearch;
+  // #2621 — on a cold load hold the files section in its skeleton until the
+  // folder list is in (and render folder-tile skeletons above it), so the
+  // files never render first only to be pushed down when the tiles mount.
+  // On a warm remount both sections come from the cache, so this never shows.
+  const foldersPending = showFolderTiles && foldersQuery.isLoading;
   const currentFolderEntry =
     currentFolder !== null && currentFolder !== 'root'
       ? folders.find((entry) => entry.code === currentFolder)
@@ -183,6 +163,7 @@ export function AssetsListPage() {
   const refresh = () => {
     setRefreshTick((tick) => tick + 1);
     void query.refetch();
+    void foldersQuery.refetch();
   };
 
   const onCompleted = (results: UploadAssetResult[]) => {
@@ -335,7 +316,9 @@ export function AssetsListPage() {
           <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
             {t('assets.folders_label', { defaultValue: 'Foldery' })}
           </div>
-          {view === 'grid' ? (
+          {foldersPending ? (
+            <FolderSkeleton view={view} />
+          ) : view === 'grid' ? (
             <div className="flex flex-wrap gap-1.5">
               {folders.map((folder) => (
                 <FolderTile
@@ -386,12 +369,12 @@ export function AssetsListPage() {
               {filesCount}
             </span>
           </div>
-          {isLoading ? (
+          {isLoading || foldersPending ? (
             <Loader2 className="size-3.5 animate-spin text-zinc-500" aria-hidden />
           ) : null}
         </div>
 
-        {isLoading || isSwitching ? (
+        {isLoading || isSwitching || foldersPending ? (
           <AssetGridSkeleton view={view} count={skeletonCount} />
         ) : assets.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-200 px-6 py-16 text-center text-[13px] text-zinc-500">
@@ -640,6 +623,46 @@ function FolderRow({ name, count, warning = false, onOpen }: FolderTileProps) {
           : ''}
       </span>
     </button>
+  );
+}
+
+/**
+ * #2621 — placeholder for the folder section on a cold load, shown while the
+ * folder list request is in flight so the files section (held in its own
+ * skeleton) is never pushed down by tiles mounting later.
+ */
+const FOLDER_SKELETON_KEYS = Array.from({ length: 8 }, (_, i) => `folder-skeleton-${i}`);
+
+function FolderSkeleton({ view }: { view: 'grid' | 'list' }) {
+  if (view === 'grid') {
+    return (
+      <div aria-hidden="true" data-testid="folder-skeleton" className="flex flex-wrap gap-1.5">
+        {FOLDER_SKELETON_KEYS.map((key) => (
+          <div key={key} className="flex w-[128px] flex-col items-center gap-1 px-2 pb-2.5 pt-3.5">
+            <div className="h-[37px] w-[46px] animate-pulse rounded-lg bg-zinc-100" />
+            <div className="mt-1 h-3 w-20 animate-pulse rounded bg-zinc-100" />
+            <div className="h-2.5 w-12 animate-pulse rounded bg-zinc-100" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="folder-skeleton"
+      className="overflow-hidden rounded-2xl border border-zinc-100 bg-white shadow-sm"
+    >
+      <div className="divide-y divide-zinc-50">
+        {FOLDER_SKELETON_KEYS.slice(0, 4).map((key) => (
+          <div key={key} className="flex items-center gap-3 px-4 py-2.5">
+            <div className="h-7 w-8 animate-pulse rounded-md bg-zinc-100" />
+            <div className="h-3 flex-1 animate-pulse rounded bg-zinc-100" />
+            <div className="h-3 w-12 animate-pulse rounded bg-zinc-100" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
