@@ -360,8 +360,27 @@ final class FilterDslResolver
             throw new RuntimeException('Condition missing attr or op.');
         }
 
-        $left = $this->resolveLeftExpression($attr);
+        // #2627 — `attributes_indexed` slots are ENVELOPES ({value}, {amount,
+        // currency}, {option_code}, ...), so the SQL path must descend into
+        // the typed key and cast numerics; the bare `->>'attr'` text lookup
+        // compares the JSON body itself (numeric ops crash Postgres with
+        // `text < integer`, text ops silently never match). Type comes from
+        // the metadata resolver; without one (unit tests, unknown attr) the
+        // legacy expression is kept so behavior degrades, never regresses.
+        $type = $this->envelopeType($attr);
         $canonical = self::normaliseOperator($op);
+
+        if ('multiselect' === $type) {
+            return FilterSqlExpressions::compileMultiselectCondition($attr, $canonical, $value, $op);
+        }
+
+        $left = $this->resolveLeftExpression($attr, $type);
+        $numeric = \in_array($type, ['price', 'number', 'metric'], true);
+        if ($numeric) {
+            $left = '('.$left.')::numeric';
+        } elseif ('boolean' === $type) {
+            $left = '('.$left.')::boolean';
+        }
 
         switch ($canonical) {
             case self::OP_IS_EMPTY:
@@ -371,47 +390,47 @@ final class FilterDslResolver
                 return $left.' IS NOT NULL';
 
             case self::OP_EQ:
-                return $left.' = '.$this->literal($value);
+                return $left.' = '.($numeric ? FilterSqlExpressions::scalarLiteral($value) : FilterSqlExpressions::literal($value));
 
             case self::OP_NEQ:
-                return $left.' <> '.$this->literal($value);
+                return $left.' <> '.($numeric ? FilterSqlExpressions::scalarLiteral($value) : FilterSqlExpressions::literal($value));
 
             case self::OP_LT:
             case self::OP_BEFORE:
-                return $left.' < '.$this->scalarLiteral($value);
+                return $left.' < '.FilterSqlExpressions::scalarLiteral($value);
 
             case self::OP_GT:
             case self::OP_AFTER:
-                return $left.' > '.$this->scalarLiteral($value);
+                return $left.' > '.FilterSqlExpressions::scalarLiteral($value);
 
             case self::OP_LTE:
-                return $left.' <= '.$this->scalarLiteral($value);
+                return $left.' <= '.FilterSqlExpressions::scalarLiteral($value);
 
             case self::OP_GTE:
-                return $left.' >= '.$this->scalarLiteral($value);
+                return $left.' >= '.FilterSqlExpressions::scalarLiteral($value);
 
             case self::OP_IN:
-                return $left.' IN ('.$this->literalList($value).')';
+                return $left.' IN ('.FilterSqlExpressions::literalList($value).')';
 
             case self::OP_NOT_IN:
-                return $left.' NOT IN ('.$this->literalList($value).')';
+                return $left.' NOT IN ('.FilterSqlExpressions::literalList($value).')';
 
             case self::OP_STARTS_WITH:
-                return $left.' LIKE '.$this->likeLiteral($value, prefix: '', suffix: '%');
+                return $left.' LIKE '.FilterSqlExpressions::likeLiteral($value, prefix: '', suffix: '%');
 
             case self::OP_ENDS_WITH:
-                return $left.' LIKE '.$this->likeLiteral($value, prefix: '%', suffix: '');
+                return $left.' LIKE '.FilterSqlExpressions::likeLiteral($value, prefix: '%', suffix: '');
 
             case self::OP_CONTAINS:
-                return $left.' LIKE '.$this->likeLiteral($value, prefix: '%', suffix: '%');
+                return $left.' LIKE '.FilterSqlExpressions::likeLiteral($value, prefix: '%', suffix: '%');
 
             case self::OP_NOT_CONTAINS:
-                return $left.' NOT LIKE '.$this->likeLiteral($value, prefix: '%', suffix: '%');
+                return $left.' NOT LIKE '.FilterSqlExpressions::likeLiteral($value, prefix: '%', suffix: '%');
 
             case self::OP_BETWEEN:
-                [$lo, $hi] = $this->rangePair($value);
+                [$lo, $hi] = FilterSqlExpressions::rangePair($value);
 
-                return $left.' BETWEEN '.$this->scalarLiteral($lo).' AND '.$this->scalarLiteral($hi);
+                return $left.' BETWEEN '.FilterSqlExpressions::scalarLiteral($lo).' AND '.FilterSqlExpressions::scalarLiteral($hi);
 
             case self::OP_IS_TRUE:
                 return $left.' = true';
@@ -540,7 +559,7 @@ final class FilterDslResolver
                 return "NOT ($attr CONTAINS ".$this->meiliLiteral($value).')';
 
             case self::OP_BETWEEN:
-                [$lo, $hi] = $this->rangePair($value);
+                [$lo, $hi] = FilterSqlExpressions::rangePair($value);
 
                 return "$attr ".$this->meiliScalar($lo).' TO '.$this->meiliScalar($hi);
 
@@ -568,13 +587,13 @@ final class FilterDslResolver
 
         if (str_contains($attr, '.')) {
             [$base, $locale] = explode('.', $attr, 2);
-            $this->safeIdent($base);
-            $this->safeIdent($locale);
+            FilterSqlExpressions::safeIdent($base);
+            FilterSqlExpressions::safeIdent($locale);
 
             return $base.'.'.$locale;
         }
 
-        return $this->safeIdent($attr);
+        return FilterSqlExpressions::safeIdent($attr);
     }
 
     private function meiliLiteral(mixed $value): string
@@ -614,103 +633,28 @@ final class FilterDslResolver
         return implode(', ', array_map($this->meiliLiteral(...), $value));
     }
 
-    private function resolveLeftExpression(string $attr): string
+    /**
+     * Attribute type used to pick the envelope key + cast, or null when the
+     * attribute maps to a physical column, is a dotted locale path, or no
+     * metadata resolver is wired (unit tests) — null keeps the legacy
+     * expression.
+     */
+    private function envelopeType(string $attr): ?string
+    {
+        if (isset(self::COLUMN_MAP[$attr]) || str_contains($attr, '.')) {
+            return null;
+        }
+
+        return $this->attributeMetadata?->getAttributeType($attr);
+    }
+
+    private function resolveLeftExpression(string $attr, ?string $type = null): string
     {
         if (isset(self::COLUMN_MAP[$attr])) {
             return self::COLUMN_MAP[$attr];
         }
 
-        // Locale-scoped path e.g. `description.pl`.
-        if (str_contains($attr, '.')) {
-            [$base, $locale] = explode('.', $attr, 2);
-            $baseEsc = $this->safeIdent($base);
-            $localeEsc = $this->safeIdent($locale);
-
-            return "NULLIF((co.attributes_indexed->'$baseEsc'->>'$localeEsc'), '')";
-        }
-
-        // Standard JSONB lookup with NULLIF to coerce empty strings to NULL.
-        $attrEsc = $this->safeIdent($attr);
-
-        return "NULLIF((co.attributes_indexed->>'$attrEsc'), '')";
-    }
-
-    private function safeIdent(string $ident): string
-    {
-        // Identifiers come from controlled UI dropdowns; allow safe chars only.
-        if (1 !== preg_match('/^[a-zA-Z0-9_\-]+$/', $ident)) {
-            throw new RuntimeException('Invalid identifier: '.$ident);
-        }
-
-        return $ident;
-    }
-
-    private function literal(mixed $value): string
-    {
-        if (\is_int($value) || \is_float($value)) {
-            return (string) $value;
-        }
-        if (\is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-        if (\is_string($value)) {
-            return "'".str_replace("'", "''", $value)."'";
-        }
-        throw new RuntimeException('Unsupported literal type.');
-    }
-
-    /**
-     * Accept both numeric and date string literals (`2026-05-14`,
-     * `2026-05-14T12:00:00Z`). The compiler wraps strings in single
-     * quotes for Postgres compatibility.
-     */
-    private function scalarLiteral(mixed $value): string
-    {
-        if (\is_int($value) || \is_float($value)) {
-            return (string) $value;
-        }
-        if (\is_string($value) && is_numeric($value)) {
-            return $value;
-        }
-        if (\is_string($value) && '' !== $value) {
-            return "'".str_replace("'", "''", $value)."'";
-        }
-        throw new RuntimeException('Numeric or date literal required.');
-    }
-
-    private function likeLiteral(mixed $value, string $prefix, string $suffix): string
-    {
-        if (!\is_string($value)) {
-            throw new RuntimeException('LIKE operator requires a string value.');
-        }
-        // Escape SQL LIKE wildcards inside the user-provided fragment so a
-        // literal `%` is not promoted to a wildcard.
-        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
-        $payload = $prefix.$escaped.$suffix;
-
-        return "'".str_replace("'", "''", $payload)."'";
-    }
-
-    /**
-     * @return array{0: mixed, 1: mixed}
-     */
-    private function rangePair(mixed $value): array
-    {
-        if (!\is_array($value) || \count($value) !== 2) {
-            throw new RuntimeException('BETWEEN operator requires a [low, high] tuple.');
-        }
-        $list = array_values($value);
-
-        return [$list[0], $list[1]];
-    }
-
-    private function literalList(mixed $value): string
-    {
-        if (!\is_array($value) || [] === $value) {
-            throw new RuntimeException('IN/NOT IN requires a non-empty array value.');
-        }
-
-        return implode(', ', array_map($this->literal(...), $value));
+        return FilterSqlExpressions::leftExpression($attr, $type);
     }
 
     /**

@@ -21,12 +21,14 @@ use Symfony\Component\Uid\Uuid;
  *
  *   1. On a worker run (ConsumedByWorkerStamp present), look up the
  *      envelope's TransportMessageIdStamp.
- *   2. INSERT the id into processed_messages with handler_class set to
- *      the receiver tag — Postgres' UNIQUE constraint on message_id
- *      surfaces a UniqueConstraintViolationException if the same id
- *      was already handled, in which case the middleware short-circuits.
- *   3. Otherwise it forwards the envelope down the stack and lets the
- *      handler run normally.
+ *   2. SELECT the id from processed_messages — a hit means the message
+ *      already completed once, so the middleware short-circuits (ack
+ *      without re-running the handler).
+ *   3. Otherwise it forwards the envelope down the stack and, only after
+ *      the handler chain RETURNS successfully, INSERTs the marker
+ *      (#2627 — a marker written before handling survives a handler
+ *      crash and silently swallows every redelivery; the transport row
+ *      lock covers the in-flight duplicate window instead).
  *
  * Synchronous dispatches (no ConsumedByWorkerStamp) skip the middleware
  * entirely — sync handlers run inside the originating transaction and
@@ -92,14 +94,45 @@ final class IdempotencyMiddleware implements MiddlewareInterface
             $messageId = Uuid::v5(Uuid::fromString(Uuid::NAMESPACE_OID), 'messenger:'.$messageId)->toRfc4122();
         }
 
-        try {
-            $this->recordProcessed($messageId, $envelope->getMessage()::class);
-        } catch (UniqueConstraintViolationException) {
-            // Already processed — short-circuit, return envelope as-is.
+        // #2627 — guard-then-record, NOT record-then-handle. The marker used
+        // to be INSERTed before the handler ran (outside doctrine_transaction,
+        // autocommit), so a handler crash — or the worker process dying — left
+        // the marker behind and every redelivery short-circuited into a silent
+        // ack: the message was swallowed forever (observed: 5 catalog runs
+        // stuck `pending`). Now the marker is written only AFTER the handler
+        // chain returns. In-flight duplicate delivery is still impossible —
+        // the doctrine transport row lock (FOR UPDATE SKIP LOCKED) is held
+        // until ack/reject, and redelivery only happens past redeliver_timeout.
+        if ($this->alreadyProcessed($messageId)) {
             return $envelope;
         }
 
-        return $stack->next()->handle($envelope, $stack);
+        $result = $stack->next()->handle($envelope, $stack);
+
+        try {
+            $this->recordProcessed($messageId, $envelope->getMessage()::class);
+        } catch (UniqueConstraintViolationException) {
+            // Lost race with a concurrent redelivery that finished first —
+            // the work is done either way.
+        }
+
+        return $result;
+    }
+
+    private function alreadyProcessed(string $messageId): bool
+    {
+        try {
+            $found = $this->connection->fetchOne(
+                'SELECT 1 FROM processed_messages WHERE message_id = :id',
+                ['id' => $messageId],
+            );
+        } catch (TableNotFoundException) {
+            $this->ensureProcessedMessagesTable();
+
+            return false;
+        }
+
+        return false !== $found;
     }
 
     /**
