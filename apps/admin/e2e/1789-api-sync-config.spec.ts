@@ -123,6 +123,11 @@ test('APIC-P3-11 — sync config: direction panels + save + run-now', async ({ p
   await page.getByRole('button', { name: /uruchom teraz|run now/i }).click();
   await expect.poll(() => ran).toBe(true);
 
+  // Long-standing flake: axe used to catch the success toast mid-fade and
+  // report a bogus color-contrast on the animating overlay. Wait for the
+  // toast to fully dismiss before auditing.
+  await expect(page.getByRole('status')).toHaveCount(0, { timeout: 10_000 });
+
   const a11y = await new AxeBuilder({ page }).analyze();
   expect(a11y.violations).toEqual([]);
 });

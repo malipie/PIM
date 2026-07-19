@@ -20,38 +20,13 @@ import type { RemoteEndpointRow } from '../wizard/steps/StepEndpoints';
 import { OutboundFilterSection } from './OutboundFilterSection';
 import { DirDiagram, EndpointSelect, ReadonlyValue } from './sync-components';
 
-type ConflictPolicy = 'lww' | 'pim_wins' | 'remote_wins';
-
-interface SyncBindingRow {
-  id: string;
-  connectionId: string;
-  objectTypeId: string;
-  readEndpointId: string | null;
-  writeEndpointId: string | null;
-  direction: SyncDirection;
-  schedule: string | null;
-  conflictPolicy: ConflictPolicy;
-  matchKeyMapping: string | null;
-  cursor: { field?: string; type?: string; state?: unknown } | null;
-  isEnabled: boolean;
-  nextRun: string | null;
-  outboundFilter: FilterDsl | null; // #2549 — outbound scope (null = send all)
-}
-
-interface ObjectTypeRow {
-  id: string;
-  code: string;
-  kind?: string;
-}
-
-const HUB = '/integrations/api-configurator/connections';
-
-const CRON_PRESETS = [
-  { key: 'every_15m', cron: '*/15 * * * *' },
-  { key: 'every_30m', cron: '*/30 * * * *' },
-  { key: 'hourly', cron: '0 * * * *' },
-  { key: 'daily_2', cron: '0 2 * * *' },
-] as const;
+import {
+  type ConflictPolicy,
+  CRON_PRESETS,
+  SYNC_HUB as HUB,
+  type ObjectTypeRow,
+  type SyncBindingRow,
+} from './sync-config-types';
 
 /**
  * APIC-P3-11 — the SyncBinding configuration screen (`integracje/api-sync.jsx`).
