@@ -23,6 +23,26 @@ use const JSON_THROW_ON_ERROR;
  */
 final readonly class RemoteResponseInspector
 {
+    /**
+     * Marks an in-body 2xx error as a THROTTLE (#2644): rate/query limits that
+     * RPC APIs report with HTTP 200 (BaseLinker: "Query limit exceeded, token
+     * blocked until …"). These are retryable after a backoff — unlike a
+     * validation error — and must pause the run instead of burning through the
+     * remaining records while the token is blocked.
+     */
+    private const string THROTTLE_PATTERN = '/limit|throttl|blocked|too many|rate.?exceed/i';
+
+    /** Returns the error message when the 2xx body reports a throttle; null otherwise. */
+    public static function throttleIn(string $body): ?string
+    {
+        $error = self::errorIn($body);
+        if (null === $error) {
+            return null;
+        }
+
+        return 1 === preg_match(self::THROTTLE_PATTERN, $error) ? $error : null;
+    }
+
     public static function errorIn(string $body): ?string
     {
         $body = trim($body);

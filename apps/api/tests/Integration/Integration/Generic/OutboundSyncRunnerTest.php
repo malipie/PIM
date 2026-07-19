@@ -29,6 +29,7 @@ use App\Integration\Generic\Domain\Repository\SyncRunRepositoryInterface;
 use App\Integration\Generic\Infrastructure\Http\RecordSelector;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use App\Tests\Unit\Integration\Generic\Application\Sync\RecordingSleeper;
 use App\Tests\Unit\Integration\Generic\Infrastructure\Http\Pagination\RecordingRequester;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
@@ -308,6 +309,70 @@ final class OutboundSyncRunnerTest extends KernelTestCase
     }
 
     #[Test]
+    public function throttleBacksOffThenAbortsTheRun(): void
+    {
+        // #2644 — an in-body 2xx throttle retries with exponential sleeps and,
+        // when the remote keeps throttling, aborts the run (partial) so the
+        // remaining records are not burned against a blocked token.
+        $this->seedObject('A-1', 'Widget');
+        $this->seedObject('B-2', 'Gadget');
+        $this->seedObject('C-3', 'Gizmo');
+        $binding = $this->seedBinding();
+
+        $throttle = new GenericRestResponse(
+            200,
+            [],
+            '{"status":"ERROR","error_code":"ERROR_QUERY_LIMIT","error_message":"Query limit exceeded, token blocked until 23:10"}',
+            1,
+            2,
+        );
+        $ok = new GenericRestResponse(201, [], '{}', 1, 2);
+        // Record 1 OK; record 2 throttled on every attempt (1 + 5 retries).
+        $requester = new RecordingRequester(
+            queue: [$ok, $throttle, $throttle, $throttle, $throttle, $throttle, $throttle],
+            default: $ok,
+        );
+        $sleeper = new RecordingSleeper();
+
+        $run = $this->runner($requester, $sleeper)->run($binding);
+        $this->em()->flush();
+
+        self::assertSame(SyncRunStatus::Partial, $run->getStatus());
+        self::assertSame(1, $run->getCreatedCount());
+        self::assertSame(1, $run->getFailedCount());
+        self::assertSame([2, 4, 8, 16, 32], $sleeper->sleeps, 'exponential backoff between throttle retries');
+        self::assertCount(7, $requester->calls, '1 OK + 6 throttled attempts; third record never attempted');
+
+        $log = $this->em()->getConnection()->fetchOne(
+            "SELECT message FROM integration_sync_run_logs WHERE run_id = :run AND action = 'failed'",
+            ['run' => $run->getId()->toRfc4122()],
+        );
+        self::assertIsString($log);
+        self::assertStringContainsString('Throttled by remote — run aborted', $log);
+    }
+
+    #[Test]
+    public function rateLimitHintPacesPushes(): void
+    {
+        // #2644 — the connection's "Limit żądań" (requests/minute) is honoured:
+        // after every N pushes the runner waits out the minute window.
+        $this->seedObject('A-1', 'Widget');
+        $this->seedObject('B-2', 'Gadget');
+        $this->seedObject('C-3', 'Gizmo');
+        $binding = $this->seedBinding();
+        $binding->getConnection()->setRateLimitHint(2);
+        $this->em()->flush();
+
+        $requester = new RecordingRequester(default: new GenericRestResponse(201, [], '{}', 1, 2));
+        $sleeper = new RecordingSleeper();
+        $run = $this->runner($requester, $sleeper)->run($binding);
+        $this->em()->flush();
+
+        self::assertSame(3, $run->getCreatedCount());
+        self::assertSame([60], $sleeper->sleeps, 'one window wait after the second push');
+    }
+
+    #[Test]
     public function rpcErrorStatusInTwoHundredCountsAsFailed(): void
     {
         // #2634 — BaseLinker answers HTTP 200 with {"status":"ERROR",…}; the
@@ -400,7 +465,7 @@ final class OutboundSyncRunnerTest extends KernelTestCase
         return $binding;
     }
 
-    private function runner(RecordingRequester $requester): OutboundSyncRunner
+    private function runner(RecordingRequester $requester, ?RecordingSleeper $sleeper = null): OutboundSyncRunner
     {
         return new OutboundSyncRunner(
             self::getContainer()->get(\App\Integration\Generic\Domain\Repository\FieldMappingRepositoryInterface::class),
@@ -414,6 +479,7 @@ final class OutboundSyncRunnerTest extends KernelTestCase
             self::getContainer()->get(OutboundResultWriter::class),
             new RecordSelector(),
             new SyncRunScope(),
+            $sleeper ?? new RecordingSleeper(),
         );
     }
 

@@ -57,4 +57,30 @@ final class RemoteResponseInspectorTest extends TestCase
         ];
         yield 'baselinker bare error status' => ['{"status":"ERROR"}', 'remote returned status ERROR'];
     }
+
+    #[DataProvider('throttleBodies')]
+    #[Test]
+    public function detectsThrottleEnvelopes(string $body, ?string $expected): void
+    {
+        self::assertSame($expected, RemoteResponseInspector::throttleIn($body));
+    }
+
+    /**
+     * @return iterable<string, array{string, ?string}>
+     */
+    public static function throttleBodies(): iterable
+    {
+        // #2644 — retryable rate limits reported inside a 2xx body.
+        yield 'baselinker query limit' => [
+            '{"status":"ERROR","error_code":"ERROR_QUERY_LIMIT","error_message":"Query limit exceeded, token blocked until 23:10"}',
+            'Query limit exceeded, token blocked until 23:10',
+        ];
+        yield 'generic too many requests' => ['{"error":"Too many requests"}', 'Too many requests'];
+        yield 'rate exceeded' => ['{"error":"Rate exceeded, slow down"}', 'Rate exceeded, slow down'];
+
+        // Non-throttle errors stay non-retryable.
+        yield 'validation error' => ['{"status":"ERROR","error_message":"Invalid price"}', null];
+        yield 'success' => ['{"status":"SUCCESS","product_id":1}', null];
+        yield 'empty' => ['', null];
+    }
 }

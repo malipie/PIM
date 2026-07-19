@@ -36,6 +36,7 @@ use App\Integration\Generic\Infrastructure\Http\RecordSelector;
 use App\Integration\Generic\Infrastructure\Http\RemoteRequester;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use App\Tests\Unit\Integration\Generic\Application\Sync\RecordingSleeper;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
@@ -148,6 +149,7 @@ final class SyncMemoryBenchmarkTest extends KernelTestCase
             self::getContainer()->get(OutboundResultWriter::class),
             new RecordSelector(),
             new SyncRunScope(),
+            new RecordingSleeper(),
         );
 
         \memory_reset_peak_usage();
