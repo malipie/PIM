@@ -2654,6 +2654,14 @@
         "saved": "Zapisano wiązanie.",
         "run_started": "Synchronizacja uruchomiona.",
         "error": "Akcja nie powiodła się. Spróbuj ponownie."
+      },
+      "outbound_filter": {
+        "count_loading": "Liczę obiekty…",
+        "count_preview_one": "obiekt zostanie wysłany",
+        "count_preview_few": "obiekty zostaną wysłane",
+        "count_preview_many": "obiektów zostanie wysłanych",
+        "count_preview_other": "obiektów zostanie wysłanych",
+        "count_note": "podgląd z indeksu wyszukiwania"
       }
     },
     "detail": {

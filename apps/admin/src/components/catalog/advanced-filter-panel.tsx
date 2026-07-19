@@ -88,6 +88,13 @@ interface AdvancedFilterPanelProps {
   onSaveAsPreset?: () => void;
   resultCount?: number;
   /**
+   * #2640 — live draft feed. Fired on every draft edit (add/update/remove
+   * condition, operator flip, open-seed) with the NORMALISED conditions
+   * (numeric strings coerced like at apply time), so hosts can render a live
+   * match count without changing the apply-gated commit semantics.
+   */
+  onDraftChange?: (conditions: FilterCondition[], operator: 'AND' | 'OR') => void;
+  /**
    * UP-09 (#1027) — per-ObjectType attribute catalog. When supplied,
    * replaces the hardcoded product-flavoured PANEL_ATTRS so custom
    * kinds (`samochody`, `vacancies`) see their own attributes in the
@@ -110,6 +117,7 @@ export function AdvancedFilterPanel({
   onSaveAsView,
   onSaveAsPreset,
   resultCount,
+  onDraftChange,
   panelAttrs,
 }: AdvancedFilterPanelProps) {
   const { t } = useTranslation();
@@ -170,6 +178,28 @@ export function AdvancedFilterPanel({
     setDraftMatchOperator(matchOperator);
   }, [open]);
 
+  // Numeric fields keep the raw string (`"101,99"`) in the draft so the
+  // operator can type the Polish decimal comma without the input resetting
+  // mid-keystroke. Normalize to numbers at apply time (and for the live draft
+  // feed) so the DSL serializer + Meili filter expression see the right type.
+  const normaliseDraft = (conds: FilterCondition[]): FilterCondition[] =>
+    conds.map((cond) => {
+      const meta = effectivePanelAttrs.find((a) => a.code === cond.attr);
+      const isNumeric = meta?.type === 'number' || meta?.type === 'metric';
+      if (!isNumeric || typeof cond.value !== 'string') return cond;
+      const trimmed = cond.value.replace(',', '.');
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? { ...cond, value: parsed } : cond;
+    });
+
+  // #2640 — live draft feed for host-rendered match counters. Fires on every
+  // draft edit; commit semantics (apply-gated) are untouched.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: notify on draft edits only
+  useEffect(() => {
+    if (!open) return;
+    onDraftChange?.(normaliseDraft(draftConditions), draftMatchOperator);
+  }, [open, draftConditions, draftMatchOperator]);
+
   if (!open) return null;
 
   const updateCondition = (idx: number, patch: Partial<FilterCondition>): void => {
@@ -183,19 +213,7 @@ export function AdvancedFilterPanel({
   };
 
   const commitAndApply = (): void => {
-    // Numeric fields keep the raw string (`"101,99"`) in the draft so
-    // the operator can type the Polish decimal comma without the input
-    // resetting mid-keystroke. Normalize to a number at apply time so
-    // the DSL serializer + Meili filter expression see the right type.
-    const normalised = draftConditions.map((cond) => {
-      const meta = effectivePanelAttrs.find((a) => a.code === cond.attr);
-      const isNumeric = meta?.type === 'number' || meta?.type === 'metric';
-      if (!isNumeric || typeof cond.value !== 'string') return cond;
-      const trimmed = cond.value.replace(',', '.');
-      const parsed = Number(trimmed);
-      return Number.isFinite(parsed) ? { ...cond, value: parsed } : cond;
-    });
-    setConditions(normalised);
+    setConditions(normaliseDraft(draftConditions));
     setMatchOperator(draftMatchOperator);
     onApply();
   };

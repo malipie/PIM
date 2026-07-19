@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AdvancedFilterPanel } from '@/components/catalog/advanced-filter-panel';
 import { Button } from '@/components/ui/button';
+import { useFilterMatchCount } from '@/features/catalog/search/use-filter-match-count';
 import {
   conditionsToDsl,
   dslToFlatConditions,
@@ -12,6 +13,12 @@ import {
 } from '@/lib/filters/filter-dsl';
 
 import { SectionLabel } from '../../components/primitives';
+
+interface FilterObjectType {
+  id: string;
+  code: string;
+  kind?: string;
+}
 
 /**
  * #2549 — the "Z PIM (wysyłka)" outbound scope for a SyncBinding. Rendered only
@@ -24,14 +31,33 @@ import { SectionLabel } from '../../components/primitives';
 export function OutboundFilterSection({
   dsl,
   onDslChange,
+  objectType = null,
 }: {
   dsl: FilterDsl | null;
   onDslChange: (dsl: FilterDsl | null) => void;
+  /** ObjectType of the binding — enables the live match counter (#2640). */
+  objectType?: FilterObjectType | null;
 }) {
   const { t } = useTranslation();
   const [conditions, setConditions] = useState<FilterCondition[]>([]);
   const [matchOperator, setMatchOperator] = useState<'AND' | 'OR'>('AND');
   const [open, setOpen] = useState(false);
+
+  // #2640 — live match preview: counts from the panel's draft while editing,
+  // from the applied conditions when the panel is closed.
+  const [draft, setDraft] = useState<{
+    conditions: FilterCondition[];
+    operator: 'AND' | 'OR';
+  } | null>(null);
+  const effectiveConditions = open && draft !== null ? draft.conditions : conditions;
+  const effectiveOperator = open && draft !== null ? draft.operator : matchOperator;
+  const { count: matchCount, isLoading: countLoading } = useFilterMatchCount(
+    objectType === null || objectType.kind === 'product' || objectType.code === 'product'
+      ? { kind: 'products' }
+      : { objectTypeId: objectType.id },
+    effectiveConditions,
+    effectiveOperator,
+  );
 
   // The panel's apply calls setConditions and setMatchOperator back-to-back in
   // one event (#2637). Deriving the second commit from this component's state
@@ -112,6 +138,34 @@ export function OutboundFilterSection({
               })}
         </span>
       </div>
+
+      {/* #2640 — live match preview (search-index based; the push itself counts via SQL). */}
+      <div
+        data-testid="outbound-filter-match-count"
+        aria-live="polite"
+        className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50/60 px-4 py-2.5 text-[12.5px]"
+      >
+        {countLoading && matchCount === undefined ? (
+          <span className="text-zinc-500">
+            {t('api_configurator.sync.outbound_filter.count_loading', {
+              defaultValue: 'Liczę obiekty…',
+            })}
+          </span>
+        ) : (
+          <span className="text-zinc-800">
+            <strong className="tabular-nums">{(matchCount ?? 0).toLocaleString('pl-PL')}</strong>{' '}
+            {t('api_configurator.sync.outbound_filter.count_preview', {
+              count: matchCount ?? 0,
+              defaultValue: 'obiektów zostanie wysłanych',
+            })}
+            <span className="ml-2 text-[11px] text-zinc-500">
+              {t('api_configurator.sync.outbound_filter.count_note', {
+                defaultValue: 'podgląd z indeksu wyszukiwania',
+              })}
+            </span>
+          </span>
+        )}
+      </div>
       <div className="relative mt-3">
         <AdvancedFilterPanel
           open={open}
@@ -119,6 +173,7 @@ export function OutboundFilterSection({
           setConditions={(next) => commit(next)}
           matchOperator={matchOperator}
           setMatchOperator={(operator) => commit(undefined, operator)}
+          onDraftChange={(next, operator) => setDraft({ conditions: next, operator })}
           onApply={() => setOpen(false)}
           onClose={() => setOpen(false)}
           onClear={() => {
