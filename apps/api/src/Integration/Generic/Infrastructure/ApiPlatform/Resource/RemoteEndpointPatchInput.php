@@ -48,6 +48,10 @@ final class RemoteEndpointPatchInput
     #[Groups(['remote_endpoint:patch'])]
     public ?string $recordSelector = null;
 
+    #[Assert\Choice(choices: ['json', 'form'])]
+    #[Groups(['remote_endpoint:patch'])]
+    public ?string $requestFormat = null;
+
     #[Assert\Choice(choices: ['json'])]
     #[Groups(['remote_endpoint:patch'])]
     public ?string $responseFormat = null;

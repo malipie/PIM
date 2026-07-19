@@ -28,4 +28,12 @@ final class FieldMappingPatchInput
 
     #[Groups(['field_mapping:patch'])]
     public ?bool $isMatchKey = null;
+
+    /**
+     * Optional endpoint scope (#2634). Null = leave unchanged; empty string =
+     * clear the scope (mapping applies to every endpoint again); UUID = scope
+     * to that endpoint of the same connection.
+     */
+    #[Groups(['field_mapping:patch'])]
+    public ?string $endpoint = null;
 }

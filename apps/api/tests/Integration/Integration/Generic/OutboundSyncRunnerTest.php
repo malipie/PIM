@@ -11,6 +11,7 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectValue;
 use App\Catalog\Domain\ObjectKind;
+use App\Integration\Generic\Application\Sync\OutboundBodyEncoder;
 use App\Integration\Generic\Application\Sync\OutboundSyncRunner;
 use App\Integration\Generic\Application\Sync\PayloadBuilder;
 use App\Integration\Generic\Domain\Entity\Connection;
@@ -139,6 +140,88 @@ final class OutboundSyncRunnerTest extends KernelTestCase
         self::assertSame(SyncRunStatus::Success, $run->getStatus());
     }
 
+    #[Test]
+    public function formEndpointSendsUrlencodedRpcEnvelope(): void
+    {
+        // #2634 — BaseLinker-style push: the endpoint's static envelope carries
+        // the RPC method + inventory id, mappings fill $.parameters.*, and the
+        // wire format is form-urlencoded with `parameters` as a JSON string.
+        $this->seedObject('A-1', 'Widget');
+        $binding = $this->seedBinding(rpc: true);
+
+        $requester = new RecordingRequester(default: new GenericRestResponse(200, [], '{"status":"SUCCESS","product_id":7}', 1, 2));
+        $run = $this->runner($requester)->run($binding);
+        $this->em()->flush();
+
+        self::assertSame(SyncRunStatus::Success, $run->getStatus());
+        self::assertCount(1, $requester->calls);
+        $call = $requester->calls[0];
+        self::assertSame('https://api.example.com/connector.php', $call['url']);
+        self::assertSame('application/x-www-form-urlencoded', $call['headers']['Content-Type'] ?? null);
+
+        parse_str((string) $call['body'], $fields);
+        self::assertSame('addInventoryProduct', $fields['method'] ?? null);
+        $rawParameters = $fields['parameters'] ?? null;
+        self::assertIsString($rawParameters);
+        $parameters = json_decode($rawParameters, true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($parameters);
+        self::assertSame(1234, $parameters['inventory_id'] ?? null);
+        self::assertSame('A-1', $parameters['sku'] ?? null);
+        self::assertSame(['name' => 'Widget'], $parameters['text_fields'] ?? null);
+    }
+
+    #[Test]
+    public function endpointScopedMappingIsExcludedFromOtherOperations(): void
+    {
+        // #2634 — a mapping scoped to another write endpoint (a different RPC
+        // operation) must not leak into this endpoint's payload.
+        $this->seedObject('A-1', 'Widget');
+        $binding = $this->seedBinding();
+
+        $em = $this->em();
+        $connection = $binding->getConnection();
+        $otherEndpoint = new RemoteEndpoint($connection, RemoteEndpointRole::WriteUpdate, 'POST', '/connector.php');
+        $otherEndpoint->assignTenant($this->tenant);
+        $em->persist($otherEndpoint);
+        $scoped = new FieldMapping($connection, 'name', '$.products.name', MappingDirection::Outbound);
+        $scoped->assignTenant($this->tenant);
+        $scoped->setEndpoint($otherEndpoint);
+        $em->persist($scoped);
+        $em->flush();
+
+        $requester = new RecordingRequester(default: new GenericRestResponse(201, [], '{}', 1, 2));
+        $this->runner($requester)->run($binding);
+        $this->em()->flush();
+
+        self::assertCount(1, $requester->calls);
+        $body = json_decode((string) $requester->calls[0]['body'], true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($body);
+        self::assertArrayNotHasKey('products', $body, 'mapping scoped to another endpoint leaked into the push');
+        self::assertSame('A-1', $body['sku']);
+    }
+
+    #[Test]
+    public function rpcErrorStatusInTwoHundredCountsAsFailed(): void
+    {
+        // #2634 — BaseLinker answers HTTP 200 with {"status":"ERROR",…}; the
+        // record must be classified failed, not created.
+        $this->seedObject('A-1', 'Widget');
+        $binding = $this->seedBinding();
+
+        $requester = new RecordingRequester(default: new GenericRestResponse(
+            200,
+            [],
+            '{"status":"ERROR","error_code":"ERROR_AUTH_TOKEN","error_message":"Invalid token"}',
+            1,
+            2,
+        ));
+        $run = $this->runner($requester)->run($binding);
+        $this->em()->flush();
+
+        self::assertSame(0, $run->getCreatedCount());
+        self::assertSame(1, $run->getFailedCount());
+    }
+
     private function seedObject(string $sku, string $name, ?string $status = null): void
     {
         $em = $this->em();
@@ -152,22 +235,44 @@ final class OutboundSyncRunnerTest extends KernelTestCase
         $em->flush();
     }
 
-    private function seedBinding(): SyncBinding
+    private function seedBinding(bool $rpc = false): SyncBinding
     {
         $em = $this->em();
         $connection = new Connection('idosell', 'IdoSell', 'https://api.example.com');
         $connection->assignTenant($this->tenant);
         $em->persist($connection);
 
-        $writeEndpoint = new RemoteEndpoint($connection, RemoteEndpointRole::WriteCreate, 'POST', '/products');
+        $writeEndpoint = new RemoteEndpoint(
+            $connection,
+            RemoteEndpointRole::WriteCreate,
+            'POST',
+            $rpc ? '/connector.php' : '/products',
+        );
         $writeEndpoint->assignTenant($this->tenant);
+        if ($rpc) {
+            $writeEndpoint->setRequestFormat('form');
+            $writeEndpoint->setRequestBodyTemplate([
+                'method' => 'addInventoryProduct',
+                'parameters' => ['inventory_id' => 1234],
+            ]);
+        }
         $em->persist($writeEndpoint);
 
-        $skuMapping = new FieldMapping($connection, 'sku', '$.sku', MappingDirection::Outbound);
+        $skuMapping = new FieldMapping(
+            $connection,
+            'sku',
+            $rpc ? '$.parameters.sku' : '$.sku',
+            MappingDirection::Outbound,
+        );
         $skuMapping->assignTenant($this->tenant);
         $skuMapping->setMatchKey(true);
         $em->persist($skuMapping);
-        $nameMapping = new FieldMapping($connection, 'name', '$.name', MappingDirection::Outbound);
+        $nameMapping = new FieldMapping(
+            $connection,
+            'name',
+            $rpc ? '$.parameters.text_fields.name' : '$.name',
+            MappingDirection::Outbound,
+        );
         $nameMapping->assignTenant($this->tenant);
         $em->persist($nameMapping);
 
@@ -185,6 +290,7 @@ final class OutboundSyncRunnerTest extends KernelTestCase
         return new OutboundSyncRunner(
             self::getContainer()->get(\App\Integration\Generic\Domain\Repository\FieldMappingRepositoryInterface::class),
             new PayloadBuilder(),
+            new OutboundBodyEncoder(),
             self::getContainer()->get(OutboundRecordReader::class),
             $requester,
             self::getContainer()->get(SyncRunRepositoryInterface::class),

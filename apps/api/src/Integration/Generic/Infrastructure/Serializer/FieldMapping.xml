@@ -15,6 +15,9 @@
         <attribute name="bindingId">
             <group>admin:read</group>
         </attribute>
+        <attribute name="endpointId">
+            <group>admin:read</group>
+        </attribute>
         <attribute name="pimTarget">
             <group>admin:read</group>
         </attribute>

@@ -3,6 +3,12 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-19: Konfigurator API — outbound do API typu RPC (BaseLinker) (#2634 → PR w toku)
+- **Kontekst:** operator chce push produktów PIM → katalog Base przez istniejące połączenie (`api.baselinker.com/connector.php`). Generyczny konektor mówił tylko czystym JSON-em; BaseLinker wymaga form-urlencoded `method`+`parameters` (JSON-string) i zwraca błędy jako HTTP 200 `{"status":"ERROR"}`.
+- **Zakres (#2634, rozszerzony decyzją operatora):** (1) `RemoteEndpoint.requestFormat` json|form + `OutboundBodyEncoder` (nested → JSON-string w form); (2) martwe dotąd `requestBodyTemplate` = statyczna koperta scalana z mapowaniami (`array_replace_recursive`, mapowanie wygrywa); (3) `RemoteResponseInspector` zna kształt BaseLinkera; (4) **scope mapowań per endpoint** (nullable FK `FieldMapping.endpoint`, CASCADE; runnery filtrują po endpoincie wiązania) — bo payload RPC jest per metoda (addInventoryProduct ≠ updateInventoryProductsStock); (5) UI: format+szablon w kroku Endpointy, scope w Mapowaniu.
+- **Follow-up otwarty do rozpisania:** przechwytywanie zdalnych ID (BaseLinker `product_id` z response) — bez tego re-push duplikuje produkty; do tego czasu initial push + zawężony filtr.
+- **Następny krok:** PR → CI → merge → live smoke na realnym connector.php (token operatora).
+
 ## 2026-07-19 (po seedzie): 3 zgłoszenia operatora — PDF hang, Multimedia×10, edycja połączeń
 - **#2627 → PR #2628 (fix(catalog))**: generowanie PDF wisiało wiecznie. Root cause (3 defekty): (1) `FilterDslResolver` kompilował filtry ślepe na koperty `attributes_indexed` — `price < 200` dawało `text < integer` w Postgres; (2) kaskada 25P02 ubijała cały worker (6 restartów); (3) `IdempotencyMiddleware` INSERT-ował marker PRZED transakcją handlera → crash połykał redelivery na zawsze. Fix: type-aware SQL (typ z `AttributeMetadataResolver`, `::numeric`/`::boolean`, multiselect przez `@>`) + marker po sukcesie handlera. Pre-merge live validation: run `done`, 4 strony, PDF 200 `application/pdf`.
 - **#2613 → PR #2629 (fix(assets))**: Multimedia ucięte do 10/1000 — Refine `mode:'off'` i tak śle `pageSize=10`. Fix: realna paginacja (PaginationBar, default 50, persist pageSize, licznik = totalItems). Smoke: 1010 assetów, pager, strona 2, pageSize 100 ✔.

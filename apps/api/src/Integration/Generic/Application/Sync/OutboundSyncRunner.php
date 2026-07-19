@@ -26,8 +26,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 
-use const JSON_THROW_ON_ERROR;
-
 /**
  * Runs one outbound (PIM → remote) sync of a {@see SyncBinding} (APIC-P3-06).
  *
@@ -47,6 +45,7 @@ final readonly class OutboundSyncRunner
     public function __construct(
         private FieldMappingRepositoryInterface $mappings,
         private PayloadBuilder $payloadBuilder,
+        private OutboundBodyEncoder $bodyEncoder,
         private OutboundRecordReader $reader,
         private RemoteRequester $requester,
         private SyncRunRepositoryInterface $runs,
@@ -68,10 +67,7 @@ final readonly class OutboundSyncRunner
             return $run;
         }
 
-        $mappings = array_values(array_filter(
-            $this->mappings->findByConnection($binding->getConnection()),
-            static fn (FieldMapping $m): bool => $m->getDirection()->appliesOutbound(),
-        ));
+        $mappings = $this->outboundMappings($binding, $writeEndpoint);
         $matchCode = $this->matchCode($mappings);
         $codes = array_values(array_unique(array_map(static fn (FieldMapping $m): string => $m->getPimTarget(), $mappings)));
 
@@ -98,10 +94,7 @@ final readonly class OutboundSyncRunner
                 $binding = $this->reload($bindingId);
                 $run = $this->reloadRun($runId);
                 $writeEndpoint = $binding->getWriteEndpoint() ?? $writeEndpoint;
-                $mappings = array_values(array_filter(
-                    $this->mappings->findByConnection($binding->getConnection()),
-                    static fn (FieldMapping $m): bool => $m->getDirection()->appliesOutbound(),
-                ));
+                $mappings = $this->outboundMappings($binding, $writeEndpoint);
             }
         }
 
@@ -109,6 +102,22 @@ final readonly class OutboundSyncRunner
         $this->runs->save($run);
 
         return $run;
+    }
+
+    /**
+     * Outbound mappings scoped to the write endpoint: endpoint-less mappings
+     * apply everywhere, endpoint-scoped ones only to their own operation (#2634
+     * — RPC APIs shape the payload per method).
+     *
+     * @return list<FieldMapping>
+     */
+    private function outboundMappings(SyncBinding $binding, RemoteEndpoint $writeEndpoint): array
+    {
+        return array_values(array_filter(
+            $this->mappings->findByConnection($binding->getConnection()),
+            static fn (FieldMapping $m): bool => $m->getDirection()->appliesOutbound()
+                && $m->appliesToEndpoint($writeEndpoint->getId()),
+        ));
     }
 
     private function reload(Uuid $bindingId): SyncBinding
@@ -151,13 +160,19 @@ final readonly class OutboundSyncRunner
         SyncRecordAction $successAction,
         bool $dryRun = false,
     ): void {
-        $body = $this->payloadBuilder->build($record->values, $mappings);
-        if ([] === $body) {
+        $mapped = $this->payloadBuilder->build($record->values, $mappings);
+        if ([] === $mapped) {
             $run->recordSkipped();
-            $this->log($run, SyncRecordAction::Skipped, null, $body, 'No outbound values to push.');
+            $this->log($run, SyncRecordAction::Skipped, null, $mapped, 'No outbound values to push.');
 
             return;
         }
+
+        // The endpoint's static envelope carries the constants an RPC API needs
+        // (method name, inventory id…); mapped values are merged over it, so a
+        // mapping always wins a key collision (#2634).
+        /** @var array<string, mixed> $body */
+        $body = array_replace_recursive($writeEndpoint->getRequestBodyTemplate() ?? [], $mapped);
 
         $matchValue = null !== $matchCode ? ($record->values[$matchCode] ?? null) : null;
         $url = $this->buildUrl($binding, $writeEndpoint, $matchValue);
@@ -177,13 +192,14 @@ final readonly class OutboundSyncRunner
         }
 
         try {
+            $encoded = $this->bodyEncoder->encode($body, $writeEndpoint->getRequestFormat());
             $response = $this->requester->request(
                 $binding->getConnection(),
                 $writeEndpoint->getHttpMethod(),
                 $url,
                 [],
-                [],
-                json_encode($body, JSON_THROW_ON_ERROR),
+                $encoded->headers,
+                $encoded->body,
             );
         } catch (SsrfBlockedException|RemoteRequestFailedException $exception) {
             $run->recordFailed();

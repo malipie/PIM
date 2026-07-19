@@ -14,6 +14,7 @@ use App\Catalog\Domain\Entity\ObjectValue;
 use App\Catalog\Domain\ObjectKind;
 use App\Integration\Generic\Application\Sync\CursorManager;
 use App\Integration\Generic\Application\Sync\InboundSyncRunner;
+use App\Integration\Generic\Application\Sync\OutboundBodyEncoder;
 use App\Integration\Generic\Application\Sync\OutboundSyncRunner;
 use App\Integration\Generic\Application\Sync\PayloadBuilder;
 use App\Integration\Generic\Application\Sync\RecordMapper;
@@ -135,6 +136,7 @@ final class SyncMemoryBenchmarkTest extends KernelTestCase
         $runner = new OutboundSyncRunner(
             self::getContainer()->get(FieldMappingRepositoryInterface::class),
             new PayloadBuilder(),
+            new OutboundBodyEncoder(),
             self::getContainer()->get(OutboundRecordReader::class),
             $this->acceptingRemote(),
             self::getContainer()->get(SyncRunRepositoryInterface::class),

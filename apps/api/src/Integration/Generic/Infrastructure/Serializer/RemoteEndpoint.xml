@@ -33,6 +33,9 @@
         <attribute name="recordSelector">
             <group>admin:read</group>
         </attribute>
+        <attribute name="requestFormat">
+            <group>admin:read</group>
+        </attribute>
         <attribute name="responseFormat">
             <group>admin:read</group>
         </attribute>

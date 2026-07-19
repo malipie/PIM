@@ -40,6 +40,16 @@ class FieldMapping extends AggregateRoot implements TenantScoped
     /** Loose link to a future SyncBinding (APIC-P3-01); no FK until it exists. */
     private ?Uuid $bindingId = null;
 
+    /**
+     * Optional endpoint scope (#2634): RPC-style APIs shape the payload per
+     * operation (BaseLinker's addInventoryProduct ≠ updateInventoryProductsStock),
+     * so a mapping may target one endpoint only. Null = applies to every
+     * endpoint of the connection (the pre-#2634 behaviour). Deleting the
+     * endpoint deletes its scoped mappings (DB cascade) — an orphaned scope
+     * must not silently widen back to all endpoints.
+     */
+    private ?RemoteEndpoint $endpoint = null;
+
     #[Assert\NotBlank]
     #[Assert\Length(max: 255)]
     private string $pimTarget;
@@ -102,6 +112,28 @@ class FieldMapping extends AggregateRoot implements TenantScoped
     public function getConnectionId(): Uuid
     {
         return $this->connection->getId();
+    }
+
+    public function getEndpoint(): ?RemoteEndpoint
+    {
+        return $this->endpoint;
+    }
+
+    public function getEndpointId(): ?Uuid
+    {
+        return $this->endpoint?->getId();
+    }
+
+    public function setEndpoint(?RemoteEndpoint $endpoint): void
+    {
+        $this->endpoint = $endpoint;
+        $this->touch();
+    }
+
+    /** Whether this mapping participates in a sync run using the given endpoint. */
+    public function appliesToEndpoint(Uuid $endpointId): bool
+    {
+        return null === $this->endpoint || $this->endpoint->getId()->equals($endpointId);
     }
 
     public function getBindingId(): ?Uuid

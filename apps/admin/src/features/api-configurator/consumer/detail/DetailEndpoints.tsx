@@ -43,10 +43,25 @@ export function DetailEndpoints({ connectionId }: { connectionId: string }) {
                 <RolePill value={ep.role as EndpointRole} />
                 <MethodPill method={ep.httpMethod as HttpMethod} />
                 <span className="font-mono text-[13px] text-zinc-800">{ep.pathTemplate}</span>
+                {ep.role.startsWith('write') && ep.requestFormat === 'form' ? (
+                  <span className="rounded bg-violet-50 px-1.5 py-0.5 font-mono text-[10.5px] font-medium text-violet-800">
+                    form
+                  </span>
+                ) : null}
                 <span className="ml-auto">
                   <PaginationPill kind={(ep.pagination?.strategy ?? 'none') as PaginationKind} />
                 </span>
               </div>
+              {ep.requestBodyTemplate != null ? (
+                <div className="mt-2 flex items-center gap-2 text-[11.5px]">
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-400">
+                    {t('api_configurator.detail.endpoints.body_template')}
+                  </span>
+                  <span className="truncate font-mono text-zinc-600">
+                    {JSON.stringify(ep.requestBodyTemplate)}
+                  </span>
+                </div>
+              ) : null}
               {ep.recordSelector != null && ep.recordSelector !== '' ? (
                 <div className="mt-2 flex items-center gap-2 text-[11.5px]">
                   <span className="text-[10px] uppercase tracking-wider text-zinc-400">

@@ -66,6 +66,58 @@ final class RemoteDescriptorApiTest extends ApiConfiguratorApiTestCase
     }
 
     #[Test]
+    public function postCreatesFormEndpointWithBodyTemplate(): void
+    {
+        // #2634 — RPC-style write endpoint: form wire format + static envelope.
+        $connectionId = $this->createConnection();
+
+        $body = $this->createEndpoint($connectionId, [
+            'role' => 'write_create',
+            'httpMethod' => 'POST',
+            'pathTemplate' => '/connector.php',
+            'requestFormat' => 'form',
+            'requestBodyTemplate' => ['method' => 'addInventoryProduct', 'parameters' => ['inventory_id' => 1234]],
+        ]);
+
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame('form', $body['requestFormat'] ?? null);
+        self::assertSame(
+            ['method' => 'addInventoryProduct', 'parameters' => ['inventory_id' => 1234]],
+            $body['requestBodyTemplate'] ?? null,
+        );
+    }
+
+    #[Test]
+    public function postEndpointRejectsUnknownRequestFormat(): void
+    {
+        $connectionId = $this->createConnection();
+
+        $this->createEndpoint($connectionId, ['requestFormat' => 'xml']);
+
+        self::assertResponseStatusCodeSame(422);
+    }
+
+    #[Test]
+    public function patchEndpointUpdatesRequestFormatAndTemplate(): void
+    {
+        $connectionId = $this->createConnection();
+        $id = $this->createEndpoint($connectionId)['id'] ?? null;
+        \assert(\is_string($id));
+
+        $body = $this->authenticatedClient()->request('PATCH', '/api/remote_endpoints/'.$id, [
+            'headers' => ['content-type' => self::MERGE_PATCH],
+            'body' => json_encode([
+                'requestFormat' => 'form',
+                'requestBodyTemplate' => ['method' => 'updateInventoryProductsStock'],
+            ], JSON_THROW_ON_ERROR),
+        ])->toArray();
+
+        self::assertResponseStatusCodeSame(200);
+        self::assertSame('form', $body['requestFormat'] ?? null);
+        self::assertSame(['method' => 'updateInventoryProductsStock'], $body['requestBodyTemplate'] ?? null);
+    }
+
+    #[Test]
     public function postEndpointUnknownConnectionIs404(): void
     {
         $this->authenticatedClient()->request('POST', '/api/remote_endpoints', [

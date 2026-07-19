@@ -7,6 +7,7 @@ namespace App\Integration\Generic\Application\Sync;
 use App\Catalog\Contracts\Integration\InboundRecordWriter;
 use App\Catalog\Contracts\Integration\InboundUpsertResult;
 use App\Integration\Generic\Domain\Entity\FieldMapping;
+use App\Integration\Generic\Domain\Entity\RemoteEndpoint;
 use App\Integration\Generic\Domain\Entity\SyncBinding;
 use App\Integration\Generic\Domain\Entity\SyncRun;
 use App\Integration\Generic\Domain\Entity\SyncRunLog;
@@ -69,7 +70,7 @@ final readonly class InboundSyncRunner
             return $run;
         }
 
-        $mappings = $this->mappings->findByConnection($binding->getConnection());
+        $mappings = $this->scopedMappings($binding, $readEndpoint);
         $cursorField = $this->cursors->current($binding)?->field;
 
         // The fetcher reads scalar descriptor fields off the connection + read
@@ -96,13 +97,27 @@ final readonly class InboundSyncRunner
             $this->em->clear();
             $binding = $this->reload($bindingId);
             $run = $this->reloadRun($runId);
-            $mappings = $this->mappings->findByConnection($binding->getConnection());
+            $mappings = $this->scopedMappings($binding, $readEndpoint);
         }
 
         $run->markFinished(null, $binding->getCursor());
         $this->runs->save($run);
 
         return $run;
+    }
+
+    /**
+     * Mappings scoped to the read endpoint: endpoint-less mappings apply
+     * everywhere, endpoint-scoped ones only to their own operation (#2634).
+     *
+     * @return list<FieldMapping>
+     */
+    private function scopedMappings(SyncBinding $binding, RemoteEndpoint $readEndpoint): array
+    {
+        return array_values(array_filter(
+            $this->mappings->findByConnection($binding->getConnection()),
+            static fn (FieldMapping $m): bool => $m->appliesToEndpoint($readEndpoint->getId()),
+        ));
     }
 
     private function reload(Uuid $bindingId): SyncBinding

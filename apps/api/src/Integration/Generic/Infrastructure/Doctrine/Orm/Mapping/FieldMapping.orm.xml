@@ -25,6 +25,13 @@
             <join-column name="connection_id" referenced-column-name="id" nullable="false" on-delete="CASCADE"/>
         </many-to-one>
 
+        <!-- Optional per-operation scope (#2634); null = applies to all endpoints.
+             CASCADE on endpoint delete so an orphaned scope never silently
+             widens back to every endpoint. -->
+        <many-to-one field="endpoint" target-entity="App\Integration\Generic\Domain\Entity\RemoteEndpoint">
+            <join-column name="endpoint_id" referenced-column-name="id" nullable="true" on-delete="CASCADE"/>
+        </many-to-one>
+
         <field name="bindingId" type="uuid" column="binding_id" nullable="true"/>
         <field name="pimTarget" type="string" length="255" column="pim_target"/>
         <field name="remoteFieldPath" type="string" length="512" column="remote_field_path"/>

@@ -2504,7 +2504,14 @@
         "selector": "Record selector",
         "add": "Add endpoint",
         "remove": "Remove endpoint {{path}}",
-        "empty": "No endpoints — add a read/write operation below."
+        "empty": "No endpoints — add a read/write operation below.",
+        "body": "Body",
+        "has_template": "template",
+        "body_format": "Body format",
+        "body_template": "Body template (JSON)",
+        "body_template_invalid": "The template must be a valid JSON object.",
+        "body_template_hint": "Static request fields (e.g. method for RPC-style APIs). Mapped values are merged over the template — a mapping wins a key collision.",
+        "actions": "Actions"
       },
       "schema": {
         "note": "detect fields",
@@ -2546,7 +2553,9 @@
       "unmapped_pim": "Unmapped PIM attributes · {{count}}",
       "all_pim_mapped": "All attributes mapped ✓",
       "unmapped_remote": "Unmapped external fields · {{count}}",
-      "all_remote_mapped": "None — all fields used"
+      "all_remote_mapped": "None — all fields used",
+      "endpoint_scope": "Endpoint",
+      "endpoint_all": "All endpoints"
     },
     "sync": {
       "back": "Back to connections",
@@ -2663,7 +2672,8 @@
       "endpoints": {
         "title": "Endpoints · REST descriptor",
         "empty": "No endpoints — add them in the connection wizard.",
-        "selector": "selector"
+        "selector": "selector",
+        "body_template": "body template"
       },
       "history": {
         "title": "Sync history",

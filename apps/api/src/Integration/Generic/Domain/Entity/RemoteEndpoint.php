@@ -32,6 +32,8 @@ class RemoteEndpoint extends AggregateRoot implements TenantScoped
 {
     public const array HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
+    public const array REQUEST_FORMATS = ['json', 'form'];
+
     private Uuid $id;
 
     private ?Tenant $tenant = null;
@@ -52,12 +54,21 @@ class RemoteEndpoint extends AggregateRoot implements TenantScoped
     private array $queryParams = [];
 
     /**
-     * Request-body template for write roles (placeholders resolved at sync
-     * time); null for read roles.
+     * Static request-body envelope for write roles (constants such as an RPC
+     * `method` name; outbound field mappings are merged over it at sync time);
+     * null for read roles.
      *
      * @var array<string, mixed>|null
      */
     private ?array $requestBodyTemplate = null;
+
+    /**
+     * Wire format of the outbound request body: `json` (raw JSON) or `form`
+     * (application/x-www-form-urlencoded with nested objects sent as JSON
+     * strings — the shape RPC-style APIs like BaseLinker expect).
+     */
+    #[Assert\Choice(choices: self::REQUEST_FORMATS)]
+    private string $requestFormat = 'json';
 
     /**
      * Pagination envelope: `{strategy, ...params}`. Defaults to no paging; the
@@ -216,6 +227,17 @@ class RemoteEndpoint extends AggregateRoot implements TenantScoped
     public function setRecordSelector(?string $recordSelector): void
     {
         $this->recordSelector = $recordSelector;
+        $this->touch();
+    }
+
+    public function getRequestFormat(): string
+    {
+        return $this->requestFormat;
+    }
+
+    public function setRequestFormat(string $requestFormat): void
+    {
+        $this->requestFormat = $requestFormat;
         $this->touch();
     }
 
