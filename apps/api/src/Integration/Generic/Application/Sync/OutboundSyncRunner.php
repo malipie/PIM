@@ -7,6 +7,7 @@ namespace App\Integration\Generic\Application\Sync;
 use App\Catalog\Contracts\Integration\OutboundRecord;
 use App\Catalog\Contracts\Integration\OutboundRecordReader;
 use App\Catalog\Contracts\Integration\OutboundResultWriter;
+use App\Integration\Generic\Application\Sleeper;
 use App\Integration\Generic\Domain\Entity\FieldMapping;
 use App\Integration\Generic\Domain\Entity\RemoteEndpoint;
 use App\Integration\Generic\Domain\Entity\SyncBinding;
@@ -47,6 +48,16 @@ final readonly class OutboundSyncRunner
     /** Clear the unit of work every N pushed records (FrankenPHP worker hygiene). */
     private const int CLEAR_EVERY = 200;
 
+    /**
+     * In-body throttle handling (#2644, architektura §7.3): RPC APIs report
+     * rate limits as HTTP 200 + error envelope, invisible to the transport
+     * backoff. Retry the record with exponential sleeps; when the remote is
+     * still throttling, ABORT the run (partial) instead of burning the
+     * remaining records against a blocked token.
+     */
+    private const int MAX_THROTTLE_RETRIES = 5;
+    private const int MAX_THROTTLE_SLEEP = 60;
+
     public function __construct(
         private FieldMappingRepositoryInterface $mappings,
         private PayloadBuilder $payloadBuilder,
@@ -59,6 +70,7 @@ final readonly class OutboundSyncRunner
         private OutboundResultWriter $resultWriter,
         private RecordSelector $recordSelector,
         private SyncRunScope $runScope,
+        private Sleeper $sleeper,
     ) {
     }
 
@@ -105,9 +117,22 @@ final readonly class OutboundSyncRunner
         // and the reader queries each object's values into the unit of work —
         // both accumulate across a 50k push, so clear every CLEAR_EVERY records
         // and reload the entities the loop keeps mutating.
+        $rateHint = $binding->getConnection()->getRateLimitHint();
+
         foreach ($this->reader->read($binding->getObjectTypeId(), $codes, $binding->getOutboundFilter()) as $record) {
-            $this->push($run, $binding, $writeEndpoint, $record, $mappings, $matchCode, $action, $dryRun);
+            $continue = $this->push($run, $binding, $writeEndpoint, $record, $mappings, $matchCode, $action, $dryRun);
             $this->em->flush();
+
+            if (!$continue) {
+                // #2644 — the remote kept throttling through the backoff:
+                // abort with what we have instead of burning the remaining
+                // records against a blocked token.
+                $run->markFinished(SyncRunStatus::Partial);
+                $this->runs->save($run);
+                $this->em->flush();
+
+                return $run;
+            }
 
             if (0 === ++$processed % self::CLEAR_EVERY) {
                 $this->em->clear();
@@ -115,6 +140,13 @@ final readonly class OutboundSyncRunner
                 $run = $this->reloadRun($runId);
                 $writeEndpoint = $binding->getWriteEndpoint() ?? $writeEndpoint;
                 $mappings = $this->outboundMappings($binding, $writeEndpoint);
+            }
+
+            // #2644 — honour the connection's "Limit żądań" (requests/minute):
+            // after every $rateHint pushes wait out the window instead of
+            // tripping the remote's limiter.
+            if (!$dryRun && null !== $rateHint && $rateHint > 0 && 0 === $processed % $rateHint) {
+                $this->sleeper->sleep(60);
             }
         }
 
@@ -168,6 +200,10 @@ final readonly class OutboundSyncRunner
     }
 
     /**
+     * Pushes one record; returns false when the run must ABORT (remote kept
+     * throttling through the backoff, #2644) — true otherwise, including
+     * per-record failures (a bad record never stops the run).
+     *
      * @param list<FieldMapping> $mappings
      */
     private function push(
@@ -179,13 +215,13 @@ final readonly class OutboundSyncRunner
         ?string $matchCode,
         SyncRecordAction $successAction,
         bool $dryRun = false,
-    ): void {
+    ): bool {
         $mapped = $this->payloadBuilder->build($record->values, $mappings);
         if ([] === $mapped) {
             $run->recordSkipped();
             $this->log($run, SyncRecordAction::Skipped, null, $mapped, 'No outbound values to push.');
 
-            return;
+            return true;
         }
 
         // The endpoint's static envelope carries the constants an RPC API needs
@@ -218,24 +254,50 @@ final readonly class OutboundSyncRunner
                 \sprintf('DRY RUN — would %s %s', $writeEndpoint->getHttpMethod(), $url),
             );
 
-            return;
+            return true;
         }
 
-        try {
-            $encoded = $this->bodyEncoder->encode($body, $writeEndpoint->getRequestFormat());
-            $response = $this->requester->request(
-                $binding->getConnection(),
-                $writeEndpoint->getHttpMethod(),
-                $url,
-                [],
-                $encoded->headers,
-                $encoded->body,
-            );
-        } catch (SsrfBlockedException|RemoteRequestFailedException $exception) {
-            $run->recordFailed();
-            $this->log($run, SyncRecordAction::Failed, $matchValue, $body, $exception->getMessage());
+        $encoded = $this->bodyEncoder->encode($body, $writeEndpoint->getRequestFormat());
+        $attempt = 0;
+        while (true) {
+            try {
+                $response = $this->requester->request(
+                    $binding->getConnection(),
+                    $writeEndpoint->getHttpMethod(),
+                    $url,
+                    [],
+                    $encoded->headers,
+                    $encoded->body,
+                );
+            } catch (SsrfBlockedException|RemoteRequestFailedException $exception) {
+                $run->recordFailed();
+                $this->log($run, SyncRecordAction::Failed, $matchValue, $body, $exception->getMessage());
 
-            return;
+                return true;
+            }
+
+            // #2644 — an in-body 2xx throttle (rate limit / blocked token) is
+            // retryable: back off and re-send this record; if the remote keeps
+            // throttling, give up on the whole run.
+            $throttle = $response->isSuccessful()
+                ? RemoteResponseInspector::throttleIn($response->body)
+                : null;
+            if (null === $throttle) {
+                break;
+            }
+            if (++$attempt > self::MAX_THROTTLE_RETRIES) {
+                $run->recordFailed();
+                $this->log(
+                    $run,
+                    SyncRecordAction::Failed,
+                    $matchValue,
+                    $body,
+                    'Throttled by remote — run aborted: '.$throttle,
+                );
+
+                return false;
+            }
+            $this->sleeper->sleep(min(2 ** $attempt, self::MAX_THROTTLE_SLEEP));
         }
 
         if ($response->isSuccessful()) {
@@ -245,7 +307,7 @@ final readonly class OutboundSyncRunner
                 $run->recordFailed();
                 $this->log($run, SyncRecordAction::Failed, $matchValue, $body, 'Remote 2xx with error: '.$remoteError);
 
-                return;
+                return true;
             }
 
             $note = $this->captureRemoteId($writeEndpoint, $record, $response->body);
@@ -253,11 +315,13 @@ final readonly class OutboundSyncRunner
             SyncRecordAction::Updated === $successAction ? $run->recordUpdated() : $run->recordCreated();
             $this->log($run, $successAction, $matchValue, $body, $note);
 
-            return;
+            return true;
         }
 
         $run->recordFailed();
         $this->log($run, SyncRecordAction::Failed, $matchValue, $body, \sprintf('HTTP %d', $response->statusCode));
+
+        return true;
     }
 
     /**
