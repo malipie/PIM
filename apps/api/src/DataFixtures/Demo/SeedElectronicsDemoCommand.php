@@ -139,9 +139,15 @@ final class SeedElectronicsDemoCommand extends Command
         $io->writeln(\sprintf('Channels ready: %s.', implode(', ', array_keys($channelIds))));
 
         $started = microtime(true);
-        $this->seeder->seed($tenant, $channelIds, $productCount, static function (string $message) use ($io): void {
-            $io->writeln($message);
-        });
+        $this->seeder->seed(
+            $tenant,
+            $channelIds,
+            $productCount,
+            static function (string $message) use ($io): void {
+                $io->writeln($message);
+            },
+            reuseExisting: true === $input->getOption('keep-existing'),
+        );
 
         $io->success(\sprintf(
             'Electronics demo dataset seeded for tenant "%s" in %.1fs (%d products). Run pim:search:reindex to rebuild Meilisearch.',
