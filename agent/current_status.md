@@ -3,6 +3,12 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-19: Dataset testowy „sklep z elektroniką" (seeder `pim:demo:seed-electronics`)
+- **Kontekst:** operator: „zamodeluj dane w PIM do testów — elektronika, kilkanaście kategorii, nowy ObjectType usługi, grupy atrybutów pod konkretne kategorie, 1000 produktów ze zdjęciami, 3 kanały (BaseLinker/Shopify/Magento), PL+EN". Baza za zgodą wyczyszczona (`pim:db:reset --with-fixtures`), potem seed.
+- **✅ Nowa komenda** `pim:demo:seed-electronics` (`src/DataFixtures/Demo/` — warstwa tooling, deptrac-exempt): purge katalogu tenanta (FK cascades) → 3 kanały → 42 atrybuty (24 nowe, wszystkie typy) → 14 grup (5 bazowych na Product, 7 przypiętych per kategoria przez `category_attribute_groups`/MOD-03, 2 na Usługach) → custom ObjectType `service` (kind=custom, wpięty do menu po Produktach) → 20 kategorii produktowych (ltree, 2 poziomy) + 5 usługowych → 20 usług → 1000 produktów: unikalne JPEG-i generowane GD i ingestowane przez realny Asset pipeline (MinIO + warianty webp), wartości PL + override'y EN (name/description), ceny per kanał (BL +3%, Shopify EUR, Magento −5%), statusy/completeness zróżnicowane.
+- **Smoke proof (live `https://pim.localhost`):** login 200; `/api/products` 1000; `/api/object_types` zawiera `service`; kanały = 3; form-schema per kategoria (router → Parametry sieciowe; smartfon → Podzespoły+Ekran+Mobilne); usługa SRV-020 z grupami usługowymi; `?locale=en` zwraca EN; signed previewUrl → 200 image/webp; 1000×3 warianty w MinIO; Meilisearch 2045 dok.
+- **Następny krok:** brak — dataset gotowy do testów operatora. Re-seed: `pim:demo:seed-electronics [--products=N]` + `pim:search:reindex`.
+
 ## 2026-07-18: Pierwsze logowanie odbijało z powrotem na /login (#2618 → PR #2619 merged)
 - **Kontekst:** operator: „po pierwszym wpisaniu hasła ekran przeładowuje się, ale nie loguje; dopiero drugie wpisanie loguje. Od początku aplikacji". „Przeładowanie" = odbicie /dashboard → /login.
 - **Root cause:** Refine 5 `useLogin` nawiguje na redirectTo PRZED invalidacją auth store (`setTimeout 32ms`); `AuthedRoute` na /dashboard czytał stale cache `{authenticated:false}` (zapisany przy wejściu niezalogowanym) → redirect z powrotem na /login. Druga próba trafiała na odświeżony cache. E2E nie łapało, bo `loginAsAdmin` wchodzi prosto na /login (pusty cache).
