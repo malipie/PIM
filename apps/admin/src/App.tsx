@@ -404,6 +404,7 @@ function App() {
               // APIC-P1-07 — consumer connections (GET /api/connections).
               name: 'connections',
               list: '/integrations/api-configurator/connections',
+              edit: '/integrations/api-configurator/connections/:id/edit',
             },
             {
               // RBAC-P5-001 (#691) — Settings → Users list. The page lives at
@@ -820,6 +821,11 @@ function App() {
                     />
                     <Route
                       path="/integrations/api-configurator/connections/new"
+                      element={<ConnectionWizardPage />}
+                    />
+                    {/* #2630 — the same wizard reused in edit mode. */}
+                    <Route
+                      path="/integrations/api-configurator/connections/:id/edit"
                       element={<ConnectionWizardPage />}
                     />
                     <Route

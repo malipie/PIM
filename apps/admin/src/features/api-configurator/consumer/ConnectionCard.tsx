@@ -1,5 +1,5 @@
 import { useDelete } from '@refinedev/core';
-import { Plug, Trash2 } from 'lucide-react';
+import { Pencil, Plug, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -93,6 +93,13 @@ export function ConnectionCard({ connection }: { connection: ConnectionRow }) {
             status={connection.status}
             label={t(`api_configurator.hub.status.${connection.status}`)}
           />
+          <Link
+            to={`${DETAIL_BASE}/${connection.id}/edit`}
+            aria-label={t('api_configurator.hub.edit', { name: connection.name })}
+            className="focus-ring grid size-8 place-items-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900"
+          >
+            <Pencil className="size-4" aria-hidden />
+          </Link>
           <button
             type="button"
             onClick={() => setConfirmOpen(true)}
