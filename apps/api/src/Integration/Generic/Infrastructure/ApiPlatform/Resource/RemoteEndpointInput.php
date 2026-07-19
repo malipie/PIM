@@ -57,6 +57,16 @@ final class RemoteEndpointInput
     #[Groups(['remote_endpoint:create'])]
     public string $requestFormat = 'json';
 
+    /** JSONPath to the remote id in a successful write response (#2636). */
+    #[Assert\Length(max: 512)]
+    #[Groups(['remote_endpoint:create'])]
+    public ?string $responseIdSelector = null;
+
+    /** PIM attribute code the captured remote id is written to (#2636). */
+    #[Assert\Length(max: 255)]
+    #[Groups(['remote_endpoint:create'])]
+    public ?string $responseIdAttribute = null;
+
     #[Assert\Choice(choices: ['json'])]
     #[Groups(['remote_endpoint:create'])]
     public string $responseFormat = 'json';

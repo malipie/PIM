@@ -83,10 +83,23 @@ z nagłówkiem `X-BLToken`):
 4. Na drucie wychodzi `method=addInventoryProduct&parameters={…}` — dokładnie
    kontrakt connector.php.
 
-**Ograniczenie (follow-up)**: PIM nie przechowuje zdalnych ID —
-`addInventoryProduct` bez `product_id` zawsze tworzy nowy rekord, więc ponowny
-pełny push zduplikuje katalog po stronie BaseLinkera. Do czasu ticketu na
-przechwytywanie zdalnych ID: jednorazowy initial push + zawężony filtr wysyłki.
+**Parowanie zdalnych ID (#2636)** — bez tego `addInventoryProduct` bez
+`product_id` zawsze tworzy nowy rekord i ponowny push duplikuje katalog:
+
+1. Utwórz w PIM zwykły atrybut na zdalne ID (np. `base_product_id`, typ text).
+2. Na endpoincie zapisu ustaw **Parowanie ID**: selector `$.product_id` +
+   atrybut `base_product_id`. Po udanym pushu silnik wyciąga ID z odpowiedzi
+   (ten sam `RecordSelector` co przy odczycie) i zapisuje je do atrybutu
+   z `provenance = integration`.
+3. Dodaj mapowanie outbound `base_product_id → $.parameters.product_id`
+   (scope na ten endpoint). Silnik pomija puste wartości, więc pierwszy push
+   naturalnie robi create, kolejne — update (rekord liczony jako `updated`).
+4. Ręczne parowanie / import istniejącego katalogu: wpisz lub zaimportuj ID do
+   atrybutu jak każdą inną wartość. „Rozłączenie" = wyczyszczenie pola.
+
+Anty-pętla: zapisy katalogowe wykonywane przez run synchronizacji (inbound
+upserty, capture ID) nie re-enqueue'ują bindingów **tego samego** połączenia
+(`SyncRunScope`); bindingi innych połączeń triggerują się normalnie.
 
 ### A.5 Synchronizacja: powiązanie + harmonogram
 

@@ -52,6 +52,16 @@ export function DetailEndpoints({ connectionId }: { connectionId: string }) {
                   <PaginationPill kind={(ep.pagination?.strategy ?? 'none') as PaginationKind} />
                 </span>
               </div>
+              {ep.responseIdSelector != null && ep.responseIdAttribute != null ? (
+                <div className="mt-2 flex items-center gap-2 text-[11.5px]">
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-400">
+                    {t('api_configurator.detail.endpoints.id_capture')}
+                  </span>
+                  <span className="font-mono text-zinc-600">
+                    {ep.responseIdSelector} → {ep.responseIdAttribute}
+                  </span>
+                </div>
+              ) : null}
               {ep.requestBodyTemplate != null ? (
                 <div className="mt-2 flex items-center gap-2 text-[11.5px]">
                   <span className="text-[10px] uppercase tracking-wider text-zinc-400">

@@ -27597,6 +27597,22 @@
                         "default": "json",
                         "type": "string"
                     },
+                    "responseIdSelector": {
+                        "maxLength": 512,
+                        "description": "JSONPath into a successful write response that yields the remote record\nid (#2636, e.g. `$.product_id`); null = no id capture. Write roles only.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "responseIdAttribute": {
+                        "maxLength": 255,
+                        "description": "PIM attribute code the captured remote id is written to (#2636,\nprovenance = integration). Subsequent pushes then inject it through an\nordinary outbound field mapping, turning creates into updates.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "pagination": {
                         "description": "Pagination envelope: `{strategy, ...params}`. Defaults to no paging; the\nconcrete strategies (offset/page/cursor/link_header) are read in\nAPIC-P2-03.",
                         "default": {
@@ -27729,6 +27745,22 @@
                         "default": "json",
                         "type": "string"
                     },
+                    "responseIdSelector": {
+                        "maxLength": 512,
+                        "description": "JSONPath to the remote id in a successful write response (#2636).",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "responseIdAttribute": {
+                        "maxLength": 255,
+                        "description": "PIM attribute code the captured remote id is written to (#2636).",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "responseFormat": {
                         "enum": [
                             "json"
@@ -27824,6 +27856,22 @@
                             "null"
                         ]
                     },
+                    "responseIdSelector": {
+                        "maxLength": 512,
+                        "description": "JSONPath to the remote id in a successful write response (#2636); '' clears.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "responseIdAttribute": {
+                        "maxLength": 255,
+                        "description": "PIM attribute code the captured remote id is written to (#2636); '' clears.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "responseFormat": {
                         "enum": [
                             "json"
@@ -27900,6 +27948,22 @@
                                 "description": "Wire format of the outbound request body: `json` (raw JSON) or `form`\n(application/x-www-form-urlencoded with nested objects sent as JSON\nstrings \u2014 the shape RPC-style APIs like BaseLinker expect).",
                                 "default": "json",
                                 "type": "string"
+                            },
+                            "responseIdSelector": {
+                                "maxLength": 512,
+                                "description": "JSONPath into a successful write response that yields the remote record\nid (#2636, e.g. `$.product_id`); null = no id capture. Write roles only.",
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "responseIdAttribute": {
+                                "maxLength": 255,
+                                "description": "PIM attribute code the captured remote id is written to (#2636,\nprovenance = integration). Subsequent pushes then inject it through an\nordinary outbound field mapping, turning creates into updates.",
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
                             },
                             "pagination": {
                                 "description": "Pagination envelope: `{strategy, ...params}`. Defaults to no paging; the\nconcrete strategies (offset/page/cursor/link_header) are read in\nAPIC-P2-03.",

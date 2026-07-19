@@ -2511,7 +2511,12 @@
         "body_template": "Body template (JSON)",
         "body_template_invalid": "The template must be a valid JSON object.",
         "body_template_hint": "Static request fields (e.g. method for RPC-style APIs). Mapped values are merged over the template — a mapping wins a key collision.",
-        "actions": "Actions"
+        "actions": "Actions",
+        "captures_id": "ID",
+        "id_capture": "ID pairing",
+        "id_selector": "Response ID selector",
+        "id_attribute": "Store ID in attribute",
+        "id_capture_hint": "After a successful write the record ID from the response is stored in the given PIM attribute (provenance: integration). Map that attribute in the Mapping tab (e.g. base_product_id → $.parameters.product_id) and subsequent pushes become updates instead of duplicates."
       },
       "schema": {
         "note": "detect fields",
@@ -2673,7 +2678,8 @@
         "title": "Endpoints · REST descriptor",
         "empty": "No endpoints — add them in the connection wizard.",
         "selector": "selector",
-        "body_template": "body template"
+        "body_template": "body template",
+        "id_capture": "ID pairing"
       },
       "history": {
         "title": "Sync history",

@@ -50,11 +50,24 @@ final readonly class InboundSyncRunner
         private SyncRunRepositoryInterface $runs,
         private EntityManagerInterface $em,
         private TenantContext $tenantContext,
+        private SyncRunScope $runScope = new SyncRunScope(),
         private LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
     public function run(SyncBinding $binding): SyncRun
+    {
+        // Anti-loop (#2636): this run's catalog writes must not re-enqueue the
+        // same connection's outbound bindings via the on-change trigger.
+        $this->runScope->enter($binding->getConnection()->getId());
+        try {
+            return $this->doRun($binding);
+        } finally {
+            $this->runScope->leave();
+        }
+    }
+
+    private function doRun(SyncBinding $binding): SyncRun
     {
         $run = new SyncRun($binding, SyncDirection::Inbound);
         $run->setCursorBefore($binding->getCursor());
