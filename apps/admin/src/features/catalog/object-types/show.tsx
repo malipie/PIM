@@ -916,14 +916,7 @@ export function ObjectTypeShowPage() {
 
       <AuditTrailCompact resource="object_types" id={id} limit={5} />
 
-      <footer className="flex flex-col items-start justify-between gap-2 border-t border-zinc-100 pt-6 text-[11.5px] text-zinc-500 sm:flex-row sm:items-center">
-        <span>
-          {t('object_types.footer_workspace', {
-            defaultValue:
-              'Pim · workspace „{{tenant}}" · ADR-009 · proponowany ADR-012 (Attribute Group as first-class)',
-            tenant: workspace.data?.name ?? '—',
-          })}
-        </span>
+      <footer className="flex items-center justify-end border-t border-zinc-100 pt-6 text-[11.5px] text-zinc-500">
         <span className="num">
           {t('object_types.footer_version', {
             defaultValue: 'v{{version}} · model schema rev {{rev}}',
