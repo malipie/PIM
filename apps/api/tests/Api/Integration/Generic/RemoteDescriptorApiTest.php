@@ -88,6 +88,35 @@ final class RemoteDescriptorApiTest extends ApiConfiguratorApiTestCase
     }
 
     #[Test]
+    public function postAndPatchCarryRemoteIdCaptureFields(): void
+    {
+        // #2636 — remote-id capture config: JSONPath into the write response +
+        // the PIM attribute the captured id is stored in.
+        $connectionId = $this->createConnection();
+
+        $body = $this->createEndpoint($connectionId, [
+            'role' => 'write_create',
+            'httpMethod' => 'POST',
+            'pathTemplate' => '/connector.php',
+            'responseIdSelector' => '$.product_id',
+            'responseIdAttribute' => 'base_product_id',
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame('$.product_id', $body['responseIdSelector'] ?? null);
+        self::assertSame('base_product_id', $body['responseIdAttribute'] ?? null);
+
+        $id = $body['id'] ?? null;
+        \assert(\is_string($id));
+        $patched = $this->authenticatedClient()->request('PATCH', '/api/remote_endpoints/'.$id, [
+            'headers' => ['content-type' => self::MERGE_PATCH],
+            'body' => json_encode(['responseIdSelector' => '', 'responseIdAttribute' => ''], JSON_THROW_ON_ERROR),
+        ])->toArray();
+        self::assertResponseStatusCodeSame(200);
+        self::assertNull($patched['responseIdSelector'] ?? null);
+        self::assertNull($patched['responseIdAttribute'] ?? null);
+    }
+
+    #[Test]
     public function postEndpointRejectsUnknownRequestFormat(): void
     {
         $connectionId = $this->createConnection();

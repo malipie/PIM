@@ -52,6 +52,8 @@
                 <option name="default">json</option>
             </options>
         </field>
+        <field name="responseIdSelector" type="string" length="512" column="response_id_selector" nullable="true"/>
+        <field name="responseIdAttribute" type="string" length="255" column="response_id_attribute" nullable="true"/>
         <field name="responseFormat" type="string" length="16" column="response_format">
             <options>
                 <option name="default">json</option>

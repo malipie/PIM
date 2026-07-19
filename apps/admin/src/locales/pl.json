@@ -2525,7 +2525,12 @@
         "body_template": "Szablon body (JSON)",
         "body_template_invalid": "Szablon musi być poprawnym obiektem JSON.",
         "body_template_hint": "Stałe pola żądania (np. method dla API typu RPC). Wartości z mapowań są scalane z szablonem — mapowanie wygrywa kolizję klucza.",
-        "actions": "Akcje"
+        "actions": "Akcje",
+        "captures_id": "ID",
+        "id_capture": "Parowanie ID",
+        "id_selector": "Selector ID z odpowiedzi",
+        "id_attribute": "Zapisz ID do atrybutu",
+        "id_capture_hint": "Po udanym zapisie ID rekordu z odpowiedzi trafia do wskazanego atrybutu PIM (provenance: integracja). Zmapuj ten atrybut w zakładce Mapowanie (np. base_product_id → $.parameters.product_id), a kolejne wysyłki będą aktualizacją zamiast duplikatu."
       },
       "schema": {
         "note": "wykryj pola",
@@ -2687,7 +2692,8 @@
         "title": "Endpointy · descriptor REST",
         "empty": "Brak endpointów — dodaj je w kreatorze połączenia.",
         "selector": "selector",
-        "body_template": "szablon body"
+        "body_template": "szablon body",
+        "id_capture": "parowanie ID"
       },
       "history": {
         "title": "Historia synchronizacji",

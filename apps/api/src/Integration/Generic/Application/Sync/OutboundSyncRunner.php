@@ -6,6 +6,7 @@ namespace App\Integration\Generic\Application\Sync;
 
 use App\Catalog\Contracts\Integration\OutboundRecord;
 use App\Catalog\Contracts\Integration\OutboundRecordReader;
+use App\Catalog\Contracts\Integration\OutboundResultWriter;
 use App\Integration\Generic\Domain\Entity\FieldMapping;
 use App\Integration\Generic\Domain\Entity\RemoteEndpoint;
 use App\Integration\Generic\Domain\Entity\SyncBinding;
@@ -19,12 +20,16 @@ use App\Integration\Generic\Domain\Exception\RemoteRequestFailedException;
 use App\Integration\Generic\Domain\Exception\SsrfBlockedException;
 use App\Integration\Generic\Domain\Repository\FieldMappingRepositoryInterface;
 use App\Integration\Generic\Domain\Repository\SyncRunRepositoryInterface;
+use App\Integration\Generic\Infrastructure\Http\RecordSelector;
 use App\Integration\Generic\Infrastructure\Http\RemoteRequester;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
+use JsonException;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
+
+use const JSON_THROW_ON_ERROR;
 
 /**
  * Runs one outbound (PIM → remote) sync of a {@see SyncBinding} (APIC-P3-06).
@@ -51,10 +56,25 @@ final readonly class OutboundSyncRunner
         private SyncRunRepositoryInterface $runs,
         private EntityManagerInterface $em,
         private TenantContext $tenantContext,
+        private OutboundResultWriter $resultWriter,
+        private RecordSelector $recordSelector,
+        private SyncRunScope $runScope,
     ) {
     }
 
     public function run(SyncBinding $binding, bool $dryRun = false): SyncRun
+    {
+        // Name the active connection so this run's own catalog writes (remote-id
+        // capture) cannot re-enqueue its bindings via the on-change trigger.
+        $this->runScope->enter($binding->getConnection()->getId());
+        try {
+            return $this->doRun($binding, $dryRun);
+        } finally {
+            $this->runScope->leave();
+        }
+    }
+
+    private function doRun(SyncBinding $binding, bool $dryRun): SyncRun
     {
         $run = new SyncRun($binding, SyncDirection::Outbound);
         $this->runs->save($run);
@@ -177,6 +197,16 @@ final readonly class OutboundSyncRunner
         $matchValue = null !== $matchCode ? ($record->values[$matchCode] ?? null) : null;
         $url = $this->buildUrl($binding, $writeEndpoint, $matchValue);
 
+        // Remote-id capture (#2636): when the id attribute already carries a
+        // value, the mapped payload injects it and the remote treats the push
+        // as an update — count it as such regardless of the endpoint role.
+        if ($writeEndpoint->capturesRemoteId()) {
+            $idAttribute = (string) $writeEndpoint->getResponseIdAttribute();
+            $successAction = '' !== trim($record->values[$idAttribute] ?? '')
+                ? SyncRecordAction::Updated
+                : SyncRecordAction::Created;
+        }
+
         if ($dryRun) {
             // Preview only — record what would be sent without calling the remote.
             $run->recordSkipped();
@@ -218,14 +248,48 @@ final readonly class OutboundSyncRunner
                 return;
             }
 
+            $note = $this->captureRemoteId($writeEndpoint, $record, $response->body);
+
             SyncRecordAction::Updated === $successAction ? $run->recordUpdated() : $run->recordCreated();
-            $this->log($run, $successAction, $matchValue, $body, null);
+            $this->log($run, $successAction, $matchValue, $body, $note);
 
             return;
         }
 
         $run->recordFailed();
         $this->log($run, SyncRecordAction::Failed, $matchValue, $body, \sprintf('HTTP %d', $response->statusCode));
+    }
+
+    /**
+     * Extracts the remote record id from a successful write response and stores
+     * it into the endpoint's configured PIM attribute (#2636). Returns a log
+     * note (`remote_id=…`) or null when capture is off / nothing was found.
+     */
+    private function captureRemoteId(RemoteEndpoint $endpoint, OutboundRecord $record, string $responseBody): ?string
+    {
+        if (!$endpoint->capturesRemoteId()) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($responseBody, true, 64, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
+
+        $remoteId = $this->recordSelector->value($decoded, $endpoint->getResponseIdSelector());
+        if (!\is_scalar($remoteId) || '' === trim((string) $remoteId)) {
+            return null;
+        }
+        $remoteId = (string) $remoteId;
+
+        $this->resultWriter->writeValue(
+            Uuid::fromString($record->objectId),
+            (string) $endpoint->getResponseIdAttribute(),
+            $remoteId,
+        );
+
+        return \sprintf('remote_id=%s', $remoteId);
     }
 
     /**

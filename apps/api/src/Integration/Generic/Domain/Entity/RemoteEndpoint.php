@@ -71,6 +71,21 @@ class RemoteEndpoint extends AggregateRoot implements TenantScoped
     private string $requestFormat = 'json';
 
     /**
+     * JSONPath into a successful write response that yields the remote record
+     * id (#2636, e.g. `$.product_id`); null = no id capture. Write roles only.
+     */
+    #[Assert\Length(max: 512)]
+    private ?string $responseIdSelector = null;
+
+    /**
+     * PIM attribute code the captured remote id is written to (#2636,
+     * provenance = integration). Subsequent pushes then inject it through an
+     * ordinary outbound field mapping, turning creates into updates.
+     */
+    #[Assert\Length(max: 255)]
+    private ?string $responseIdAttribute = null;
+
+    /**
      * Pagination envelope: `{strategy, ...params}`. Defaults to no paging; the
      * concrete strategies (offset/page/cursor/link_header) are read in
      * APIC-P2-03.
@@ -239,6 +254,34 @@ class RemoteEndpoint extends AggregateRoot implements TenantScoped
     {
         $this->requestFormat = $requestFormat;
         $this->touch();
+    }
+
+    public function getResponseIdSelector(): ?string
+    {
+        return $this->responseIdSelector;
+    }
+
+    public function setResponseIdSelector(?string $responseIdSelector): void
+    {
+        $this->responseIdSelector = '' === $responseIdSelector ? null : $responseIdSelector;
+        $this->touch();
+    }
+
+    public function getResponseIdAttribute(): ?string
+    {
+        return $this->responseIdAttribute;
+    }
+
+    public function setResponseIdAttribute(?string $responseIdAttribute): void
+    {
+        $this->responseIdAttribute = '' === $responseIdAttribute ? null : $responseIdAttribute;
+        $this->touch();
+    }
+
+    /** Whether this write endpoint captures the remote id from responses (#2636). */
+    public function capturesRemoteId(): bool
+    {
+        return null !== $this->responseIdSelector && null !== $this->responseIdAttribute;
     }
 
     public function getResponseFormat(): string

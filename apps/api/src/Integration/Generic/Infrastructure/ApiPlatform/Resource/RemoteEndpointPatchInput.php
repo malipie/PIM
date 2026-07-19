@@ -52,6 +52,16 @@ final class RemoteEndpointPatchInput
     #[Groups(['remote_endpoint:patch'])]
     public ?string $requestFormat = null;
 
+    /** JSONPath to the remote id in a successful write response (#2636); '' clears. */
+    #[Assert\Length(max: 512)]
+    #[Groups(['remote_endpoint:patch'])]
+    public ?string $responseIdSelector = null;
+
+    /** PIM attribute code the captured remote id is written to (#2636); '' clears. */
+    #[Assert\Length(max: 255)]
+    #[Groups(['remote_endpoint:patch'])]
+    public ?string $responseIdAttribute = null;
+
     #[Assert\Choice(choices: ['json'])]
     #[Groups(['remote_endpoint:patch'])]
     public ?string $responseFormat = null;

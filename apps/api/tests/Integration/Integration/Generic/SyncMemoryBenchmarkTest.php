@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Integration\Generic;
 
 use App\Catalog\Contracts\Integration\InboundRecordWriter;
 use App\Catalog\Contracts\Integration\OutboundRecordReader;
+use App\Catalog\Contracts\Integration\OutboundResultWriter;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
@@ -18,6 +19,7 @@ use App\Integration\Generic\Application\Sync\OutboundBodyEncoder;
 use App\Integration\Generic\Application\Sync\OutboundSyncRunner;
 use App\Integration\Generic\Application\Sync\PayloadBuilder;
 use App\Integration\Generic\Application\Sync\RecordMapper;
+use App\Integration\Generic\Application\Sync\SyncRunScope;
 use App\Integration\Generic\Domain\Entity\Connection;
 use App\Integration\Generic\Domain\Entity\FieldMapping;
 use App\Integration\Generic\Domain\Entity\RemoteEndpoint;
@@ -115,6 +117,7 @@ final class SyncMemoryBenchmarkTest extends KernelTestCase
             self::getContainer()->get(SyncRunRepositoryInterface::class),
             $this->em(),
             $this->tenantContext(),
+            new SyncRunScope(),
         );
 
         \memory_reset_peak_usage();
@@ -142,6 +145,9 @@ final class SyncMemoryBenchmarkTest extends KernelTestCase
             self::getContainer()->get(SyncRunRepositoryInterface::class),
             $this->em(),
             $this->tenantContext(),
+            self::getContainer()->get(OutboundResultWriter::class),
+            new RecordSelector(),
+            new SyncRunScope(),
         );
 
         \memory_reset_peak_usage();

@@ -29,6 +29,8 @@ export interface RemoteEndpointRow {
   recordSelector: string | null;
   requestFormat: RequestFormat;
   requestBodyTemplate: Record<string, unknown> | null;
+  responseIdSelector: string | null;
+  responseIdAttribute: string | null;
 }
 
 const ROLES: EndpointRole[] = ['read_list', 'read_one', 'write_create', 'write_update'];
@@ -61,6 +63,8 @@ export function StepEndpoints({ connectionId }: { connectionId: string | null })
   const [format, setFormat] = useState<RequestFormat>('json');
   const [template, setTemplate] = useState('');
   const [templateInvalid, setTemplateInvalid] = useState(false);
+  const [idSelector, setIdSelector] = useState('');
+  const [idAttribute, setIdAttribute] = useState('');
 
   const endpoints = result.data;
   const isWriteRole = role.startsWith('write');
@@ -102,12 +106,16 @@ export function StepEndpoints({ connectionId }: { connectionId: string | null })
           recordSelector: selector.trim() === '' ? null : selector.trim(),
           requestFormat: format,
           requestBodyTemplate: parsedTemplate,
+          responseIdSelector: isWriteRole && idSelector.trim() !== '' ? idSelector.trim() : null,
+          responseIdAttribute: isWriteRole && idAttribute.trim() !== '' ? idAttribute.trim() : null,
         },
         successNotification: false,
       },
       {
         onSuccess: () => {
           setTemplate('');
+          setIdSelector('');
+          setIdAttribute('');
           void query.refetch();
         },
       },
@@ -156,6 +164,9 @@ export function StepEndpoints({ connectionId }: { connectionId: string | null })
                     {endpoint.requestFormat}
                     {endpoint.requestBodyTemplate !== null
                       ? ` · ${t('api_configurator.wizard.ep.has_template')}`
+                      : ''}
+                    {endpoint.responseIdSelector !== null && endpoint.responseIdAttribute !== null
+                      ? ` · ${t('api_configurator.wizard.ep.captures_id')}`
                       : ''}
                   </span>
                 ) : (
@@ -276,6 +287,28 @@ export function StepEndpoints({ connectionId }: { connectionId: string | null })
                 {t('api_configurator.wizard.ep.body_template_hint')}
               </p>
             )}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                {t('api_configurator.wizard.ep.id_capture')}
+              </span>
+              <Input
+                value={idSelector}
+                onChange={(e) => setIdSelector(e.target.value)}
+                placeholder="$.product_id"
+                aria-label={t('api_configurator.wizard.ep.id_selector')}
+                className="h-9 w-40 font-mono"
+              />
+              <Input
+                value={idAttribute}
+                onChange={(e) => setIdAttribute(e.target.value)}
+                placeholder="base_product_id"
+                aria-label={t('api_configurator.wizard.ep.id_attribute')}
+                className="h-9 w-44 font-mono"
+              />
+            </div>
+            <p className="text-[11.5px] text-zinc-500">
+              {t('api_configurator.wizard.ep.id_capture_hint')}
+            </p>
           </div>
         ) : null}
       </div>

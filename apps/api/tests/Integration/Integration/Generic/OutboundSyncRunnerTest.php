@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Integration\Generic;
 
 use App\Catalog\Contracts\Integration\OutboundRecordReader;
+use App\Catalog\Contracts\Integration\OutboundResultWriter;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
@@ -14,6 +15,7 @@ use App\Catalog\Domain\ObjectKind;
 use App\Integration\Generic\Application\Sync\OutboundBodyEncoder;
 use App\Integration\Generic\Application\Sync\OutboundSyncRunner;
 use App\Integration\Generic\Application\Sync\PayloadBuilder;
+use App\Integration\Generic\Application\Sync\SyncRunScope;
 use App\Integration\Generic\Domain\Entity\Connection;
 use App\Integration\Generic\Domain\Entity\FieldMapping;
 use App\Integration\Generic\Domain\Entity\RemoteEndpoint;
@@ -24,6 +26,7 @@ use App\Integration\Generic\Domain\Enum\SyncDirection;
 use App\Integration\Generic\Domain\Enum\SyncRunStatus;
 use App\Integration\Generic\Domain\GenericRestResponse;
 use App\Integration\Generic\Domain\Repository\SyncRunRepositoryInterface;
+use App\Integration\Generic\Infrastructure\Http\RecordSelector;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Tests\Unit\Integration\Generic\Infrastructure\Http\Pagination\RecordingRequester;
@@ -201,6 +204,110 @@ final class OutboundSyncRunnerTest extends KernelTestCase
     }
 
     #[Test]
+    public function capturesRemoteIdIntoConfiguredAttribute(): void
+    {
+        // #2636 — a successful push stores the remote id from the response into
+        // the endpoint's configured PIM attribute (provenance = integration).
+        $baseId = new Attribute('base_id', ['pl' => 'Base ID'], AttributeType::Text);
+        $this->em()->persist($baseId);
+        $this->em()->flush();
+
+        $this->seedObject('A-1', 'Widget');
+        $binding = $this->seedBinding(rpc: true);
+        $endpoint = $binding->getWriteEndpoint();
+        \assert($endpoint instanceof RemoteEndpoint);
+        $endpoint->setResponseIdSelector('$.product_id');
+        $endpoint->setResponseIdAttribute('base_id');
+        $this->em()->flush();
+
+        $requester = new RecordingRequester(default: new GenericRestResponse(
+            200,
+            [],
+            '{"status":"SUCCESS","product_id":777}',
+            1,
+            2,
+        ));
+        $run = $this->runner($requester)->run($binding);
+        $this->em()->flush();
+
+        self::assertSame(1, $run->getCreatedCount());
+
+        $row = $this->em()->getConnection()->fetchAssociative(
+            <<<'SQL'
+                SELECT ov.value->>'value' AS value, ov.provenance
+                FROM object_values ov
+                JOIN attributes a ON a.id = ov.attribute_id
+                WHERE a.code = 'base_id'
+                LIMIT 1
+                SQL,
+        );
+        self::assertIsArray($row, 'captured remote id was not written');
+        self::assertSame('777', $row['value']);
+        self::assertSame('integration', $row['provenance']);
+
+        $log = $this->em()->getConnection()->fetchOne(
+            'SELECT message FROM integration_sync_run_logs WHERE run_id = :run',
+            ['run' => $run->getId()->toRfc4122()],
+        );
+        self::assertIsString($log);
+        self::assertStringContainsString('remote_id=777', $log);
+    }
+
+    #[Test]
+    public function secondPushInjectsCapturedIdAndCountsUpdated(): void
+    {
+        // #2636 — once the id attribute carries a value, an ordinary outbound
+        // mapping injects it and the push counts as an update (no duplicate).
+        $baseId = new Attribute('base_id', ['pl' => 'Base ID'], AttributeType::Text);
+        $this->em()->persist($baseId);
+        $this->em()->flush();
+
+        $this->seedObject('A-1', 'Widget');
+        $binding = $this->seedBinding(rpc: true);
+        $connection = $binding->getConnection();
+        $endpoint = $binding->getWriteEndpoint();
+        \assert($endpoint instanceof RemoteEndpoint);
+        $endpoint->setResponseIdSelector('$.product_id');
+        $endpoint->setResponseIdAttribute('base_id');
+        $idMapping = new FieldMapping($connection, 'base_id', '$.parameters.product_id', MappingDirection::Outbound);
+        $idMapping->assignTenant($this->tenant);
+        $this->em()->persist($idMapping);
+        $this->em()->flush();
+
+        $requester = new RecordingRequester(default: new GenericRestResponse(
+            200,
+            [],
+            '{"status":"SUCCESS","product_id":777}',
+            1,
+            2,
+        ));
+        $firstRun = $this->runner($requester)->run($binding);
+        $this->em()->flush();
+        self::assertSame(1, $firstRun->getCreatedCount());
+        $firstFields = [];
+        parse_str((string) $requester->calls[0]['body'], $firstFields);
+        $firstRawParameters = $firstFields['parameters'] ?? null;
+        self::assertIsString($firstRawParameters);
+        $firstParameters = json_decode($firstRawParameters, true);
+        self::assertIsArray($firstParameters);
+        self::assertArrayNotHasKey('product_id', $firstParameters, 'first push must be a create');
+
+        $secondRun = $this->runner($requester)->run($this->reloadBinding($binding->getId()));
+        $this->em()->flush();
+
+        self::assertSame(0, $secondRun->getCreatedCount());
+        self::assertSame(1, $secondRun->getUpdatedCount());
+        self::assertCount(2, $requester->calls);
+        $fields = [];
+        parse_str((string) $requester->calls[1]['body'], $fields);
+        $rawParameters = $fields['parameters'] ?? null;
+        self::assertIsString($rawParameters);
+        $parameters = json_decode($rawParameters, true);
+        self::assertIsArray($parameters);
+        self::assertSame(777, $parameters['product_id'] ?? null, 'second push must inject the captured id');
+    }
+
+    #[Test]
     public function rpcErrorStatusInTwoHundredCountsAsFailed(): void
     {
         // #2634 — BaseLinker answers HTTP 200 with {"status":"ERROR",…}; the
@@ -220,6 +327,14 @@ final class OutboundSyncRunnerTest extends KernelTestCase
 
         self::assertSame(0, $run->getCreatedCount());
         self::assertSame(1, $run->getFailedCount());
+    }
+
+    private function reloadBinding(\Symfony\Component\Uid\Uuid $id): SyncBinding
+    {
+        $binding = $this->em()->find(SyncBinding::class, $id->toRfc4122());
+        \assert($binding instanceof SyncBinding);
+
+        return $binding;
     }
 
     private function seedObject(string $sku, string $name, ?string $status = null): void
@@ -296,6 +411,9 @@ final class OutboundSyncRunnerTest extends KernelTestCase
             self::getContainer()->get(SyncRunRepositoryInterface::class),
             $this->em(),
             $this->tenantContext(),
+            self::getContainer()->get(OutboundResultWriter::class),
+            new RecordSelector(),
+            new SyncRunScope(),
         );
     }
 

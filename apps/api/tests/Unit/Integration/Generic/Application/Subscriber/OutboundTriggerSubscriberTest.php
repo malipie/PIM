@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Integration\Generic\Application\Subscriber;
 use App\Catalog\Contracts\BulkGuard;
 use App\Catalog\Contracts\Event\ObjectAttributesChanged;
 use App\Integration\Generic\Application\Subscriber\OutboundTriggerSubscriber;
+use App\Integration\Generic\Application\Sync\SyncRunScope;
 use App\Integration\Generic\Domain\Entity\Connection;
 use App\Integration\Generic\Domain\Entity\SyncBinding;
 use App\Integration\Generic\Domain\Enum\SyncDirection;
@@ -56,6 +57,37 @@ final class OutboundTriggerSubscriberTest extends TestCase
     }
 
     #[Test]
+    public function skipsBindingsOfTheConnectionWhoseRunIsWriting(): void
+    {
+        // #2636 anti-loop: remote-id capture during connection A's run must not
+        // re-enqueue A's own bindings, while B's bindings still trigger.
+        $type = Uuid::v7();
+        $active = new Connection('base', 'Base', 'https://api.baselinker.com');
+        $other = new Connection('shop', 'Shop', 'https://shop.example');
+        $bindings = [
+            $this->binding($active, $type, SyncDirection::Outbound), // writing → skip
+            $this->binding($other, $type, SyncDirection::Outbound),  // other conn → enqueue
+        ];
+
+        $scope = new SyncRunScope();
+        $scope->enter($active->getId());
+        $bus = $this->bus();
+        $this->subscriber($bus, $bindings, bulk: false, scope: $scope)(
+            new ObjectAttributesChanged(Uuid::v7(), Uuid::v7(), ['base_product_id'], objectTypeId: $type),
+        );
+
+        self::assertCount(1, $bus->dispatched);
+
+        // Outside a run everything triggers again.
+        $scope->leave();
+        $bus2 = $this->bus();
+        $this->subscriber($bus2, $bindings, bulk: false, scope: $scope)(
+            new ObjectAttributesChanged(Uuid::v7(), Uuid::v7(), ['name'], objectTypeId: $type),
+        );
+        self::assertCount(2, $bus2->dispatched);
+    }
+
+    #[Test]
     public function skipsWhenEventHasNoObjectType(): void
     {
         $bus = $this->bus();
@@ -76,15 +108,19 @@ final class OutboundTriggerSubscriberTest extends TestCase
     /**
      * @param list<SyncBinding> $bindings
      */
-    private function subscriber(RecordingMessageBus $bus, array $bindings, bool $bulk): OutboundTriggerSubscriber
-    {
+    private function subscriber(
+        RecordingMessageBus $bus,
+        array $bindings,
+        bool $bulk,
+        ?SyncRunScope $scope = null,
+    ): OutboundTriggerSubscriber {
         $guard = $this->createStub(BulkGuard::class);
         $guard->method('isBulk')->willReturn($bulk);
 
         $repo = $this->createStub(SyncBindingRepositoryInterface::class);
         $repo->method('findEnabled')->willReturn($bindings);
 
-        return new OutboundTriggerSubscriber($guard, $repo, $bus);
+        return new OutboundTriggerSubscriber($guard, $repo, $scope ?? new SyncRunScope(), $bus);
     }
 
     private function bus(): RecordingMessageBus
