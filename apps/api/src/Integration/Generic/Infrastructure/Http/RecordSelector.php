@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Integration\Generic\Infrastructure\Http;
 
+use App\Integration\Generic\Application\Sync\RemotePathSegments;
+
 /**
  * Resolves a record selector against a decoded JSON body (ADR-0022, epic APIC,
  * ticket APIC-P2-03).
  *
- * MVP supports the dot-path subset of JSONPath the wizard emits — `$` (root),
- * `$.results`, `$.data.items`, or the bare `results` form. Full JSONPath
- * (filters, wildcards, recursive descent) is a deferred §7 hook; the selector
- * column is wide enough to grow into it without a migration.
+ * MVP supports the dot-path + bracket subset of JSONPath the wizard emits —
+ * `$` (root), `$.results`, `$.data.items`, `$.prices['1374']`, or the bare
+ * `results` form (#2642). Full JSONPath (filters, wildcards, recursive
+ * descent) is a deferred §7 hook; the selector column is wide enough to grow
+ * into it without a migration.
  *
  * `records()` always yields a list of associative records: a list selector
  * returns its rows, a single object is wrapped, anything else is empty.
@@ -85,23 +88,14 @@ final class RecordSelector
     }
 
     /**
-     * Splits `$.a.b` / `a.b` / `$` into path segments. Root (`$`, ``, null)
-     * yields no segments, so the whole body is returned.
+     * Splits `$.a.b` / `a.b['c']` / `$` into path segments (#2642 — shared
+     * tokenizer with bracket-notation support). Root (`$`, ``, null) yields no
+     * segments, so the whole body is returned.
      *
      * @return list<string>
      */
     private static function segments(?string $path): array
     {
-        if (null === $path) {
-            return [];
-        }
-
-        $trimmed = ltrim(trim($path), '$');
-        $trimmed = ltrim($trimmed, '.');
-        if ('' === $trimmed) {
-            return [];
-        }
-
-        return array_values(array_filter(explode('.', $trimmed), static fn (string $s): bool => '' !== $s));
+        return RemotePathSegments::parse($path);
     }
 }

@@ -91,6 +91,21 @@ final class PayloadBuilderTest extends TestCase
         self::assertSame(['sku' => 'A-1'], $body);
     }
 
+    #[Test]
+    public function bracketPathBuildsNestedObjectNotLiteralKey(): void
+    {
+        // #2642 — the BaseLinker price-group case: `prices['1374']` must nest,
+        // not become a literal `prices['1374']` key the remote silently drops.
+        $mappings = [
+            $this->mapping('price', "\$.parameters.prices['1374']", MappingDirection::Outbound),
+        ];
+
+        $body = $this->builder->build(['price' => '249.99'], $mappings);
+
+        self::assertSame(['parameters' => ['prices' => ['1374' => 249.99]]], $body);
+        self::assertSame('{"parameters":{"prices":{"1374":249.99}}}', json_encode($body));
+    }
+
     private function mapping(string $pimTarget, string $remotePath, MappingDirection $direction): FieldMapping
     {
         return new FieldMapping($this->connection, $pimTarget, $remotePath, $direction);

@@ -92,11 +92,8 @@ final readonly class PayloadBuilder
      */
     private static function segments(string $path): array
     {
-        $trimmed = ltrim(ltrim(trim($path), '$'), '.');
-        if ('' === $trimmed) {
-            return [];
-        }
-
-        return array_values(array_filter(explode('.', $trimmed), static fn (string $s): bool => '' !== $s));
+        // #2642 — shared tokenizer: brackets (`prices['1374']`) build nested
+        // objects instead of a literal key the remote would silently drop.
+        return RemotePathSegments::parse($path);
     }
 }
