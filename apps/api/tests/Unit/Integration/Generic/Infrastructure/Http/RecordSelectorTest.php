@@ -52,6 +52,17 @@ final class RecordSelectorTest extends TestCase
     }
 
     #[Test]
+    public function bracketSelectorDigsLikeDotNotation(): void
+    {
+        // #2642 — bracket dialect: `$.data['items']` ≡ `$.data.items`,
+        // numeric bracket keys resolve string-keyed JSON objects.
+        $body = ['data' => ['items' => [['id' => 1]]], 'prices' => ['1374' => 249.99]];
+
+        self::assertSame([['id' => 1]], $this->selector->records($body, "\$.data['items']"));
+        self::assertSame(249.99, $this->selector->value($body, "\$.prices['1374']"));
+    }
+
+    #[Test]
     public function missingPathYieldsNoRecords(): void
     {
         self::assertSame([], $this->selector->records(['results' => []], '$.missing'));
