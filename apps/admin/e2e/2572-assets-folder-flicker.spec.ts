@@ -37,7 +37,8 @@ test('entering a folder shows a target-sized skeleton, not the previous cards', 
   const countText = (await firstFolder.locator('.num').innerText()).trim();
   const countMatch = countText.match(/\d+/);
   const targetCount = countMatch ? Number(countMatch[0]) : null;
-  const expectedSkeleton = targetCount !== null ? Math.min(Math.max(targetCount, 1), 120) : 12;
+  // #2613 — the switch skeleton is capped at one PAGE of tiles (default 50).
+  const expectedSkeleton = targetCount !== null ? Math.min(Math.max(targetCount, 1), 50) : 12;
 
   // Hold the next assets request so the switch stays visible long enough.
   let armed = false;
@@ -68,8 +69,12 @@ test('entering a folder shows a target-sized skeleton, not the previous cards', 
   await expect(realGrid).toHaveCount(0);
 
   // After the request resolves the real grid returns and the skeleton is gone.
-  // (No exact-count assertion on the settled grid — the list is currently
-  // capped by the pagination bug tracked in #2613.)
   await expect(skeleton).toHaveCount(0, { timeout: 5000 });
   await expect(realGrid.locator('> li').first()).toBeVisible();
+
+  // #2613 fixed the 10-item cap: the settled grid shows the folder's full
+  // content up to one page (server pagination, default 50/page).
+  if (targetCount !== null) {
+    await expect(realGrid.locator('> li')).toHaveCount(Math.min(targetCount, 50));
+  }
 });

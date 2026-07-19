@@ -13,6 +13,11 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import {
+  PAGE_SIZE_OPTIONS,
+  type PageSize,
+  PaginationBar,
+} from '@/components/catalog/pagination-bar';
 import { usePageActions } from '@/layout/page-actions-context';
 import type { DuplicateAssetError, UploadAssetResult } from '@/lib/asset-upload';
 import { useDebouncedCallback } from '@/lib/use-debounced-callback';
@@ -32,6 +37,18 @@ interface DuplicateState {
 
 const POLL_INTERVAL_MS = 3500;
 const VIEW_STORAGE_KEY = 'pim.assets.view';
+// #2613 — server pagination for the files grid; page size persisted like the
+// grid/list toggle, page resets on any folder/search/type change.
+const PAGE_SIZE_STORAGE_KEY = 'pim.assets.pageSize';
+const DEFAULT_PAGE_SIZE: PageSize = 50;
+
+function readInitialPageSize(): PageSize {
+  if (typeof window === 'undefined') return DEFAULT_PAGE_SIZE;
+  const stored = Number(window.localStorage.getItem(PAGE_SIZE_STORAGE_KEY));
+  return (PAGE_SIZE_OPTIONS as readonly number[]).includes(stored)
+    ? (stored as PageSize)
+    : DEFAULT_PAGE_SIZE;
+}
 
 type AssetsView = 'grid' | 'list';
 type TypeFilter = 'all' | 'image' | 'pdf';
@@ -65,6 +82,8 @@ export function AssetsListPage() {
   const [targetCount, setTargetCount] = useState<number | null>(null);
   const [drawerAsset, setDrawerAsset] = useState<AssetMeta | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(readInitialPageSize);
 
   const setSearchSoon = useDebouncedCallback((value: string) => setDebouncedSearch(value), 300);
   useEffect(() => {
@@ -74,6 +93,17 @@ export function AssetsListPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') window.localStorage.setItem(VIEW_STORAGE_KEY, view);
   }, [view]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined')
+      window.localStorage.setItem(PAGE_SIZE_STORAGE_KEY, String(pageSize));
+  }, [pageSize]);
+
+  // Any narrowing change targets a different result set — restart at page 1.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps ARE the reset triggers
+  useEffect(() => {
+    setPage(1);
+  }, [currentFolder, debouncedSearch, typeFilter]);
 
   // Topbar CTA — design places "Prześlij pliki" in the topbar (PageActions).
   usePageActions(
@@ -113,7 +143,9 @@ export function AssetsListPage() {
 
   const { result, query } = useList<AssetEntry>({
     resource: 'assets',
-    pagination: { mode: 'off' },
+    // #2613 — `mode: 'off'` still sent Refine's default pageSize=10 to the
+    // data provider, silently capping the view at 10 files with no pager.
+    pagination: { currentPage: page, pageSize },
     filters: filterParams,
     queryOptions: {
       // #2572 — keep the previous folder's thumbnails on screen while the new
@@ -145,10 +177,12 @@ export function AssetsListPage() {
   // matches the final one, so the switch settles without a flash-and-collapse.
   // Unknown targets (up-navigation, "Bez przypisania") fall back to 12.
   const skeletonCount =
-    isSwitching && targetCount !== null ? Math.min(Math.max(targetCount, 1), 120) : 12;
-  // While switching, show the destination count instead of the stale
-  // placeholder length ("PLIKI 10" flashing on entry into a 1-file folder).
-  const filesCount = isSwitching && targetCount !== null ? targetCount : assets.length;
+    isSwitching && targetCount !== null ? Math.min(Math.max(targetCount, 1), pageSize) : 12;
+  // #2613 — the header counter reflects the FULL result set (totalItems from
+  // the collection), not the current page length; while switching it shows
+  // the destination count ("PLIKI 10" flashing on entry into a 1-file folder).
+  const totalItems = result?.total ?? assets.length;
+  const filesCount = isSwitching && targetCount !== null ? targetCount : totalItems;
   const showFolderTiles = currentFolder === null && !debouncedSearch;
   // #2621 — on a cold load hold the files section in its skeleton until the
   // folder list is in (and render folder-tile skeletons above it), so the
@@ -455,6 +489,20 @@ export function AssetsListPage() {
             </div>
           </div>
         )}
+
+        {!isLoading && !isSwitching && totalItems > pageSize ? (
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+            className="mt-3"
+          />
+        ) : null}
       </div>
 
       <AssetBulkActionsBar
