@@ -32,6 +32,7 @@ interface FieldMappingRow {
   direction: ApiDirection;
   isMatchKey: boolean;
   version: number;
+  endpointId: string | null;
 }
 
 interface RemoteFieldRow {
@@ -153,6 +154,21 @@ export function MappingScreen({ embedded = false }: { embedded?: boolean } = {})
 
   const [newTarget, setNewTarget] = useState('');
   const [newPath, setNewPath] = useState('');
+  const [newEndpoint, setNewEndpoint] = useState('');
+
+  const allEndpoints = endpointsQuery.result.data;
+  const endpointLabel = useCallback(
+    (endpointId: string | null): string | null => {
+      if (endpointId === null) {
+        return null;
+      }
+      const endpoint = allEndpoints.find((e) => e.id === endpointId);
+      return endpoint === undefined
+        ? endpointId
+        : `${endpoint.httpMethod} ${endpoint.pathTemplate} · ${endpoint.role}`;
+    },
+    [allEndpoints],
+  );
 
   function refresh(): void {
     void mappingsQuery.query.refetch();
@@ -171,6 +187,7 @@ export function MappingScreen({ embedded = false }: { embedded?: boolean } = {})
           remoteFieldPath: newPath.trim(),
           direction: 'inbound',
           isMatchKey: false,
+          endpoint: newEndpoint === '' ? null : newEndpoint,
         },
         successNotification: false,
       },
@@ -294,7 +311,25 @@ export function MappingScreen({ embedded = false }: { embedded?: boolean } = {})
                 </div>
               ) : null}
 
-              <div className="mt-2 flex justify-end">
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2 text-[11px] text-zinc-500">
+                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-zinc-500">
+                    {t('api_configurator.mapping.endpoint_scope')}
+                  </span>
+                  <select
+                    value={m.endpointId ?? ''}
+                    onChange={(e) => patch(m.id, { endpoint: e.target.value })}
+                    aria-label={t('api_configurator.mapping.endpoint_scope')}
+                    className="focus-ring h-7 max-w-[280px] truncate rounded-md border border-zinc-200 bg-white px-1.5 text-[11px]"
+                  >
+                    <option value="">{t('api_configurator.mapping.endpoint_all')}</option>
+                    {allEndpoints.map((ep) => (
+                      <option key={ep.id} value={ep.id}>
+                        {endpointLabel(ep.id)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <button
                   type="button"
                   onClick={() =>
@@ -311,7 +346,7 @@ export function MappingScreen({ embedded = false }: { embedded?: boolean } = {})
         })}
       </div>
 
-      <div className="grid grid-cols-1 items-end gap-3 rounded-xl border border-dashed border-zinc-300 p-4 lg:grid-cols-[1fr_1fr_auto]">
+      <div className="grid grid-cols-1 items-end gap-3 rounded-xl border border-dashed border-zinc-300 p-4 lg:grid-cols-[1fr_1fr_220px_auto]">
         <Input
           value={newTarget}
           onChange={(e) => setNewTarget(e.target.value)}
@@ -338,6 +373,19 @@ export function MappingScreen({ embedded = false }: { embedded?: boolean } = {})
             <option key={field.path} value={field.path} />
           ))}
         </datalist>
+        <select
+          value={newEndpoint}
+          onChange={(e) => setNewEndpoint(e.target.value)}
+          aria-label={t('api_configurator.mapping.endpoint_scope')}
+          className="focus-ring h-9 truncate rounded-xl border border-zinc-200 bg-white px-2 text-[12px]"
+        >
+          <option value="">{t('api_configurator.mapping.endpoint_all')}</option>
+          {allEndpoints.map((ep) => (
+            <option key={ep.id} value={ep.id}>
+              {endpointLabel(ep.id)}
+            </option>
+          ))}
+        </select>
         <Button type="button" onClick={addMapping}>
           <Plus className="mr-1 size-4" aria-hidden="true" />
           {t('api_configurator.mapping.add')}

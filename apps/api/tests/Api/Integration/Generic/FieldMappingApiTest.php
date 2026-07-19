@@ -64,6 +64,51 @@ final class FieldMappingApiTest extends ApiConfiguratorApiTestCase
     }
 
     #[Test]
+    public function postCreatesEndpointScopedMapping(): void
+    {
+        // #2634 — a mapping may be scoped to one endpoint (RPC operations shape
+        // the payload per method); null scope keeps the applies-to-all default.
+        $connectionId = $this->createConnection();
+        $endpointId = $this->createEndpoint($connectionId);
+
+        $body = $this->createMapping($connectionId, [
+            'direction' => 'outbound',
+            'endpoint' => $endpointId,
+        ]);
+
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame($endpointId, $body['endpointId'] ?? null);
+    }
+
+    #[Test]
+    public function postMappingRejectsEndpointOfAnotherConnection(): void
+    {
+        $connectionId = $this->createConnection();
+        $otherEndpointId = $this->createEndpoint($this->createConnection('beta'));
+
+        $this->createMapping($connectionId, ['endpoint' => $otherEndpointId]);
+
+        self::assertResponseStatusCodeSame(422);
+    }
+
+    #[Test]
+    public function patchClearsEndpointScopeWithEmptyString(): void
+    {
+        $connectionId = $this->createConnection();
+        $endpointId = $this->createEndpoint($connectionId);
+        $id = $this->createMapping($connectionId, ['endpoint' => $endpointId])['id'] ?? null;
+        \assert(\is_string($id));
+
+        $body = $this->authenticatedClient()->request('PATCH', '/api/field_mappings/'.$id, [
+            'headers' => ['content-type' => self::MERGE_PATCH],
+            'body' => json_encode(['endpoint' => ''], JSON_THROW_ON_ERROR),
+        ])->toArray();
+
+        self::assertResponseStatusCodeSame(200);
+        self::assertNull($body['endpointId'] ?? null);
+    }
+
+    #[Test]
     public function deleteMappingThenGetIs404(): void
     {
         $connectionId = $this->createConnection();
@@ -174,6 +219,24 @@ final class FieldMappingApiTest extends ApiConfiguratorApiTestCase
                 'name' => ucfirst($code),
                 'baseUrl' => 'https://api.idosell.com',
                 'authType' => 'none',
+            ], JSON_THROW_ON_ERROR),
+        ])->toArray(false);
+
+        $id = $body['id'] ?? null;
+        \assert(\is_string($id));
+
+        return $id;
+    }
+
+    private function createEndpoint(string $connectionId): string
+    {
+        $body = $this->authenticatedClient()->request('POST', '/api/remote_endpoints', [
+            'headers' => ['content-type' => self::LD_JSON],
+            'body' => json_encode([
+                'connection' => $connectionId,
+                'role' => 'write_create',
+                'httpMethod' => 'POST',
+                'pathTemplate' => '/connector.php',
             ], JSON_THROW_ON_ERROR),
         ])->toArray(false);
 

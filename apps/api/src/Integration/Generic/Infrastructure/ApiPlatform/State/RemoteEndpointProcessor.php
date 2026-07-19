@@ -83,6 +83,7 @@ final readonly class RemoteEndpointProcessor implements ProcessorInterface
         $endpoint->setRequestBodyTemplate($data->requestBodyTemplate);
         $endpoint->setPagination($data->pagination);
         $endpoint->setRecordSelector($data->recordSelector);
+        $endpoint->setRequestFormat($data->requestFormat);
         $endpoint->setResponseFormat($data->responseFormat);
 
         $this->endpoints->save($endpoint);
@@ -122,6 +123,9 @@ final readonly class RemoteEndpointProcessor implements ProcessorInterface
         }
         if (null !== $data->recordSelector) {
             $endpoint->setRecordSelector($data->recordSelector);
+        }
+        if (null !== $data->requestFormat) {
+            $endpoint->setRequestFormat($data->requestFormat);
         }
         if (null !== $data->responseFormat) {
             $endpoint->setResponseFormat($data->responseFormat);

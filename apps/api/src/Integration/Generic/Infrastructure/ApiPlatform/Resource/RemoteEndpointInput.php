@@ -53,6 +53,10 @@ final class RemoteEndpointInput
     #[Groups(['remote_endpoint:create'])]
     public ?string $recordSelector = null;
 
+    #[Assert\Choice(choices: ['json', 'form'])]
+    #[Groups(['remote_endpoint:create'])]
+    public string $requestFormat = 'json';
+
     #[Assert\Choice(choices: ['json'])]
     #[Groups(['remote_endpoint:create'])]
     public string $responseFormat = 'json';

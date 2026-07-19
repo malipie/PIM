@@ -52,6 +52,41 @@
   `POST /api/connections/{id}/mappings/validate` — ostrzega przy niezgodności
   typów. Mapowanie ma kierunek (`inbound` / `outbound` / `both`) i flagę
   `matchKey` (po czym dopasowujemy istniejący obiekt przy upsercie).
+- **Scope per endpoint (#2634)**: mapowanie może być opcjonalnie przypięte do
+  jednego endpointu (`endpoint` w input/patch; pusty string w PATCH czyści
+  scope). Bez scope'u mapowanie dotyczy wszystkich endpointów połączenia.
+  Potrzebne dla API typu RPC, gdzie każda operacja (metoda) ma inny kształt
+  payloadu — silniki sync filtrują mapowania po endpoincie wiązania. Usunięcie
+  endpointu usuwa jego mapowania (DB cascade) — osierocony scope nie może po
+  cichu rozszerzyć się na wszystkie operacje.
+
+### A.4a API typu RPC (BaseLinker) — form body + statyczna koperta (#2634)
+
+Endpointy zapisu mają `requestFormat` (`json` — domyślny surowy JSON, lub
+`form` — `application/x-www-form-urlencoded`, gdzie zagnieżdżone obiekty są
+wysyłane jako JSON-stringi) oraz `requestBodyTemplate` — statyczną kopertę
+scalaną z payloadem z mapowań (`array_replace_recursive`; mapowanie wygrywa
+kolizję klucza). Odpowiedzi `HTTP 200` z `{"status":"ERROR",…}` są
+klasyfikowane jako błąd rekordu (`RemoteResponseInspector`).
+
+Przepis dla BaseLinkera (`https://api.baselinker.com`, auth `api_key`
+z nagłówkiem `X-BLToken`):
+
+1. **Endpoint zapisu**: rola `write_create`, `POST /connector.php`,
+   format `form`, szablon
+   `{"method":"addInventoryProduct","parameters":{"inventory_id":<ID>}}`.
+2. **Mapowania** (kierunek outbound, scope na ten endpoint lub bez scope'u):
+   `sku → $.parameters.sku` (match key),
+   `name → $.parameters.text_fields.name`, itd.
+3. **Wiązanie**: kierunek Outbound (push), endpoint zapisu z pkt 1, filtr
+   wysyłki wg potrzeb.
+4. Na drucie wychodzi `method=addInventoryProduct&parameters={…}` — dokładnie
+   kontrakt connector.php.
+
+**Ograniczenie (follow-up)**: PIM nie przechowuje zdalnych ID —
+`addInventoryProduct` bez `product_id` zawsze tworzy nowy rekord, więc ponowny
+pełny push zduplikuje katalog po stronie BaseLinkera. Do czasu ticketu na
+przechwytywanie zdalnych ID: jednorazowy initial push + zawężony filtr wysyłki.
 
 ### A.5 Synchronizacja: powiązanie + harmonogram
 

@@ -40,6 +40,21 @@ final readonly class RemoteResponseInspector
             return null;
         }
 
+        // RPC-style status envelope (BaseLinker): HTTP 200 with
+        // `{"status":"ERROR","error_code":…,"error_message":…}` (#2634).
+        if ('ERROR' === ($decoded['status'] ?? null)) {
+            $message = $decoded['error_message'] ?? null;
+            if (\is_string($message) && '' !== trim($message)) {
+                return trim($message);
+            }
+            $code = $decoded['error_code'] ?? null;
+            if ((\is_string($code) && '' !== trim($code)) || \is_int($code)) {
+                return \sprintf('error_code %s', (string) $code);
+            }
+
+            return 'remote returned status ERROR';
+        }
+
         // Top-level `error` string (common REST shape).
         $error = $decoded['error'] ?? null;
         if (\is_string($error) && '' !== trim($error)) {

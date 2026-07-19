@@ -47,6 +47,11 @@
             </options>
         </field>
         <field name="recordSelector" type="string" length="512" column="record_selector" nullable="true"/>
+        <field name="requestFormat" type="string" length="16" column="request_format">
+            <options>
+                <option name="default">json</option>
+            </options>
+        </field>
         <field name="responseFormat" type="string" length="16" column="response_format">
             <options>
                 <option name="default">json</option>

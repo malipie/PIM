@@ -11,14 +11,17 @@ use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
 use App\Integration\Generic\Domain\Entity\Connection;
 use App\Integration\Generic\Domain\Entity\FieldMapping;
+use App\Integration\Generic\Domain\Entity\RemoteEndpoint;
 use App\Integration\Generic\Domain\Enum\MappingDirection;
 use App\Integration\Generic\Domain\Repository\ConnectionRepositoryInterface;
 use App\Integration\Generic\Domain\Repository\FieldMappingRepositoryInterface;
+use App\Integration\Generic\Domain\Repository\RemoteEndpointRepositoryInterface;
 use App\Integration\Generic\Infrastructure\ApiPlatform\Resource\FieldMappingInput;
 use App\Integration\Generic\Infrastructure\ApiPlatform\Resource\FieldMappingPatchInput;
 use InvalidArgumentException;
 use LogicException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -34,6 +37,7 @@ final readonly class FieldMappingProcessor implements ProcessorInterface
     public function __construct(
         private ConnectionRepositoryInterface $connections,
         private FieldMappingRepositoryInterface $mappings,
+        private RemoteEndpointRepositoryInterface $endpoints,
     ) {
     }
 
@@ -75,6 +79,9 @@ final readonly class FieldMappingProcessor implements ProcessorInterface
             MappingDirection::from($data->direction),
         );
         $mapping->setMatchKey($data->isMatchKey);
+        if (null !== $data->endpoint && '' !== $data->endpoint) {
+            $mapping->setEndpoint($this->requireEndpointOf($connection, $data->endpoint));
+        }
 
         $this->mappings->save($mapping);
 
@@ -109,6 +116,12 @@ final readonly class FieldMappingProcessor implements ProcessorInterface
             $mapping->setMatchKey($data->isMatchKey);
             $changed = true;
         }
+        if (null !== $data->endpoint) {
+            $mapping->setEndpoint(
+                '' === $data->endpoint ? null : $this->requireEndpointOf($mapping->getConnection(), $data->endpoint),
+            );
+            $changed = true;
+        }
 
         if ($changed) {
             $mapping->bumpVersion();
@@ -117,6 +130,20 @@ final readonly class FieldMappingProcessor implements ProcessorInterface
         $this->mappings->save($mapping);
 
         return $mapping;
+    }
+
+    /** Resolves the endpoint tenant-scoped and requires it on the same connection (422 otherwise). */
+    private function requireEndpointOf(Connection $connection, string $id): RemoteEndpoint
+    {
+        $endpoint = $this->endpoints->findById($this->parseId($id, 'endpoint'));
+        if (!$endpoint instanceof RemoteEndpoint) {
+            throw new NotFoundHttpException('RemoteEndpoint was not found.');
+        }
+        if (!$endpoint->getConnectionId()->equals($connection->getId())) {
+            throw new UnprocessableEntityHttpException('Endpoint belongs to a different connection.');
+        }
+
+        return $endpoint;
     }
 
     private function requireConnection(string $id): Connection

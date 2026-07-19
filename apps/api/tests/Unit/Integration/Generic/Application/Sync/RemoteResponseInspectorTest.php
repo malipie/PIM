@@ -43,5 +43,18 @@ final class RemoteResponseInspectorTest extends TestCase
         yield 'idosell fault code only' => ['{"errors":{"faultCode":7,"faultString":""}}', 'faultCode 7'];
         yield 'top-level error string' => ['{"error":"unauthorized"}', 'unauthorized'];
         yield 'errors list' => ['{"errors":["bad sku","bad price"]}', 'remote returned 2 error(s)'];
+
+        // BaseLinker-style RPC status envelope (#2634).
+        yield 'baselinker success' => ['{"status":"SUCCESS","product_id":123}', null];
+        yield 'baselinker non-error status' => ['{"status":"draft"}', null];
+        yield 'baselinker error message' => [
+            '{"status":"ERROR","error_code":"ERROR_AUTH_TOKEN","error_message":"Invalid token"}',
+            'Invalid token',
+        ];
+        yield 'baselinker error code only' => [
+            '{"status":"ERROR","error_code":"ERROR_UNKNOWN_METHOD"}',
+            'error_code ERROR_UNKNOWN_METHOD',
+        ];
+        yield 'baselinker bare error status' => ['{"status":"ERROR"}', 'remote returned status ERROR'];
     }
 }

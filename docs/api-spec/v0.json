@@ -25532,6 +25532,14 @@
                         "readOnly": true,
                         "type": "string",
                         "format": "uuid"
+                    },
+                    "endpointId": {
+                        "readOnly": true,
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid"
                     }
                 },
                 "required": [
@@ -25574,6 +25582,13 @@
                     "isMatchKey": {
                         "default": false,
                         "type": "boolean"
+                    },
+                    "endpoint": {
+                        "description": "Optional endpoint scope (#2634): UUID of a RemoteEndpoint belonging to the\nsame connection. Null = the mapping applies to every endpoint.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     }
                 }
             },
@@ -25609,6 +25624,13 @@
                     "isMatchKey": {
                         "type": [
                             "boolean",
+                            "null"
+                        ]
+                    },
+                    "endpoint": {
+                        "description": "Optional endpoint scope (#2634). Null = leave unchanged; empty string =\nclear the scope (mapping applies to every endpoint again); UUID = scope\nto that endpoint of the same connection.",
+                        "type": [
+                            "string",
                             "null"
                         ]
                     }
@@ -25681,6 +25703,14 @@
                             "connectionId": {
                                 "readOnly": true,
                                 "type": "string",
+                                "format": "uuid"
+                            },
+                            "endpointId": {
+                                "readOnly": true,
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
                                 "format": "uuid"
                             }
                         },
@@ -27546,7 +27576,7 @@
                         }
                     },
                     "requestBodyTemplate": {
-                        "description": "Request-body template for write roles (placeholders resolved at sync\ntime); null for read roles.",
+                        "description": "Static request-body envelope for write roles (constants such as an RPC\n`method` name; outbound field mappings are merged over it at sync time);\nnull for read roles.",
                         "type": [
                             "object",
                             "null"
@@ -27557,6 +27587,15 @@
                                 "null"
                             ]
                         }
+                    },
+                    "requestFormat": {
+                        "enum": [
+                            "json",
+                            "form"
+                        ],
+                        "description": "Wire format of the outbound request body: `json` (raw JSON) or `form`\n(application/x-www-form-urlencoded with nested objects sent as JSON\nstrings \u2014 the shape RPC-style APIs like BaseLinker expect).",
+                        "default": "json",
+                        "type": "string"
                     },
                     "pagination": {
                         "description": "Pagination envelope: `{strategy, ...params}`. Defaults to no paging; the\nconcrete strategies (offset/page/cursor/link_header) are read in\nAPIC-P2-03.",
@@ -27682,6 +27721,14 @@
                             "null"
                         ]
                     },
+                    "requestFormat": {
+                        "enum": [
+                            "json",
+                            "form"
+                        ],
+                        "default": "json",
+                        "type": "string"
+                    },
                     "responseFormat": {
                         "enum": [
                             "json"
@@ -27767,6 +27814,16 @@
                             "null"
                         ]
                     },
+                    "requestFormat": {
+                        "enum": [
+                            "json",
+                            "form"
+                        ],
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "responseFormat": {
                         "enum": [
                             "json"
@@ -27823,7 +27880,7 @@
                                 }
                             },
                             "requestBodyTemplate": {
-                                "description": "Request-body template for write roles (placeholders resolved at sync\ntime); null for read roles.",
+                                "description": "Static request-body envelope for write roles (constants such as an RPC\n`method` name; outbound field mappings are merged over it at sync time);\nnull for read roles.",
                                 "type": [
                                     "object",
                                     "null"
@@ -27834,6 +27891,15 @@
                                         "null"
                                     ]
                                 }
+                            },
+                            "requestFormat": {
+                                "enum": [
+                                    "json",
+                                    "form"
+                                ],
+                                "description": "Wire format of the outbound request body: `json` (raw JSON) or `form`\n(application/x-www-form-urlencoded with nested objects sent as JSON\nstrings \u2014 the shape RPC-style APIs like BaseLinker expect).",
+                                "default": "json",
+                                "type": "string"
                             },
                             "pagination": {
                                 "description": "Pagination envelope: `{strategy, ...params}`. Defaults to no paging; the\nconcrete strategies (offset/page/cursor/link_header) are read in\nAPIC-P2-03.",
