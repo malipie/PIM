@@ -1,5 +1,5 @@
 import { Send } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AdvancedFilterPanel } from '@/components/catalog/advanced-filter-panel';
@@ -33,22 +33,33 @@ export function OutboundFilterSection({
   const [matchOperator, setMatchOperator] = useState<'AND' | 'OR'>('AND');
   const [open, setOpen] = useState(false);
 
+  // The panel's apply calls setConditions and setMatchOperator back-to-back in
+  // one event (#2637). Deriving the second commit from this component's state
+  // would read the stale pre-render value and wipe the DSL the first commit
+  // just reported, so the last committed pair lives in refs and every commit
+  // reads from them.
+  const conditionsRef = useRef<FilterCondition[]>([]);
+  const operatorRef = useRef<'AND' | 'OR'>('AND');
+
   // Hydrate the flat editor from the stored DSL. A nested (AND/OR-of-groups)
   // DSL can't render flat; fall back to an empty editor (the stored filter
   // still applies on the backend until re-saved).
   useEffect(() => {
-    setConditions(dslToFlatConditions(dsl) ?? []);
-    setMatchOperator(
+    conditionsRef.current = dslToFlatConditions(dsl) ?? [];
+    operatorRef.current =
       dsl !== null && typeof dsl === 'object' && 'operator' in dsl && dsl.operator === 'OR'
         ? 'OR'
-        : 'AND',
-    );
+        : 'AND';
+    setConditions(conditionsRef.current);
+    setMatchOperator(operatorRef.current);
   }, [dsl]);
 
-  const commit = (next: FilterCondition[], operator: 'AND' | 'OR'): void => {
-    setConditions(next);
-    setMatchOperator(operator);
-    onDslChange(conditionsToDsl(next, operator));
+  const commit = (next?: FilterCondition[], operator?: 'AND' | 'OR'): void => {
+    if (next !== undefined) conditionsRef.current = next;
+    if (operator !== undefined) operatorRef.current = operator;
+    setConditions(conditionsRef.current);
+    setMatchOperator(operatorRef.current);
+    onDslChange(conditionsToDsl(conditionsRef.current, operatorRef.current));
   };
 
   return (
@@ -105,9 +116,9 @@ export function OutboundFilterSection({
         <AdvancedFilterPanel
           open={open}
           conditions={conditions}
-          setConditions={(next) => commit(next, matchOperator)}
+          setConditions={(next) => commit(next)}
           matchOperator={matchOperator}
-          setMatchOperator={(operator) => commit(conditions, operator)}
+          setMatchOperator={(operator) => commit(undefined, operator)}
           onApply={() => setOpen(false)}
           onClose={() => setOpen(false)}
           onClear={() => {
