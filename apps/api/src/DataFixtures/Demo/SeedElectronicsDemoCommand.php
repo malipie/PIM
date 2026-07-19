@@ -163,6 +163,7 @@ final class SeedElectronicsDemoCommand extends Command
      */
     private function purge(Tenant $tenant, SymfonyStyle $io): void
     {
+        // tenant-safe: explicit tenant_id filter in WHERE (demo tooling purge)
         $params = ['tenant' => $tenant->getId()->toRfc4122()];
         $objects = $this->connection->executeStatement('DELETE FROM objects WHERE tenant_id = :tenant', $params);
         $assets = $this->connection->executeStatement('DELETE FROM assets WHERE tenant_id = :tenant', $params);
