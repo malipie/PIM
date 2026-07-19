@@ -41,6 +41,7 @@ interface SyncBindingRow {
 interface ObjectTypeRow {
   id: string;
   code: string;
+  kind?: string;
 }
 
 const HUB = '/integrations/api-configurator/connections';
@@ -416,7 +417,16 @@ export function SyncConfigScreen({ embedded = false }: { embedded?: boolean } = 
 
         {/* #2549 — outbound scope; absent for inbound (no PIM-side import filter). */}
         {dir !== 'inbound' ? (
-          <OutboundFilterSection dsl={outboundFilterDsl} onDslChange={setOutboundFilterDsl} />
+          <OutboundFilterSection
+            dsl={outboundFilterDsl}
+            onDslChange={setOutboundFilterDsl}
+            objectType={
+              binding === null
+                ? null
+                : (objectTypesQuery.result.data.find((ot) => ot.id === binding.objectTypeId) ??
+                  null)
+            }
+          />
         ) : null}
 
         {/* Conflict — bidirectional only */}

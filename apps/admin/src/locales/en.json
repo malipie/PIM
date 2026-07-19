@@ -2635,6 +2635,12 @@
         "saved": "Binding saved.",
         "run_started": "Sync started.",
         "error": "Action failed. Please try again."
+      },
+      "outbound_filter": {
+        "count_loading": "Counting objects…",
+        "count_preview_one": "object will be pushed",
+        "count_preview_other": "objects will be pushed",
+        "count_note": "search-index preview"
       }
     },
     "detail": {

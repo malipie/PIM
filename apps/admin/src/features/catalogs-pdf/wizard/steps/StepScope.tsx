@@ -1,9 +1,9 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AdvancedFilterPanel } from '@/components/catalog/advanced-filter-panel';
-import { useCatalogSearch } from '@/features/catalog/search/use-catalog-search';
-import { dslToBase64 } from '@/lib/filters/url-serializer';
+import { useFilterMatchCount } from '@/features/catalog/search/use-filter-match-count';
+import type { FilterCondition } from '@/lib/filters/filter-dsl';
 import { useFilterDslState } from '@/lib/filters/use-filter-dsl-state';
 import { cn } from '@/lib/utils';
 
@@ -30,22 +30,18 @@ export function StepScope() {
     dispatch({ type: 'SET_FILTER', filterDsl: filter.dsl });
   }, [filter.dsl, dispatch]);
 
-  // #2567 — count the products the current filter selects (empty = all).
-  const filterBlob = useMemo<string | undefined>(() => {
-    if (filter.dsl === null) return undefined;
-    try {
-      return dslToBase64(filter.dsl);
-    } catch {
-      return undefined;
-    }
-  }, [filter.dsl]);
-  const { result: countResult, isLoading: countLoading } = useCatalogSearch({
-    kind: 'products',
-    query: '',
-    filterBlob,
-    perPage: 1,
-  });
-  const matchCount = countResult?.totalHits;
+  // #2567 / #2640 — live count of the selected products. Counts from the
+  // panel's DRAFT (via onDraftChange), so the number reacts while the operator
+  // types — before "Zastosuj filtr" commits the DSL to the wizard store.
+  const [draft, setDraft] = useState<{
+    conditions: FilterCondition[];
+    operator: 'AND' | 'OR';
+  }>({ conditions: filter.conditions, operator: filter.matchOperator });
+  const { count: matchCount, isLoading: countLoading } = useFilterMatchCount(
+    { kind: 'products' },
+    draft.conditions,
+    draft.operator,
+  );
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-surface p-7 shadow-card">
@@ -64,6 +60,7 @@ export function StepScope() {
           onApply={() => dispatch({ type: 'SET_FILTER', filterDsl: filter.dsl })}
           onClose={() => undefined}
           onClear={filter.clear}
+          onDraftChange={(conditions, operator) => setDraft({ conditions, operator })}
         />
       </div>
 
