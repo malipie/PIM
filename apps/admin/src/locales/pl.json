@@ -2447,7 +2447,8 @@
       "empty_title": "Brak połączeń",
       "empty_desc": "Dodaj pierwsze połączenie z zewnętrznym API, aby PIM mógł pobierać i wysyłać dane.",
       "no_matches_title": "Brak wyników",
-      "no_matches_desc": "Żadne połączenie nie pasuje do filtra lub frazy wyszukiwania."
+      "no_matches_desc": "Żadne połączenie nie pasuje do filtra lub frazy wyszukiwania.",
+      "edit": "Edytuj połączenie {{name}}"
     },
     "wizard": {
       "title": "Nowe połączenie",
@@ -2534,7 +2535,10 @@
         "accept": "Zapisz pola ({{count}})",
         "saving": "Zapisywanie…",
         "saved": "Pola zapisane"
-      }
+      },
+      "edit_title": "Edytuj połączenie",
+      "edit_subtitle": "Zmiany zapisują się na istniejącym połączeniu — kod pozostaje niezmienny.",
+      "credentials_keep_note": "Poświadczenia są tylko do zapisu — zostaw pola puste, aby zachować obecne."
     },
     "mapping": {
       "title": "Mapowanie pól",

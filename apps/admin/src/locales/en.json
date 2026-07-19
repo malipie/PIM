@@ -2433,7 +2433,8 @@
       "empty_title": "No connections",
       "empty_desc": "Add your first external-API connection so PIM can pull and push data.",
       "no_matches_title": "No results",
-      "no_matches_desc": "No connection matches the current filter or search query."
+      "no_matches_desc": "No connection matches the current filter or search query.",
+      "edit": "Edit connection {{name}}"
     },
     "wizard": {
       "title": "New connection",
@@ -2520,7 +2521,10 @@
         "accept": "Save fields ({{count}})",
         "saving": "Saving…",
         "saved": "Fields saved"
-      }
+      },
+      "edit_title": "Edit connection",
+      "edit_subtitle": "Changes are saved onto the existing connection — the code stays immutable.",
+      "credentials_keep_note": "Credentials are write-only — leave the fields blank to keep the current ones."
     },
     "mapping": {
       "title": "Field mapping",

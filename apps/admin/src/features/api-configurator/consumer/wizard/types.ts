@@ -110,3 +110,62 @@ export function toConnectionInput(form: WizardForm): Record<string, unknown> {
     rateLimitHint: Number.isFinite(rate) && rate > 0 ? rate : null,
   };
 }
+
+/**
+ * #2630 — true when the user actually typed a secret for the selected auth
+ * scheme. The API never returns credentials (write-only), so in edit mode the
+ * fields start blank and a PATCH must omit `credentials` entirely unless new
+ * ones were entered — otherwise the stored secret would be rotated to blanks.
+ */
+export function hasCredentialInput(form: WizardForm): boolean {
+  switch (form.authType) {
+    case 'api_key':
+      return form.apiKeyValue.trim() !== '';
+    case 'bearer':
+      return form.bearer.trim() !== '';
+    case 'oauth2_token':
+      return form.oauthToken.trim() !== '';
+    case 'basic':
+      return form.basicUser.trim() !== '' || form.basicPass.trim() !== '';
+    default:
+      return false;
+  }
+}
+
+/**
+ * #2630 — RFC 7396 PATCH body for an existing connection: `code` is immutable
+ * (omitted) and `credentials` ride along only when the user typed new ones.
+ */
+export function toConnectionPatch(form: WizardForm): Record<string, unknown> {
+  const { code: _code, credentials, ...rest } = toConnectionInput(form);
+  return hasCredentialInput(form) ? { ...rest, credentials } : rest;
+}
+
+/** The subset of `GET /api/connections/{id}` the wizard prefills from. */
+export interface ConnectionPrefill {
+  code: string;
+  name: string;
+  baseUrl: string;
+  authType: AuthType;
+  defaultHeaders?: Record<string, string> | null;
+  rateLimitHint?: number | null;
+}
+
+/**
+ * #2630 — maps a persisted connection onto the wizard form for edit mode.
+ * Credential fields stay blank (the API is write-only for secrets); the
+ * api_key header name is part of the credentials map, so it falls back to the
+ * INITIAL_FORM default.
+ */
+export function connectionToForm(row: ConnectionPrefill): WizardForm {
+  const headers = Object.entries(row.defaultHeaders ?? {}).map(([k, v]) => ({ k, v }));
+  return {
+    ...INITIAL_FORM,
+    name: row.name,
+    code: row.code,
+    baseUrl: row.baseUrl,
+    authType: row.authType,
+    headers: headers.length > 0 ? headers : [{ k: '', v: '' }],
+    rateLimit: row.rateLimitHint != null ? String(row.rateLimitHint) : '',
+  };
+}

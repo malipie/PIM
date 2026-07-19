@@ -10,6 +10,8 @@ import { slugify, type WizardForm } from './types';
 interface StepConnectionProps {
   form: WizardForm;
   set: (patch: Partial<WizardForm>) => void;
+  /** #2630 — edit mode: `code` is immutable and credential fields start blank. */
+  isEdit?: boolean;
 }
 
 /**
@@ -17,7 +19,7 @@ interface StepConnectionProps {
  * conditional credential fields, default headers and the SSRF/encryption note.
  * Credentials are write-only (never returned by the API) and stored AES-GCM.
  */
-export function StepConnection({ form, set }: StepConnectionProps) {
+export function StepConnection({ form, set, isEdit = false }: StepConnectionProps) {
   const { t } = useTranslation();
 
   const authOptions: ReadonlyArray<{ value: AuthType; label: string }> = [
@@ -41,7 +43,13 @@ export function StepConnection({ form, set }: StepConnectionProps) {
         <Field label={t('api_configurator.wizard.name')} required>
           <Input
             value={form.name}
-            onChange={(e) => set({ name: e.target.value, code: slugify(e.target.value) })}
+            onChange={(e) =>
+              set(
+                isEdit
+                  ? { name: e.target.value }
+                  : { name: e.target.value, code: slugify(e.target.value) },
+              )
+            }
             placeholder={t('api_configurator.wizard.name_placeholder')}
             aria-label={t('api_configurator.wizard.name')}
           />
@@ -55,6 +63,7 @@ export function StepConnection({ form, set }: StepConnectionProps) {
             onChange={(e) => set({ code: e.target.value })}
             placeholder="nexar-components"
             className="font-mono"
+            disabled={isEdit}
             aria-label={t('api_configurator.wizard.code')}
           />
         </Field>
@@ -85,6 +94,11 @@ export function StepConnection({ form, set }: StepConnectionProps) {
               onChange={(authType) => set({ authType })}
             />
           </Field>
+          {isEdit && form.authType !== 'none' ? (
+            <p className="mt-2 text-[12px] text-zinc-500">
+              {t('api_configurator.wizard.credentials_keep_note')}
+            </p>
+          ) : null}
         </div>
 
         {form.authType === 'api_key' ? (
