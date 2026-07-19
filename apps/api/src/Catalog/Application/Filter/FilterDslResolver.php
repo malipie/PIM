@@ -9,6 +9,8 @@ use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Throwable;
 
+use const JSON_THROW_ON_ERROR;
+
 /**
  * VIEW-09 (#535) — Filter DSL resolver.
  *
@@ -360,8 +362,27 @@ final class FilterDslResolver
             throw new RuntimeException('Condition missing attr or op.');
         }
 
-        $left = $this->resolveLeftExpression($attr);
+        // #2627 — `attributes_indexed` slots are ENVELOPES ({value}, {amount,
+        // currency}, {option_code}, ...), so the SQL path must descend into
+        // the typed key and cast numerics; the bare `->>'attr'` text lookup
+        // compares the JSON body itself (numeric ops crash Postgres with
+        // `text < integer`, text ops silently never match). Type comes from
+        // the metadata resolver; without one (unit tests, unknown attr) the
+        // legacy expression is kept so behavior degrades, never regresses.
+        $type = $this->envelopeType($attr);
         $canonical = self::normaliseOperator($op);
+
+        if ('multiselect' === $type) {
+            return $this->compileMultiselectCondition($attr, $canonical, $value, $op);
+        }
+
+        $left = $this->resolveLeftExpression($attr, $type);
+        $numeric = \in_array($type, ['price', 'number', 'metric'], true);
+        if ($numeric) {
+            $left = '('.$left.')::numeric';
+        } elseif ('boolean' === $type) {
+            $left = '('.$left.')::boolean';
+        }
 
         switch ($canonical) {
             case self::OP_IS_EMPTY:
@@ -371,10 +392,10 @@ final class FilterDslResolver
                 return $left.' IS NOT NULL';
 
             case self::OP_EQ:
-                return $left.' = '.$this->literal($value);
+                return $left.' = '.($numeric ? $this->scalarLiteral($value) : $this->literal($value));
 
             case self::OP_NEQ:
-                return $left.' <> '.$this->literal($value);
+                return $left.' <> '.($numeric ? $this->scalarLiteral($value) : $this->literal($value));
 
             case self::OP_LT:
             case self::OP_BEFORE:
@@ -614,7 +635,22 @@ final class FilterDslResolver
         return implode(', ', array_map($this->meiliLiteral(...), $value));
     }
 
-    private function resolveLeftExpression(string $attr): string
+    /**
+     * Attribute type used to pick the envelope key + cast, or null when the
+     * attribute maps to a physical column, is a dotted locale path, or no
+     * metadata resolver is wired (unit tests) — null keeps the legacy
+     * expression.
+     */
+    private function envelopeType(string $attr): ?string
+    {
+        if (isset(self::COLUMN_MAP[$attr]) || str_contains($attr, '.')) {
+            return null;
+        }
+
+        return $this->attributeMetadata?->getAttributeType($attr);
+    }
+
+    private function resolveLeftExpression(string $attr, ?string $type = null): string
     {
         if (isset(self::COLUMN_MAP[$attr])) {
             return self::COLUMN_MAP[$attr];
@@ -629,10 +665,66 @@ final class FilterDslResolver
             return "NULLIF((co.attributes_indexed->'$baseEsc'->>'$localeEsc'), '')";
         }
 
-        // Standard JSONB lookup with NULLIF to coerce empty strings to NULL.
         $attrEsc = $this->safeIdent($attr);
 
+        // #2627 — descend into the envelope key that matches the attribute
+        // type (ValueWriteCore::ALLOWED_KEYS shapes). Unknown type / no
+        // metadata → legacy top-level text lookup.
+        $valueKey = match ($type) {
+            'price' => 'amount',
+            'select' => 'option_code',
+            'asset' => 'asset_id',
+            'relation', 'reference' => 'object_id',
+            null => null,
+            default => 'value',
+        };
+        if (null !== $valueKey) {
+            return "NULLIF((co.attributes_indexed->'$attrEsc'->>'$valueKey'), '')";
+        }
+
+        // Standard JSONB lookup with NULLIF to coerce empty strings to NULL.
         return "NULLIF((co.attributes_indexed->>'$attrEsc'), '')";
+    }
+
+    /**
+     * Multiselect slots hold `{option_codes: ["a","b"]}` — membership tests
+     * ride JSONB containment (`@>`), never the `?` operator (it would be
+     * misread as a positional placeholder by consumers embedding this
+     * fragment in parametrised queries).
+     */
+    private function compileMultiselectCondition(string $attr, string $canonical, mixed $value, string $rawOp): string
+    {
+        $attrEsc = $this->safeIdent($attr);
+        $codesText = "NULLIF((co.attributes_indexed->'$attrEsc'->>'option_codes'), '[]')";
+        $codesJson = "co.attributes_indexed->'$attrEsc'->'option_codes'";
+
+        switch ($canonical) {
+            case self::OP_IS_EMPTY:
+                return $codesText.' IS NULL';
+
+            case self::OP_IS_NOT_EMPTY:
+                return $codesText.' IS NOT NULL';
+
+            case self::OP_CONTAINS:
+                return $codesJson.' @> '.$this->jsonbArrayLiteral($value);
+
+            case self::OP_NOT_CONTAINS:
+                // Rows without the attribute count as "does not contain".
+                return 'COALESCE(NOT ('.$codesJson.' @> '.$this->jsonbArrayLiteral($value).'), true)';
+
+            default:
+                throw new RuntimeException('Operator not supported for multiselect: '.$rawOp);
+        }
+    }
+
+    private function jsonbArrayLiteral(mixed $value): string
+    {
+        if (!\is_string($value) || '' === $value) {
+            throw new RuntimeException('Multiselect membership requires a non-empty string value.');
+        }
+        $encoded = json_encode([$value], JSON_THROW_ON_ERROR);
+
+        return "'".str_replace("'", "''", $encoded)."'::jsonb";
     }
 
     private function safeIdent(string $ident): string

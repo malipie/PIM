@@ -8,6 +8,7 @@ use App\Shared\Infrastructure\Messenger\IdempotencyMiddleware;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\Test;
 use ReflectionProperty;
+use RuntimeException;
 use stdClass;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Messenger\Envelope;
@@ -108,6 +109,83 @@ final class IdempotencyMiddlewareSelfHealTest extends KernelTestCase
             $this->countProcessedMessages($connection),
             'idempotency PK must still hold one row after the self-heal',
         );
+    }
+
+    /**
+     * #2627 — the marker used to be INSERTed BEFORE the handler ran, so a
+     * handler crash (or a dead worker) left it behind and every redelivery
+     * short-circuited into a silent ack: the message was swallowed forever
+     * (observed live: 5 PDF catalog runs stuck `pending`). The marker must
+     * be written only after the handler chain returns.
+     */
+    #[Test]
+    public function handlerCrashLeavesNoMarkerSoRedeliveryRunsHandler(): void
+    {
+        $connection = $this->connection();
+        $middleware = new IdempotencyMiddleware($connection);
+
+        $messageId = Uuid::v7()->toRfc4122();
+        $envelope = new Envelope(new stdClass())
+            ->with(new ConsumedByWorkerStamp())
+            ->with(new TransportMessageIdStamp($messageId));
+
+        $thrown = false;
+        try {
+            $middleware->handle($envelope, $this->throwingStack());
+        } catch (RuntimeException) {
+            $thrown = true;
+        }
+        self::assertTrue($thrown, 'the handler failure must propagate (retry/failure-transport semantics)');
+        self::assertSame(
+            0,
+            $this->countMarker($connection, $messageId),
+            'a crashed handling must NOT leave a processed marker behind',
+        );
+
+        $redelivery = new stdClass();
+        $redelivery->value = false;
+        $middleware->handle($envelope, $this->terminalStack($redelivery));
+        self::assertTrue($redelivery->value, 'redelivery after a crash must run the handler');
+        self::assertSame(1, $this->countMarker($connection, $messageId), 'a successful handling records the marker');
+
+        $duplicate = new stdClass();
+        $duplicate->value = false;
+        $middleware->handle($envelope, $this->terminalStack($duplicate));
+        self::assertFalse($duplicate->value, 'a completed message must still short-circuit duplicates');
+    }
+
+    private function countMarker(Connection $connection, string $messageId): int
+    {
+        $count = $connection->fetchOne(
+            'SELECT COUNT(*) FROM processed_messages WHERE message_id = :id',
+            ['id' => $messageId],
+        );
+
+        return (int) (\is_scalar($count) ? $count : 0);
+    }
+
+    /**
+     * A stack whose terminal handler always throws — the crash scenario.
+     */
+    private function throwingStack(): StackInterface
+    {
+        $terminal = new class implements MiddlewareInterface {
+            public function handle(Envelope $envelope, StackInterface $stack): Envelope
+            {
+                throw new RuntimeException('handler exploded mid-message');
+            }
+        };
+
+        return new class($terminal) implements StackInterface {
+            public function __construct(private readonly MiddlewareInterface $next)
+            {
+            }
+
+            public function next(): MiddlewareInterface
+            {
+                return $this->next;
+            }
+        };
     }
 
     private function connection(): Connection

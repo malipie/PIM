@@ -4,7 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Catalog;
 
+use App\Catalog\Application\Filter\AttributeMetadataResolver;
 use App\Catalog\Application\Filter\FilterDslResolver;
+use App\Catalog\Domain\AttributeType;
+use App\Catalog\Domain\Entity\Attribute;
+use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
+use App\Shared\Application\TenantContext;
+use App\Shared\Domain\Tenant;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
@@ -256,5 +262,172 @@ final class FilterDslResolverTest extends TestCase
 
         self::assertNotNull($sql);
         self::assertStringContainsString("NOT IN ('Bosch')", $sql);
+    }
+
+    // ── #2627 — type-aware envelope SQL ─────────────────────────────────
+    //
+    // `attributes_indexed` slots are envelopes ({value}, {amount, currency},
+    // {option_code}, {option_codes}); the SQL path must descend into the
+    // typed key and cast numerics, otherwise numeric comparisons crash
+    // Postgres (`text < integer` — the bug that wedged every PDF catalog
+    // run) and text comparisons silently never match.
+
+    public function testTypedPriceComparisonDescendsToAmountAndCastsNumeric(): void
+    {
+        $sql = $this->typedResolver(['price' => AttributeType::Price])
+            ->toCountSql(['attr' => 'price', 'op' => '<', 'value' => 200]);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("(NULLIF((co.attributes_indexed->'price'->>'amount'), ''))::numeric < 200", $sql);
+    }
+
+    public function testTypedPriceBetweenCastsNumeric(): void
+    {
+        $sql = $this->typedResolver(['price' => AttributeType::Price])
+            ->toCountSql(['attr' => 'price', 'op' => 'BETWEEN', 'value' => [100, 200]]);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("'price'->>'amount'", $sql);
+        self::assertStringContainsString('::numeric BETWEEN 100 AND 200', $sql);
+    }
+
+    public function testTypedNumberComparisonDescendsToValue(): void
+    {
+        $sql = $this->typedResolver(['refresh_rate' => AttributeType::Number])
+            ->toCountSql(['attr' => 'refresh_rate', 'op' => '>', 'value' => 120]);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("(NULLIF((co.attributes_indexed->'refresh_rate'->>'value'), ''))::numeric > 120", $sql);
+    }
+
+    public function testTypedMetricComparisonDescendsToValue(): void
+    {
+        $sql = $this->typedResolver(['weight' => AttributeType::Metric])
+            ->toCountSql(['attr' => 'weight', 'op' => '≤', 'value' => 2.5]);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("'weight'->>'value'", $sql);
+        self::assertStringContainsString('::numeric <= 2.5', $sql);
+    }
+
+    public function testTypedNumericEqualityUsesUnquotedLiteral(): void
+    {
+        $sql = $this->typedResolver(['price' => AttributeType::Price])
+            ->toCountSql(['attr' => 'price', 'op' => '=', 'value' => '199.99']);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString('::numeric = 199.99', $sql);
+        self::assertStringNotContainsString("'199.99'", $sql);
+    }
+
+    public function testTypedBooleanCastsAndComparesTrue(): void
+    {
+        $sql = $this->typedResolver(['in_stock' => AttributeType::Boolean])
+            ->toCountSql(['attr' => 'in_stock', 'op' => '= TRUE']);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("(NULLIF((co.attributes_indexed->'in_stock'->>'value'), ''))::boolean = true", $sql);
+    }
+
+    public function testTypedSelectDescendsToOptionCode(): void
+    {
+        $sql = $this->typedResolver(['color' => AttributeType::Select])
+            ->toCountSql(['attr' => 'color', 'op' => '=', 'value' => 'red']);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("NULLIF((co.attributes_indexed->'color'->>'option_code'), '') = 'red'", $sql);
+    }
+
+    public function testTypedTextDescendsToValue(): void
+    {
+        $sql = $this->typedResolver(['brand' => AttributeType::Text])
+            ->toCountSql(['attr' => 'brand', 'op' => '=', 'value' => 'Samsung']);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("NULLIF((co.attributes_indexed->'brand'->>'value'), '') = 'Samsung'", $sql);
+    }
+
+    public function testTypedDateAfterComparesIsoText(): void
+    {
+        $sql = $this->typedResolver(['release_date' => AttributeType::Date])
+            ->toCountSql(['attr' => 'release_date', 'op' => 'AFTER', 'value' => '2026-01-01']);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("NULLIF((co.attributes_indexed->'release_date'->>'value'), '') > '2026-01-01'", $sql);
+    }
+
+    public function testTypedMultiselectContainsUsesJsonbContainment(): void
+    {
+        $sql = $this->typedResolver(['tags' => AttributeType::Multiselect])
+            ->toCountSql(['attr' => 'tags', 'op' => 'CONTAINS', 'value' => 'new']);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("co.attributes_indexed->'tags'->'option_codes' @> '[\"new\"]'::jsonb", $sql);
+        self::assertStringNotContainsString(' ? ', $sql, 'the ? operator would be misread as a PDO placeholder');
+    }
+
+    public function testTypedMultiselectNotContainsCountsMissingSlotAsNotContaining(): void
+    {
+        $sql = $this->typedResolver(['tags' => AttributeType::Multiselect])
+            ->toCountSql(['attr' => 'tags', 'op' => 'NOT CONTAINS', 'value' => 'sale']);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString('COALESCE(NOT (', $sql);
+        self::assertStringContainsString('@> \'["sale"]\'::jsonb), true)', $sql);
+    }
+
+    public function testTypedMultiselectIsEmptyTreatsEmptyListAsEmpty(): void
+    {
+        $sql = $this->typedResolver(['tags' => AttributeType::Multiselect])
+            ->toCountSql(['attr' => 'tags', 'op' => 'IS EMPTY']);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("NULLIF((co.attributes_indexed->'tags'->>'option_codes'), '[]') IS NULL", $sql);
+    }
+
+    public function testTypedReservedColumnKeepsColumnReference(): void
+    {
+        // completeness_pct resolves to a physical column even with metadata
+        // wired — the reserved COLUMN_MAP must win over envelope descent.
+        $sql = $this->typedResolver([])
+            ->toCountSql(['attr' => 'completeness_pct', 'op' => '<', 'value' => 50]);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString('co.completeness_pct < 50', $sql);
+        self::assertStringNotContainsString('::numeric', $sql);
+    }
+
+    public function testWithoutMetadataResolverLegacyExpressionIsKept(): void
+    {
+        // Unit-test / degraded mode: no metadata → the pre-#2627 shape, so
+        // behavior degrades predictably instead of guessing envelope keys.
+        $sql = $this->resolver->toCountSql(['attr' => 'price', 'op' => '<', 'value' => 200]);
+
+        self::assertNotNull($sql);
+        self::assertStringContainsString("NULLIF((co.attributes_indexed->>'price'), '') < 200", $sql);
+    }
+
+    /**
+     * Build a resolver with a real {@see AttributeMetadataResolver} backed by
+     * a stubbed repository mapping code => AttributeType.
+     *
+     * @param array<string, AttributeType> $types
+     */
+    private function typedResolver(array $types): FilterDslResolver
+    {
+        $repository = $this->createStub(AttributeRepositoryInterface::class);
+        $repository->method('findByCode')->willReturnCallback(
+            static function (string $code) use ($types): ?Attribute {
+                if (!isset($types[$code])) {
+                    return null;
+                }
+
+                return new Attribute($code, ['en' => $code], $types[$code]);
+            },
+        );
+        $tenantContext = new TenantContext();
+        $tenantContext->set(new Tenant('unit', 'Unit Tenant'));
+
+        return new FilterDslResolver(new AttributeMetadataResolver($repository, $tenantContext));
     }
 }
