@@ -679,15 +679,6 @@ export function UniversalListPage({
 
   const totalHits = isSearchActive ? (searchResult?.totalHits ?? 0) : totalForList;
 
-  const lastSyncMinutesAgo = useMemo<number | null>(() => {
-    const stamps = products
-      .map((p) => (typeof p.updatedAt === 'string' ? Date.parse(p.updatedAt) : NaN))
-      .filter((n) => !Number.isNaN(n));
-    if (stamps.length === 0) return null;
-    const newest = Math.max(...stamps);
-    return Math.max(0, Math.floor((Date.now() - newest) / 60000));
-  }, [products]);
-
   const toggleSelect = (id: string): void => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -847,28 +838,6 @@ export function UniversalListPage({
 
   return (
     <div id="universal-list-page" className="space-y-5 pb-24">
-      <div className="flex items-baseline justify-between gap-4">
-        <div>
-          <div className="text-[13px] text-zinc-500 font-medium">
-            {t('products.header.workspace', { defaultValue: 'Workspace · katalog' })}
-          </div>
-          <h1 className="font-display text-[32px] font-semibold tracking-tight leading-none mt-1">
-            {objectTypeLabel}
-          </h1>
-        </div>
-        <div className="text-[12px] text-zinc-500 tabular-nums text-right">
-          <span className="text-zinc-900 font-semibold">{totalHits.toLocaleString('pl-PL')}</span>{' '}
-          {t('products.header.total_skus_suffix', { defaultValue: 'SKU' })}
-          {' · '}
-          {lastSyncMinutesAgo === null
-            ? t('products.header.last_sync_unknown', { defaultValue: 'brak danych o sync' })
-            : t('products.header.last_sync_minutes_ago', {
-                minutes: lastSyncMinutesAgo,
-                defaultValue: 'ostatnia synchronizacja {{minutes}} min temu',
-              })}
-        </div>
-      </div>
-
       <SmartFilterPresetsRow
         presets={smartPresets}
         activeId={activeSmartPresetId}

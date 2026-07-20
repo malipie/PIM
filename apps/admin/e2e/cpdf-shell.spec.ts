@@ -23,9 +23,16 @@ test('CPDF-P5-01 — catalogs shell: tabs, empty state, templates, a11y', async 
 
   await loginAsAdmin(page);
   await page.goto('/catalogs-pdf');
+  // Freeze CSS transitions before the axe scan: the pill-tab color
+  // transition (150ms) otherwise races the contrast check — axe samples
+  // mid-transition colors (e.g. #616f85 on #d0d4dc) and reports false
+  // color-contrast violations (#2669).
+  await page.addStyleTag({
+    content: '*, *::before, *::after { transition: none !important; animation: none !important; }',
+  });
 
-  // Header + both pill tabs render (bilingual-tolerant).
-  await expect(page.getByRole('heading', { name: /web to print/i })).toBeVisible();
+  // Both pill tabs render (bilingual-tolerant) — the "Web To Print" page
+  // header was removed in #2669 (topbar breadcrumb names the area).
   const catalogsTab = page.getByRole('tab', { name: /^katalogi$|^catalogs$/i });
   const templatesTab = page.getByRole('tab', { name: /^szablony$|^templates$/i });
   await expect(catalogsTab).toBeVisible();

@@ -123,9 +123,9 @@ test('Modeling shell + Dashboard mock — full handoff smoke', async ({ page }) 
   await page.goto('/products');
   await expect(page).toHaveURL(/\/products$/);
 
-  // Header pixel-perfect (32px h1 + breadcrumb + total + last sync).
-  await expect(page.getByText(/Workspace · (katalog|catalog)/, { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { level: 1, name: /Produkty|Products/ })).toBeVisible();
+  // #2669 — the in-page header (breadcrumb + h1 + total/last-sync) was
+  // removed; the topbar breadcrumb carries the context now. The toolbar is
+  // the first thing the list renders.
 
   // Toolbar: search + 4 FilterPill + segmented + Nowy produkt.
   await expect(

@@ -1008,7 +1008,6 @@
     }
   },
   "catalogs_pdf": {
-    "page_title": "Web To Print",
     "placeholder_title": "Coming soon",
     "placeholder_description": "PDF catalog generation is in the backlog. Scope will be defined in a separate ticket.",
     "tabs_aria": "PDF catalog sections",
@@ -1757,12 +1756,6 @@
     "empty": "No products yet. Create one to get started.",
     "import": "Import",
     "import_disabled": "Mock — CSV/XLSX import endpoint is pending",
-    "header": {
-      "workspace": "Workspace · catalog",
-      "total_skus_suffix": "SKU",
-      "last_sync_minutes_ago": "last sync {{minutes}} min ago",
-      "last_sync_unknown": "no sync data"
-    },
     "toolbar": {
       "search_placeholder": "Search by SKU, name, EAN, attribute…",
       "search_aria": "Search products",
@@ -2906,8 +2899,6 @@
     }
   },
   "modeling": {
-    "title": "Modeling",
-    "description": "Define ObjectTypes, Attributes, Attribute Groups, Categories, Channels and Locales used across the catalog.",
     "tabs": {
       "aria_label": "Modeling sections",
       "object_types": "Object Types",

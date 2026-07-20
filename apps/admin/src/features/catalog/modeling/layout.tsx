@@ -1,14 +1,19 @@
 import { useList } from '@refinedev/core';
 import { useTranslation } from 'react-i18next';
-import { NavLink, Outlet, useLocation } from 'react-router';
+import { Outlet, useLocation, useNavigate } from 'react-router';
+
+import { PillTabs } from '@/components/ui-v2/pill-tabs';
 
 /**
  * UI-08.9 (#264) — Modeling layout shell. UI-03b polish (#365) added KPI
  * counters next to each tab so operators see the catalogue size at a glance.
  * DP-03 (#2033) moved Channels and Locales in from Settings — they scope
  * attribute values (scopable/localizable), so they belong to the data model.
+ * #2669 — the shell header was dropped (the topbar breadcrumb already names
+ * the area) and the underline tablist was replaced with the shared v2
+ * PillTabs, matching the Exports/Imports hubs.
  *
- * Renders a 6-tab top bar (Object Types / Attributes / Attribute Groups /
+ * Renders a 6-tab pill bar (Object Types / Attributes / Attribute Groups /
  * Categories / Channels / Locales) that drives the `/modeling/*` route tree.
  * Active tab is derived from the current pathname so a deep-link (e.g.
  * `/modeling/attributes/{id}`) still highlights the parent tab.
@@ -60,85 +65,59 @@ const TABS: readonly TabDef[] = [
   },
 ] as const;
 
-interface TabBadgeProps {
-  resource: NonNullable<TabDef['resource']>;
-  isActive: boolean;
-}
-
 /**
- * KPI counter rendered next to a tab label. Uses Refine's useList with
+ * KPI counter shown inside a tab pill. Uses Refine's useList with
  * `pagination.pageSize: 1` so the network call is small but still hits the
- * server-side `total` accumulator. Falls back to a discreet dot while loading.
+ * server-side `total` accumulator. Undefined while loading — PillTabs hides
+ * the badge until the count resolves.
  */
-function TabBadge({ resource, isActive }: TabBadgeProps) {
+function useResourceCount(resource: NonNullable<TabDef['resource']>): number | undefined {
   const { result, query } = useList({
     resource,
     pagination: { currentPage: 1, pageSize: 1 },
     queryOptions: { staleTime: 30_000 },
   });
 
-  if (query.isLoading) {
-    return (
-      <span className="ml-2 inline-flex size-1.5 animate-pulse rounded-full bg-muted-foreground/40" />
-    );
-  }
-
-  const total = result.total ?? result.data.length;
-
-  return (
-    <span
-      className={
-        isActive
-          ? 'num ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-ink/10 px-1.5 text-[11px] font-medium text-ink'
-          : 'num ml-2 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-muted px-1.5 text-[11px] font-medium text-muted-foreground'
-      }
-    >
-      {total}
-    </span>
-  );
+  if (query.isLoading) return undefined;
+  return result.total ?? result.data.length;
 }
 
 export function ModelingLayout() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  const objectTypesCount = useResourceCount('object_types');
+  const attributesCount = useResourceCount('attributes');
+  const attributeGroupsCount = useResourceCount('attribute_groups');
+  const categoriesCount = useResourceCount('categories');
+  const channelsCount = useResourceCount('channels');
+  const counts: Record<NonNullable<TabDef['resource']>, number | undefined> = {
+    object_types: objectTypesCount,
+    attributes: attributesCount,
+    attribute_groups: attributeGroupsCount,
+    categories: categoriesCount,
+    channels: channelsCount,
+  };
 
   const activeTab = TABS.find((tab) => pathname.startsWith(tab.to))?.value ?? TABS[0]?.value ?? '';
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="display text-[28px] font-semibold tracking-tight">{t('modeling.title')}</h1>
-        <p className="text-sm text-muted-foreground">{t('modeling.description')}</p>
-      </header>
-      <div
-        className="flex gap-1 border-b"
-        role="tablist"
-        aria-label={t('modeling.tabs.aria_label')}
-      >
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.value;
-          return (
-            <NavLink
-              key={tab.value}
-              to={tab.to}
-              role="tab"
-              aria-selected={isActive}
-              aria-controls={`modeling-panel-${tab.value}`}
-              className={
-                isActive
-                  ? 'border-ink text-foreground -mb-px flex items-center border-b-2 px-4 py-2 text-sm font-medium'
-                  : 'text-muted-foreground hover:text-foreground -mb-px flex items-center border-b-2 border-transparent px-4 py-2 text-sm'
-              }
-            >
-              <span>{t(tab.label)}</span>
-              {tab.resource ? <TabBadge resource={tab.resource} isActive={isActive} /> : null}
-            </NavLink>
-          );
-        })}
-      </div>
-      <div role="tabpanel" id={`modeling-panel-${activeTab}`}>
-        <Outlet />
-      </div>
+      <PillTabs
+        ariaLabel={t('modeling.tabs.aria_label')}
+        activeId={activeTab}
+        onChange={(id) => {
+          const tab = TABS.find((candidate) => candidate.value === id);
+          if (tab) void navigate(tab.to);
+        }}
+        items={TABS.map((tab) => ({
+          id: tab.value,
+          label: t(tab.label),
+          count: tab.resource ? counts[tab.resource] : undefined,
+        }))}
+      />
+      <Outlet />
     </div>
   );
 }
