@@ -3,6 +3,14 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-20: Edycja zbiorcza psuła kształt wartości w cache (#2664 → PR #2665)
+- **Zgłoszenie**: cena ustawiona akcją zbiorczą widoczna na liście („1"), ale pole ceny w szczegółach **puste**.
+- **Root cause**: `BulkSetAttributeHandler` wpisywał SUROWĄ wartość do `attributes_indexed` (`price = "1"`) zamiast kanonicznej koperty `{amount,currency}` — łamie regułę „NIGDY nie pisz attributes_indexed ręcznie". Detal bazuje na cache (`ObjectValueLocaleOverlay` pomija globalne wiersze object_values), więc typowane pole ceny nie umiało sparsować gołej wartości → puste. Lista tolerowała → rozjazd. (Wcześniejsza edycja „Excel" operatora zadziałała poprawnie — zapisała object_values.)
+- **✅ Fix**: nowy `BulkValueCanonicalizer` reużywa `ValueWriteCore::normalise()` (ta sama normalizacja co single-edit/import) → price `{amount,currency}` (waluta z `validation_rules.currencies[0]`), select `{option_code}`; podpięty w `BulkSetAttributeHandler` + `BulkMultiAttributeEditHandler`. Testy 108/108, PHPStan 0.
+- **✅ Naprawa danych**: `pim:catalog:detect-attributes-drift --reconcile` (drifted=2) przywrócił cache 2 produktów z object_values.
+- **Live proof**: bulk price=5 → API i UI (zakładka Ceny) pokazują 5; rollback sesji przywrócił 2288.79.
+- **⚠️ Follow-up #2666 (VIEW-13)**: cały podsystem bulk (8 handlerów + rollback) pisze WYŁĄCZNIE do cache — wartość z bulku znika przy kolejnym single-edicie (rebuild z object_values). Dług pre-existing, duży refactor. Do tego czasu: trwałe wartości przez formularz szczegółów.
+
 ## 2026-07-20 (nocna zmiana za śpiącego operatora): Base — throttling, konfiguracja, incydent duplikatów
 - **Incydent na realnym Base**: operator wypchnął pełny katalog (1000 created, run success) + drugi pełny run (469 duplikatów — parowania ID jeszcze nie było), aż BaseLinker zablokował token (`Query limit exceeded, token blocked until…` w HTTP 200). Kolejne runy: 2×1000 failed w sekundy. **Duplikaty (469) do ręcznego usunięcia w panelu Base przez operatora.**
 - **✅ Błędy konfiguracji operatora naprawione PATCH-ami** (za zgodą „napraw bez pytania"): (1) parowanie ID było zrobione mapowaniem `base_product_id → $.product_id` (inbound) zamiast na ENDPOINCIE — ustawione `responseIdSelector=$.product_id` + `responseIdAttribute=base_product_id`; (2) mapowanie poprawione na outbound `→ $.parameters.product_id`; (3) `sku` = match key (to też fix erroru „Inbound sync requires at least one match key" przy próbie dwukierunkowej). Dwukierunkowa z Base ODRADZONA (generyczny reader nie umie RPC-odczytu przez connector.php).
