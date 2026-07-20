@@ -79,7 +79,27 @@ test('#2669 — headers removed, modeling tabs as pills, orange CTA', async ({ p
   await attributesCta.click();
   await expect(page).toHaveURL(/\/modeling\/attributes\/new$/);
 
-  // Leaving the modeling area clears the topbar slot.
-  await page.goto('/dashboard');
+  // Leaving the modeling area clears the topbar slot. Navigate client-side
+  // (sidebar links) from here on — every full page.goto re-runs the auth
+  // bootstrap and burns the 5/IP/15min login-rate-limiter budget
+  // (lessons.md §10).
+  const nav = page.getByRole('complementary');
+  await nav.getByRole('link', { name: 'Workspace', exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('link', { name: /nowy atrybut|new attribute/i })).toHaveCount(0);
+
+  // API Configurator hubs follow the same pattern: create CTA in the topbar.
+  await nav.getByText(/^Integracje$|^Integrations$/i).click();
+  await nav.getByRole('link', { name: /konfigurator api|api configurator/i }).click();
+  await expect(page).toHaveURL(/\/integrations\/api-configurator\/connections$/);
+  const connectionsCta = page.getByRole('link', { name: /nowe połączenie|new connection/i });
+  await expect(connectionsCta).toBeVisible();
+  await expect(connectionsCta).toHaveClass(/bg-cta/);
+  await expect(main.getByRole('link', { name: /nowe połączenie|new connection/i })).toHaveCount(0);
+
+  await nav.getByRole('link', { name: /konfigurator xml|xml configurator/i }).click();
+  await expect(page).toHaveURL(/\/integrations\/api-configurator\/feeds$/);
+  const feedsCta = page.getByRole('link', { name: /nowy feed|new feed/i });
+  await expect(feedsCta).toBeVisible();
+  await expect(feedsCta).toHaveClass(/bg-cta/);
 });

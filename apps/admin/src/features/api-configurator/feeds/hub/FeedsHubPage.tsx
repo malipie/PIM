@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router';
 
+import { TopbarCta } from '@/components/ui-v2/topbar-cta';
 import { Segmented } from '@/features/api-configurator/components/primitives';
+import { usePageActions } from '@/layout/page-actions-context';
 
 import { type FeedStatus, filterFeeds, useFeedKpi, useFeeds } from '../api/feeds';
 import { FeedsSubnav } from '../components/FeedsSubnav';
@@ -27,6 +29,17 @@ export function FeedsHubPage() {
 
   const feeds = feedsQuery.data ?? [];
   const filtered = useMemo(() => filterFeeds(feeds, search, status), [feeds, search, status]);
+
+  usePageActions(
+    useMemo(
+      () => (
+        <TopbarCta to="/integrations/api-configurator/feeds/new">
+          {t('api_configurator.feeds.hub.new_feed')}
+        </TopbarCta>
+      ),
+      [t],
+    ),
+  );
 
   return (
     <div className="space-y-6">

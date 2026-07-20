@@ -39,7 +39,9 @@ test('APIC-P4-08 — unified shell: navigate across producer / consumer / monito
 
   // a11y on the unified shell at rest (each face is audited in its own E2E;
   // here we check the shell landing before exercising cross-face navigation).
-  const a11y = await new AxeBuilder({ page }).analyze();
+  // `.exclude('.bg-cta')` — orange topbar CTA (#2671), sanctioned design
+  // accent excluded across a11y specs (same as nui-13 / exr-16).
+  const a11y = await new AxeBuilder({ page }).exclude('.bg-cta').analyze();
   expect(a11y.violations).toEqual([]);
 
   // → Producer face (Moje API), now on its own /producer path.

@@ -120,7 +120,9 @@ test('XMLF-P5-01 — feeds hub: tab, KPI, cards, filtering, a11y', async ({ page
   await expect(page).toHaveURL(/\/integrations\/api-configurator\/feeds$/);
 
   // a11y — no serious/critical violations on the hub.
-  const axe = await new AxeBuilder({ page }).analyze();
+  // `.exclude('.bg-cta')` — the orange topbar CTA (#2671) is the sanctioned
+  // design accent excluded across a11y specs (same as nui-13 / exr-16).
+  const axe = await new AxeBuilder({ page }).exclude('.bg-cta').analyze();
   const blocking = axe.violations.filter(
     (violation) => violation.impact === 'serious' || violation.impact === 'critical',
   );

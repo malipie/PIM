@@ -1,11 +1,10 @@
 import { useList } from '@refinedev/core';
-import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TopbarCta } from '@/components/ui-v2/topbar-cta';
+import { usePageActions } from '@/layout/page-actions-context';
 
 import { Segmented } from '../components/primitives';
 import { ConnectionCard, type ConnectionRow } from './ConnectionCard';
@@ -20,6 +19,17 @@ type StatusFilter = 'all' | 'active' | 'paused' | 'error' | 'draft';
  */
 export function ConnectionsHubPage() {
   const { t } = useTranslation();
+
+  usePageActions(
+    useMemo(
+      () => (
+        <TopbarCta to="/integrations/api-configurator/connections/new">
+          {t('api_configurator.hub.new_connection')}
+        </TopbarCta>
+      ),
+      [t],
+    ),
+  );
   const { result, query } = useList<ConnectionRow>({
     resource: 'connections',
     pagination: { mode: 'off' },
@@ -65,12 +75,6 @@ export function ConnectionsHubPage() {
             {t('api_configurator.hub.subtitle', { count: counts.all })}
           </p>
         </div>
-        <Button asChild>
-          <Link to="/integrations/api-configurator/connections/new">
-            <Plus className="mr-1 size-4" aria-hidden />
-            {t('api_configurator.hub.new_connection')}
-          </Link>
-        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
