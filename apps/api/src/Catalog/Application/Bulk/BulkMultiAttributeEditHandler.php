@@ -38,6 +38,7 @@ final class BulkMultiAttributeEditHandler extends AbstractBulkHandler
         BulkContext $bulkContext,
         private readonly AttributeLockReader $lockReader,
         BulkReindexQueueInterface $reindexQueue,
+        private readonly BulkValueCanonicalizer $canonicalizer,
     ) {
         parent::__construct($catalogObjects, $em, $bulkContext, $reindexQueue);
     }
@@ -82,7 +83,8 @@ final class BulkMultiAttributeEditHandler extends AbstractBulkHandler
             }
 
             if ('set' === $op) {
-                $newValue = $edit['value'] ?? null;
+                // #2664 — canonicalise into the typed envelope (see BulkSetAttributeHandler).
+                $newValue = $this->canonicalizer->canonicalize($code, $edit['value'] ?? null);
                 $indexed[$code] = $newValue;
             } elseif ('clear' === $op) {
                 $newValue = null;

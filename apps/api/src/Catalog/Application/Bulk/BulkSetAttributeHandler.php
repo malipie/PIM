@@ -42,6 +42,7 @@ final class BulkSetAttributeHandler extends AbstractBulkHandler
         private readonly AttributeLockReader $lockReader,
         BulkReindexQueueInterface $reindexQueue,
         private readonly BulkRelationApplier $relationApplier,
+        private readonly BulkValueCanonicalizer $canonicalizer,
     ) {
         parent::__construct($catalogObjects, $em, $bulkContext, $reindexQueue);
     }
@@ -99,12 +100,14 @@ final class BulkSetAttributeHandler extends AbstractBulkHandler
 
         $oldValue = $object->getAttributesIndexed()[$this->attrCode] ?? null;
 
-        // Set in attributesIndexed (denormalised JSONB) — the canonical
-        // write path lives in object_values; for the MVP slice this is a
-        // thin wrapper, full write through ObjectAttributesUpserter lands
-        // in VIEW-13.
+        // Set in attributesIndexed (denormalised JSONB). #2664 — canonicalise
+        // the raw value into the same envelope the single-edit path produces
+        // (price → {amount,currency}, select → {option_code}) so the typed
+        // detail-form input renders it; the bare scalar left the field empty.
+        // The canonical object_values write is the deferred VIEW-13 refactor.
+        $canonicalValue = $this->canonicalizer->canonicalize($this->attrCode, $this->newValue);
         $indexed = $object->getAttributesIndexed();
-        $indexed[$this->attrCode] = $this->newValue;
+        $indexed[$this->attrCode] = $canonicalValue;
         $object->updateAttributeIndex($indexed);
         $object->markTouchedByBulkSession($session->getId());
 
@@ -113,7 +116,7 @@ final class BulkSetAttributeHandler extends AbstractBulkHandler
             $object->getId(),
             null,
             $oldValue,
-            $this->newValue,
+            $canonicalValue,
             BulkLog::LEVEL_INFO,
             null,
         ));
