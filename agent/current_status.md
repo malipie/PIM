@@ -3,6 +3,12 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-20: Konfigurator API — źródło wartości per kanał/język dla outbound (#2667 → PR #2668)
+- **Zgłoszenie operatora**: „chcę w konfiguratorze API wybierać z którego kanału (Base/Allegro/cokolwiek) idą pola do wysyłki". Decyzje operatora w planie: zakres kanał+język; granulacja **per wiązanie** (per-mapowane-pole = przyszły override).
+- **✅ Feature (merged `e10529f4`)**: `SyncBinding.sourceChannel` (kod) + `sourceLocale` (SHORT) — loose references, walidacja 422 przez `ChannelResolverInterface`/`LocaleCodeResolverInterface`, PATCH idiom `''`=wyczyść; reader (`ExportOutboundRecordReader`) rozstrzyga per atrybut rankiem `localeMatch*2+channelMatch` (locale-first, parytet z `ObjectValueLocaleOverlay`) z fallbackiem do globalnej; **nieznany kod kanału failuje run głośno** (nie ciche globalne ceny — lekcja nocnego incydentu). UI: sekcja „Źródło wartości" (`OutboundSourceSection`, kanały z `/api/channels`, locale z `useCurrentWorkspace().enabledLocales`) dla outbound/bidirectional.
+- **Live proof (#2667 close comment)**: run przez realny worker na echo-połączeniu (httpbin) → payload `{"sku":"ELEC-0424","name":"…Silver","price":"3837.76 PLN"}` — cena kanałowa BL (+3% vs globalna 3725.98), name EN, sku fallback globalny; 422 dla złego kodu na żywo; sprzątnięte kaskadą.
+- **Świadome odejścia**: scope per-mapowanie (przyszłość), inbound nadal pisze globalnie (asymetria bidirectional w hint UI + guide §A.5), locale fallback chains poza MVP (docblock readera).
+
 ## 2026-07-20: Edycja zbiorcza psuła kształt wartości w cache (#2664 → PR #2665)
 - **Zgłoszenie**: cena ustawiona akcją zbiorczą widoczna na liście („1"), ale pole ceny w szczegółach **puste**.
 - **Root cause**: `BulkSetAttributeHandler` wpisywał SUROWĄ wartość do `attributes_indexed` (`price = "1"`) zamiast kanonicznej koperty `{amount,currency}` — łamie regułę „NIGDY nie pisz attributes_indexed ręcznie". Detal bazuje na cache (`ObjectValueLocaleOverlay` pomija globalne wiersze object_values), więc typowane pole ceny nie umiało sparsować gołej wartości → puste. Lista tolerowała → rozjazd. (Wcześniejsza edycja „Excel" operatora zadziałała poprawnie — zapisała object_values.)
