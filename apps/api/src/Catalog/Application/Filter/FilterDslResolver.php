@@ -181,6 +181,7 @@ final class FilterDslResolver
 
     public function __construct(
         private readonly ?AttributeMetadataResolver $attributeMetadata = null,
+        private readonly ?FilterScopeResolver $scopeResolver = null,
     ) {
     }
 
@@ -274,6 +275,11 @@ final class FilterDslResolver
      */
     public function validate(array $dsl): void
     {
+        // #2673 — the optional root `scope` (value context) is validated
+        // eagerly so an unknown channel/locale surfaces as a clear 400
+        // instead of a silently-null count from toCountSql().
+        $this->scopeResolver?->resolve($dsl['scope'] ?? null);
+
         if (isset($dsl['operator']) && isset($dsl['conditions'])) {
             $this->validateGroup($dsl, depth: 0);
 
@@ -285,6 +291,27 @@ final class FilterDslResolver
         }
 
         $this->validateCondition($dsl);
+    }
+
+    /**
+     * #2673 — true when the DSL root carries a non-empty value-context
+     * (`scope: {channel?, locale?}`). Callers on the Meilisearch path use
+     * this to switch to the SQL prefilter — scoped values are not in the
+     * Meili document (#1148 keeps it global-only).
+     *
+     * @param array<string, mixed> $dsl
+     */
+    public static function hasScope(array $dsl): bool
+    {
+        $scope = $dsl['scope'] ?? null;
+        if (!\is_array($scope)) {
+            return false;
+        }
+        $channel = $scope['channel'] ?? null;
+        $locale = $scope['locale'] ?? null;
+
+        return (\is_string($channel) && '' !== trim($channel))
+            || (\is_string($locale) && '' !== trim($locale));
     }
 
     /**
@@ -305,7 +332,11 @@ final class FilterDslResolver
     public function toCountSql(array $dsl): ?string
     {
         try {
-            return $this->compile($dsl, depth: 0);
+            // #2673 — the root-level `scope` sets the value context for
+            // every condition in the document (panel-wide selector).
+            $scope = $this->scopeResolver?->resolve($dsl['scope'] ?? null);
+
+            return $this->compile($dsl, depth: 0, scope: $scope);
         } catch (Throwable) {
             return null;
         }
@@ -314,7 +345,7 @@ final class FilterDslResolver
     /**
      * @param array<string, mixed> $dsl
      */
-    private function compile(array $dsl, int $depth): string
+    private function compile(array $dsl, int $depth, ?FilterScopeContext $scope = null): string
     {
         if ($depth > 3) {
             throw new RuntimeException('FilterDsl nesting too deep (>3).');
@@ -330,7 +361,7 @@ final class FilterDslResolver
 
             $parts = [];
             foreach ($group['conditions'] as $condition) {
-                $parts[] = '('.$this->compile($condition, $depth + 1).')';
+                $parts[] = '('.$this->compile($condition, $depth + 1, $scope).')';
             }
             if ([] === $parts) {
                 return '1=1';
@@ -339,13 +370,13 @@ final class FilterDslResolver
             return implode(' '.$operator.' ', $parts);
         }
 
-        return $this->compileCondition($dsl);
+        return $this->compileCondition($dsl, $scope);
     }
 
     /**
      * @param array<string, mixed> $cond
      */
-    private function compileCondition(array $cond): string
+    private function compileCondition(array $cond, ?FilterScopeContext $scope = null): string
     {
         $attrRaw = $cond['attr'] ?? null;
         $opRaw = $cond['op'] ?? null;
@@ -370,11 +401,43 @@ final class FilterDslResolver
         $type = $this->envelopeType($attr);
         $canonical = self::normaliseOperator($op);
 
-        if ('multiselect' === $type) {
-            return FilterSqlExpressions::compileMultiselectCondition($attr, $canonical, $value, $op);
+        // #2673 — value context: scope dimensions are trimmed to the
+        // attribute's capabilities (a non-localizable attribute ignores the
+        // locale, a non-scopable one ignores the channel). COLUMN_MAP codes
+        // and explicit dotted locale paths carry no meta and stay on the
+        // legacy path — a dot-path is an explicit legacy locale pick and
+        // wins over the panel scope.
+        $scopedAttributeId = null;
+        $scopedChannelId = null;
+        $scopedLocale = null;
+        if (null !== $scope && !$scope->isEmpty()) {
+            $meta = (isset(self::COLUMN_MAP[$attr]) || str_contains($attr, '.'))
+                ? null
+                : $this->attributeMetadata?->getAttributeMeta($attr);
+            if (null !== $meta) {
+                $scopedChannelId = $meta->scopable ? $scope->channelId : null;
+                $scopedLocale = $meta->localizable ? $scope->locale : null;
+                if (null !== $scopedChannelId || null !== $scopedLocale) {
+                    $scopedAttributeId = $meta->id;
+                }
+            }
         }
 
-        $left = $this->resolveLeftExpression($attr, $type);
+        if ('multiselect' === $type) {
+            return FilterSqlExpressions::compileMultiselectCondition(
+                $attr,
+                $canonical,
+                $value,
+                $op,
+                $scopedAttributeId,
+                $scopedChannelId,
+                $scopedLocale,
+            );
+        }
+
+        $left = null !== $scopedAttributeId
+            ? FilterSqlExpressions::scopedLeftExpression($attr, $type, $scopedAttributeId, $scopedChannelId, $scopedLocale)
+            : $this->resolveLeftExpression($attr, $type);
         $numeric = \in_array($type, ['price', 'number', 'metric'], true);
         if ($numeric) {
             $left = '('.$left.')::numeric';
@@ -462,6 +525,13 @@ final class FilterDslResolver
      */
     public function toMeilisearchFilter(array $dsl): string
     {
+        // #2673 — scoped values are not in the Meili document (#1148 keeps
+        // it global-only); callers must branch to the SQL prefilter path
+        // (`hasScope()` + `toCountSql()` → `id IN [...]`) before compiling.
+        if (self::hasScope($dsl)) {
+            throw new RuntimeException('FilterDsl with a value-context scope cannot compile to a Meilisearch filter — use the SQL prefilter path.');
+        }
+
         return $this->compileMeili($dsl, depth: 0);
     }
 

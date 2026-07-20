@@ -97,6 +97,61 @@ final class FilterDslResolverOperatorMatrixTest extends TestCase
         self::assertNotEmpty($meili, 'Meili compilation must succeed for '.$case['op']);
     }
 
+    /**
+     * #2673 — every operator must also compile on the SQL path with an
+     * active value-context scope (channel + locale, scopable+localizable
+     * attribute → full COALESCE subselect variant).
+     *
+     * @param array{type: string, op: string, value?: mixed} $case
+     */
+    #[DataProvider('operatorMatrixProvider')]
+    public function testOperatorCompilesToSqlWithScope(array $case): void
+    {
+        $resolver = $this->scopedResolver($case['type']);
+
+        $cond = [
+            'scope' => ['channel' => 'shopify', 'locale' => 'pl'],
+            'attr' => 'brand',
+            'op' => $case['op'],
+        ];
+        if (\array_key_exists('value', $case)) {
+            $cond['value'] = $case['value'];
+        }
+
+        $sql = $resolver->toCountSql($cond);
+        self::assertNotNull($sql, 'scoped SQL compilation must succeed for '.$case['type'].' '.$case['op']);
+        self::assertStringContainsString('object_values', $sql);
+    }
+
+    private function scopedResolver(string $type): FilterDslResolver
+    {
+        $repository = $this->createStub(\App\Catalog\Domain\Repository\AttributeRepositoryInterface::class);
+        $repository->method('findByCode')->willReturnCallback(
+            static function (string $code) use ($type): \App\Catalog\Domain\Entity\Attribute {
+                $attribute = new \App\Catalog\Domain\Entity\Attribute(
+                    $code,
+                    ['en' => $code],
+                    \App\Catalog\Domain\AttributeType::from($type),
+                );
+                $attribute->changeLocalizable(true);
+                $attribute->changeScopable(true);
+
+                return $attribute;
+            },
+        );
+        $tenantContext = new \App\Shared\Application\TenantContext();
+        $tenantContext->set(new \App\Shared\Domain\Tenant('unit', 'Unit Tenant'));
+
+        $scopes = $this->createStub(\App\Channel\Contracts\ScopeEnumeratorInterface::class);
+        $scopes->method('channelIdsByCode')->willReturn(['shopify' => '0198c9a0-0000-7000-8000-0000000000aa']);
+        $scopes->method('localeShortCodes')->willReturn(['pl', 'en']);
+
+        return new FilterDslResolver(
+            new \App\Catalog\Application\Filter\AttributeMetadataResolver($repository, $tenantContext),
+            new \App\Catalog\Application\Filter\FilterScopeResolver($scopes, $tenantContext),
+        );
+    }
+
     public function testOperatorsByTypeMatrixCovers8DomainTypes(): void
     {
         $expected = ['text', 'number', 'date', 'select', 'multiselect', 'boolean', 'relation', 'asset'];

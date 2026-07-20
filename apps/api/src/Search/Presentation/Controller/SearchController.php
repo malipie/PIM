@@ -11,6 +11,7 @@ use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Search\Application\CatalogSearchService;
+use App\Search\Application\ScopedFilterPrefilter;
 use App\Shared\Application\TenantContext;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -50,6 +51,7 @@ final class SearchController
         private readonly EntityManagerInterface $em,
         private readonly TenantContext $tenantContext,
         private readonly ObjectTypeRepositoryInterface $objectTypes,
+        private readonly ScopedFilterPrefilter $scopedPrefilter,
     ) {
     }
 
@@ -173,7 +175,7 @@ final class SearchController
         // VIEW-10 (#538) — `smart_preset` + `filter` query params compile
         // a FilterDsl through the resolver and AND-merge the resulting
         // Meilisearch expression with the existing flat filters above.
-        $customFilterExpression = $this->resolveCustomFilter($request);
+        [$customFilterExpression, $scopeTruncated] = $this->resolveCustomFilter($request);
 
         // UP-06 (#1024) — `/api/search/objects` scopes by objectTypeId on
         // top of the kind filter so two custom ObjectTypes sharing
@@ -207,6 +209,7 @@ final class SearchController
             return new JsonResponse([
                 'totalHits' => $result['totalHits'],
                 'processingTimeMs' => $result['processingTimeMs'],
+                'scopeTruncated' => $scopeTruncated,
             ]);
         }
 
@@ -217,6 +220,10 @@ final class SearchController
             'processingTimeMs' => $result['processingTimeMs'],
             'page' => $page,
             'perPage' => $perPage,
+            // #2673 — true when a value-context scope matched more objects
+            // than the SQL→Meili id prefilter cap; the hit list is then
+            // approximate and the FE renders a "narrow your filter" note.
+            'scopeTruncated' => $scopeTruncated,
         ]);
     }
 
@@ -242,10 +249,12 @@ final class SearchController
 
     /**
      * Resolve `?smart_preset` and `?filter` query params into a
-     * Meilisearch filter expression string, or `null` if neither is
-     * present.
+     * Meilisearch filter expression string (`null` if neither is present)
+     * plus the #2673 scope-truncation flag.
+     *
+     * @return array{0: ?string, 1: bool}
      */
-    private function resolveCustomFilter(Request $request): ?string
+    private function resolveCustomFilter(Request $request): array
     {
         $smartPreset = $request->query->get('smart_preset');
         if (\is_string($smartPreset) && '' !== trim($smartPreset)) {
@@ -254,7 +263,7 @@ final class SearchController
                 throw new NotFoundHttpException(\sprintf('Smart filter preset "%s" not found.', $smartPreset));
             }
 
-            return $this->filterDslResolver->toMeilisearchFilter($preset->getQuery());
+            return $this->compileCustomFilter($preset->getQuery());
         }
 
         $blob = $request->query->get('q');
@@ -266,16 +275,34 @@ final class SearchController
             try {
                 $dsl = $this->filterUrlSerializer->fromBase64(trim($blob));
             } catch (BadRequestHttpException) {
-                return null;
+                return [null, false];
             }
             if ([] === $dsl) {
-                return null;
+                return [null, false];
             }
 
-            return $this->filterDslResolver->toMeilisearchFilter($dsl);
+            return $this->compileCustomFilter($dsl);
         }
 
-        return null;
+        return [null, false];
+    }
+
+    /**
+     * #2673 — scoped documents (value context) cannot compile to a Meili
+     * filter (the document holds global values only); they run through the
+     * SQL prefilter and reach Meili as an `id IN [...]` expression.
+     *
+     * @param array<string, mixed> $dsl
+     *
+     * @return array{0: string, 1: bool}
+     */
+    private function compileCustomFilter(array $dsl): array
+    {
+        if (FilterDslResolver::hasScope($dsl)) {
+            return $this->scopedPrefilter->compile($dsl);
+        }
+
+        return [$this->filterDslResolver->toMeilisearchFilter($dsl), false];
     }
 
     private function loadPreset(string $idOrSlug): ?SmartFilterPreset
