@@ -75,6 +75,26 @@ class SyncBinding extends AggregateRoot implements TenantScoped
     #[Assert\Length(max: 255)]
     private ?string $matchKeyMapping = null;
 
+    /**
+     * #2667 — outbound value-source scope: the PIM channel CODE whose values
+     * the push reads (loose reference like `objectTypeId`; the binding API
+     * validates it resolves). null = global values. Per attribute the scoped
+     * value wins and missing scoped values fall back to the global one; an
+     * unresolvable code fails the run rather than silently pushing globals.
+     * Outbound only — inbound writes stay global (bidirectional asymmetry).
+     */
+    #[Assert\Length(max: 64)]
+    private ?string $sourceChannel = null;
+
+    /**
+     * #2667 — outbound value-source scope: SHORT locale code (`en`, matching
+     * `ObjectValue::$locale`). null = global. Same fallback semantics as
+     * `$sourceChannel`; locale dominates channel in the precedence (parity
+     * with the ObjectValueLocaleOverlay rank).
+     */
+    #[Assert\Length(max: 16)]
+    private ?string $sourceLocale = null;
+
     private bool $enabled = true;
 
     /**
@@ -249,6 +269,28 @@ class SyncBinding extends AggregateRoot implements TenantScoped
     public function setMatchKeyMapping(?string $matchKeyMapping): void
     {
         $this->matchKeyMapping = $matchKeyMapping;
+        $this->touch();
+    }
+
+    public function getSourceChannel(): ?string
+    {
+        return $this->sourceChannel;
+    }
+
+    public function setSourceChannel(?string $sourceChannel): void
+    {
+        $this->sourceChannel = $sourceChannel;
+        $this->touch();
+    }
+
+    public function getSourceLocale(): ?string
+    {
+        return $this->sourceLocale;
+    }
+
+    public function setSourceLocale(?string $sourceLocale): void
+    {
+        $this->sourceLocale = $sourceLocale;
         $this->touch();
     }
 

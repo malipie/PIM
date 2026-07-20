@@ -113,6 +113,17 @@ upserty, capture ID) nie re-enqueue'ują bindingów **tego samego** połączenia
 - **Konflikt bidirectional**: polityka per binding —
   `last_write_wins` / `pim_wins` / `remote_wins`; anti-loop po `provenance`
   (zapisy z integracji oznaczone `Provenance::Integration`).
+- **Źródło wartości (#2667)**: wiązanie outbound może wskazać kanał PIM i/lub
+  język, z którego push czyta wartości (`sourceChannel` — kod kanału,
+  `sourceLocale` — krótki kod języka, np. `en`; UI: sekcja „Źródło wartości"
+  na ekranie *Synchronizacja*). Wartość scoped wygrywa per atrybut (locale
+  dominuje, kanał jest tie-breakerem — parytet z odczytami
+  `?locale=&channel=`), brakująca wartość spada do globalnej; puste pola =
+  wartości globalne (zachowanie sprzed #2667). Nierozwiązywalny kod kanału
+  (np. skasowany kanał) celowo failuje run, zamiast po cichu wysłać wartości
+  globalne. Przy bidirectional kierunek odczytu nadal zapisuje wartości
+  globalne (asymetria opisana w hincie UI). W PATCH `''` czyści pole
+  (powrót do globalnych), null = bez zmian.
 - **Delta sync**: kursor monotoniczny, crash-safe (advance raz na stronę);
   re-run pobiera tylko okno od ostatniego kursora (upsert idempotentny).
 

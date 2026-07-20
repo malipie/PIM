@@ -9,6 +9,8 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
+use App\Channel\Contracts\ChannelResolverInterface;
+use App\Channel\Contracts\LocaleCodeResolverInterface;
 use App\Integration\Generic\Application\Schedule\SyncScheduleDispatcher;
 use App\Integration\Generic\Domain\Entity\Connection;
 use App\Integration\Generic\Domain\Entity\RemoteEndpoint;
@@ -20,6 +22,8 @@ use App\Integration\Generic\Domain\Repository\RemoteEndpointRepositoryInterface;
 use App\Integration\Generic\Domain\Repository\SyncBindingRepositoryInterface;
 use App\Integration\Generic\Infrastructure\ApiPlatform\Resource\SyncBindingInput;
 use App\Integration\Generic\Infrastructure\ApiPlatform\Resource\SyncBindingPatchInput;
+use App\Shared\Application\TenantContext;
+use App\Shared\Domain\Tenant;
 use InvalidArgumentException;
 use LogicException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -42,6 +46,9 @@ final readonly class SyncBindingProcessor implements ProcessorInterface
         private ConnectionRepositoryInterface $connections,
         private RemoteEndpointRepositoryInterface $endpoints,
         private SyncScheduleDispatcher $dispatcher,
+        private ChannelResolverInterface $channels,
+        private LocaleCodeResolverInterface $localeCodes,
+        private TenantContext $tenantContext,
     ) {
     }
 
@@ -84,6 +91,8 @@ final readonly class SyncBindingProcessor implements ProcessorInterface
         $binding->setMatchKeyMapping($data->matchKeyMapping);
         $binding->setEnabled($data->enabled);
         $binding->setOutboundFilter([] === $data->outboundFilter ? null : $data->outboundFilter);
+        $binding->setSourceChannel($this->resolveSourceChannel($data->sourceChannel));
+        $binding->setSourceLocale($this->resolveSourceLocale($data->sourceLocale));
 
         // Persist first so the tenant is stamped, then compute the (jittered)
         // next run off the assigned tenant.
@@ -130,6 +139,13 @@ final readonly class SyncBindingProcessor implements ProcessorInterface
         if (null !== $data->outboundFilter) {
             // `[]` is the explicit "clear the scope" signal (send all again).
             $binding->setOutboundFilter([] === $data->outboundFilter ? null : $data->outboundFilter);
+        }
+        if (null !== $data->sourceChannel) {
+            // '' is the explicit "back to global values" signal (#2667).
+            $binding->setSourceChannel($this->resolveSourceChannel($data->sourceChannel));
+        }
+        if (null !== $data->sourceLocale) {
+            $binding->setSourceLocale($this->resolveSourceLocale($data->sourceLocale));
         }
         if (null !== $data->enabled) {
             $binding->setEnabled($data->enabled);
@@ -179,6 +195,58 @@ final readonly class SyncBindingProcessor implements ProcessorInterface
         }
 
         return $endpoint;
+    }
+
+    /**
+     * Resolve the outbound value-source channel CODE (#2667). null/'' → null
+     * (global values); otherwise the code must resolve within the tenant — a
+     * typo'd or cross-tenant code is a 422, mirroring {@see resolveEndpoint()}.
+     * The CODE is stored (not the id), consistent with the Export session
+     * channel contract; the outbound reader re-resolves it per run.
+     */
+    private function resolveSourceChannel(?string $code): ?string
+    {
+        if (null === $code || '' === $code) {
+            return null;
+        }
+
+        if (null === $this->channels->resolveId($code, $this->requireTenant())) {
+            throw new UnprocessableEntityHttpException(\sprintf('Unknown source channel "%s".', $code));
+        }
+
+        return $code;
+    }
+
+    /**
+     * Resolve the outbound value-source locale (#2667). Input may be SHORT or
+     * BCP-47; the SHORT form is stored (that is what `ObjectValue::$locale`
+     * holds). Accepted when the tenant enables it (legacy JSONB list) or when
+     * an active tenant locale matches (tenant_locales) — the two sources may
+     * drift, so either suffices.
+     */
+    private function resolveSourceLocale(?string $code): ?string
+    {
+        if (null === $code || '' === $code) {
+            return null;
+        }
+
+        $tenant = $this->requireTenant();
+        $short = $this->localeCodes->toShort($code);
+        if (!$tenant->isLocaleEnabled($short) && null === $this->localeCodes->toBcp47($short, $tenant)) {
+            throw new UnprocessableEntityHttpException(\sprintf('Unknown source locale "%s".', $code));
+        }
+
+        return $short;
+    }
+
+    private function requireTenant(): Tenant
+    {
+        $tenant = $this->tenantContext->get();
+        if (!$tenant instanceof Tenant) {
+            throw new UnprocessableEntityHttpException('No tenant context to resolve the value-source scope.');
+        }
+
+        return $tenant;
     }
 
     /**

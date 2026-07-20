@@ -49,6 +49,8 @@
         </field>
         <field name="conflictPolicy" type="string" length="16" column="conflict_policy"/>
         <field name="matchKeyMapping" type="string" length="255" column="match_key_mapping" nullable="true"/>
+        <field name="sourceChannel" type="string" length="64" column="source_channel" nullable="true"/>
+        <field name="sourceLocale" type="string" length="16" column="source_locale" nullable="true"/>
         <field name="enabled" type="boolean">
             <options>
                 <option name="default">true</option>

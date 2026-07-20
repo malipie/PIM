@@ -19,11 +19,17 @@ use Symfony\Component\Uid\Uuid;
 interface OutboundRecordReader
 {
     /**
-     * @param list<string>              $codes  the attribute codes to serialise per object
-     * @param array<string, mixed>|null $filter #2549 — a FilterDsl snapshot scoping which
-     *                                          objects are emitted (null/empty = all)
+     * @param list<string>              $codes   the attribute codes to serialise per object
+     * @param array<string, mixed>|null $filter  #2549 — a FilterDsl snapshot scoping which
+     *                                           objects are emitted (null/empty = all)
+     * @param string|null               $channel #2667 — channel CODE whose values to prefer
+     *                                           (fallback to global per attribute); null = global
+     * @param string|null               $locale  #2667 — locale code (SHORT or BCP-47) whose
+     *                                           values to prefer; locale dominates channel in
+     *                                           the precedence, mirroring the platform's
+     *                                           locale/channel overlay; null = global
      *
      * @return iterable<OutboundRecord>
      */
-    public function read(Uuid $objectTypeId, array $codes, ?array $filter = null): iterable;
+    public function read(Uuid $objectTypeId, array $codes, ?array $filter = null, ?string $channel = null, ?string $locale = null): iterable;
 }

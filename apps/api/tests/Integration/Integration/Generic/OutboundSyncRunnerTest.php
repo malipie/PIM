@@ -12,6 +12,8 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectValue;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Provenance;
+use App\Channel\Domain\Entity\Channel;
 use App\Integration\Generic\Application\Sync\OutboundBodyEncoder;
 use App\Integration\Generic\Application\Sync\OutboundSyncRunner;
 use App\Integration\Generic\Application\Sync\PayloadBuilder;
@@ -33,6 +35,7 @@ use App\Tests\Unit\Integration\Generic\Application\Sync\RecordingSleeper;
 use App\Tests\Unit\Integration\Generic\Infrastructure\Http\Pagination\RecordingRequester;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
+use RuntimeException;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
@@ -392,6 +395,141 @@ final class OutboundSyncRunnerTest extends KernelTestCase
 
         self::assertSame(0, $run->getCreatedCount());
         self::assertSame(1, $run->getFailedCount());
+    }
+
+    #[Test]
+    public function sourceChannelScopeSendsChannelValuesWithGlobalFallback(): void
+    {
+        // #2667 — a binding scoped to a channel pushes the channel value where
+        // one exists (name) and falls back to the global one where not (sku).
+        $channel = $this->seedChannel('shopify');
+        $this->seedObject('A-1', 'Widget');
+        $this->addNameValue('A-1', 'Widget Shopify', channelId: $channel->getId());
+        $binding = $this->seedBinding();
+        $binding->setSourceChannel('shopify');
+        $this->em()->flush();
+
+        $body = $this->pushOnce();
+        self::assertSame('Widget Shopify', $body['name']);
+        self::assertSame('A-1', $body['sku']);
+    }
+
+    #[Test]
+    public function sourceLocaleScopePrefersLocaleAndFallsBackToGlobal(): void
+    {
+        $this->seedObject('A-1', 'Widget');
+        $this->addNameValue('A-1', 'Widget EN', locale: 'en');
+        $binding = $this->seedBinding();
+        $binding->setSourceLocale('en');
+        $this->em()->flush();
+
+        $body = $this->pushOnce();
+        self::assertSame('Widget EN', $body['name']);
+        self::assertSame('A-1', $body['sku']);
+    }
+
+    #[Test]
+    public function sourceScopePrecedenceIsLocaleFirst(): void
+    {
+        // #2667 — rank parity with the ObjectValueLocaleOverlay: the combined
+        // (locale,channel) row wins outright, and with only single-dimension
+        // rows the locale one beats the channel one (locale dominates).
+        $channel = $this->seedChannel('shopify');
+        $this->seedObject('A-1', 'Widget');
+        $this->addNameValue('A-1', 'Widget EN Shopify', channelId: $channel->getId(), locale: 'en');
+        $this->addNameValue('A-1', 'Widget EN', locale: 'en');
+        $this->addNameValue('A-1', 'Widget Shopify', channelId: $channel->getId());
+        $binding = $this->seedBinding();
+        $binding->setSourceChannel('shopify');
+        $binding->setSourceLocale('en');
+        $this->em()->flush();
+
+        self::assertSame('Widget EN Shopify', $this->pushOnce()['name']);
+
+        // Remove the combined row: the locale row must now beat the channel row.
+        $this->em()->createQuery(
+            'DELETE FROM '.ObjectValue::class." ov WHERE ov.locale = 'en' AND ov.channelId IS NOT NULL",
+        )->execute();
+
+        self::assertSame('Widget EN', $this->pushOnce()['name']);
+    }
+
+    #[Test]
+    public function nullSourceScopeStillReadsOnlyGlobalValues(): void
+    {
+        // #2667 regression guard — an unscoped binding must behave exactly as
+        // before: scoped rows exist but only the global values are pushed.
+        $channel = $this->seedChannel('shopify');
+        $this->seedObject('A-1', 'Widget');
+        $this->addNameValue('A-1', 'Widget Shopify', channelId: $channel->getId());
+        $this->addNameValue('A-1', 'Widget EN', locale: 'en');
+        $binding = $this->seedBinding();
+
+        $body = $this->pushOnce($binding);
+        self::assertSame('Widget', $body['name']);
+    }
+
+    #[Test]
+    public function unknownSourceChannelFailsTheRunBeforeAnyPush(): void
+    {
+        // #2667 — a stale channel code must fail loudly instead of silently
+        // pushing global values to a channel-scoped remote.
+        $this->seedObject('A-1', 'Widget');
+        $binding = $this->seedBinding();
+        $binding->setSourceChannel('ghost');
+        $this->em()->flush();
+
+        $requester = new RecordingRequester(default: new GenericRestResponse(201, [], '{}', 1, 2));
+
+        try {
+            $this->runner($requester)->run($binding);
+            self::fail('Expected the run to fail on the unresolvable source channel.');
+        } catch (RuntimeException $exception) {
+            self::assertStringContainsString('ghost', $exception->getMessage());
+        }
+        self::assertCount(0, $requester->calls, 'nothing may be pushed on a broken scope reference');
+    }
+
+    private function seedChannel(string $code): Channel
+    {
+        $channel = new Channel($code, ucfirst($code));
+        $channel->assignTenant($this->tenant);
+        $this->em()->persist($channel);
+        $this->em()->flush();
+
+        return $channel;
+    }
+
+    private function addNameValue(string $sku, string $name, ?\Symfony\Component\Uid\Uuid $channelId = null, ?string $locale = null): void
+    {
+        $em = $this->em();
+        $object = $em->getRepository(CatalogObject::class)->findOneBy(['code' => $sku]);
+        \assert($object instanceof CatalogObject);
+        $em->persist(new ObjectValue($object, $this->name, ['value' => $name], Provenance::Manual, $channelId, $locale));
+        $em->flush();
+    }
+
+    /**
+     * Runs the binding against a recording requester and returns the single
+     * pushed JSON body.
+     *
+     * @return array<array-key, mixed>
+     */
+    private function pushOnce(?SyncBinding $binding = null): array
+    {
+        $binding ??= $this->em()->getRepository(SyncBinding::class)->findOneBy([]);
+        \assert($binding instanceof SyncBinding);
+
+        $requester = new RecordingRequester(default: new GenericRestResponse(201, [], '{}', 1, 2));
+        $run = $this->runner($requester)->run($binding);
+        $this->em()->flush();
+
+        self::assertSame(SyncRunStatus::Success, $run->getStatus());
+        self::assertCount(1, $requester->calls);
+        $body = json_decode((string) $requester->calls[0]['body'], true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($body);
+
+        return $body;
     }
 
     private function reloadBinding(\Symfony\Component\Uid\Uuid $id): SyncBinding

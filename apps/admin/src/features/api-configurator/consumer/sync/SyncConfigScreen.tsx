@@ -18,6 +18,7 @@ import {
 } from '../../components/primitives';
 import type { RemoteEndpointRow } from '../wizard/steps/StepEndpoints';
 import { OutboundFilterSection } from './OutboundFilterSection';
+import { type OutboundSource, OutboundSourceSection } from './OutboundSourceSection';
 import { DirDiagram, EndpointSelect, ReadonlyValue } from './sync-components';
 
 import {
@@ -88,6 +89,7 @@ export function SyncConfigScreen({ embedded = false }: { embedded?: boolean } = 
   const [enabled, setEnabled] = useState(true);
   const [newObjectTypeId, setNewObjectTypeId] = useState('');
   const [outboundFilterDsl, setOutboundFilterDsl] = useState<FilterDsl | null>(null);
+  const [source, setSource] = useState<OutboundSource>({ channel: '', locale: '' });
 
   // Hydrate the form from the loaded binding.
   useEffect(() => {
@@ -101,6 +103,7 @@ export function SyncConfigScreen({ embedded = false }: { embedded?: boolean } = 
     setWriteEndpointId(binding.writeEndpointId ?? '');
     setEnabled(binding.isEnabled);
     setOutboundFilterDsl(binding.outboundFilter);
+    setSource({ channel: binding.sourceChannel ?? '', locale: binding.sourceLocale ?? '' });
   }, [binding]);
 
   const cronHuman =
@@ -156,6 +159,9 @@ export function SyncConfigScreen({ embedded = false }: { embedded?: boolean } = 
           enabled,
           // #2549 — `[]` clears; inbound never carries a PIM-side filter.
           outboundFilter: dir === 'inbound' ? [] : (outboundFilterDsl ?? []),
+          // #2667 — '' clears the value-source scope (back to global values).
+          sourceChannel: dir === 'inbound' ? '' : source.channel,
+          sourceLocale: dir === 'inbound' ? '' : source.locale,
         },
         successNotification: false,
       },
@@ -403,6 +409,9 @@ export function SyncConfigScreen({ embedded = false }: { embedded?: boolean } = 
             }
           />
         ) : null}
+
+        {/* #2667 — outbound value-source scope (channel/locale); global when empty. */}
+        {dir !== 'inbound' ? <OutboundSourceSection value={source} onChange={setSource} /> : null}
 
         {/* Conflict — bidirectional only */}
         {dir === 'bidirectional' ? (

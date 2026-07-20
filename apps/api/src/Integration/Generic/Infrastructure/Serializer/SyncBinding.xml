@@ -39,6 +39,12 @@
         <attribute name="matchKeyMapping">
             <group>admin:read</group>
         </attribute>
+        <attribute name="sourceChannel">
+            <group>admin:read</group>
+        </attribute>
+        <attribute name="sourceLocale">
+            <group>admin:read</group>
+        </attribute>
         <attribute name="cursor">
             <group>admin:read</group>
         </attribute>

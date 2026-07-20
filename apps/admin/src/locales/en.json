@@ -2628,6 +2628,13 @@
         "title": "Match key",
         "hint": "Records are matched on this mapping. Change the “key” flag in the Mapping tab."
       },
+      "source": {
+        "title": "Value source",
+        "channel": "Channel",
+        "locale": "Language",
+        "global": "— global (default) —",
+        "hint": "The push reads values scoped to the selected channel/language; a field with no value in that scope falls back to the global one. In bidirectional sync the inbound leg still writes global values."
+      },
       "footer": {
         "toggle": "Binding active",
         "active": "Binding active",

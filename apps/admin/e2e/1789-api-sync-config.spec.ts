@@ -24,8 +24,11 @@ test('APIC-P3-11 — sync config: direction panels + save + run-now', async ({ p
     cursor: { field: 'updated_at', type: 'updated_at', state: '2026-05-11T13:58:22Z' },
     isEnabled: true,
     nextRun: '2026-12-01T02:00:00+00:00',
+    sourceChannel: null,
+    sourceLocale: null,
   };
   let patched = false;
+  let lastPatch: Record<string, unknown> = {};
   let ran = false;
 
   await page.route('**/api/sync_bindings**', (route: Route) => {
@@ -44,6 +47,7 @@ test('APIC-P3-11 — sync config: direction panels + save + run-now', async ({ p
     if (method === 'PATCH') {
       patched = true;
       const body = route.request().postDataJSON() as Record<string, unknown>;
+      lastPatch = body;
       Object.assign(binding, body);
       return route.fulfill({
         status: 200,
@@ -97,6 +101,32 @@ test('APIC-P3-11 — sync config: direction panels + save + run-now', async ({ p
     }),
   );
 
+  // #2667 — the value-source section pulls channels + workspace locales.
+  await page.route('**/api/channels**', (route: Route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/ld+json',
+      body: JSON.stringify({
+        member: [{ id: 'ch-1', code: 'baselinker', name: 'BaseLinker' }],
+        totalItems: 1,
+      }),
+    }),
+  );
+  await page.route('**/api/workspaces/current**', (route: Route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'ws-1',
+        code: 'demo',
+        name: 'Demo',
+        plan: 'mvp',
+        enabledLocales: ['pl', 'en'],
+        primaryLocale: 'pl',
+      }),
+    }),
+  );
+
   await page.goto('/integrations/api-configurator/connections/conn-1/sync');
 
   await expect(
@@ -110,14 +140,24 @@ test('APIC-P3-11 — sync config: direction panels + save + run-now', async ({ p
   // in the page subtitle, so it is not a reliable presence signal).
   await expect(page.getByText(/cursor \(inkrementalny|cursor \(incremental/i)).toBeVisible();
   await expect(page.getByRole('button', { name: /last-write-wins/i })).toHaveCount(0);
+  // #2667 — the value-source picker is outbound-only, so hidden for inbound.
+  await expect(page.getByRole('combobox', { name: /^(kanał|channel)$/i })).toHaveCount(0);
 
   // Switch to bidirectional → the conflict policy card appears.
   await page.getByRole('button', { name: /dwukierunkowy|bidirectional/i }).click();
   await expect(page.getByRole('button', { name: /last-write-wins/i })).toBeVisible();
 
+  // #2667 — pick the value-source channel + language before saving.
+  const channelSelect = page.getByRole('combobox', { name: /^(kanał|channel)$/i });
+  await expect(channelSelect).toBeVisible();
+  await channelSelect.selectOption('baselinker');
+  await page.getByRole('combobox', { name: /^(język|language)$/i }).selectOption('en');
+
   // Save the binding.
   await page.getByRole('button', { name: /zapisz wiązanie|save binding/i }).click();
   await expect.poll(() => patched).toBe(true);
+  expect(lastPatch.sourceChannel).toBe('baselinker');
+  expect(lastPatch.sourceLocale).toBe('en');
 
   // Run now.
   await page.getByRole('button', { name: /uruchom teraz|run now/i }).click();

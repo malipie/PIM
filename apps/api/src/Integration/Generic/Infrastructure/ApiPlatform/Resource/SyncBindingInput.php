@@ -57,6 +57,22 @@ final class SyncBindingInput
     public bool $enabled = true;
 
     /**
+     * #2667 — outbound value-source scope: channel CODE whose values the push
+     * reads (validated to resolve within the tenant). null/'' = global values.
+     */
+    #[Assert\Length(max: 64)]
+    #[Groups(['sync_binding:create'])]
+    public ?string $sourceChannel = null;
+
+    /**
+     * #2667 — outbound value-source scope: locale code (stored SHORT, e.g.
+     * `en`; BCP-47 input is normalised). null/'' = global values.
+     */
+    #[Assert\Length(max: 16)]
+    #[Groups(['sync_binding:create'])]
+    public ?string $sourceLocale = null;
+
+    /**
      * #2549 — FilterDsl snapshot scoping the OUTBOUND push (null = send all).
      * Applies only to the write flow; the FE builder emits a valid DSL and the
      * Export reader compiles it at run time.
