@@ -1,13 +1,15 @@
 import { useList } from '@refinedev/core';
 import { Lock, Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import { ModelingPageHeader } from '@/components/modeling/modeling-page-header';
 import { ModelingRow, ModelingSection } from '@/components/modeling/modeling-section';
 import { ObjectTypeIcon } from '@/components/modeling/object-type-icon';
+import { TopbarCta } from '@/components/ui-v2/topbar-cta';
 import { resolveLabel } from '@/features/catalog/attributes/list';
+import { usePageActions } from '@/layout/page-actions-context';
 import { jsonFetch } from '@/lib/http';
 
 interface ObjectTypeRow {
@@ -54,6 +56,17 @@ export function ObjectTypesListPage() {
   const instanceCounts = useObjectTypeInstanceCounts(types);
   const groupCounts = useObjectTypeGroupCounts(types);
 
+  usePageActions(
+    useMemo(
+      () => (
+        <TopbarCta to="/modeling/object-types/new">
+          {t('object_types.create_custom_action', { defaultValue: 'Utwórz custom ObjectType' })}
+        </TopbarCta>
+      ),
+      [t],
+    ),
+  );
+
   // UX-05 — Category and Asset are system-managed; the operator never
   // models them through this page. Surface only Product among built-ins
   // (plus any future built-in kinds explicitly enabled in modeling).
@@ -76,8 +89,6 @@ export function ObjectTypesListPage() {
           defaultValue:
             'Każdy ObjectType definiuje czym jest obiekt — Produkt, Usługa, Marka. Built-in typy (🔒) są niezbędne dla integracji i nie mogą być usunięte. Tworzenie własnych typów odblokowuje nowe rodzaje obiektów (np. Subskrypcja, Wydarzenie, Lokalizacja).',
         })}
-        ctaLabel={t('object_types.create_custom_action', { defaultValue: '+ Nowy typ' })}
-        onCtaClick={() => navigate('/modeling/object-types/new')}
       />
 
       {isLoading ? (

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Languages, MoreHorizontal, Plus, Star } from 'lucide-react';
+import { Languages, MoreHorizontal, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -20,6 +20,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toast } from '@/components/ui/toast';
+import { TopbarCta } from '@/components/ui-v2/topbar-cta';
+import { usePageActions } from '@/layout/page-actions-context';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -87,6 +89,13 @@ export function LocalesSettingsPage() {
     return Math.max(...rows.map((r) => r.sortOrder)) + 1;
   }, [rows]);
   const [addOpen, setAddOpen] = useState(false);
+
+  usePageActions(
+    useMemo(
+      () => <TopbarCta onClick={() => setAddOpen(true)}>{t('settings.locales.add_cta')}</TopbarCta>,
+      [t],
+    ),
+  );
 
   const onSetDefault = async (code: string) => {
     try {
@@ -163,10 +172,6 @@ export function LocalesSettingsPage() {
           </h2>
           <p className="max-w-2xl text-sm text-muted-foreground">{t('settings.locales.intro')}</p>
         </div>
-        <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
-          <Plus className="size-4" aria-hidden="true" />
-          {t('settings.locales.add_cta')}
-        </Button>
       </header>
 
       <div className="overflow-hidden rounded-lg border bg-background shadow-sm">

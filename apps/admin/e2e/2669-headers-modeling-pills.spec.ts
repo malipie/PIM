@@ -10,8 +10,9 @@ import { loginAsAdmin } from './helpers/auth';
  *     sync" counter; the toolbar is the first thing the list renders.
  *  2. /modeling — no "Modelowanie" header; the 6 tabs render as PillTabs
  *     (same pattern as the Exports hub) and still navigate + highlight.
- *  3. Modeling sub-pages keep their own header whose CTA now uses the
- *     standard orange `bg-cta` styling.
+ *  3. (#2671) Modeling sub-pages register their create CTA into the topbar
+ *     action slot (left of the language switcher) with the standard orange
+ *     `bg-cta` styling — no second create button inside the page content.
  */
 test('#2669 — headers removed, modeling tabs as pills, orange CTA', async ({ page }) => {
   await page.addInitScript(() => {
@@ -55,8 +56,30 @@ test('#2669 — headers removed, modeling tabs as pills, orange CTA', async ({ p
   await page.goto('/modeling/object-types');
   await expect(objectTypesTab).toHaveAttribute('aria-selected', 'true');
 
-  // 3. Sub-page CTA uses the shared orange CTA styling.
-  const cta = main.getByRole('button', { name: /utwórz custom|create custom/i }).first();
-  await expect(cta).toBeVisible();
-  await expect(cta).toHaveClass(/bg-cta/);
+  // 3. (#2671) Create CTAs live in the topbar action slot, not in the page
+  //    content, and use the shared orange bg-cta styling.
+  const objectTypesCta = page.getByRole('link', { name: /utwórz custom|create custom/i });
+  await expect(objectTypesCta).toBeVisible();
+  await expect(objectTypesCta).toHaveClass(/bg-cta/);
+  await expect(main.getByRole('link', { name: /utwórz custom|create custom/i })).toHaveCount(0);
+
+  // Categories: exactly one plus (the icon) — label carries no "+" prefix —
+  // and the tree's ObjectType filter stays in-page.
+  await page.goto('/modeling/categories');
+  const categoriesCta = page.getByRole('link', { name: /nowa kategoria|new category/i });
+  await expect(categoriesCta).toBeVisible();
+  await expect(categoriesCta).toHaveClass(/bg-cta/);
+  await expect(categoriesCta).not.toContainText('+');
+  await expect(main.getByRole('link', { name: /nowa kategoria|new category/i })).toHaveCount(0);
+
+  // Attributes: topbar CTA navigates to the create form.
+  await page.goto('/modeling/attributes');
+  const attributesCta = page.getByRole('link', { name: /nowy atrybut|new attribute/i });
+  await expect(attributesCta).toBeVisible();
+  await attributesCta.click();
+  await expect(page).toHaveURL(/\/modeling\/attributes\/new$/);
+
+  // Leaving the modeling area clears the topbar slot.
+  await page.goto('/dashboard');
+  await expect(page.getByRole('link', { name: /nowy atrybut|new attribute/i })).toHaveCount(0);
 });

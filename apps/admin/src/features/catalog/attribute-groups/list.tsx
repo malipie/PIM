@@ -1,14 +1,15 @@
 import { useList } from '@refinedev/core';
 import { useQueries } from '@tanstack/react-query';
-import { ChevronRight, Lock, Plus, Search } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronRight, Lock, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
 import { BuiltInLockBadge } from '@/components/modeling/built-in-lock-badge';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { TopbarCta } from '@/components/ui-v2/topbar-cta';
 import { resolveLabel } from '@/features/catalog/attributes/list';
+import { usePageActions } from '@/layout/page-actions-context';
 import { jsonFetch } from '@/lib/http';
 import { isLegacyOptionalSystemGroupCode } from '@/lib/legacy-attribute-groups';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,17 @@ interface UsageResp {
 export function AttributeGroupsListPage() {
   const { t, i18n } = useTranslation();
   const [search, setSearch] = useState('');
+
+  usePageActions(
+    useMemo(
+      () => (
+        <TopbarCta to="/modeling/attribute-groups/new">
+          {t('modeling.attributeGroups.create_action', { defaultValue: 'Nowa grupa' })}
+        </TopbarCta>
+      ),
+      [t],
+    ),
+  );
 
   const { result, query } = useList<AttributeGroupRow>({
     resource: 'attribute_groups',
@@ -107,14 +119,6 @@ export function AttributeGroupsListPage() {
                 'Grupa atrybutów jako wymienialna jednostka — przypinasz ją do ObjectType (globalnie) lub Category (z dziedziczeniem). Pimcore nie ma tej abstrakcji, Akeneo traktuje ją tylko jako sortowanie. U nas — własny URL, audit, wersjonowanie.',
             })}
           </p>
-        </div>
-        <div>
-          <Button asChild size="sm" className="h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800">
-            <Link to="/modeling/attribute-groups/new">
-              <Plus className="size-4" />
-              {t('modeling.attributeGroups.create_action', { defaultValue: 'Nowa grupa' })}
-            </Link>
-          </Button>
         </div>
       </div>
 

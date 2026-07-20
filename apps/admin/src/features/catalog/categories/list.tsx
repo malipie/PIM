@@ -17,6 +17,8 @@ import { ObjectTypeFilterDropdown } from '@/components/modeling/object-type-filt
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MockBadge } from '@/components/ui/mock-badge';
+import { TopbarCta } from '@/components/ui-v2/topbar-cta';
+import { usePageActions } from '@/layout/page-actions-context';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -112,6 +114,23 @@ export function CategoriesTreePage() {
   // dropdown on mount, so a reload restores the exact tree + kind.
   const targetObjectTypeId = searchParams.get('targetObjectTypeId') ?? '';
   const targetType: string = searchParams.get('targetType') ?? 'product';
+
+  usePageActions(
+    useMemo(
+      () => (
+        <TopbarCta
+          to={
+            targetObjectTypeId
+              ? `/modeling/categories/new?targetObjectTypeId=${targetObjectTypeId}`
+              : '/modeling/categories/new'
+          }
+        >
+          {t('categories.create_action', { defaultValue: 'Nowa kategoria' })}
+        </TopbarCta>
+      ),
+      [t, targetObjectTypeId],
+    ),
+  );
   const selectedId = searchParams.get('selected') ?? null;
   // DP-01 (#2031) — `?move=1` (deep-link from show.tsx) auto-opens the Move
   // dialog for the selected node once the tree resolves.
@@ -195,12 +214,6 @@ export function CategoriesTreePage() {
           defaultValue:
             'Drzewo kategorii deklaruje jakie grupy atrybutów mają obiekty w tej gałęzi. Dziedziczenie idzie w dół — Ortopeda dziedziczy wszystko od Lekarz + Chirurg, plus własne. Inheritance preview pokazuje co użytkownik zobaczy w formularzu.',
         })}
-        ctaLabel={t('categories.create_action', { defaultValue: '+ Nowa kategoria' })}
-        ctaTo={
-          targetObjectTypeId
-            ? `/modeling/categories/new?targetObjectTypeId=${targetObjectTypeId}`
-            : '/modeling/categories/new'
-        }
         trailing={
           <ObjectTypeFilterDropdown
             value={targetObjectTypeId || null}
