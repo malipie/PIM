@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\Filter;
 
-use App\Shared\Infrastructure\Meilisearch\MeiliFilterLiteral;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Throwable;
@@ -563,144 +562,9 @@ final class FilterDslResolver
             return implode(' '.$operator.' ', $parts);
         }
 
-        return $this->compileMeiliCondition($dsl);
-    }
-
-    /**
-     * @param array<string, mixed> $cond
-     */
-    private function compileMeiliCondition(array $cond): string
-    {
-        $attrRaw = $cond['attr'] ?? null;
-        $opRaw = $cond['op'] ?? null;
-        if (!\is_string($attrRaw) || !\is_string($opRaw)) {
-            throw new RuntimeException('Condition attr/op must be strings.');
-        }
-        $attr = $this->meiliAttrPath($attrRaw);
-        $canonical = self::normaliseOperator($opRaw);
-        $value = $cond['value'] ?? null;
-
-        switch ($canonical) {
-            case self::OP_IS_EMPTY:
-                return "(NOT $attr EXISTS OR $attr IS NULL OR $attr IS EMPTY)";
-
-            case self::OP_IS_NOT_EMPTY:
-                return "($attr EXISTS AND $attr IS NOT NULL AND $attr IS NOT EMPTY)";
-
-            case self::OP_EQ:
-                return "$attr = ".$this->meiliLiteral($value);
-
-            case self::OP_NEQ:
-                return "$attr != ".$this->meiliLiteral($value);
-
-            case self::OP_LT:
-            case self::OP_BEFORE:
-                return "$attr < ".$this->meiliScalar($value);
-
-            case self::OP_GT:
-            case self::OP_AFTER:
-                return "$attr > ".$this->meiliScalar($value);
-
-            case self::OP_LTE:
-                return "$attr <= ".$this->meiliScalar($value);
-
-            case self::OP_GTE:
-                return "$attr >= ".$this->meiliScalar($value);
-
-            case self::OP_IN:
-                return "$attr IN [".$this->meiliList($value).']';
-
-            case self::OP_NOT_IN:
-                return "$attr NOT IN [".$this->meiliList($value).']';
-
-            case self::OP_STARTS_WITH:
-                return "$attr STARTS WITH ".$this->meiliLiteral($value);
-
-            case self::OP_ENDS_WITH:
-                // Meilisearch lacks ENDS WITH — emulate via CONTAINS
-                // (full-text); behaviour drifts vs SQL but covers the
-                // common case of suffix lookup in admin search.
-                return "$attr CONTAINS ".$this->meiliLiteral($value);
-
-            case self::OP_CONTAINS:
-                return "$attr CONTAINS ".$this->meiliLiteral($value);
-
-            case self::OP_NOT_CONTAINS:
-                return "NOT ($attr CONTAINS ".$this->meiliLiteral($value).')';
-
-            case self::OP_BETWEEN:
-                [$lo, $hi] = FilterSqlExpressions::rangePair($value);
-
-                return "$attr ".$this->meiliScalar($lo).' TO '.$this->meiliScalar($hi);
-
-            case self::OP_IS_TRUE:
-                return "$attr = true";
-
-            case self::OP_IS_FALSE:
-                return "$attr = false";
-
-            default:
-                throw new RuntimeException('Operator not supported in Meilisearch compiler: '.$opRaw);
-        }
-    }
-
-    private function meiliAttrPath(string $attr): string
-    {
-        // #2237 — `sku` is the UI/agent alias for the natural key; the
-        // Meili document stores it as `code` (the physical column, mirroring
-        // COLUMN_MAP `sku => co.code` on the SQL path). Without this the
-        // agent's grounding filter `sku = "…"` hit a non-existent Meili field
-        // and the search degraded — misread as a backend outage.
-        if ('sku' === $attr) {
-            return 'code';
-        }
-
-        if (str_contains($attr, '.')) {
-            [$base, $locale] = explode('.', $attr, 2);
-            FilterSqlExpressions::safeIdent($base);
-            FilterSqlExpressions::safeIdent($locale);
-
-            return $base.'.'.$locale;
-        }
-
-        return FilterSqlExpressions::safeIdent($attr);
-    }
-
-    private function meiliLiteral(mixed $value): string
-    {
-        if (\is_int($value) || \is_float($value)) {
-            return (string) $value;
-        }
-        if (\is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-        if (\is_string($value)) {
-            return MeiliFilterLiteral::quote($value);
-        }
-        throw new RuntimeException('Unsupported Meilisearch literal type.');
-    }
-
-    private function meiliScalar(mixed $value): string
-    {
-        if (\is_int($value) || \is_float($value)) {
-            return (string) $value;
-        }
-        if (\is_string($value) && is_numeric($value)) {
-            return $value;
-        }
-        if (\is_string($value)) {
-            return $this->meiliLiteral($value);
-        }
-        throw new RuntimeException('Numeric or date literal required.');
-    }
-
-    private function meiliList(mixed $value): string
-    {
-        if (!\is_array($value) || [] === $value) {
-            throw new RuntimeException('IN/NOT IN requires a non-empty array value.');
-        }
-
-        return implode(', ', array_map($this->meiliLiteral(...), $value));
+        // #2673 — condition compilation extracted to FilterMeiliExpressions
+        // (max-lines guard; mirrors the #2627 FilterSqlExpressions split).
+        return FilterMeiliExpressions::compileCondition($dsl);
     }
 
     /**

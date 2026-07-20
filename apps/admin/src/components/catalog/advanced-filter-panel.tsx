@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import { Globe2, Link2, Plus, Trash2, X } from 'lucide-react';
+import { Link2, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AdvancedFilterScopeBar } from '@/components/catalog/advanced-filter-scope-bar';
 import { AttributePicker } from '@/components/catalog/attribute-picker';
 import { BulkValueInput } from '@/components/catalog/bulk-wizard/bulk-value-input';
 import { Button } from '@/components/ui/button';
@@ -119,18 +120,6 @@ interface AdvancedFilterPanelProps {
   setScope?: (scope: FilterScope | null) => void;
 }
 
-interface ScopeChannelOption {
-  code: string;
-  name?: string | null;
-}
-
-interface ScopeLocaleRow {
-  code: string;
-  /** Short language code (`pl`) — matches `ObjectValue.locale` on the BE. */
-  language?: string;
-  isActive?: boolean;
-}
-
 export function AdvancedFilterPanel({
   open,
   conditions,
@@ -150,39 +139,6 @@ export function AdvancedFilterPanel({
 }: AdvancedFilterPanelProps) {
   const { t } = useTranslation();
   const scopeEnabled = setScope !== undefined;
-
-  // #2673 — scope sources; fetched only when the host wires the scope bar.
-  const { data: scopeChannels } = useQuery({
-    queryKey: ['channels', 'filter-scope'],
-    enabled: scopeEnabled,
-    staleTime: 60_000,
-    queryFn: async (): Promise<ScopeChannelOption[]> => {
-      const response = await jsonFetch<{ member?: ScopeChannelOption[] } | ScopeChannelOption[]>(
-        '/api/channels',
-        { accept: 'application/ld+json' },
-      );
-      return Array.isArray(response) ? response : (response.member ?? []);
-    },
-  });
-  const { data: scopeLocales } = useQuery({
-    queryKey: ['tenant-locales', 'filter-scope'],
-    enabled: scopeEnabled,
-    staleTime: 60_000,
-    queryFn: async (): Promise<string[]> => {
-      const response = await jsonFetch<{ items?: ScopeLocaleRow[] }>('/api/tenant-locales', {
-        accept: 'application/json',
-      });
-      // Short language codes (`pl`), deduped — `ObjectValue.locale` and the
-      // BE scope validation both speak short codes, not full `pl_PL`.
-      return Array.from(
-        new Set(
-          (response.items ?? [])
-            .filter((row) => row.isActive !== false)
-            .map((row) => row.language ?? row.code.split('_')[0] ?? row.code),
-        ),
-      );
-    },
-  });
 
   // #1354 — strict filterable catalog. The panel offers ONLY attributes
   // flagged `is_filterable=true`; this drives the type-badge / operator
@@ -325,67 +281,7 @@ export function AdvancedFilterPanel({
 
       {/* #2673 — value-context bar: the channel/locale every condition is
           evaluated against (with fallback to the global value). */}
-      {scopeEnabled && (
-        <div className="px-5 h-11 flex items-center gap-3 border-b border-zinc-100 bg-zinc-50/60">
-          <Globe2 className="size-3.5 text-zinc-500" aria-hidden />
-          <span className="text-[11px] uppercase tracking-wider font-semibold text-zinc-500">
-            {t('products.advanced_filter.scope_label', { defaultValue: 'Kontekst' })}
-          </span>
-          <label className="flex items-center gap-1.5 text-[12px] text-zinc-600">
-            {t('products.advanced_filter.scope_channel', { defaultValue: 'Kanał' })}
-            <select
-              value={draftScope?.channel ?? ''}
-              onChange={(e) =>
-                setDraftScope(
-                  normalizeScope({ ...draftScope, channel: e.target.value || undefined }),
-                )
-              }
-              aria-label={t('products.advanced_filter.scope_channel_aria', {
-                defaultValue: 'Kanał kontekstu filtra',
-              })}
-              className="h-8 px-2 text-[12.5px] bg-white border border-zinc-200 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 min-w-[130px]"
-            >
-              <option value="">
-                {t('products.advanced_filter.scope_global', { defaultValue: '(globalny)' })}
-              </option>
-              {(scopeChannels ?? []).map((channel) => (
-                <option key={channel.code} value={channel.code}>
-                  {channel.name ?? channel.code}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-1.5 text-[12px] text-zinc-600">
-            {t('products.advanced_filter.scope_locale', { defaultValue: 'Język' })}
-            <select
-              value={draftScope?.locale ?? ''}
-              onChange={(e) =>
-                setDraftScope(
-                  normalizeScope({ ...draftScope, locale: e.target.value || undefined }),
-                )
-              }
-              aria-label={t('products.advanced_filter.scope_locale_aria', {
-                defaultValue: 'Język kontekstu filtra',
-              })}
-              className="h-8 px-2 text-[12.5px] bg-white border border-zinc-200 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 min-w-[110px] font-mono uppercase"
-            >
-              <option value="">
-                {t('products.advanced_filter.scope_global', { defaultValue: '(globalny)' })}
-              </option>
-              {(scopeLocales ?? []).map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span className="text-[11px] text-zinc-400">
-            {t('products.advanced_filter.scope_hint', {
-              defaultValue: 'Warunki liczone na wartościach tego kontekstu (fallback: globalne).',
-            })}
-          </span>
-        </div>
-      )}
+      {scopeEnabled && <AdvancedFilterScopeBar scope={draftScope} onScopeChange={setDraftScope} />}
 
       {/* Body */}
       <div className="p-5">
