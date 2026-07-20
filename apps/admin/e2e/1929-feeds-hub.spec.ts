@@ -111,8 +111,10 @@ test('XMLF-P5-01 — feeds hub: tab, KPI, cards, filtering, a11y', async ({ page
   await expect(page.getByText('Ceneo — Elektronika')).not.toBeVisible();
   await page.getByRole('textbox', { name: /Szukaj feedów|Search feeds/ }).fill('');
 
-  // NewFeedCard CTA routes to the wizard placeholder.
-  await page.getByRole('button', { name: /Nowy feed|New feed/ }).click();
+  // The topbar "Nowy feed" CTA (#2671; the in-grid NewFeedCard became the
+  // exports-style empty state shown only with zero feeds) routes to the
+  // wizard placeholder.
+  await page.getByRole('link', { name: /Nowy feed|New feed/ }).click();
   await expect(page).toHaveURL(/\/integrations\/api-configurator\/feeds\/new$/);
   // The target is the full wizard since P5-02 — return via its back control.
   await expect(page.getByRole('heading', { name: /Nowy feed|New feed/ })).toBeVisible();

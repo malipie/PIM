@@ -520,7 +520,6 @@
     },
     "locales": {
       "title": "Languages",
-      "intro": "Pick which languages this tenant works in. Each locale carries a default flag, a mandatory flag that feeds completeness, and an optional fallback to another locale.",
       "col_locale": "Locale",
       "col_default": "Default",
       "col_mandatory": "Mandatory",
@@ -1471,7 +1470,6 @@
   },
   "channels": {
     "list_title": "Channels",
-    "list_subtitle": "Publication targets — locales and attribute mapping per kind.",
     "back": "Back to channels",
     "empty": "No channels for the current tenant.",
     "fields": {
@@ -1663,7 +1661,7 @@
     "phase_2_badge": "Faza 2",
     "custom_disabled_explanation": "Custom ObjectTypes (kind=custom) are stored in the database from day one but disabled by feature flag in MVP. The schema-add agent in Faza 2 will mint and configure them through natural-language requests.",
     "create_custom_disabled": "Create custom ObjectType",
-    "create_custom_action": "Create custom ObjectType",
+    "create_custom_action": "New object",
     "custom_empty": "No custom ObjectTypes yet — create your first one above.",
     "custom_present_note": "{{count}} custom ObjectType(s) exist in this tenant; visible after Faza 2 unlock.",
     "create_custom": {
@@ -2087,6 +2085,7 @@
           "paused": "paused",
           "error": "error"
         },
+        "empty_title": "No feeds yet",
         "new_feed": "New feed",
         "new_feed_hint": "Pick a template (Google Shopping, Ceneo, Meta) or build your own. Mapping, filter, preview and a stable URL — no developer needed.",
         "adhoc_title": "Need a one-off XML dump?",

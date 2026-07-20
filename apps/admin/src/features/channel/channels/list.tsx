@@ -70,12 +70,9 @@ export function ChannelsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('channels.list_title')}</h1>
-          <p className="text-sm text-muted-foreground">{t('channels.list_subtitle')}</p>
-        </div>
-      </div>
+      <h1 className="font-display text-[22px] font-semibold tracking-tight">
+        {t('channels.list_title')}
+      </h1>
 
       <div className="rounded-xl border bg-card">
         <Table>

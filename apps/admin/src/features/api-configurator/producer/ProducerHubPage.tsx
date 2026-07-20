@@ -23,13 +23,9 @@ export function ProducerHubPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="font-display text-[22px] font-semibold tracking-tight">
-          {t('api_configurator.producer.title')}
-        </h1>
-        <p className="text-[12.5px] text-zinc-500">{t('api_configurator.producer.subtitle')}</p>
-      </div>
-
+      {/* #2671 — visible header removed; sr-only h1 keeps a11y (see
+          ConnectionsHubPage). */}
+      <h1 className="sr-only">{t('api_configurator.producer.title')}</h1>
       <div
         role="tablist"
         aria-label={t('api_configurator.producer.tabs_label')}

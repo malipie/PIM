@@ -136,18 +136,7 @@ export function ImportSourcesView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-6">
-        <div className="max-w-2xl space-y-1">
-          <div className="text-[13px] text-zinc-500 font-medium">
-            {t('imports.sources.subtitle_eyebrow')}
-          </div>
-          <h2 className="font-display text-[24px] font-semibold tracking-tight">
-            {t('imports.sources.title')}
-          </h2>
-          <p className="text-[13.5px] text-zinc-500 leading-relaxed">
-            {t('imports.sources.description')}
-          </p>
-        </div>
+      <div className="flex items-start justify-end gap-6">
         <div className="flex items-center gap-2 shrink-0">
           <Button onClick={handleCreate}>
             <Plus className="size-4" />

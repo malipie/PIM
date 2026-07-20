@@ -58,10 +58,10 @@ test('#2669 — headers removed, modeling tabs as pills, orange CTA', async ({ p
 
   // 3. (#2671) Create CTAs live in the topbar action slot, not in the page
   //    content, and use the shared orange bg-cta styling.
-  const objectTypesCta = page.getByRole('link', { name: /utwórz custom|create custom/i });
+  const objectTypesCta = page.getByRole('link', { name: /nowy obiekt|new object/i });
   await expect(objectTypesCta).toBeVisible();
   await expect(objectTypesCta).toHaveClass(/bg-cta/);
-  await expect(main.getByRole('link', { name: /utwórz custom|create custom/i })).toHaveCount(0);
+  await expect(main.getByRole('link', { name: /nowy obiekt|new object/i })).toHaveCount(0);
 
   // Categories: exactly one plus (the icon) — label carries no "+" prefix —
   // and the tree's ObjectType filter stays in-page.
@@ -99,7 +99,9 @@ test('#2669 — headers removed, modeling tabs as pills, orange CTA', async ({ p
 
   await nav.getByRole('link', { name: /konfigurator xml|xml configurator/i }).click();
   await expect(page).toHaveURL(/\/integrations\/api-configurator\/feeds$/);
-  const feedsCta = page.getByRole('link', { name: /nowy feed|new feed/i });
+  // `.first()` — the topbar CTA precedes main in the DOM; with zero feeds the
+  // exports-style empty state renders a second "Nowy feed" link inside main.
+  const feedsCta = page.getByRole('link', { name: /nowy feed|new feed/i }).first();
   await expect(feedsCta).toBeVisible();
   await expect(feedsCta).toHaveClass(/bg-cta/);
 });

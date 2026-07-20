@@ -165,14 +165,9 @@ export function LocalesSettingsPage() {
 
   return (
     <div className="space-y-4">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="display text-xl font-semibold tracking-tight">
-            {t('settings.locales.title')}
-          </h2>
-          <p className="max-w-2xl text-sm text-muted-foreground">{t('settings.locales.intro')}</p>
-        </div>
-      </header>
+      <h1 className="font-display text-[22px] font-semibold tracking-tight">
+        {t('settings.locales.title')}
+      </h1>
 
       <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
         <Table>

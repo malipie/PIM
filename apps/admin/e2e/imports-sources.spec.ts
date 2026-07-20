@@ -11,9 +11,7 @@ test('imports sources hub — title + empty state + add dialog', async ({ page }
   await loginAsAdmin(page);
   await page.goto('/integrations/imports/sources');
 
-  await expect(page.getByRole('heading', { name: /źródła danych|data sources/i })).toBeVisible();
-
-  // Empty state for a fresh tenant.
+  // Empty state for a fresh tenant (the in-page header was removed in #2671).
   await expect(
     page.getByRole('heading', { name: /brak skonfigurowanych źródeł|no sources yet/i }),
   ).toBeVisible();

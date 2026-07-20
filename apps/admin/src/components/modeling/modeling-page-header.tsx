@@ -1,39 +1,23 @@
 import type { ReactNode } from 'react';
 
 interface ModelingPageHeaderProps {
-  /** Small caption above the heading, e.g. "7 typów obiektów". */
-  caption: string;
   /** Display heading, e.g. "Object Types". */
   title: string;
-  /** Long description paragraph beneath the title. */
-  description: ReactNode;
-  /** Slot rendered beneath the description (e.g. extra controls). */
+  /** Optional slot rendered beneath the title (e.g. extra controls). */
   trailing?: ReactNode;
 }
 
 /**
- * UI-03c — shared header for the Modelowanie sub-tabs.
- *
- * Mirrors the handoff `Project Plan/UI/Wdrozenie_grafiki/...` and the
- * Object Types reference shot in `docs/Tests/UI/Modelowanie/`. Caption,
- * display heading and long description make up the consistent shell every
- * sub-tab gets. The primary "+ Nowy ___" CTA moved to the topbar action
- * slot (#2671) — pages register it via `usePageActions`.
+ * UI-03c — shared header for the Modelowanie sub-tabs. #2671 aligned it with
+ * the v2 hub chrome (Connections hub): a single 22px display heading — the
+ * caption/count, long description and the primary CTA are gone (the CTA moved
+ * to the topbar action slot via `usePageActions`).
  */
-export function ModelingPageHeader({
-  caption,
-  title,
-  description,
-  trailing,
-}: ModelingPageHeaderProps) {
+export function ModelingPageHeader({ title, trailing }: ModelingPageHeaderProps) {
   return (
     <header className="space-y-3">
-      <p className="text-[12px] font-medium uppercase tracking-wider text-muted-foreground">
-        {caption}
-      </p>
-      <h1 className="display text-[32px] font-semibold leading-tight text-ink">{title}</h1>
-      <div className="max-w-3xl text-[14px] leading-relaxed text-ink-2">{description}</div>
-      {trailing ? <div className="flex flex-wrap items-center gap-3 pt-1">{trailing}</div> : null}
+      <h1 className="font-display text-[22px] font-semibold tracking-tight">{title}</h1>
+      {trailing ? <div className="flex flex-wrap items-center gap-3">{trailing}</div> : null}
     </header>
   );
 }

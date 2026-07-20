@@ -66,17 +66,10 @@ export function ConnectionsHubPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-[22px] font-semibold tracking-tight">
-            {t('api_configurator.hub.title')}
-          </h1>
-          <p className="mt-0.5 text-[13px] text-zinc-500">
-            {t('api_configurator.hub.subtitle', { count: counts.all })}
-          </p>
-        </div>
-      </div>
-
+      {/* #2671 — the visible hub header was removed (topbar breadcrumb names
+          the area); the sr-only h1 keeps screen-reader orientation and the
+          page-has-heading-one axe rule satisfied. */}
+      <h1 className="sr-only">{t('api_configurator.hub.title')}</h1>
       <div className="flex flex-wrap items-center gap-3">
         <Input
           value={search}

@@ -95,32 +95,9 @@ export function AttributeGroupsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-medium text-muted-foreground">
-              {t('modeling.attributeGroups.list_caption', {
-                defaultValue: '{{count}} grup atrybutów',
-                count: groups.length,
-              })}
-            </span>
-            <span className="rounded bg-orange-50 px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-orange-800">
-              {t('modeling.attributeGroups.list_first_class_badge', {
-                defaultValue: '⭐ first-class entity',
-              })}
-            </span>
-          </div>
-          <h1 className="font-display text-[28px] font-semibold tracking-tight">
-            {t('modeling.attributeGroups.list_title', { defaultValue: 'Attribute Groups' })}
-          </h1>
-          <p className="mt-1 max-w-3xl text-[13px] text-muted-foreground">
-            {t('modeling.attributeGroups.list_description', {
-              defaultValue:
-                'Grupa atrybutów jako wymienialna jednostka — przypinasz ją do ObjectType (globalnie) lub Category (z dziedziczeniem). Pimcore nie ma tej abstrakcji, Akeneo traktuje ją tylko jako sortowanie. U nas — własny URL, audit, wersjonowanie.',
-            })}
-          </p>
-        </div>
-      </div>
+      <h1 className="font-display text-[22px] font-semibold tracking-tight">
+        {t('modeling.attributeGroups.list_title', { defaultValue: 'Attribute Groups' })}
+      </h1>
 
       <Card className="p-2">
         <div className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3">

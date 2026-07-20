@@ -151,25 +151,9 @@ export function AttributesListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <div>
-          <div className="text-[13px] font-medium text-muted-foreground">
-            {t('attributes.list_caption', {
-              defaultValue: '{{count}} atrybutów w bibliotece',
-              count: attributes.length,
-            })}
-          </div>
-          <h1 className="font-display text-[28px] font-semibold tracking-tight">
-            {t('attributes.list_title', { defaultValue: 'Attributes' })}
-          </h1>
-          <p className="mt-1 max-w-3xl text-[13px] text-muted-foreground">
-            {t('attributes.list_description', {
-              defaultValue:
-                'Globalna biblioteka pól PIM-u — każdy atrybut ma własny code, typ i walidację. Atrybuty dołączane są do ObjectType lub Attribute Group; tu zarządzasz nimi w jednym miejscu. Built-in atrybuty (created_at, updated_by) są chronione przed usunięciem.',
-            })}
-          </p>
-        </div>
-      </div>
+      <h1 className="font-display text-[22px] font-semibold tracking-tight">
+        {t('attributes.list_title', { defaultValue: 'Attributes' })}
+      </h1>
 
       <Card className="p-2">
         <div className="flex flex-wrap items-center gap-3 border-b border-zinc-100 px-4 py-3">

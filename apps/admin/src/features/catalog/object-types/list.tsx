@@ -60,7 +60,7 @@ export function ObjectTypesListPage() {
     useMemo(
       () => (
         <TopbarCta to="/modeling/object-types/new">
-          {t('object_types.create_custom_action', { defaultValue: 'Utwórz custom ObjectType' })}
+          {t('object_types.create_custom_action', { defaultValue: 'Nowy obiekt' })}
         </TopbarCta>
       ),
       [t],
@@ -80,15 +80,7 @@ export function ObjectTypesListPage() {
   return (
     <div className="space-y-6">
       <ModelingPageHeader
-        caption={t('object_types.list_caption', {
-          defaultValue: '{{count}} typów obiektów',
-          count: types.length,
-        })}
         title={t('object_types.list_heading', { defaultValue: 'Object Types' })}
-        description={t('object_types.list_description', {
-          defaultValue:
-            'Każdy ObjectType definiuje czym jest obiekt — Produkt, Usługa, Marka. Built-in typy (🔒) są niezbędne dla integracji i nie mogą być usunięte. Tworzenie własnych typów odblokowuje nowe rodzaje obiektów (np. Subskrypcja, Wydarzenie, Lokalizacja).',
-        })}
       />
 
       {isLoading ? (

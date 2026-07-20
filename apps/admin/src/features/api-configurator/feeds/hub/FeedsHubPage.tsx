@@ -1,8 +1,9 @@
 import { ArrowRight, Download, Plus, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 
+import { EmptyState } from '@/components/ui-v2/empty-state';
 import { TopbarCta } from '@/components/ui-v2/topbar-cta';
 import { Segmented } from '@/features/api-configurator/components/primitives';
 import { usePageActions } from '@/layout/page-actions-context';
@@ -21,7 +22,6 @@ type StatusFilter = 'all' | FeedStatus;
  */
 export function FeedsHubPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const feedsQuery = useFeeds();
   const kpiQuery = useFeedKpi();
   const [search, setSearch] = useState('');
@@ -78,26 +78,29 @@ export function FeedsHubPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {filtered.map((feed) => (
-          <FeedCard key={feed.id} feed={feed} />
-        ))}
-        <button
-          type="button"
-          onClick={() => void navigate('/integrations/api-configurator/feeds/new')}
-          className="group flex min-h-[240px] flex-col items-center justify-center rounded-3xl border-2 border-dashed border-zinc-200 p-5 text-zinc-500 transition hover:border-zinc-400 hover:bg-zinc-50/50 hover:text-zinc-900"
-        >
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 transition group-hover:bg-zinc-900 group-hover:text-white">
-            <Plus className="h-5 w-5" aria-hidden />
-          </div>
-          <div className="mt-3 text-[14px] font-medium">
-            {t('api_configurator.feeds.hub.new_feed')}
-          </div>
-          <div className="mt-1 max-w-[280px] text-center text-[12px] leading-relaxed text-zinc-500">
-            {t('api_configurator.feeds.hub.new_feed_hint')}
-          </div>
-        </button>
-      </div>
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-zinc-200 bg-surface">
+          <EmptyState
+            icon={<Plus className="size-5" />}
+            title={t('api_configurator.feeds.hub.empty_title')}
+            description={t('api_configurator.feeds.hub.new_feed_hint')}
+            action={
+              <Link
+                to="/integrations/api-configurator/feeds/new"
+                className="focus-ring inline-flex h-9 items-center rounded-xl bg-cta px-3.5 text-[13px] font-semibold text-cta-foreground transition hover:bg-accent-hover"
+              >
+                {t('api_configurator.feeds.hub.new_feed')}
+              </Link>
+            }
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {filtered.map((feed) => (
+            <FeedCard key={feed.id} feed={feed} />
+          ))}
+        </div>
+      )}
 
       <Link
         to="/exports"

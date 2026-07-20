@@ -205,15 +205,7 @@ export function CategoriesTreePage() {
   return (
     <div className="space-y-6">
       <ModelingPageHeader
-        caption={t('categories.list_caption', {
-          defaultValue: 'drzewo ltree · target {{kind}}',
-          kind: targetType.charAt(0).toUpperCase() + targetType.slice(1),
-        })}
         title={t('categories.list_title', { defaultValue: 'Categories · modeling' })}
-        description={t('categories.list_description', {
-          defaultValue:
-            'Drzewo kategorii deklaruje jakie grupy atrybutów mają obiekty w tej gałęzi. Dziedziczenie idzie w dół — Ortopeda dziedziczy wszystko od Lekarz + Chirurg, plus własne. Inheritance preview pokazuje co użytkownik zobaczy w formularzu.',
-        })}
         trailing={
           <ObjectTypeFilterDropdown
             value={targetObjectTypeId || null}

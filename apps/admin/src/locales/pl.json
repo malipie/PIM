@@ -522,7 +522,6 @@
     },
     "locales": {
       "title": "Wersje językowe",
-      "intro": "Wybierz, w jakich językach pracujesz na tenancie. Każdy locale ma flagę domyślności, wymagalność dla completeness oraz opcjonalny fallback do innego locale.",
       "col_locale": "Locale",
       "col_default": "Domyślny",
       "col_mandatory": "Wymagany",
@@ -1485,7 +1484,6 @@
   },
   "channels": {
     "list_title": "Kanały",
-    "list_subtitle": "Cele publikacji — locale, waluty i mapping atrybutów per kind.",
     "back": "Wróć do kanałów",
     "empty": "Brak kanałów dla aktualnego najemcy.",
     "fields": {
@@ -1677,7 +1675,7 @@
     "phase_2_badge": "Faza 2",
     "custom_disabled_explanation": "Custom ObjectTypes (kind=custom) są w bazie od dnia 1, ale wyłączone feature flagiem w MVP. Schema-add agent w Fazie 2 będzie tworzył i konfigurował je z naturalnego języka.",
     "create_custom_disabled": "Utwórz custom ObjectType",
-    "create_custom_action": "Utwórz custom ObjectType",
+    "create_custom_action": "Nowy obiekt",
     "custom_empty": "Brak custom ObjectTypes — utwórz pierwszy przez przycisk powyżej.",
     "custom_present_note": "{{count}} custom ObjectType istnieje w tym najemcy; widoczne po odblokowaniu w Fazie 2.",
     "create_custom": {
@@ -2101,6 +2099,7 @@
           "paused": "wstrzymane",
           "error": "błąd"
         },
+        "empty_title": "Brak feedów",
         "new_feed": "Nowy feed",
         "new_feed_hint": "Wybierz szablon (Google Shopping, Ceneo, Meta) albo zbuduj własny. Mapowanie, filtr, podgląd i stabilny URL — bez developera.",
         "adhoc_title": "Potrzebujesz jednorazowego zrzutu XML?",
