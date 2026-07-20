@@ -119,7 +119,7 @@ final readonly class OutboundSyncRunner
         // and reload the entities the loop keeps mutating.
         $rateHint = $binding->getConnection()->getRateLimitHint();
 
-        foreach ($this->reader->read($binding->getObjectTypeId(), $codes, $binding->getOutboundFilter()) as $record) {
+        foreach ($this->reader->read($binding->getObjectTypeId(), $codes, $binding->getOutboundFilter(), $binding->getSourceChannel(), $binding->getSourceLocale()) as $record) {
             $continue = $this->push($run, $binding, $writeEndpoint, $record, $mappings, $matchCode, $action, $dryRun);
             $this->em->flush();
 

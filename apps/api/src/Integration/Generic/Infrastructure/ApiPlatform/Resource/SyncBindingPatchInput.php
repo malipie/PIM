@@ -54,4 +54,22 @@ final class SyncBindingPatchInput
      */
     #[Groups(['sync_binding:patch'])]
     public ?array $outboundFilter = null;
+
+    /**
+     * #2667 — outbound value-source channel CODE. Null = leave unchanged;
+     * empty string = clear (back to global values); code = set (validated to
+     * resolve within the tenant).
+     */
+    #[Assert\Length(max: 64)]
+    #[Groups(['sync_binding:patch'])]
+    public ?string $sourceChannel = null;
+
+    /**
+     * #2667 — outbound value-source locale (stored SHORT, e.g. `en`). Null =
+     * leave unchanged; empty string = clear; code = set (validated against the
+     * tenant's enabled locales).
+     */
+    #[Assert\Length(max: 16)]
+    #[Groups(['sync_binding:patch'])]
+    public ?string $sourceLocale = null;
 }

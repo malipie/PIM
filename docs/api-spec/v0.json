@@ -28306,6 +28306,22 @@
                             "null"
                         ]
                     },
+                    "sourceChannel": {
+                        "maxLength": 64,
+                        "description": "#2667 \u2014 outbound value-source scope: the PIM channel CODE whose values\nthe push reads (loose reference like `objectTypeId`; the binding API\nvalidates it resolves). null = global values. Per attribute the scoped\nvalue wins and missing scoped values fall back to the global one; an\nunresolvable code fails the run rather than silently pushing globals.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "sourceLocale": {
+                        "maxLength": 16,
+                        "description": "#2667 \u2014 outbound value-source scope: SHORT locale code (`en`, matching\n`ObjectValue::$locale`). null = global. Same fallback semantics as\n`$sourceChannel`; locale dominates channel in the precedence (parity\nwith the ObjectValueLocaleOverlay rank).",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "nextRun": {
                         "description": "When the scheduler next fires this binding; null = manual-only (no cron)\nor not yet computed. Maintained by the schedule dispatcher (APIC-P3-09),\njittered per tenant so concurrent bindings don't stampede the same remote.",
                         "type": [
@@ -28432,6 +28448,22 @@
                         "default": true,
                         "type": "boolean"
                     },
+                    "sourceChannel": {
+                        "maxLength": 64,
+                        "description": "#2667 \u2014 outbound value-source scope: channel CODE whose values the push\nreads (validated to resolve within the tenant). null/'' = global values.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "sourceLocale": {
+                        "maxLength": 16,
+                        "description": "#2667 \u2014 outbound value-source scope: locale code (stored SHORT, e.g.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "outboundFilter": {
                         "description": "#2549 \u2014 FilterDsl snapshot scoping the OUTBOUND push (null = send all).",
                         "type": [
@@ -28535,6 +28567,22 @@
                                 "null"
                             ]
                         }
+                    },
+                    "sourceChannel": {
+                        "maxLength": 64,
+                        "description": "#2667 \u2014 outbound value-source channel CODE. Null = leave unchanged;\nempty string = clear (back to global values); code = set (validated to\nresolve within the tenant).",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "sourceLocale": {
+                        "maxLength": 16,
+                        "description": "#2667 \u2014 outbound value-source locale (stored SHORT, e.g. `en`). Null =\nleave unchanged; empty string = clear; code = set (validated against the\ntenant's enabled locales).",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     }
                 }
             },
@@ -28607,6 +28655,22 @@
                             "matchKeyMapping": {
                                 "maxLength": 255,
                                 "description": "The PIM target acting as the upsert match key; null until mappings are set.",
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "sourceChannel": {
+                                "maxLength": 64,
+                                "description": "#2667 \u2014 outbound value-source scope: the PIM channel CODE whose values\nthe push reads (loose reference like `objectTypeId`; the binding API\nvalidates it resolves). null = global values. Per attribute the scoped\nvalue wins and missing scoped values fall back to the global one; an\nunresolvable code fails the run rather than silently pushing globals.",
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "sourceLocale": {
+                                "maxLength": 16,
+                                "description": "#2667 \u2014 outbound value-source scope: SHORT locale code (`en`, matching\n`ObjectValue::$locale`). null = global. Same fallback semantics as\n`$sourceChannel`; locale dominates channel in the precedence (parity\nwith the ObjectValueLocaleOverlay rank).",
                                 "type": [
                                     "string",
                                     "null"

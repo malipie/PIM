@@ -23,6 +23,8 @@ export interface SyncBindingRow {
   isEnabled: boolean;
   nextRun: string | null;
   outboundFilter: FilterDsl | null; // #2549 — outbound scope (null = send all)
+  sourceChannel: string | null; // #2667 — outbound value-source channel code (omitted when null)
+  sourceLocale: string | null; // #2667 — outbound value-source SHORT locale (omitted when null)
 }
 
 export interface ObjectTypeRow {

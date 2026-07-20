@@ -2642,6 +2642,13 @@
         "title": "Klucz parowania (match key)",
         "hint": "Rekordy parowane po tym mapowaniu. Zmień oznaczenie „key” w zakładce Mapowanie."
       },
+      "source": {
+        "title": "Źródło wartości",
+        "channel": "Kanał",
+        "locale": "Język",
+        "global": "— globalne (domyślne) —",
+        "hint": "Wysyłka czyta wartości wybranego kanału/języka; pole bez wartości w tym zakresie spada do wartości globalnej. Przy synchronizacji dwukierunkowej odczyt z API nadal zapisuje wartości globalne."
+      },
       "footer": {
         "toggle": "Aktywność wiązania",
         "active": "Wiązanie aktywne",
