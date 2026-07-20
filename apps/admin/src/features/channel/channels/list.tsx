@@ -1,6 +1,6 @@
 import { useDelete, useList } from '@refinedev/core';
-import { Eye, MoreHorizontal, Pencil, Plus, Radio, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Eye, MoreHorizontal, Pencil, Radio, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
@@ -20,6 +20,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
+import { TopbarCta } from '@/components/ui-v2/topbar-cta';
+import { usePageActions } from '@/layout/page-actions-context';
 
 import { ChannelDeleteConfirmDialog } from './delete-confirm-dialog';
 
@@ -36,6 +38,13 @@ export function ChannelsListPage() {
     resource: 'channels',
     pagination: { mode: 'off' },
   });
+
+  usePageActions(
+    useMemo(
+      () => <TopbarCta to="/modeling/channels/new">{t('channels.list.create_button')}</TopbarCta>,
+      [t],
+    ),
+  );
   const { mutate: doDelete } = useDelete();
   const toast = useToast();
 
@@ -61,18 +70,9 @@ export function ChannelsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('channels.list_title')}</h1>
-          <p className="text-sm text-muted-foreground">{t('channels.list_subtitle')}</p>
-        </div>
-        <Button asChild>
-          <Link to="/modeling/channels/new">
-            <Plus className="size-4" />
-            {t('channels.list.create_button')}
-          </Link>
-        </Button>
-      </div>
+      <h1 className="font-display text-[22px] font-semibold tracking-tight">
+        {t('channels.list_title')}
+      </h1>
 
       <div className="rounded-xl border bg-card">
         <Table>

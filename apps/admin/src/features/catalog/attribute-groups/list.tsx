@@ -1,14 +1,15 @@
 import { useList } from '@refinedev/core';
 import { useQueries } from '@tanstack/react-query';
-import { ChevronRight, Lock, Plus, Search } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronRight, Lock, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
 import { BuiltInLockBadge } from '@/components/modeling/built-in-lock-badge';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { TopbarCta } from '@/components/ui-v2/topbar-cta';
 import { resolveLabel } from '@/features/catalog/attributes/list';
+import { usePageActions } from '@/layout/page-actions-context';
 import { jsonFetch } from '@/lib/http';
 import { isLegacyOptionalSystemGroupCode } from '@/lib/legacy-attribute-groups';
 import { cn } from '@/lib/utils';
@@ -51,6 +52,17 @@ export function AttributeGroupsListPage() {
   const { t, i18n } = useTranslation();
   const [search, setSearch] = useState('');
 
+  usePageActions(
+    useMemo(
+      () => (
+        <TopbarCta to="/modeling/attribute-groups/new">
+          {t('modeling.attributeGroups.create_action', { defaultValue: 'Nowa grupa' })}
+        </TopbarCta>
+      ),
+      [t],
+    ),
+  );
+
   const { result, query } = useList<AttributeGroupRow>({
     resource: 'attribute_groups',
     pagination: { mode: 'off' },
@@ -83,40 +95,9 @@ export function AttributeGroupsListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-medium text-muted-foreground">
-              {t('modeling.attributeGroups.list_caption', {
-                defaultValue: '{{count}} grup atrybutów',
-                count: groups.length,
-              })}
-            </span>
-            <span className="rounded bg-orange-50 px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-orange-800">
-              {t('modeling.attributeGroups.list_first_class_badge', {
-                defaultValue: '⭐ first-class entity',
-              })}
-            </span>
-          </div>
-          <h1 className="font-display text-[28px] font-semibold tracking-tight">
-            {t('modeling.attributeGroups.list_title', { defaultValue: 'Attribute Groups' })}
-          </h1>
-          <p className="mt-1 max-w-3xl text-[13px] text-muted-foreground">
-            {t('modeling.attributeGroups.list_description', {
-              defaultValue:
-                'Grupa atrybutów jako wymienialna jednostka — przypinasz ją do ObjectType (globalnie) lub Category (z dziedziczeniem). Pimcore nie ma tej abstrakcji, Akeneo traktuje ją tylko jako sortowanie. U nas — własny URL, audit, wersjonowanie.',
-            })}
-          </p>
-        </div>
-        <div>
-          <Button asChild size="sm" className="h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800">
-            <Link to="/modeling/attribute-groups/new">
-              <Plus className="size-4" />
-              {t('modeling.attributeGroups.create_action', { defaultValue: 'Nowa grupa' })}
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <h1 className="font-display text-[22px] font-semibold tracking-tight">
+        {t('modeling.attributeGroups.list_title', { defaultValue: 'Attribute Groups' })}
+      </h1>
 
       <Card className="p-2">
         <div className="flex items-center gap-3 border-b border-zinc-100 px-4 py-3">

@@ -35,17 +35,20 @@ test('APIC-P4-08 — unified shell: navigate across producer / consumer / monito
   // tab, the configured first face.
   await page.goto('/integrations/api-configurator');
   await expect(page).toHaveURL(/\/connections$/);
-  await expect(page.getByRole('heading', { name: /^połączenia$|^connections$/i })).toBeVisible();
+  // In-page hub headers were removed in #2671 — the search box is the
+  // connections face's ready signal.
+  await expect(page.getByRole('textbox', { name: /szukaj|search/i }).first()).toBeVisible();
 
   // a11y on the unified shell at rest (each face is audited in its own E2E;
   // here we check the shell landing before exercising cross-face navigation).
-  const a11y = await new AxeBuilder({ page }).analyze();
+  // `.exclude('.bg-cta')` — orange topbar CTA (#2671), sanctioned design
+  // accent excluded across a11y specs (same as nui-13 / exr-16).
+  const a11y = await new AxeBuilder({ page }).exclude('.bg-cta').analyze();
   expect(a11y.violations).toEqual([]);
 
   // → Producer face (Moje API), now on its own /producer path.
   await page.getByRole('tab', { name: /^moje api$|^my api$/i }).click();
   await expect(page).toHaveURL(/\/producer$/);
-  await expect(page.getByRole('heading', { name: /moje api|my api/i })).toBeVisible();
 
   // → Monitor.
   await page.getByRole('tab', { name: /^monitor$/i }).click();
@@ -57,5 +60,4 @@ test('APIC-P4-08 — unified shell: navigate across producer / consumer / monito
   // → back to Połączenia.
   await page.getByRole('tab', { name: /^połączenia$|^connections$/i }).click();
   await expect(page).toHaveURL(/\/connections$/);
-  await expect(page.getByRole('heading', { name: /^połączenia$|^connections$/i })).toBeVisible();
 });

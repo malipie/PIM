@@ -74,7 +74,9 @@ test('APIC #1883 — connection card links to detail + delete with confirm', asy
   await expect(cardLink).toBeVisible();
 
   // a11y on the hub with a rendered card.
-  const a11y = await new AxeBuilder({ page }).analyze();
+  // `.exclude('.bg-cta')` — orange topbar CTA (#2671), sanctioned design
+  // accent excluded across a11y specs (same as nui-13 / exr-16).
+  const a11y = await new AxeBuilder({ page }).exclude('.bg-cta').analyze();
   expect(a11y.violations).toEqual([]);
 
   // 1) Whole card navigates to the detail.

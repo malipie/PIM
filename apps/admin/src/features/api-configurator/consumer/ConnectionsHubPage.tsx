@@ -1,11 +1,10 @@
 import { useList } from '@refinedev/core';
-import { Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TopbarCta } from '@/components/ui-v2/topbar-cta';
+import { usePageActions } from '@/layout/page-actions-context';
 
 import { Segmented } from '../components/primitives';
 import { ConnectionCard, type ConnectionRow } from './ConnectionCard';
@@ -20,6 +19,17 @@ type StatusFilter = 'all' | 'active' | 'paused' | 'error' | 'draft';
  */
 export function ConnectionsHubPage() {
   const { t } = useTranslation();
+
+  usePageActions(
+    useMemo(
+      () => (
+        <TopbarCta to="/integrations/api-configurator/connections/new">
+          {t('api_configurator.hub.new_connection')}
+        </TopbarCta>
+      ),
+      [t],
+    ),
+  );
   const { result, query } = useList<ConnectionRow>({
     resource: 'connections',
     pagination: { mode: 'off' },
@@ -56,23 +66,10 @@ export function ConnectionsHubPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-[22px] font-semibold tracking-tight">
-            {t('api_configurator.hub.title')}
-          </h1>
-          <p className="mt-0.5 text-[13px] text-zinc-500">
-            {t('api_configurator.hub.subtitle', { count: counts.all })}
-          </p>
-        </div>
-        <Button asChild>
-          <Link to="/integrations/api-configurator/connections/new">
-            <Plus className="mr-1 size-4" aria-hidden />
-            {t('api_configurator.hub.new_connection')}
-          </Link>
-        </Button>
-      </div>
-
+      {/* #2671 — the visible hub header was removed (topbar breadcrumb names
+          the area); the sr-only h1 keeps screen-reader orientation and the
+          page-has-heading-one axe rule satisfied. */}
+      <h1 className="sr-only">{t('api_configurator.hub.title')}</h1>
       <div className="flex flex-wrap items-center gap-3">
         <Input
           value={search}

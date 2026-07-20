@@ -15,12 +15,9 @@ test.describe('Imports MVP', () => {
     await loginAsAdmin(page);
 
     await page.goto('/integrations/imports');
-    // NUI-09 — the legacy IntegrationsLayout header is gone; the hub
-    // renders pill tabs + the sessions view heading under the v2 shell.
-    await expect(
-      page.getByRole('heading', { name: /sesje import|importy|import sessions/i }),
-    ).toBeVisible();
-
+    // NUI-09 — the legacy IntegrationsLayout header is gone; #2671 also
+    // removed the in-page sessions header. The "Nowy import" CTA is the
+    // hub's ready signal.
     await page
       .getByRole('link', { name: /nowy import|new import/i })
       .first()

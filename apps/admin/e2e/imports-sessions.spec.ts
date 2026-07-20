@@ -12,10 +12,8 @@ test('imports sessions hub — KPI + filter + new-import CTA', async ({ page }) 
   await loginAsAdmin(page);
   await page.goto('/integrations/imports/sessions');
 
-  // Section heading + KPI strip labels.
-  await expect(
-    page.getByRole('heading', { name: /sesje importów|import sessions/i }),
-  ).toBeVisible();
+  // KPI strip labels (the in-page section header was removed in #2671 —
+  // the topbar breadcrumb names the area).
   await expect(page.getByText(/^w toku$|^in progress$/i).first()).toBeVisible();
   await expect(page.getByText(/^dziś|^today/i).first()).toBeVisible();
   await expect(page.getByText(/sukces · 30 dni|success · 30 days/i)).toBeVisible();

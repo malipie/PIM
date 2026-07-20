@@ -11,11 +11,8 @@ test('imports profiles hub — title + grid/list toggle + new-profile CTA', asyn
   await loginAsAdmin(page);
   await page.goto('/integrations/imports/profiles');
 
-  await expect(
-    page.getByRole('heading', { name: /profile mapowań|mapping profiles/i }),
-  ).toBeVisible();
-
-  // "Nowy profil" CTA is visible in the header.
+  // The in-page header was removed in #2671 — the "Nowy profil" CTA is the
+  // hub's ready signal.
   const newProfile = page.getByRole('button', { name: /nowy profil|new profile/i }).first();
   await expect(newProfile).toBeVisible();
 

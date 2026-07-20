@@ -1,13 +1,14 @@
 import { useList } from '@refinedev/core';
 import { useQueries } from '@tanstack/react-query';
-import { ChevronRight, Layers, Plus, Search, Shield, Zap } from 'lucide-react';
-import { useState } from 'react';
+import { ChevronRight, Layers, Search, Shield, Zap } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
 
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
+import { TopbarCta } from '@/components/ui-v2/topbar-cta';
+import { usePageActions } from '@/layout/page-actions-context';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -69,6 +70,17 @@ export function AttributesListPage() {
   const { t, i18n } = useTranslation();
   const [filter, setFilter] = useState<TypeFilter>('all');
   const [query, setQuery] = useState('');
+
+  usePageActions(
+    useMemo(
+      () => (
+        <TopbarCta to="/modeling/attributes/new">
+          {t('attributes.create_action', { defaultValue: 'Nowy atrybut' })}
+        </TopbarCta>
+      ),
+      [t],
+    ),
+  );
   // DP-04 (#2034) — group filter lives in the URL (`?group=<uuid>`) so a
   // refresh / back-navigation keeps the narrowed view. Filtering happens
   // server-side via `?attributeGroup=` (AttributeGroupFilter, BE).
@@ -139,33 +151,9 @@ export function AttributesListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <div>
-          <div className="text-[13px] font-medium text-muted-foreground">
-            {t('attributes.list_caption', {
-              defaultValue: '{{count}} atrybutów w bibliotece',
-              count: attributes.length,
-            })}
-          </div>
-          <h1 className="font-display text-[28px] font-semibold tracking-tight">
-            {t('attributes.list_title', { defaultValue: 'Attributes' })}
-          </h1>
-          <p className="mt-1 max-w-3xl text-[13px] text-muted-foreground">
-            {t('attributes.list_description', {
-              defaultValue:
-                'Globalna biblioteka pól PIM-u — każdy atrybut ma własny code, typ i walidację. Atrybuty dołączane są do ObjectType lub Attribute Group; tu zarządzasz nimi w jednym miejscu. Built-in atrybuty (created_at, updated_by) są chronione przed usunięciem.',
-            })}
-          </p>
-        </div>
-        <div>
-          <Button asChild size="sm" className="h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800">
-            <Link to="/modeling/attributes/new">
-              <Plus className="size-4" />
-              {t('attributes.create_action', { defaultValue: 'Nowy atrybut' })}
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <h1 className="font-display text-[22px] font-semibold tracking-tight">
+        {t('attributes.list_title', { defaultValue: 'Attributes' })}
+      </h1>
 
       <Card className="p-2">
         <div className="flex flex-wrap items-center gap-3 border-b border-zinc-100 px-4 py-3">

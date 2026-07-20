@@ -77,9 +77,8 @@ test('APIC-P4-06 — producer hub: profiles / keys / webhooks tabs', async ({ pa
   // redirects to the Połączenia tab) to its own /producer path.
   await page.goto('/integrations/api-configurator/producer');
 
-  await expect(page.getByRole('heading', { name: /moje api|my api/i })).toBeVisible();
-
-  // Profiles tab (default): the profile card.
+  // Profiles tab (default): the profile card (the in-page "Moje API" header
+  // was removed in #2671).
   await expect(page.getByText('Storefront feed', { exact: true })).toBeVisible();
 
   // Keys tab.
