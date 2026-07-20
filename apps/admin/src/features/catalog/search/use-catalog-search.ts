@@ -45,6 +45,11 @@ export interface CatalogSearchResult {
   processingTimeMs: number;
   page: number;
   perPage: number;
+  /**
+   * #2673 — true when a value-context scope matched more objects than the
+   * SQL→Meili prefilter cap (10k); the hit list is then approximate.
+   */
+  scopeTruncated?: boolean;
 }
 
 export type UseCatalogSearchOptions = CatalogSearchTarget & UseCatalogSearchBaseOptions;

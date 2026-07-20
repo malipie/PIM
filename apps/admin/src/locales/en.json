@@ -2046,7 +2046,16 @@
       }
     },
     "advanced_filter": {
-      "remove_condition": "Remove condition"
+      "remove_condition": "Remove condition",
+      "scope_label": "Context",
+      "scope_channel": "Channel",
+      "scope_locale": "Locale",
+      "scope_global": "(global)",
+      "scope_hint": "Conditions evaluate against this context (fallback: global values).",
+      "scope_channel_aria": "Filter context channel",
+      "scope_locale_aria": "Filter context locale",
+      "scope_clear": "Clear context",
+      "scope_truncated": "Approximate result — narrow the filter (10,000-object context limit)."
     },
     "view_mode": {
       "aria": "View mode",

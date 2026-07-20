@@ -1,10 +1,12 @@
 import {
+  extractScope,
   type FilterCondition,
   type FilterDsl,
   type FilterGroup,
   type FilterOperator,
   isFilterGroup,
   normaliseOperator,
+  normalizeScope,
   operatorRequiresArray,
   operatorRequiresRange,
   operatorRequiresValue,
@@ -128,6 +130,12 @@ export function dslToUrlParams(dsl: FilterDsl | null): URLSearchParams {
     }
   }
 
+  // #2673 — value context rides dedicated `fscope[...]` params so a
+  // shareable flat URL round-trips the panel's channel/locale selector.
+  const scope = extractScope(dsl);
+  if (scope?.channel) params.set('fscope[channel]', scope.channel);
+  if (scope?.locale) params.set('fscope[locale]', scope.locale);
+
   return params;
 }
 
@@ -157,6 +165,8 @@ export function urlParamsToDsl(params: URLSearchParams): FilterDsl | null {
   // Also support compressed shorthand `?brand=Festo` (no `filter[]` wrapper).
   for (const [key, value] of params.entries()) {
     if (key.startsWith('filter[')) continue;
+    // #2673 — `fscope[...]` carries the value context, never a condition.
+    if (key.startsWith('fscope[')) continue;
     if (key === 'q' || key === 'smart_preset' || key === 'page' || key === 'perPage') continue;
     if (conditions.has(key)) continue;
     if (value.includes(',')) {
@@ -173,11 +183,17 @@ export function urlParamsToDsl(params: URLSearchParams): FilterDsl | null {
     }
   }
 
+  const scope = normalizeScope({
+    channel: params.get('fscope[channel]') ?? undefined,
+    locale: params.get('fscope[locale]') ?? undefined,
+  });
+
   const list = Array.from(conditions.values());
   const first = list[0];
   if (first === undefined) return null;
-  if (list.length === 1) return first;
-  return { operator: 'AND', conditions: list };
+  const withScope = <T extends FilterDsl>(dsl: T): T => (scope ? { ...dsl, scope } : dsl);
+  if (list.length === 1) return withScope(first);
+  return withScope({ operator: 'AND', conditions: list });
 }
 
 function flattenSingleLevel(dsl: FilterDsl): FilterCondition[] | null {

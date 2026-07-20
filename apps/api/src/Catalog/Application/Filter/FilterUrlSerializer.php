@@ -100,6 +100,38 @@ final class FilterUrlSerializer
     }
 
     /**
+     * #2673 — decode WITHOUT validation, or `null` when the payload is not
+     * base64 JSON at all. Lets callers with a legacy raw-text fallback
+     * (SearchController `?q=`) distinguish "not a blob — treat as text"
+     * from "a real DSL that failed validation" (which must 400 loudly, not
+     * silently drop the filter).
+     *
+     * @return ?array<string, mixed>
+     */
+    public function tryDecode(string $blob): ?array
+    {
+        if ('' === $blob || \strlen($blob) > self::MAX_BLOB_BYTES) {
+            return null;
+        }
+        $raw = base64_decode($blob, true);
+        if (false === $raw) {
+            return null;
+        }
+        try {
+            $decoded = json_decode($raw, true, flags: JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
+        if (!\is_array($decoded)) {
+            return null;
+        }
+        /** @var array<string, mixed> $typed */
+        $typed = $decoded;
+
+        return $typed;
+    }
+
+    /**
      * Encode a DSL array as base64 JSON.
      *
      * @param array<string, mixed> $dsl

@@ -184,6 +184,8 @@ export function StepScope({
               setConditions={filterState.setConditions}
               matchOperator={filterState.matchOperator}
               setMatchOperator={filterState.setMatchOperator}
+              scope={filterState.scope}
+              setScope={filterState.setScope}
               onApply={() => {}}
               onClose={() => {}}
               onClear={() => filterState.clear()}

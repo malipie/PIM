@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { conditionsToDsl, type FilterCondition } from '@/lib/filters/filter-dsl';
+import { conditionsToDsl, type FilterCondition, type FilterScope } from '@/lib/filters/filter-dsl';
 import { dslToBase64 } from '@/lib/filters/url-serializer';
 
 import { type CatalogSearchTarget, useCatalogSearch } from './use-catalog-search';
@@ -26,19 +26,22 @@ export function useFilterMatchCount(
   target: CatalogSearchTarget,
   conditions: FilterCondition[],
   matchOperator: 'AND' | 'OR',
+  scope?: FilterScope | null,
 ): UseFilterMatchCountState {
   const filterBlob = useMemo<string | undefined>(() => {
     const effective = conditions.filter(
       (cond) => cond.op === 'IS EMPTY' || cond.op === 'IS NOT EMPTY' || cond.value !== '',
     );
-    const dsl = conditionsToDsl(effective, matchOperator);
+    // #2673 — the scope rides the blob; the search endpoint evaluates it
+    // through the SQL prefilter, so the counter reflects the value context.
+    const dsl = conditionsToDsl(effective, matchOperator, scope);
     if (dsl === null) return undefined;
     try {
       return dslToBase64(dsl);
     } catch {
       return undefined;
     }
-  }, [conditions, matchOperator]);
+  }, [conditions, matchOperator, scope]);
 
   const { result, isLoading } = useCatalogSearch({
     ...target,

@@ -1,8 +1,8 @@
-import { Link2, X } from 'lucide-react';
+import { Globe2, Link2, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { toast } from '@/components/ui/toast';
-import type { FilterCondition } from '@/lib/filters/filter-dsl';
+import type { FilterCondition, FilterScope } from '@/lib/filters/filter-dsl';
 import { cn } from '@/lib/utils';
 
 /**
@@ -23,6 +23,9 @@ interface FilterChipsBarProps {
   onRemove: (index: number) => void;
   onClearAll: () => void;
   onEditChip?: (index: number) => void;
+  /** #2673 — active value context; renders a leading scope chip. */
+  scope?: FilterScope | null;
+  onClearScope?: () => void;
 }
 
 export function FilterChipsBar({
@@ -31,6 +34,8 @@ export function FilterChipsBar({
   onRemove,
   onClearAll,
   onEditChip,
+  scope,
+  onClearScope,
 }: FilterChipsBarProps) {
   const { t } = useTranslation();
   if (chips.length === 0) return null;
@@ -63,6 +68,33 @@ export function FilterChipsBar({
       <span className="text-[10.5px] uppercase tracking-wider font-semibold text-zinc-500">
         {t('products.filter_chips.active_label', { defaultValue: 'Aktywne filtry' })}
       </span>
+      {(scope?.channel || scope?.locale) && (
+        <span className="h-9 pl-3 pr-1.5 rounded-2xl bg-white border border-zinc-300 text-zinc-700 text-[12.5px] font-medium inline-flex items-center gap-1.5">
+          <Globe2 className="size-3.5 text-zinc-500" aria-hidden />
+          <span>
+            {[
+              scope.channel
+                ? `${t('products.advanced_filter.scope_channel', { defaultValue: 'Kanał' })}: ${scope.channel}`
+                : null,
+              scope.locale ? scope.locale.toUpperCase() : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          {onClearScope && (
+            <button
+              type="button"
+              aria-label={t('products.advanced_filter.scope_clear', {
+                defaultValue: 'Wyczyść kontekst',
+              })}
+              onClick={onClearScope}
+              className="ml-1 h-5 w-5 rounded-full hover:bg-zinc-100 grid place-items-center text-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900"
+            >
+              <X className="size-3" />
+            </button>
+          )}
+        </span>
+      )}
       {chips.map((chip, i) => {
         const label = attrLabelMap[chip.attr] ?? chip.attr;
         const valueDisplay = formatValue(chip);

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link2, Plus, Trash2, X } from 'lucide-react';
+import { Globe2, Link2, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,6 +12,8 @@ import {
   type FilterCondition,
   type FilterConditionValue,
   type FilterOperator,
+  type FilterScope,
+  normalizeScope,
 } from '@/lib/filters/filter-dsl';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
@@ -93,7 +95,11 @@ interface AdvancedFilterPanelProps {
    * (numeric strings coerced like at apply time), so hosts can render a live
    * match count without changing the apply-gated commit semantics.
    */
-  onDraftChange?: (conditions: FilterCondition[], operator: 'AND' | 'OR') => void;
+  onDraftChange?: (
+    conditions: FilterCondition[],
+    operator: 'AND' | 'OR',
+    scope?: FilterScope | null,
+  ) => void;
   /**
    * UP-09 (#1027) — per-ObjectType attribute catalog. When supplied,
    * replaces the hardcoded product-flavoured PANEL_ATTRS so custom
@@ -103,6 +109,26 @@ interface AdvancedFilterPanelProps {
    * without a schema round-trip on every render.
    */
   panelAttrs?: ReadonlyArray<PanelAttr>;
+  /**
+   * #2673 — panel-wide value context (channel/locale) the conditions
+   * evaluate against on the backend (fallback to global). Committed on
+   * „Zastosuj filtr" like the conditions. Both props required for the
+   * scope bar to render — hosts without scope support are unaffected.
+   */
+  scope?: FilterScope | null;
+  setScope?: (scope: FilterScope | null) => void;
+}
+
+interface ScopeChannelOption {
+  code: string;
+  name?: string | null;
+}
+
+interface ScopeLocaleRow {
+  code: string;
+  /** Short language code (`pl`) — matches `ObjectValue.locale` on the BE. */
+  language?: string;
+  isActive?: boolean;
 }
 
 export function AdvancedFilterPanel({
@@ -119,8 +145,44 @@ export function AdvancedFilterPanel({
   resultCount,
   onDraftChange,
   panelAttrs,
+  scope,
+  setScope,
 }: AdvancedFilterPanelProps) {
   const { t } = useTranslation();
+  const scopeEnabled = setScope !== undefined;
+
+  // #2673 — scope sources; fetched only when the host wires the scope bar.
+  const { data: scopeChannels } = useQuery({
+    queryKey: ['channels', 'filter-scope'],
+    enabled: scopeEnabled,
+    staleTime: 60_000,
+    queryFn: async (): Promise<ScopeChannelOption[]> => {
+      const response = await jsonFetch<{ member?: ScopeChannelOption[] } | ScopeChannelOption[]>(
+        '/api/channels',
+        { accept: 'application/ld+json' },
+      );
+      return Array.isArray(response) ? response : (response.member ?? []);
+    },
+  });
+  const { data: scopeLocales } = useQuery({
+    queryKey: ['tenant-locales', 'filter-scope'],
+    enabled: scopeEnabled,
+    staleTime: 60_000,
+    queryFn: async (): Promise<string[]> => {
+      const response = await jsonFetch<{ items?: ScopeLocaleRow[] }>('/api/tenant-locales', {
+        accept: 'application/json',
+      });
+      // Short language codes (`pl`), deduped — `ObjectValue.locale` and the
+      // BE scope validation both speak short codes, not full `pl_PL`.
+      return Array.from(
+        new Set(
+          (response.items ?? [])
+            .filter((row) => row.isActive !== false)
+            .map((row) => row.language ?? row.code.split('_')[0] ?? row.code),
+        ),
+      );
+    },
+  });
 
   // #1354 — strict filterable catalog. The panel offers ONLY attributes
   // flagged `is_filterable=true`; this drives the type-badge / operator
@@ -166,6 +228,8 @@ export function AdvancedFilterPanel({
   // behaviour where picking an attribute alone wiped the list to 0 hits.
   const [draftConditions, setDraftConditions] = useState<FilterCondition[]>(conditions);
   const [draftMatchOperator, setDraftMatchOperator] = useState<'AND' | 'OR'>(matchOperator);
+  // #2673 — scope drafts alongside the conditions; committed on apply.
+  const [draftScope, setDraftScope] = useState<FilterScope | null>(scope ?? null);
 
   // VIEW-22a — re-seed draft only when the panel transitions from closed
   // → open. While open we keep the local draft and ignore parent prop
@@ -176,6 +240,7 @@ export function AdvancedFilterPanel({
     if (!open) return;
     setDraftConditions(conditions);
     setDraftMatchOperator(matchOperator);
+    setDraftScope(scope ?? null);
   }, [open]);
 
   // Numeric fields keep the raw string (`"101,99"`) in the draft so the
@@ -197,8 +262,12 @@ export function AdvancedFilterPanel({
   // biome-ignore lint/correctness/useExhaustiveDependencies: notify on draft edits only
   useEffect(() => {
     if (!open) return;
-    onDraftChange?.(normaliseDraft(draftConditions), draftMatchOperator);
-  }, [open, draftConditions, draftMatchOperator]);
+    onDraftChange?.(
+      normaliseDraft(draftConditions),
+      draftMatchOperator,
+      normalizeScope(draftScope),
+    );
+  }, [open, draftConditions, draftMatchOperator, draftScope]);
 
   if (!open) return null;
 
@@ -215,6 +284,7 @@ export function AdvancedFilterPanel({
   const commitAndApply = (): void => {
     setConditions(normaliseDraft(draftConditions));
     setMatchOperator(draftMatchOperator);
+    setScope?.(normalizeScope(draftScope));
     onApply();
   };
 
@@ -252,6 +322,70 @@ export function AdvancedFilterPanel({
           </button>
         </div>
       </div>
+
+      {/* #2673 — value-context bar: the channel/locale every condition is
+          evaluated against (with fallback to the global value). */}
+      {scopeEnabled && (
+        <div className="px-5 h-11 flex items-center gap-3 border-b border-zinc-100 bg-zinc-50/60">
+          <Globe2 className="size-3.5 text-zinc-500" aria-hidden />
+          <span className="text-[11px] uppercase tracking-wider font-semibold text-zinc-500">
+            {t('products.advanced_filter.scope_label', { defaultValue: 'Kontekst' })}
+          </span>
+          <label className="flex items-center gap-1.5 text-[12px] text-zinc-600">
+            {t('products.advanced_filter.scope_channel', { defaultValue: 'Kanał' })}
+            <select
+              value={draftScope?.channel ?? ''}
+              onChange={(e) =>
+                setDraftScope(
+                  normalizeScope({ ...draftScope, channel: e.target.value || undefined }),
+                )
+              }
+              aria-label={t('products.advanced_filter.scope_channel_aria', {
+                defaultValue: 'Kanał kontekstu filtra',
+              })}
+              className="h-8 px-2 text-[12.5px] bg-white border border-zinc-200 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 min-w-[130px]"
+            >
+              <option value="">
+                {t('products.advanced_filter.scope_global', { defaultValue: '(globalny)' })}
+              </option>
+              {(scopeChannels ?? []).map((channel) => (
+                <option key={channel.code} value={channel.code}>
+                  {channel.name ?? channel.code}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-[12px] text-zinc-600">
+            {t('products.advanced_filter.scope_locale', { defaultValue: 'Język' })}
+            <select
+              value={draftScope?.locale ?? ''}
+              onChange={(e) =>
+                setDraftScope(
+                  normalizeScope({ ...draftScope, locale: e.target.value || undefined }),
+                )
+              }
+              aria-label={t('products.advanced_filter.scope_locale_aria', {
+                defaultValue: 'Język kontekstu filtra',
+              })}
+              className="h-8 px-2 text-[12.5px] bg-white border border-zinc-200 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 min-w-[110px] font-mono uppercase"
+            >
+              <option value="">
+                {t('products.advanced_filter.scope_global', { defaultValue: '(globalny)' })}
+              </option>
+              {(scopeLocales ?? []).map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span className="text-[11px] text-zinc-400">
+            {t('products.advanced_filter.scope_hint', {
+              defaultValue: 'Warunki liczone na wartościach tego kontekstu (fallback: globalne).',
+            })}
+          </span>
+        </div>
+      )}
 
       {/* Body */}
       <div className="p-5">

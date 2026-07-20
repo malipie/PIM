@@ -269,17 +269,15 @@ final class SearchController
         $blob = $request->query->get('q');
         if (\is_string($blob) && '' !== trim($blob)) {
             // VIEW-20 (#551) — `?q=` is now blob-only, but older FE versions
-            // (pre-VIEW-20) may still send raw text here. If decoding fails
-            // we silently treat the param as text-search and skip the filter
-            // path rather than 400-ing the whole request.
-            try {
-                $dsl = $this->filterUrlSerializer->fromBase64(trim($blob));
-            } catch (BadRequestHttpException) {
+            // (pre-VIEW-20) may still send raw text here. A payload that is
+            // not base64 JSON is silently treated as text-search; a REAL
+            // decoded DSL that fails validation (#2673: e.g. unknown scope
+            // channel) must 400 loudly instead of dropping the filter.
+            $dsl = $this->filterUrlSerializer->tryDecode(trim($blob));
+            if (null === $dsl || [] === $dsl) {
                 return [null, false];
             }
-            if ([] === $dsl) {
-                return [null, false];
-            }
+            $this->filterDslResolver->validate($dsl);
 
             return $this->compileCustomFilter($dsl);
         }
