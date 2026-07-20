@@ -2,7 +2,8 @@ import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
-import { Button } from '@/components/ui/button';
+const CTA_CLASSES =
+  'focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-cta px-3.5 text-[13px] font-semibold text-cta-foreground transition hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-50';
 
 interface ModelingPageHeaderProps {
   /** Small caption above the heading, e.g. "7 typów obiektów". */
@@ -39,22 +40,15 @@ export function ModelingPageHeader({
   trailing,
 }: ModelingPageHeaderProps) {
   const ctaButton = ctaTo ? (
-    <Button asChild className="bg-ink text-white hover:bg-ink/90">
-      <Link to={ctaTo}>
-        <Plus className="size-4" />
-        {ctaLabel}
-      </Link>
-    </Button>
-  ) : (
-    <Button
-      type="button"
-      onClick={onCtaClick}
-      disabled={!onCtaClick}
-      className="bg-ink text-white hover:bg-ink/90"
-    >
-      <Plus className="size-4" />
+    <Link to={ctaTo} className={CTA_CLASSES}>
+      <Plus className="size-4" aria-hidden />
       {ctaLabel}
-    </Button>
+    </Link>
+  ) : (
+    <button type="button" onClick={onCtaClick} disabled={!onCtaClick} className={CTA_CLASSES}>
+      <Plus className="size-4" aria-hidden />
+      {ctaLabel}
+    </button>
   );
 
   return (

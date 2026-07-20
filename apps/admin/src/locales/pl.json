@@ -1018,7 +1018,6 @@
     }
   },
   "catalogs_pdf": {
-    "page_title": "Web To Print",
     "placeholder_title": "W przygotowaniu",
     "placeholder_description": "Generowanie katalogów PDF jest na liście backlogu. Scope ustalimy w osobnym tickecie.",
     "tabs_aria": "Sekcje katalogów PDF",
@@ -1771,12 +1770,6 @@
     "empty": "Brak produktów. Dodaj pierwszy, aby rozpocząć.",
     "import": "Import",
     "import_disabled": "Mock — wymaga oprogramowania importu CSV/XLSX",
-    "header": {
-      "workspace": "Workspace · katalog",
-      "total_skus_suffix": "SKU",
-      "last_sync_minutes_ago": "ostatnia synchronizacja {{minutes}} min temu",
-      "last_sync_unknown": "brak danych o sync"
-    },
     "toolbar": {
       "search_placeholder": "Szukaj po SKU, nazwie, EAN, atrybucie…",
       "search_aria": "Szukaj produktów",
@@ -2922,8 +2915,6 @@
     }
   },
   "modeling": {
-    "title": "Modelowanie",
-    "description": "Definiuj typy obiektów, atrybuty, grupy atrybutów, kategorie, kanały i wersje językowe używane w katalogu.",
     "tabs": {
       "aria_label": "Sekcje modelowania",
       "object_types": "Typy obiektów",
