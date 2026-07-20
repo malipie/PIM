@@ -3,6 +3,12 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-20 (nocna zmiana za śpiącego operatora): Base — throttling, konfiguracja, incydent duplikatów
+- **Incydent na realnym Base**: operator wypchnął pełny katalog (1000 created, run success) + drugi pełny run (469 duplikatów — parowania ID jeszcze nie było), aż BaseLinker zablokował token (`Query limit exceeded, token blocked until…` w HTTP 200). Kolejne runy: 2×1000 failed w sekundy. **Duplikaty (469) do ręcznego usunięcia w panelu Base przez operatora.**
+- **✅ Błędy konfiguracji operatora naprawione PATCH-ami** (za zgodą „napraw bez pytania"): (1) parowanie ID było zrobione mapowaniem `base_product_id → $.product_id` (inbound) zamiast na ENDPOINCIE — ustawione `responseIdSelector=$.product_id` + `responseIdAttribute=base_product_id`; (2) mapowanie poprawione na outbound `→ $.parameters.product_id`; (3) `sku` = match key (to też fix erroru „Inbound sync requires at least one match key" przy próbie dwukierunkowej). Dwukierunkowa z Base ODRADZONA (generyczny reader nie umie RPC-odczytu przez connector.php).
+- **✅ #2644 → PR #2645 (`663848cc`)**: throttling RPC w body 2xx — `throttleIn()` klasyfikuje limity, runner backoffuje (2→32 s, 5 prób) i PRZERYWA run jako `partial` zamiast palić rekordy; `rateLimitHint` („Limit żądań") wpięty w outbound (pauza 60 s co N pushy). Live proof: run 3 produktów z hint=2 → 61 s.
+- **Do zrobienia przez operatora rano**: (1) usunąć duplikaty/wyczyścić inventory w Base; (2) ustawić „Limit żądań"=90 na połączeniu Base; (3) po odblokowaniu tokenu jeden pełny push (create + capture ID), potem kolejne runy będą update'ami.
+
 ## 2026-07-20: Seria APIC — filtr wysyłki, liczniki, zdalne ID, bracket paths (5 PR-ów merged)
 - **#2637 → PR #2638**: filtr wysyłki nie zapisywał się (stale-closure double-commit w OutboundFilterSection) — fix przez refy; live smoke: PATCH z realnym DSL + persist.
 - **#2636 → PR #2639 (wariant A — decyzja operatora)**: przechwytywanie zdalnych ID do ATRYBUTU PIM (`responseIdSelector`+`responseIdAttribute` na endpoincie; capture przez seam `OutboundResultWriter`/ValueWriteCore, provenance=integration); wstrzykiwanie = zwykłe mapowanie outbound → 1. push create, 2. update. Anty-pętla trigger-level `SyncRunScope` (subscriber pomija bindingi aktywnego połączenia). Live smoke: 2× push → created→updated bez duplikatu, runy=2.
