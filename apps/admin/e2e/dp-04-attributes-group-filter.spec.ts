@@ -15,14 +15,11 @@ test('DP-04 — attributes list narrows by attribute group and keeps state in UR
   await loginAsAdmin(page);
   await page.goto('/modeling/attributes');
 
-  // Baseline: caption reports the full library size (digit prefix keeps the
-  // locator away from the digit-less "Atrybuty"/"Attributes" headings).
-  const caption = page.getByText(/^\d+\s+(atrybutów|attributes)/i).first();
-  await expect(caption).toBeVisible();
-  const readCount = async (): Promise<number> => {
-    const text = (await caption.textContent()) ?? '';
-    return Number.parseInt(text.replace(/\D/g, ''), 10);
-  };
+  // Baseline: count the rendered library rows (the "{N} atrybutów" caption
+  // was removed in #2671 — rows are detail links inside main; the topbar
+  // "Nowy atrybut" CTA lives outside main so it does not inflate the count).
+  const rows = page.locator('main').locator('a[href^="/modeling/attributes/"]');
+  const readCount = (): Promise<number> => rows.count();
   await expect.poll(readCount).toBeGreaterThan(0);
   const before = await readCount();
 

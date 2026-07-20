@@ -11,7 +11,8 @@ test('imports schedule hub — title + empty state + add dialog', async ({ page 
   await loginAsAdmin(page);
   await page.goto('/integrations/imports/schedule');
 
-  await expect(page.getByRole('heading', { name: /^harmonogram$|^schedule$/i })).toBeVisible();
+  // The in-page "Harmonogram" header was removed in #2671 — the empty state
+  // below is the tab's ready signal.
 
   // Empty state for a fresh tenant.
   await expect(
