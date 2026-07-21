@@ -2,6 +2,8 @@ import { RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
+import { ModelingSection } from '@/components/modeling/modeling-section';
+import { ObjectTypeIcon } from '@/components/modeling/object-type-icon';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -329,73 +331,90 @@ export function ReviewQueuePage() {
           })}
         />
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="w-8 px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleAll}
-                    aria-label={t('workflow.queue.select_all', {
-                      defaultValue: 'Zaznacz wszystkie',
-                    })}
-                  />
-                </th>
-                <th className="px-3 py-2">
-                  {t('workflow.queue.col_object', { defaultValue: 'Obiekt' })}
-                </th>
-                <th className="px-3 py-2">
-                  {t('workflow.queue.col_completeness', { defaultValue: 'Kompletność' })}
-                </th>
-                <th className="px-3 py-2">
-                  {t('workflow.queue.col_submitted', { defaultValue: 'Zgłoszono' })}
-                </th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {visibleRows.map((row) => (
-                <tr key={row.id} className="border-t border-border" data-testid="review-queue-row">
-                  <td className="px-3 py-2">
+        // #2677 — the queue mirrors the ObjectType list (ModelingSection card
+        // shell + rows) instead of a `<table>`. The table forced horizontal
+        // scroll on narrow viewports, hiding the approve/reject actions off
+        // screen; the row now stacks vertically below `sm` so the actions are
+        // always reachable without an overflow-x scroll.
+        <div className="mt-4">
+          <ModelingSection
+            label={t('workflow.queue.section_label', { defaultValue: 'Do przeglądu' })}
+            summary={
+              <label className="flex items-center gap-2 text-[12px] normal-case tracking-normal">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  aria-label={t('workflow.queue.select_all', {
+                    defaultValue: 'Zaznacz wszystkie',
+                  })}
+                />
+                {t('workflow.queue.select_all', { defaultValue: 'Zaznacz wszystkie' })}
+              </label>
+            }
+          >
+            {visibleRows.map((row) => (
+              <li
+                key={row.id}
+                data-testid="review-queue-row"
+                className="transition-colors hover:bg-surface-2/40"
+              >
+                <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-4">
+                  {/* Object identity — flexible, truncates before it crowds
+                      the meta/actions. */}
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
                       onChange={() => toggleOne(row.id)}
                       aria-label={row.label}
+                      className="mt-1.5 shrink-0"
                     />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Link to={objectHref(row.kind, row.id)} className="font-medium hover:underline">
-                      {row.label}
-                    </Link>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <span>{row.code}</span>
-                      <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600">
-                        {t(`workflow.kind.${row.kind}`, {
-                          defaultValue: kindLabelDefault(row.kind),
-                        })}
+                    <ObjectTypeIcon kind={row.kind} size="sm" className="shrink-0" />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to={objectHref(row.kind, row.id)}
+                          className="truncate text-[14.5px] font-semibold text-ink hover:underline"
+                        >
+                          {row.label}
+                        </Link>
+                        <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600">
+                          {t(`workflow.kind.${row.kind}`, {
+                            defaultValue: kindLabelDefault(row.kind),
+                          })}
+                        </span>
+                      </div>
+                      <code className="mt-0.5 block truncate font-mono text-[11.5px] text-muted-foreground">
+                        {row.code}
+                      </code>
+                      {row.submitted?.comment != null && (
+                        <div className="mt-1 border-l-2 border-zinc-200 pl-2 text-xs italic text-zinc-500">
+                          {row.submitted.comment}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Meta: completeness + submitter. Sits inline on desktop,
+                      wraps under the title on mobile. */}
+                  <div className="flex items-center gap-5 pl-8 sm:pl-0">
+                    <div className="shrink-0 text-[12.5px] tabular-nums text-muted-foreground">
+                      <span className="font-medium text-ink">{row.completenessPct}%</span>{' '}
+                      <span className="hidden sm:inline">
+                        {t('workflow.queue.col_completeness', { defaultValue: 'Kompletność' })}
                       </span>
                     </div>
-                    {row.submitted?.comment != null && (
-                      <div className="mt-1 border-l-2 border-zinc-200 pl-2 text-xs italic text-zinc-500">
-                        {row.submitted.comment}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">{row.completenessPct}%</td>
-                  <td className="px-3 py-2">
                     {row.submitted !== null ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <span
                           className={`grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold ${avatarTone(row.submitted.actor_name ?? row.id)}`}
                           aria-hidden="true"
                         >
                           {avatarInitial(row.submitted.actor_name)}
                         </span>
-                        <div className="leading-tight">
-                          <div className="text-[13px] text-zinc-700">
+                        <div className="min-w-0 leading-tight">
+                          <div className="truncate text-[13px] text-zinc-700">
                             {row.submitted.actor_name ??
                               t('workflow.queue.system_actor', { defaultValue: 'System' })}
                           </div>
@@ -404,42 +423,43 @@ export function ReviewQueuePage() {
                           </div>
                         </div>
                       </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {canDecide ? (
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setComment('');
-                            setDecision({ transition: 'approve', ids: [row.id] });
-                          }}
-                          data-testid={`queue-approve-${row.code}`}
-                        >
-                          {t('workflow.transition.approve', { defaultValue: 'Zatwierdź' })}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setComment('');
-                            setDecision({ transition: 'reject', ids: [row.id] });
-                          }}
-                          data-testid={`queue-reject-${row.code}`}
-                        >
-                          {t('workflow.transition.reject', { defaultValue: 'Odrzuć' })}
-                        </Button>
-                      </div>
                     ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+
+                  {/* Actions: full width on mobile so they never fall off the
+                      viewport; auto-width and right-aligned on desktop. */}
+                  {canDecide ? (
+                    <div className="flex gap-2 pl-8 sm:shrink-0 sm:justify-end sm:pl-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 sm:flex-none"
+                        onClick={() => {
+                          setComment('');
+                          setDecision({ transition: 'approve', ids: [row.id] });
+                        }}
+                        data-testid={`queue-approve-${row.code}`}
+                      >
+                        {t('workflow.transition.approve', { defaultValue: 'Zatwierdź' })}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="flex-1 sm:flex-none"
+                        onClick={() => {
+                          setComment('');
+                          setDecision({ transition: 'reject', ids: [row.id] });
+                        }}
+                        data-testid={`queue-reject-${row.code}`}
+                      >
+                        {t('workflow.transition.reject', { defaultValue: 'Odrzuć' })}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ModelingSection>
         </div>
       )}
 

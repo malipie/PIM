@@ -4153,6 +4153,7 @@
       "subtitle": "Objects waiting for a decision (approve / reject).",
       "empty_title": "Nothing to review",
       "empty_body": "Submitted objects will show up here automatically.",
+      "section_label": "Awaiting review",
       "col_object": "Object",
       "col_completeness": "Completeness",
       "col_submitted": "Submitted",
