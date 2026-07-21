@@ -76,6 +76,7 @@ export function DefinitionsListView() {
         <Button
           onClick={() => void navigate('/workflow/definitions/new')}
           data-testid="definition-create"
+          className="bg-cta text-cta-foreground hover:bg-accent-hover"
         >
           <Plus className="mr-1 size-4" />
           {t('settings.workflow.create_cta', { defaultValue: 'Nowa definicja' })}

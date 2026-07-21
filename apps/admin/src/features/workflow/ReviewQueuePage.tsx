@@ -1,7 +1,7 @@
 import { RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
+import { ModelingSection } from '@/components/modeling/modeling-section';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,19 +17,10 @@ import { EmptyState } from '@/components/ui-v2/empty-state';
 import { jsonFetch } from '@/lib/http';
 import { useIdentity } from '@/lib/identity';
 import { ensureMercureAuthorization, mercureSubscribeUrl, mercureTenantTopic } from '@/lib/mercure';
-import {
-  applyWorkflowTransition,
-  fetchWorkflowLog,
-  type WorkflowLogEntry,
-} from '@/lib/workflow/api';
+import { applyWorkflowTransition, fetchWorkflowLog } from '@/lib/workflow/api';
 
-import {
-  avatarInitial,
-  avatarTone,
-  kindLabelDefault,
-  objectHref,
-  relativeTime,
-} from './task-presentation';
+import { ReviewQueueRow, type ReviewRow } from './ReviewQueueRow';
+import { kindLabelDefault } from './task-presentation';
 
 /**
  * WFL-P3-02 (#2424) — the review queue: every object waiting for a
@@ -43,15 +34,6 @@ import {
  * broadcast topic (WFL-P2-01) — any submit/approve/reject triggers a
  * debounced refetch, so items appear/disappear without a reload.
  */
-
-interface ReviewRow {
-  id: string;
-  code: string;
-  kind: string;
-  label: string;
-  completenessPct: number;
-  submitted: WorkflowLogEntry | null;
-}
 
 interface HydraObject {
   id: string;
@@ -329,117 +311,42 @@ export function ReviewQueuePage() {
           })}
         />
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="w-8 px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleAll}
-                    aria-label={t('workflow.queue.select_all', {
-                      defaultValue: 'Zaznacz wszystkie',
-                    })}
-                  />
-                </th>
-                <th className="px-3 py-2">
-                  {t('workflow.queue.col_object', { defaultValue: 'Obiekt' })}
-                </th>
-                <th className="px-3 py-2">
-                  {t('workflow.queue.col_completeness', { defaultValue: 'Kompletność' })}
-                </th>
-                <th className="px-3 py-2">
-                  {t('workflow.queue.col_submitted', { defaultValue: 'Zgłoszono' })}
-                </th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {visibleRows.map((row) => (
-                <tr key={row.id} className="border-t border-border" data-testid="review-queue-row">
-                  <td className="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(row.id)}
-                      onChange={() => toggleOne(row.id)}
-                      aria-label={row.label}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Link to={objectHref(row.kind, row.id)} className="font-medium hover:underline">
-                      {row.label}
-                    </Link>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <span>{row.code}</span>
-                      <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600">
-                        {t(`workflow.kind.${row.kind}`, {
-                          defaultValue: kindLabelDefault(row.kind),
-                        })}
-                      </span>
-                    </div>
-                    {row.submitted?.comment != null && (
-                      <div className="mt-1 border-l-2 border-zinc-200 pl-2 text-xs italic text-zinc-500">
-                        {row.submitted.comment}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">{row.completenessPct}%</td>
-                  <td className="px-3 py-2">
-                    {row.submitted !== null ? (
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold ${avatarTone(row.submitted.actor_name ?? row.id)}`}
-                          aria-hidden="true"
-                        >
-                          {avatarInitial(row.submitted.actor_name)}
-                        </span>
-                        <div className="leading-tight">
-                          <div className="text-[13px] text-zinc-700">
-                            {row.submitted.actor_name ??
-                              t('workflow.queue.system_actor', { defaultValue: 'System' })}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            {relativeTime(row.submitted.created_at, i18n.language)}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {canDecide ? (
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setComment('');
-                            setDecision({ transition: 'approve', ids: [row.id] });
-                          }}
-                          data-testid={`queue-approve-${row.code}`}
-                        >
-                          {t('workflow.transition.approve', { defaultValue: 'Zatwierdź' })}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setComment('');
-                            setDecision({ transition: 'reject', ids: [row.id] });
-                          }}
-                          data-testid={`queue-reject-${row.code}`}
-                        >
-                          {t('workflow.transition.reject', { defaultValue: 'Odrzuć' })}
-                        </Button>
-                      </div>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        // #2677 — the queue mirrors the ObjectType list (ModelingSection card
+        // shell + rows) instead of a `<table>`. The table forced horizontal
+        // scroll on narrow viewports, hiding the approve/reject actions off
+        // screen; the row now stacks vertically below `sm` so the actions are
+        // always reachable without an overflow-x scroll.
+        <div className="mt-4">
+          <ModelingSection
+            label={t('workflow.queue.section_label', { defaultValue: 'Do przeglądu' })}
+            summary={
+              <label className="flex items-center gap-2 text-[12px] normal-case tracking-normal">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  aria-label={t('workflow.queue.select_all', {
+                    defaultValue: 'Zaznacz wszystkie',
+                  })}
+                />
+                {t('workflow.queue.select_all', { defaultValue: 'Zaznacz wszystkie' })}
+              </label>
+            }
+          >
+            {visibleRows.map((row) => (
+              <ReviewQueueRow
+                key={row.id}
+                row={row}
+                selected={selected.has(row.id)}
+                canDecide={canDecide}
+                onToggle={toggleOne}
+                onDecide={(transition, id) => {
+                  setComment('');
+                  setDecision({ transition, ids: [id] });
+                }}
+              />
+            ))}
+          </ModelingSection>
         </div>
       )}
 

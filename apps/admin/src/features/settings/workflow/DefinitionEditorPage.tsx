@@ -181,7 +181,12 @@ export function DefinitionEditorPage() {
             ? t('settings.workflow.edit_title', { defaultValue: 'Edytuj definicję' })
             : t('settings.workflow.new_title', { defaultValue: 'Nowa definicja' })}
         </h2>
-        <Button onClick={save} disabled={saving} data-testid="definition-save">
+        <Button
+          onClick={save}
+          disabled={saving}
+          data-testid="definition-save"
+          className="bg-cta text-cta-foreground hover:bg-accent-hover"
+        >
           {t('common.save', { defaultValue: 'Zapisz' })}
         </Button>
       </header>

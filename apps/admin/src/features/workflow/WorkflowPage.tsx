@@ -32,24 +32,34 @@ export function WorkflowPage() {
     useMemo(
       () =>
         canManageDefinitions ? (
+          // #2677 — the labels collapse to icon-only below `sm` so the two
+          // CTAs stop pushing the topbar past a mobile viewport (they added
+          // ~360px and caused a 141px horizontal overflow). `aria-label`
+          // keeps the icon-only buttons accessible.
           <div className="flex items-center gap-2">
             {showDefinitions ? (
               <Link
                 to="/workflow/definitions"
                 data-testid="workflow-definitions-cta"
-                className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3.5 text-[13px] font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                aria-label={t('workflow.definitions_cta', { defaultValue: 'Definicje przepływu' })}
+                className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2.5 text-[13px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:px-3.5"
               >
                 <GitBranch className="size-4" aria-hidden="true" />
-                {t('workflow.definitions_cta', { defaultValue: 'Definicje przepływu' })}
+                <span className="hidden sm:inline">
+                  {t('workflow.definitions_cta', { defaultValue: 'Definicje przepływu' })}
+                </span>
               </Link>
             ) : null}
             <Link
               to="/workflow/settings"
               data-testid="workflow-settings-cta"
-              className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-zinc-900 px-3.5 text-[13px] font-semibold text-white transition hover:bg-zinc-800"
+              aria-label={t('workflow.settings_cta', { defaultValue: 'Ustawienia przepływu' })}
+              className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-cta px-2.5 text-[13px] font-semibold text-cta-foreground transition hover:bg-accent-hover sm:px-3.5"
             >
               <SlidersHorizontal className="size-4" aria-hidden="true" />
-              {t('workflow.settings_cta', { defaultValue: 'Ustawienia przepływu' })}
+              <span className="hidden sm:inline">
+                {t('workflow.settings_cta', { defaultValue: 'Ustawienia przepływu' })}
+              </span>
             </Link>
           </div>
         ) : null,
@@ -66,7 +76,7 @@ export function WorkflowPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-6" data-testid="workflow-page">
+    <div className="space-y-5" data-testid="workflow-page">
       {/* Page title comes from the shell topbar breadcrumb (hub pattern). */}
       <PillTabs
         items={tabs}
