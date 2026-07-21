@@ -10,6 +10,7 @@ use App\Catalog\Domain\Entity\SmartFilterPreset;
 use App\Catalog\Domain\ObjectKind;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Search\Application\CatalogSearchService;
+use App\Search\Application\ScopedFilterPrefilter;
 use App\Shared\Application\TenantContext;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -47,6 +48,7 @@ final class BulkSelectionController
         private readonly FilterUrlSerializer $filterUrlSerializer,
         private readonly EntityManagerInterface $em,
         private readonly TenantContext $tenantContext,
+        private readonly ScopedFilterPrefilter $scopedPrefilter,
     ) {
     }
 
@@ -139,7 +141,7 @@ final class BulkSelectionController
                 throw new NotFoundHttpException(\sprintf('Smart filter preset "%s" not found.', $smartPreset));
             }
 
-            return $this->filterDslResolver->toMeilisearchFilter($preset->getQuery());
+            return $this->compileCustomFilter($preset->getQuery());
         }
 
         $blob = $body['filter'] ?? null;
@@ -149,10 +151,29 @@ final class BulkSelectionController
                 return null;
             }
 
-            return $this->filterDslResolver->toMeilisearchFilter($dsl);
+            return $this->compileCustomFilter($dsl);
         }
 
         return null;
+    }
+
+    /**
+     * #2673 — scoped documents run through the SQL prefilter (see
+     * SearchController::compileCustomFilter); the truncation flag is
+     * irrelevant here — the selection endpoint applies its own cap via
+     * `totalMatched` / `capped`.
+     *
+     * @param array<string, mixed> $dsl
+     */
+    private function compileCustomFilter(array $dsl): string
+    {
+        if (FilterDslResolver::hasScope($dsl)) {
+            [$expression] = $this->scopedPrefilter->compile($dsl);
+
+            return $expression;
+        }
+
+        return $this->filterDslResolver->toMeilisearchFilter($dsl);
     }
 
     private function loadPreset(string $idOrSlug): ?SmartFilterPreset

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\Filter;
 
-use App\Shared\Infrastructure\Meilisearch\MeiliFilterLiteral;
 use RuntimeException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Throwable;
@@ -181,6 +180,7 @@ final class FilterDslResolver
 
     public function __construct(
         private readonly ?AttributeMetadataResolver $attributeMetadata = null,
+        private readonly ?FilterScopeResolver $scopeResolver = null,
     ) {
     }
 
@@ -274,6 +274,11 @@ final class FilterDslResolver
      */
     public function validate(array $dsl): void
     {
+        // #2673 — the optional root `scope` (value context) is validated
+        // eagerly so an unknown channel/locale surfaces as a clear 400
+        // instead of a silently-null count from toCountSql().
+        $this->scopeResolver?->resolve($dsl['scope'] ?? null);
+
         if (isset($dsl['operator']) && isset($dsl['conditions'])) {
             $this->validateGroup($dsl, depth: 0);
 
@@ -285,6 +290,27 @@ final class FilterDslResolver
         }
 
         $this->validateCondition($dsl);
+    }
+
+    /**
+     * #2673 — true when the DSL root carries a non-empty value-context
+     * (`scope: {channel?, locale?}`). Callers on the Meilisearch path use
+     * this to switch to the SQL prefilter — scoped values are not in the
+     * Meili document (#1148 keeps it global-only).
+     *
+     * @param array<string, mixed> $dsl
+     */
+    public static function hasScope(array $dsl): bool
+    {
+        $scope = $dsl['scope'] ?? null;
+        if (!\is_array($scope)) {
+            return false;
+        }
+        $channel = $scope['channel'] ?? null;
+        $locale = $scope['locale'] ?? null;
+
+        return (\is_string($channel) && '' !== trim($channel))
+            || (\is_string($locale) && '' !== trim($locale));
     }
 
     /**
@@ -305,7 +331,11 @@ final class FilterDslResolver
     public function toCountSql(array $dsl): ?string
     {
         try {
-            return $this->compile($dsl, depth: 0);
+            // #2673 — the root-level `scope` sets the value context for
+            // every condition in the document (panel-wide selector).
+            $scope = $this->scopeResolver?->resolve($dsl['scope'] ?? null);
+
+            return $this->compile($dsl, depth: 0, scope: $scope);
         } catch (Throwable) {
             return null;
         }
@@ -314,7 +344,7 @@ final class FilterDslResolver
     /**
      * @param array<string, mixed> $dsl
      */
-    private function compile(array $dsl, int $depth): string
+    private function compile(array $dsl, int $depth, ?FilterScopeContext $scope = null): string
     {
         if ($depth > 3) {
             throw new RuntimeException('FilterDsl nesting too deep (>3).');
@@ -330,7 +360,7 @@ final class FilterDslResolver
 
             $parts = [];
             foreach ($group['conditions'] as $condition) {
-                $parts[] = '('.$this->compile($condition, $depth + 1).')';
+                $parts[] = '('.$this->compile($condition, $depth + 1, $scope).')';
             }
             if ([] === $parts) {
                 return '1=1';
@@ -339,13 +369,13 @@ final class FilterDslResolver
             return implode(' '.$operator.' ', $parts);
         }
 
-        return $this->compileCondition($dsl);
+        return $this->compileCondition($dsl, $scope);
     }
 
     /**
      * @param array<string, mixed> $cond
      */
-    private function compileCondition(array $cond): string
+    private function compileCondition(array $cond, ?FilterScopeContext $scope = null): string
     {
         $attrRaw = $cond['attr'] ?? null;
         $opRaw = $cond['op'] ?? null;
@@ -370,11 +400,43 @@ final class FilterDslResolver
         $type = $this->envelopeType($attr);
         $canonical = self::normaliseOperator($op);
 
-        if ('multiselect' === $type) {
-            return FilterSqlExpressions::compileMultiselectCondition($attr, $canonical, $value, $op);
+        // #2673 — value context: scope dimensions are trimmed to the
+        // attribute's capabilities (a non-localizable attribute ignores the
+        // locale, a non-scopable one ignores the channel). COLUMN_MAP codes
+        // and explicit dotted locale paths carry no meta and stay on the
+        // legacy path — a dot-path is an explicit legacy locale pick and
+        // wins over the panel scope.
+        $scopedAttributeId = null;
+        $scopedChannelId = null;
+        $scopedLocale = null;
+        if (null !== $scope && !$scope->isEmpty()) {
+            $meta = (isset(self::COLUMN_MAP[$attr]) || str_contains($attr, '.'))
+                ? null
+                : $this->attributeMetadata?->getAttributeMeta($attr);
+            if (null !== $meta) {
+                $scopedChannelId = $meta->scopable ? $scope->channelId : null;
+                $scopedLocale = $meta->localizable ? $scope->locale : null;
+                if (null !== $scopedChannelId || null !== $scopedLocale) {
+                    $scopedAttributeId = $meta->id;
+                }
+            }
         }
 
-        $left = $this->resolveLeftExpression($attr, $type);
+        if ('multiselect' === $type) {
+            return FilterSqlExpressions::compileMultiselectCondition(
+                $attr,
+                $canonical,
+                $value,
+                $op,
+                $scopedAttributeId,
+                $scopedChannelId,
+                $scopedLocale,
+            );
+        }
+
+        $left = null !== $scopedAttributeId
+            ? FilterSqlExpressions::scopedLeftExpression($attr, $type, $scopedAttributeId, $scopedChannelId, $scopedLocale)
+            : $this->resolveLeftExpression($attr, $type);
         $numeric = \in_array($type, ['price', 'number', 'metric'], true);
         if ($numeric) {
             $left = '('.$left.')::numeric';
@@ -462,6 +524,13 @@ final class FilterDslResolver
      */
     public function toMeilisearchFilter(array $dsl): string
     {
+        // #2673 — scoped values are not in the Meili document (#1148 keeps
+        // it global-only); callers must branch to the SQL prefilter path
+        // (`hasScope()` + `toCountSql()` → `id IN [...]`) before compiling.
+        if (self::hasScope($dsl)) {
+            throw new RuntimeException('FilterDsl with a value-context scope cannot compile to a Meilisearch filter — use the SQL prefilter path.');
+        }
+
         return $this->compileMeili($dsl, depth: 0);
     }
 
@@ -493,144 +562,9 @@ final class FilterDslResolver
             return implode(' '.$operator.' ', $parts);
         }
 
-        return $this->compileMeiliCondition($dsl);
-    }
-
-    /**
-     * @param array<string, mixed> $cond
-     */
-    private function compileMeiliCondition(array $cond): string
-    {
-        $attrRaw = $cond['attr'] ?? null;
-        $opRaw = $cond['op'] ?? null;
-        if (!\is_string($attrRaw) || !\is_string($opRaw)) {
-            throw new RuntimeException('Condition attr/op must be strings.');
-        }
-        $attr = $this->meiliAttrPath($attrRaw);
-        $canonical = self::normaliseOperator($opRaw);
-        $value = $cond['value'] ?? null;
-
-        switch ($canonical) {
-            case self::OP_IS_EMPTY:
-                return "(NOT $attr EXISTS OR $attr IS NULL OR $attr IS EMPTY)";
-
-            case self::OP_IS_NOT_EMPTY:
-                return "($attr EXISTS AND $attr IS NOT NULL AND $attr IS NOT EMPTY)";
-
-            case self::OP_EQ:
-                return "$attr = ".$this->meiliLiteral($value);
-
-            case self::OP_NEQ:
-                return "$attr != ".$this->meiliLiteral($value);
-
-            case self::OP_LT:
-            case self::OP_BEFORE:
-                return "$attr < ".$this->meiliScalar($value);
-
-            case self::OP_GT:
-            case self::OP_AFTER:
-                return "$attr > ".$this->meiliScalar($value);
-
-            case self::OP_LTE:
-                return "$attr <= ".$this->meiliScalar($value);
-
-            case self::OP_GTE:
-                return "$attr >= ".$this->meiliScalar($value);
-
-            case self::OP_IN:
-                return "$attr IN [".$this->meiliList($value).']';
-
-            case self::OP_NOT_IN:
-                return "$attr NOT IN [".$this->meiliList($value).']';
-
-            case self::OP_STARTS_WITH:
-                return "$attr STARTS WITH ".$this->meiliLiteral($value);
-
-            case self::OP_ENDS_WITH:
-                // Meilisearch lacks ENDS WITH — emulate via CONTAINS
-                // (full-text); behaviour drifts vs SQL but covers the
-                // common case of suffix lookup in admin search.
-                return "$attr CONTAINS ".$this->meiliLiteral($value);
-
-            case self::OP_CONTAINS:
-                return "$attr CONTAINS ".$this->meiliLiteral($value);
-
-            case self::OP_NOT_CONTAINS:
-                return "NOT ($attr CONTAINS ".$this->meiliLiteral($value).')';
-
-            case self::OP_BETWEEN:
-                [$lo, $hi] = FilterSqlExpressions::rangePair($value);
-
-                return "$attr ".$this->meiliScalar($lo).' TO '.$this->meiliScalar($hi);
-
-            case self::OP_IS_TRUE:
-                return "$attr = true";
-
-            case self::OP_IS_FALSE:
-                return "$attr = false";
-
-            default:
-                throw new RuntimeException('Operator not supported in Meilisearch compiler: '.$opRaw);
-        }
-    }
-
-    private function meiliAttrPath(string $attr): string
-    {
-        // #2237 — `sku` is the UI/agent alias for the natural key; the
-        // Meili document stores it as `code` (the physical column, mirroring
-        // COLUMN_MAP `sku => co.code` on the SQL path). Without this the
-        // agent's grounding filter `sku = "…"` hit a non-existent Meili field
-        // and the search degraded — misread as a backend outage.
-        if ('sku' === $attr) {
-            return 'code';
-        }
-
-        if (str_contains($attr, '.')) {
-            [$base, $locale] = explode('.', $attr, 2);
-            FilterSqlExpressions::safeIdent($base);
-            FilterSqlExpressions::safeIdent($locale);
-
-            return $base.'.'.$locale;
-        }
-
-        return FilterSqlExpressions::safeIdent($attr);
-    }
-
-    private function meiliLiteral(mixed $value): string
-    {
-        if (\is_int($value) || \is_float($value)) {
-            return (string) $value;
-        }
-        if (\is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-        if (\is_string($value)) {
-            return MeiliFilterLiteral::quote($value);
-        }
-        throw new RuntimeException('Unsupported Meilisearch literal type.');
-    }
-
-    private function meiliScalar(mixed $value): string
-    {
-        if (\is_int($value) || \is_float($value)) {
-            return (string) $value;
-        }
-        if (\is_string($value) && is_numeric($value)) {
-            return $value;
-        }
-        if (\is_string($value)) {
-            return $this->meiliLiteral($value);
-        }
-        throw new RuntimeException('Numeric or date literal required.');
-    }
-
-    private function meiliList(mixed $value): string
-    {
-        if (!\is_array($value) || [] === $value) {
-            throw new RuntimeException('IN/NOT IN requires a non-empty array value.');
-        }
-
-        return implode(', ', array_map($this->meiliLiteral(...), $value));
+        // #2673 — condition compilation extracted to FilterMeiliExpressions
+        // (max-lines guard; mirrors the #2627 FilterSqlExpressions split).
+        return FilterMeiliExpressions::compileCondition($dsl);
     }
 
     /**

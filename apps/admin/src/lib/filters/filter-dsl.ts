@@ -42,15 +42,30 @@ export type FilterOperator =
 
 export type FilterConditionValue = string | number | boolean | Array<string | number> | null;
 
+/**
+ * #2673 — value context of a filter document. When set, every condition
+ * evaluates against the value for that channel/locale (with fallback to the
+ * global slot) on the backend. Codes, not UUIDs. Root-level only by
+ * convention — the panel-wide selector applies to the whole document.
+ */
+export interface FilterScope {
+  channel?: string;
+  locale?: string;
+}
+
 export interface FilterCondition {
   attr: string;
   op: FilterOperator;
   value?: FilterConditionValue;
+  /** #2673 — only meaningful on the DSL ROOT (single-condition documents). */
+  scope?: FilterScope;
 }
 
 export interface FilterGroup {
   operator: 'AND' | 'OR';
   conditions: Array<FilterCondition | FilterGroup>;
+  /** #2673 — only meaningful on the DSL ROOT. */
+  scope?: FilterScope;
 }
 
 export type FilterDsl = FilterCondition | FilterGroup;
@@ -167,11 +182,37 @@ export function isFilterGroup(dsl: FilterDsl): dsl is FilterGroup {
 export function conditionsToDsl(
   conditions: FilterCondition[],
   operator: 'AND' | 'OR' = 'AND',
+  scope?: FilterScope | null,
 ): FilterDsl | null {
   const first = conditions[0];
   if (first === undefined) return null;
-  if (conditions.length === 1) return first;
-  return { operator, conditions };
+  const normalizedScope = normalizeScope(scope);
+  if (conditions.length === 1) {
+    return normalizedScope ? { ...first, scope: normalizedScope } : first;
+  }
+  return normalizedScope
+    ? { operator, conditions, scope: normalizedScope }
+    : { operator, conditions };
+}
+
+/**
+ * #2673 — drop empty strings / empty objects so a cleared selector never
+ * serialises a dangling `scope: {}` into presets/URLs.
+ */
+export function normalizeScope(scope?: FilterScope | null): FilterScope | null {
+  if (!scope) return null;
+  const channel = scope.channel?.trim() || undefined;
+  const locale = scope.locale?.trim() || undefined;
+  if (!channel && !locale) return null;
+  return { ...(channel ? { channel } : {}), ...(locale ? { locale } : {}) };
+}
+
+/**
+ * #2673 — read the value-context scope off a DSL root (condition or group).
+ */
+export function extractScope(dsl: FilterDsl | null): FilterScope | null {
+  if (!dsl) return null;
+  return normalizeScope(dsl.scope ?? null);
 }
 
 /**
@@ -182,7 +223,11 @@ export function conditionsToDsl(
  */
 export function dslToFlatConditions(dsl: FilterDsl | null): FilterCondition[] | null {
   if (!dsl) return [];
-  if (!isFilterGroup(dsl)) return [dsl];
+  if (!isFilterGroup(dsl)) {
+    // #2673 — scope lives in the panel state, not on the flat condition.
+    const { scope: _scope, ...bare } = dsl;
+    return [bare];
+  }
 
   const flat: FilterCondition[] = [];
   for (const cond of dsl.conditions) {

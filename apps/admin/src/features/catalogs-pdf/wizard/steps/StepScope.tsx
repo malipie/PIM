@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AdvancedFilterPanel } from '@/components/catalog/advanced-filter-panel';
 import { useFilterMatchCount } from '@/features/catalog/search/use-filter-match-count';
-import type { FilterCondition } from '@/lib/filters/filter-dsl';
+import type { FilterCondition, FilterScope } from '@/lib/filters/filter-dsl';
 import { useFilterDslState } from '@/lib/filters/use-filter-dsl-state';
 import { cn } from '@/lib/utils';
 
@@ -36,11 +36,13 @@ export function StepScope() {
   const [draft, setDraft] = useState<{
     conditions: FilterCondition[];
     operator: 'AND' | 'OR';
-  }>({ conditions: filter.conditions, operator: filter.matchOperator });
+    scope?: FilterScope | null;
+  }>({ conditions: filter.conditions, operator: filter.matchOperator, scope: filter.scope });
   const { count: matchCount, isLoading: countLoading } = useFilterMatchCount(
     { kind: 'products' },
     draft.conditions,
     draft.operator,
+    draft.scope,
   );
 
   return (
@@ -57,10 +59,12 @@ export function StepScope() {
           setConditions={filter.setConditions}
           matchOperator={filter.matchOperator}
           setMatchOperator={filter.setMatchOperator}
+          scope={filter.scope}
+          setScope={filter.setScope}
           onApply={() => dispatch({ type: 'SET_FILTER', filterDsl: filter.dsl })}
           onClose={() => undefined}
           onClear={filter.clear}
-          onDraftChange={(conditions, operator) => setDraft({ conditions, operator })}
+          onDraftChange={(conditions, operator, scope) => setDraft({ conditions, operator, scope })}
         />
       </div>
 

@@ -460,6 +460,8 @@ export function UniversalListPage({
     setConditions: setPanelConditions,
     matchOperator,
     setMatchOperator,
+    scope: panelScope,
+    setScope: setPanelScope,
     dsl: panelDsl,
   } = useFilterDslState(initialUrlDsl);
   const [showSaveAsPresetModal, setShowSaveAsPresetModal] = useState(false);
@@ -678,6 +680,8 @@ export function UniversalListPage({
   const isLoading = isSearchActive ? isSearchLoading : isListLoading;
 
   const totalHits = isSearchActive ? (searchResult?.totalHits ?? 0) : totalForList;
+  // #2673 — the scoped-filter prefilter capped at 10k ids; hits are approximate.
+  const scopeTruncated = isSearchActive && searchResult?.scopeTruncated === true;
 
   const toggleSelect = (id: string): void => {
     setSelected((prev) => {
@@ -838,6 +842,17 @@ export function UniversalListPage({
 
   return (
     <div id="universal-list-page" className="space-y-5 pb-24">
+      {scopeTruncated && (
+        <div
+          role="status"
+          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12.5px] text-amber-900"
+        >
+          {t('products.advanced_filter.scope_truncated', {
+            defaultValue: 'Wynik przybliżony — zawęź filtr (limit 10 000 obiektów w kontekście).',
+          })}
+        </div>
+      )}
+
       <SmartFilterPresetsRow
         presets={smartPresets}
         activeId={activeSmartPresetId}
@@ -938,12 +953,15 @@ export function UniversalListPage({
               onClose={() => setAdvancedPanelOpen(false)}
               onClear={() => {
                 setPanelConditions([]);
+                setPanelScope(null);
                 setActiveSmartPresetId(null);
               }}
               onSaveAsPreset={() => {
                 setShowSaveAsPresetModal(true);
               }}
               resultCount={totalHits}
+              scope={panelScope}
+              setScope={setPanelScope}
             />
           </Suspense>
         ) : null}
@@ -951,6 +969,8 @@ export function UniversalListPage({
 
       <FilterChipsBar
         chips={panelConditions}
+        scope={panelScope}
+        onClearScope={() => setPanelScope(null)}
         attrLabelMap={{
           brand: t('products.toolbar.filter_brand', { defaultValue: 'Marka' }),
           category: t('products.fields.categories', { defaultValue: 'Kategoria' }),
@@ -966,6 +986,7 @@ export function UniversalListPage({
         }}
         onClearAll={() => {
           setPanelConditions([]);
+          setPanelScope(null);
           setActiveSmartPresetId(null);
         }}
         onEditChip={() => setAdvancedPanelOpen(true)}

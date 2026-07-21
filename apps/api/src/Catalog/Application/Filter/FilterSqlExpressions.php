@@ -23,6 +23,105 @@ use const JSON_THROW_ON_ERROR;
 final class FilterSqlExpressions
 {
     /**
+     * Envelope key for a given attribute type — shared by the global
+     * (`attributes_indexed`) and scoped (`object_values`) left expressions.
+     */
+    public static function envelopeKey(?string $type): ?string
+    {
+        return match ($type) {
+            'price' => 'amount',
+            'select' => 'option_code',
+            'asset' => 'asset_id',
+            'relation', 'reference' => 'object_id',
+            null => null,
+            default => 'value',
+        };
+    }
+
+    /**
+     * #2673 — value-context left expression: the effective value of `$attr`
+     * for the (channel, locale) scope with fallback to the global slot.
+     *
+     * The correlated subselect probes `object_values` for the scope-specific
+     * slots only (the global slot rides the COALESCE fallback through the
+     * legacy `attributes_indexed` expression, envelope quirks included).
+     * With both dimensions set the candidates are (c,l) > (c,∅) > (∅,l),
+     * ordered by specificity; with a single dimension the unique constraint
+     * guarantees at most one row. Covered by `object_values_scope_uniq`
+     * (leading object_id, attribute_id) — no extra index needed.
+     *
+     * Note the NULLIF('') coercion: a scoped slot holding an empty string
+     * falls back to the global value, mirroring the global path — so
+     * `IS [NOT] EMPTY` reads as "the EFFECTIVE value in this scope".
+     */
+    public static function scopedLeftExpression(
+        string $attr,
+        ?string $type,
+        string $attributeId,
+        ?string $channelId,
+        ?string $locale,
+    ): string {
+        $key = self::envelopeKey($type) ?? 'value';
+        $inner = "NULLIF((ov.value->>'".self::safeIdent($key)."'), '')";
+
+        $subselect = self::scopedSubselect($inner, $attributeId, $channelId, $locale);
+
+        return 'COALESCE('.$subselect.', '.self::leftExpression($attr, $type).')';
+    }
+
+    /**
+     * Correlated scoped probe returning `$innerExpression` evaluated on the
+     * best-matching scope-specific `object_values` row (never the global one).
+     */
+    public static function scopedSubselect(
+        string $innerExpression,
+        string $attributeId,
+        ?string $channelId,
+        ?string $locale,
+    ): string {
+        if (null === $channelId && null === $locale) {
+            throw new RuntimeException('Scoped subselect requires a channel or a locale.');
+        }
+        $attrId = self::safeUuid($attributeId);
+
+        $predicates = [
+            'ov.object_id = co.id',
+            'ov.tenant_id = co.tenant_id',
+            "ov.attribute_id = '$attrId'",
+        ];
+        $order = '';
+        if (null !== $channelId && null !== $locale) {
+            $ch = self::safeUuid($channelId);
+            $loc = self::safeIdent($locale);
+            $predicates[] = "(ov.channel_id = '$ch' OR ov.channel_id IS NULL)";
+            $predicates[] = "(ov.locale = '$loc' OR ov.locale IS NULL)";
+            $predicates[] = 'NOT (ov.channel_id IS NULL AND ov.locale IS NULL)';
+            $order = ' ORDER BY (ov.channel_id IS NOT NULL) DESC, (ov.locale IS NOT NULL) DESC';
+        } elseif (null !== $channelId) {
+            $ch = self::safeUuid($channelId);
+            $predicates[] = "ov.channel_id = '$ch'";
+            $predicates[] = 'ov.locale IS NULL';
+        } else {
+            /** @var string $locale narrowed by the guard above */
+            $loc = self::safeIdent($locale);
+            $predicates[] = 'ov.channel_id IS NULL';
+            $predicates[] = "ov.locale = '$loc'";
+        }
+
+        return '(SELECT '.$innerExpression.' FROM object_values ov WHERE '
+            .implode(' AND ', $predicates).$order.' LIMIT 1)';
+    }
+
+    public static function safeUuid(string $uuid): string
+    {
+        if (1 !== preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/', $uuid)) {
+            throw new RuntimeException('Invalid UUID literal: '.$uuid);
+        }
+
+        return $uuid;
+    }
+
+    /**
      * Envelope-aware JSONB left expression for a non-column attribute.
      */
     public static function leftExpression(string $attr, ?string $type = null): string
@@ -38,14 +137,7 @@ final class FilterSqlExpressions
 
         $attrEsc = self::safeIdent($attr);
 
-        $valueKey = match ($type) {
-            'price' => 'amount',
-            'select' => 'option_code',
-            'asset' => 'asset_id',
-            'relation', 'reference' => 'object_id',
-            null => null,
-            default => 'value',
-        };
+        $valueKey = self::envelopeKey($type);
         if (null !== $valueKey) {
             return "NULLIF((co.attributes_indexed->'$attrEsc'->>'$valueKey'), '')";
         }
@@ -60,11 +152,38 @@ final class FilterSqlExpressions
      * misread as a positional placeholder by consumers embedding this
      * fragment in parametrised queries).
      */
-    public static function compileMultiselectCondition(string $attr, string $canonical, mixed $value, string $rawOp): string
-    {
+    public static function compileMultiselectCondition(
+        string $attr,
+        string $canonical,
+        mixed $value,
+        string $rawOp,
+        ?string $scopedAttributeId = null,
+        ?string $scopedChannelId = null,
+        ?string $scopedLocale = null,
+    ): string {
         $attrEsc = self::safeIdent($attr);
         $codesText = "NULLIF((co.attributes_indexed->'$attrEsc'->>'option_codes'), '[]')";
         $codesJson = "co.attributes_indexed->'$attrEsc'->'option_codes'";
+
+        // #2673 — value-context: prefer the scope-specific slot, fall back to
+        // the global one (an empty scoped list falls back too, mirroring the
+        // scalar NULLIF('') coercion).
+        if (null !== $scopedAttributeId && (null !== $scopedChannelId || null !== $scopedLocale)) {
+            $scopedText = self::scopedSubselect(
+                "NULLIF((ov.value->>'option_codes'), '[]')",
+                $scopedAttributeId,
+                $scopedChannelId,
+                $scopedLocale,
+            );
+            $scopedJson = self::scopedSubselect(
+                "NULLIF((ov.value->'option_codes'), '[]'::jsonb)",
+                $scopedAttributeId,
+                $scopedChannelId,
+                $scopedLocale,
+            );
+            $codesText = 'COALESCE('.$scopedText.', '.$codesText.')';
+            $codesJson = 'COALESCE('.$scopedJson.', '.$codesJson.')';
+        }
 
         switch ($canonical) {
             case FilterDslResolver::OP_IS_EMPTY:

@@ -3,6 +3,7 @@ import { Link2, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AdvancedFilterScopeBar } from '@/components/catalog/advanced-filter-scope-bar';
 import { AttributePicker } from '@/components/catalog/attribute-picker';
 import { BulkValueInput } from '@/components/catalog/bulk-wizard/bulk-value-input';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,8 @@ import {
   type FilterCondition,
   type FilterConditionValue,
   type FilterOperator,
+  type FilterScope,
+  normalizeScope,
 } from '@/lib/filters/filter-dsl';
 import { jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
@@ -93,7 +96,11 @@ interface AdvancedFilterPanelProps {
    * (numeric strings coerced like at apply time), so hosts can render a live
    * match count without changing the apply-gated commit semantics.
    */
-  onDraftChange?: (conditions: FilterCondition[], operator: 'AND' | 'OR') => void;
+  onDraftChange?: (
+    conditions: FilterCondition[],
+    operator: 'AND' | 'OR',
+    scope?: FilterScope | null,
+  ) => void;
   /**
    * UP-09 (#1027) — per-ObjectType attribute catalog. When supplied,
    * replaces the hardcoded product-flavoured PANEL_ATTRS so custom
@@ -103,6 +110,14 @@ interface AdvancedFilterPanelProps {
    * without a schema round-trip on every render.
    */
   panelAttrs?: ReadonlyArray<PanelAttr>;
+  /**
+   * #2673 — panel-wide value context (channel/locale) the conditions
+   * evaluate against on the backend (fallback to global). Committed on
+   * „Zastosuj filtr" like the conditions. Both props required for the
+   * scope bar to render — hosts without scope support are unaffected.
+   */
+  scope?: FilterScope | null;
+  setScope?: (scope: FilterScope | null) => void;
 }
 
 export function AdvancedFilterPanel({
@@ -119,8 +134,11 @@ export function AdvancedFilterPanel({
   resultCount,
   onDraftChange,
   panelAttrs,
+  scope,
+  setScope,
 }: AdvancedFilterPanelProps) {
   const { t } = useTranslation();
+  const scopeEnabled = setScope !== undefined;
 
   // #1354 — strict filterable catalog. The panel offers ONLY attributes
   // flagged `is_filterable=true`; this drives the type-badge / operator
@@ -166,6 +184,8 @@ export function AdvancedFilterPanel({
   // behaviour where picking an attribute alone wiped the list to 0 hits.
   const [draftConditions, setDraftConditions] = useState<FilterCondition[]>(conditions);
   const [draftMatchOperator, setDraftMatchOperator] = useState<'AND' | 'OR'>(matchOperator);
+  // #2673 — scope drafts alongside the conditions; committed on apply.
+  const [draftScope, setDraftScope] = useState<FilterScope | null>(scope ?? null);
 
   // VIEW-22a — re-seed draft only when the panel transitions from closed
   // → open. While open we keep the local draft and ignore parent prop
@@ -176,6 +196,7 @@ export function AdvancedFilterPanel({
     if (!open) return;
     setDraftConditions(conditions);
     setDraftMatchOperator(matchOperator);
+    setDraftScope(scope ?? null);
   }, [open]);
 
   // Numeric fields keep the raw string (`"101,99"`) in the draft so the
@@ -197,8 +218,12 @@ export function AdvancedFilterPanel({
   // biome-ignore lint/correctness/useExhaustiveDependencies: notify on draft edits only
   useEffect(() => {
     if (!open) return;
-    onDraftChange?.(normaliseDraft(draftConditions), draftMatchOperator);
-  }, [open, draftConditions, draftMatchOperator]);
+    onDraftChange?.(
+      normaliseDraft(draftConditions),
+      draftMatchOperator,
+      normalizeScope(draftScope),
+    );
+  }, [open, draftConditions, draftMatchOperator, draftScope]);
 
   if (!open) return null;
 
@@ -215,6 +240,7 @@ export function AdvancedFilterPanel({
   const commitAndApply = (): void => {
     setConditions(normaliseDraft(draftConditions));
     setMatchOperator(draftMatchOperator);
+    setScope?.(normalizeScope(draftScope));
     onApply();
   };
 
@@ -252,6 +278,10 @@ export function AdvancedFilterPanel({
           </button>
         </div>
       </div>
+
+      {/* #2673 — value-context bar: the channel/locale every condition is
+          evaluated against (with fallback to the global value). */}
+      {scopeEnabled && <AdvancedFilterScopeBar scope={draftScope} onScopeChange={setDraftScope} />}
 
       {/* Body */}
       <div className="p-5">

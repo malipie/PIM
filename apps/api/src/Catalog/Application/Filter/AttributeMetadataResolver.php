@@ -49,6 +49,16 @@ final class AttributeMetadataResolver
      */
     private array $cache = [];
 
+    /**
+     * #2673 — full meta cache (id + capability flags) for the scoped
+     * filter path. Kept separate from the type cache: reserved codes have
+     * a type but no meta (they map to physical columns, never to
+     * `object_values` rows).
+     *
+     * @var array<string, ?AttributeMeta>
+     */
+    private array $metaCache = [];
+
     public function __construct(
         private readonly AttributeRepositoryInterface $attributes,
         private readonly TenantContext $tenantContext,
@@ -86,11 +96,47 @@ final class AttributeMetadataResolver
     }
 
     /**
+     * #2673 — full attribute meta for the scoped filter path, or `null`
+     * for reserved/system codes (column-mapped, never scoped), dotted
+     * locale paths and unknown codes.
+     */
+    public function getAttributeMeta(string $code): ?AttributeMeta
+    {
+        $base = $this->stripLocaleSuffix($code);
+
+        if (\array_key_exists($base, $this->metaCache)) {
+            return $this->metaCache[$base];
+        }
+
+        if (isset(self::RESERVED_TYPES[$base])) {
+            return $this->metaCache[$base] = null;
+        }
+
+        $tenant = $this->tenantContext->get();
+        if (null === $tenant) {
+            return $this->metaCache[$base] = null;
+        }
+
+        $attribute = $this->attributes->findByCode($base, $tenant);
+        if (null === $attribute) {
+            return $this->metaCache[$base] = null;
+        }
+
+        return $this->metaCache[$base] = new AttributeMeta(
+            id: $attribute->getId()->toRfc4122(),
+            type: $attribute->getType()->value,
+            localizable: $attribute->isLocalizable(),
+            scopable: $attribute->isScopable(),
+        );
+    }
+
+    /**
      * @internal for tests
      */
     public function clearCache(): void
     {
         $this->cache = [];
+        $this->metaCache = [];
     }
 
     private function stripLocaleSuffix(string $code): string

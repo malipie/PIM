@@ -64,6 +64,10 @@ final class IndexSettingsTemplate
         // SKU X"). Exact-match filtering on it needs it filterable in Meili;
         // FilterDslResolver maps `sku -> code` so both spellings resolve here.
         'code',
+        // #2673 — the ScopedFilterPrefilter hands scoped filter results to
+        // Meili as `id IN [...]`; the primary key must be filterable for
+        // that expression to parse.
+        'id',
     ];
 
     /**

@@ -2065,7 +2065,16 @@
       }
     },
     "advanced_filter": {
-      "remove_condition": "Usuń warunek"
+      "remove_condition": "Usuń warunek",
+      "scope_label": "Kontekst",
+      "scope_channel": "Kanał",
+      "scope_locale": "Język",
+      "scope_global": "(globalny)",
+      "scope_hint": "Warunki liczone na wartościach tego kontekstu (fallback: globalne).",
+      "scope_channel_aria": "Kanał kontekstu filtra",
+      "scope_locale_aria": "Język kontekstu filtra",
+      "scope_clear": "Wyczyść kontekst",
+      "scope_truncated": "Wynik przybliżony — zawęź filtr (limit 10 000 obiektów w kontekście)."
     }
   },
   "api_configurator": {

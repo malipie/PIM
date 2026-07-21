@@ -8,8 +8,10 @@ import { useFilterMatchCount } from '@/features/catalog/search/use-filter-match-
 import {
   conditionsToDsl,
   dslToFlatConditions,
+  extractScope,
   type FilterCondition,
   type FilterDsl,
+  type FilterScope,
 } from '@/lib/filters/filter-dsl';
 
 import { SectionLabel } from '../../components/primitives';
@@ -41,6 +43,7 @@ export function OutboundFilterSection({
   const { t } = useTranslation();
   const [conditions, setConditions] = useState<FilterCondition[]>([]);
   const [matchOperator, setMatchOperator] = useState<'AND' | 'OR'>('AND');
+  const [scope, setScope] = useState<FilterScope | null>(null);
   const [open, setOpen] = useState(false);
 
   // #2640 — live match preview: counts from the panel's draft while editing,
@@ -48,15 +51,18 @@ export function OutboundFilterSection({
   const [draft, setDraft] = useState<{
     conditions: FilterCondition[];
     operator: 'AND' | 'OR';
+    scope?: FilterScope | null;
   } | null>(null);
   const effectiveConditions = open && draft !== null ? draft.conditions : conditions;
   const effectiveOperator = open && draft !== null ? draft.operator : matchOperator;
+  const effectiveScope = open && draft !== null ? (draft.scope ?? null) : scope;
   const { count: matchCount, isLoading: countLoading } = useFilterMatchCount(
     objectType === null || objectType.kind === 'product' || objectType.code === 'product'
       ? { kind: 'products' }
       : { objectTypeId: objectType.id },
     effectiveConditions,
     effectiveOperator,
+    effectiveScope,
   );
 
   // The panel's apply calls setConditions and setMatchOperator back-to-back in
@@ -66,6 +72,7 @@ export function OutboundFilterSection({
   // reads from them.
   const conditionsRef = useRef<FilterCondition[]>([]);
   const operatorRef = useRef<'AND' | 'OR'>('AND');
+  const scopeRef = useRef<FilterScope | null>(null);
 
   // Hydrate the flat editor from the stored DSL. A nested (AND/OR-of-groups)
   // DSL can't render flat; fall back to an empty editor (the stored filter
@@ -76,16 +83,24 @@ export function OutboundFilterSection({
       dsl !== null && typeof dsl === 'object' && 'operator' in dsl && dsl.operator === 'OR'
         ? 'OR'
         : 'AND';
+    scopeRef.current = extractScope(dsl);
     setConditions(conditionsRef.current);
     setMatchOperator(operatorRef.current);
+    setScope(scopeRef.current);
   }, [dsl]);
 
-  const commit = (next?: FilterCondition[], operator?: 'AND' | 'OR'): void => {
+  const commit = (
+    next?: FilterCondition[],
+    operator?: 'AND' | 'OR',
+    nextScope?: FilterScope | null,
+  ): void => {
     if (next !== undefined) conditionsRef.current = next;
     if (operator !== undefined) operatorRef.current = operator;
+    if (nextScope !== undefined) scopeRef.current = nextScope;
     setConditions(conditionsRef.current);
     setMatchOperator(operatorRef.current);
-    onDslChange(conditionsToDsl(conditionsRef.current, operatorRef.current));
+    setScope(scopeRef.current);
+    onDslChange(conditionsToDsl(conditionsRef.current, operatorRef.current, scopeRef.current));
   };
 
   return (
@@ -173,11 +188,15 @@ export function OutboundFilterSection({
           setConditions={(next) => commit(next)}
           matchOperator={matchOperator}
           setMatchOperator={(operator) => commit(undefined, operator)}
-          onDraftChange={(next, operator) => setDraft({ conditions: next, operator })}
+          scope={scope}
+          setScope={(next) => commit(undefined, undefined, next)}
+          onDraftChange={(next, operator, draftScope) =>
+            setDraft({ conditions: next, operator, scope: draftScope })
+          }
           onApply={() => setOpen(false)}
           onClose={() => setOpen(false)}
           onClear={() => {
-            commit([], 'AND');
+            commit([], 'AND', null);
             setOpen(false);
           }}
         />
