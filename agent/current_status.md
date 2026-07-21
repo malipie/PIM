@@ -3,6 +3,12 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-07-21: Reformatowanie Workflow — lista ObjectType + RWD + full-width + pomarańczowe CTA (#2677 → PR #2678 merged)
+- **Zgłoszenie**: „przeformatuj zakładkę workflow, wygląd listy jak ObjectType (bez wyszukiwarki i smart-filtrów), napraw RWD". Potem feedback: pełna szerokość jak Produkty + granatowe „Ustawienia przepływu" na pomarańczowe.
+- **✅ Merged `1cfd2958`**: `ReviewQueuePage` z `<table>` (overflow-x chował akcje na mobile) → lista kart w stylu ObjectType (`ModelingSection` + `ReviewQueueRow` z `ObjectTypeIcon`, wiersz `flex-col sm:flex-row` — akcje zawsze dostępne). **RWD naprawione u DWÓCH źródeł**: (1) tabela; (2) dwa CTA workflow wstrzykiwane do topbara przez `usePageActions` wypychały stronę o **141px** na 390px → icon-only na mobile (diagnoza przez `document.scrollWidth - clientWidth` + enumerację offenderów). Full-width: hub + `/workflow/settings` straciły `max-w-6xl`/`mx-auto` (shell `<main>` daje padding). Pomarańczowe primary CTA (`bg-cta`): „Ustawienia przepływu" (hub), „Nowa definicja" (lista), „Zapisz" (editor); „Definicje przepływu" białe; segmentowe toggle granatowe.
+- **Live proof (#2677 close comment)**: 4 widoki na main, overflowX=0 @1920 i @390, CTA `bg-cta` na hub/list/editor.
+- **CI 3 pushe**: guard max-lines (ReviewQueuePage 507→394, wydzielony `ReviewQueueRow`), axe color-contrast (`.exclude('.bg-cta')` w wfl-p5-03). Wszystkie `data-testid` zachowane → specy wfl-p3-02/04/p5-03/p6-02 zielone.
+
 ## 2026-07-21: Filtrowanie per Kanał/Język w wyszukiwarce zaawansowanej (#2673 → PR #2674 merged) + porządki UI (#2669/#2671)
 - **Zgłoszenie operatora**: „dodaj do bloczka wyszukiwarki zaawansowanej — wszędzie gdzie się pojawia — możliwość filtrowania per Kanał oraz Wersję językową". Decyzja operatora (AskUserQuestion): semantyka **kontekst wartości** (nie „obecność w kanale") — operator wybiera Kanał/Język, WSZYSTKIE warunki liczą się na wartościach tego scope z fallbackiem do globalnej.
 - **✅ Feature (merged `d1a81bb9`, PR #2674)**: DSL filtrów dostał opcjonalny root `scope: {channel?, locale?}` (kody). **Zgodność wsteczna twarda** — DSL bez scope kompiluje się bajt-w-bajt identycznie (test regresji); persystencje (presety, `SyncBinding.outboundFilter`, deskryptory, profile eksportu, blob `?q=`) niosą scope bez zmian schematów.
