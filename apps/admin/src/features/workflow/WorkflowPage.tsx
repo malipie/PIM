@@ -54,7 +54,7 @@ export function WorkflowPage() {
               to="/workflow/settings"
               data-testid="workflow-settings-cta"
               aria-label={t('workflow.settings_cta', { defaultValue: 'Ustawienia przepływu' })}
-              className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-zinc-900 px-2.5 text-[13px] font-semibold text-white transition hover:bg-zinc-800 sm:px-3.5"
+              className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-cta px-2.5 text-[13px] font-semibold text-cta-foreground transition hover:bg-accent-hover sm:px-3.5"
             >
               <SlidersHorizontal className="size-4" aria-hidden="true" />
               <span className="hidden sm:inline">
@@ -76,7 +76,7 @@ export function WorkflowPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6" data-testid="workflow-page">
+    <div className="space-y-5" data-testid="workflow-page">
       {/* Page title comes from the shell topbar breadcrumb (hub pattern). */}
       <PillTabs
         items={tabs}
