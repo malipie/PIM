@@ -33,8 +33,12 @@ test('definition builder: custom place shows up on the product without a deploy'
     await expect(page.getByTestId('workflow-definitions-page')).toBeVisible();
 
     // Accessibility gate on the list page (serious/critical only, per DoD).
+    // `.exclude('.bg-cta')` — the orange primary CTA (#2677) is the sanctioned
+    // design accent whose white-on-#ff4f00 contrast (3.29) is excluded across
+    // a11y specs (same as nui-13 / exr-16 / feed wizard).
     const a11y = await new AxeBuilder({ page })
       .include('[data-testid="workflow-definitions-page"]')
+      .exclude('.bg-cta')
       .analyze();
     expect(
       a11y.violations.filter(
