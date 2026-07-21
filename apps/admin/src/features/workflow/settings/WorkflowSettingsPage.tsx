@@ -152,7 +152,7 @@ export function WorkflowSettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 px-6 py-6" data-testid="workflow-settings-page">
+    <div className="space-y-5" data-testid="workflow-settings-page">
       <RoleLegend />
 
       <section className="flex items-center justify-between rounded-2xl border border-zinc-200 bg-white p-5">
