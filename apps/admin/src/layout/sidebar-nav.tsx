@@ -1,4 +1,3 @@
-import { useGetIdentity } from '@refinedev/core';
 import {
   ArrowRight,
   Boxes,
@@ -22,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation } from 'react-router';
 
+import { BrandLogo } from '@/components/brand/brand-logo';
 import { MockBadge } from '@/components/ui/mock-badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { hasFeature, hasPermission, isMenuRefVisible, useIdentity } from '@/lib/identity';
@@ -34,14 +34,6 @@ import { UserMenu } from './user-menu';
 
 interface SidebarNavProps {
   onNavigate?: () => void;
-}
-
-interface RefineIdentity {
-  id: string;
-  name: string;
-  email: string;
-  roles: string[];
-  tenant: { id: string; code: string; name: string } | null;
 }
 
 /**
@@ -196,7 +188,6 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
   const { t } = useTranslation();
   const { data, isError } = useEffectiveMenu();
   const { identity } = useIdentity();
-  const { data: refineIdentity } = useGetIdentity<RefineIdentity>();
   const { pathname } = useLocation();
 
   const rawItems: EffectiveMenuItem[] = data && !isError ? data.visible : FALLBACK_ITEMS;
@@ -470,28 +461,14 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
     );
   };
 
-  const brandSubtitle =
-    refineIdentity?.tenant?.name ?? t('app.brand_subtitle_fallback', { defaultValue: 'Workspace' });
-
   const agentTooltip = t('topbar.agent_pill_tooltip', {
     defaultValue: 'Nawigacja ⌘K działa; sekcja agenta = MOCK (epik 0.7, Faza 2)',
   });
 
   return (
     <>
-      <div className="flex items-center gap-2.5 px-2 pb-3 pt-1">
-        <div
-          className="grid h-9 w-9 place-items-center rounded-2xl bg-zinc-900 text-white"
-          aria-hidden
-        >
-          <span className="text-[15px] font-bold">P</span>
-        </div>
-        <div className="min-w-0 leading-tight">
-          <div className="truncate text-[15px] font-semibold tracking-tight text-zinc-900">
-            {t('app.title')}
-          </div>
-          <div className="truncate text-[11px] text-zinc-500">{brandSubtitle}</div>
-        </div>
+      <div className="px-2 pb-3 pt-1">
+        <BrandLogo />
       </div>
 
       <Tooltip>
