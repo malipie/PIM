@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
 import { HttpError, jsonFetch } from '@/lib/http';
+import { cn } from '@/lib/utils';
 
 interface TenantConfig {
   id: string;
@@ -72,8 +73,15 @@ function TenantConfigForm() {
   const dirty =
     tenant !== null && (name !== tenant.name || primaryLocale !== tenant.primary_locale);
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
+  const cancel = () => {
+    if (tenant) {
+      setName(tenant.name);
+      setPrimaryLocale(tenant.primary_locale);
+    }
+  };
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
     if (!tenant || !dirty || saving) return;
     setSaving(true);
     const payload: Record<string, string> = {};
@@ -118,11 +126,40 @@ function TenantConfigForm() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-1">
-        <h2 className="display text-xl font-semibold tracking-tight">
-          {t('settings.tenant.title')}
-        </h2>
-        <p className="max-w-2xl text-sm text-muted-foreground">{t('settings.tenant.intro')}</p>
+      {/* Action bar (ObjectType-style): ghost Anuluj + navy Save greyed until
+          there are unsaved changes. */}
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <h2 className="display text-xl font-semibold tracking-tight">
+            {t('settings.tenant.title')}
+          </h2>
+          <p className="max-w-2xl text-sm text-muted-foreground">{t('settings.tenant.intro')}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={cancel}
+            disabled={!dirty || saving}
+            className="h-9 rounded-xl px-3 text-[12.5px] text-zinc-600"
+          >
+            {t('app.cancel', { defaultValue: 'Anuluj' })}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void submit()}
+            disabled={!dirty || saving}
+            className={cn(
+              'h-9 rounded-xl px-4 text-[12.5px] font-medium',
+              dirty && !saving
+                ? 'bg-zinc-900 text-white hover:bg-zinc-800'
+                : 'bg-zinc-200 text-zinc-500',
+            )}
+          >
+            {saving ? t('settings.tenant.saving') : t('settings.tenant.save')}
+          </Button>
+        </div>
       </header>
 
       <form
@@ -199,12 +236,6 @@ function TenantConfigForm() {
               {t('settings.tenant.locales_pending_hint')}
             </p>
           </div>
-        </div>
-
-        <div className="mt-6 flex justify-end">
-          <Button type="submit" disabled={!dirty || saving}>
-            {saving ? t('settings.tenant.saving') : t('settings.tenant.save')}
-          </Button>
         </div>
       </form>
 

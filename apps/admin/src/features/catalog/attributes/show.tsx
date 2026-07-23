@@ -399,7 +399,7 @@ function Editor({
   };
 
   return (
-    <div className={cn('space-y-6', dirty ? 'pb-24' : '')}>
+    <div className="space-y-6">
       <Dialog open={deleteOpen} onOpenChange={(next) => (!next ? setDeleteOpen(false) : undefined)}>
         <DialogContent>
           <div className="space-y-2">
@@ -441,7 +441,9 @@ function Editor({
         <AuditLogIndicator />
       </div>
 
-      <div className="flex flex-wrap items-start gap-4">
+      {/* Sticky action bar (ObjectType-style): the persistent Save + Anuluj
+          live here, so there is no separate fixed bottom dirty-bar. */}
+      <div className="sticky top-0 z-20 flex flex-wrap items-start gap-4 rounded-2xl border border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
         <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-zinc-200 bg-white text-zinc-600">
           {isSystem ? <Shield className="size-5" /> : <Zap className="size-5" />}
         </div>
@@ -500,17 +502,34 @@ function Editor({
             </Button>
           ) : null}
           {!isSystem ? (
-            <Button
-              size="sm"
-              disabled={saving}
-              onClick={() => {
-                void saveAndExit();
-              }}
-              className="h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800"
-            >
-              <Save className="size-4" />
-              {t('attributes.save_changes', { defaultValue: 'Zapisz zmiany' })}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={cancel}
+                disabled={saving || !dirty}
+                className="h-9 rounded-xl"
+              >
+                {t('app.cancel', { defaultValue: 'Anuluj' })}
+              </Button>
+              <Button
+                size="sm"
+                disabled={saving || !dirty}
+                onClick={() => {
+                  void saveAndExit();
+                }}
+                className={cn(
+                  'h-9 rounded-xl',
+                  dirty && !saving
+                    ? 'bg-zinc-900 text-white hover:bg-zinc-800'
+                    : 'bg-zinc-200 text-zinc-500',
+                )}
+              >
+                <Save className="size-4" />
+                {t('attributes.save_changes', { defaultValue: 'Zapisz zmiany' })}
+              </Button>
+            </>
           ) : null}
         </div>
       </div>
@@ -671,41 +690,10 @@ function Editor({
         </p>
       ) : null}
 
-      {dirty ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white shadow-lg">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-6 py-4">
-            <span className="text-[13px] text-muted-foreground">
-              {t('attributes.dirty_count', {
-                defaultValue: '{{count}} pól zmienionych',
-                count: dirtyFields,
-              })}
-            </span>
-            {error !== null ? <span className="text-[12px] text-destructive">{error}</span> : null}
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={cancel}
-                disabled={saving}
-                className="h-9 rounded-xl"
-              >
-                {t('app.cancel')}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={saving}
-                onClick={() => {
-                  void save();
-                }}
-                className="h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800"
-              >
-                {t('attributes.save_changes', { defaultValue: 'Zapisz zmiany' })}
-              </Button>
-            </div>
-          </div>
-        </div>
+      {error !== null ? (
+        <p className="text-[12px] text-destructive" role="alert">
+          {error}
+        </p>
       ) : null}
     </div>
   );
