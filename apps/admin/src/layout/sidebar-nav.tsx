@@ -1,4 +1,3 @@
-import { useGetIdentity } from '@refinedev/core';
 import {
   ArrowRight,
   Boxes,
@@ -35,14 +34,6 @@ import { UserMenu } from './user-menu';
 
 interface SidebarNavProps {
   onNavigate?: () => void;
-}
-
-interface RefineIdentity {
-  id: string;
-  name: string;
-  email: string;
-  roles: string[];
-  tenant: { id: string; code: string; name: string } | null;
 }
 
 /**
@@ -197,7 +188,6 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
   const { t } = useTranslation();
   const { data, isError } = useEffectiveMenu();
   const { identity } = useIdentity();
-  const { data: refineIdentity } = useGetIdentity<RefineIdentity>();
   const { pathname } = useLocation();
 
   const rawItems: EffectiveMenuItem[] = data && !isError ? data.visible : FALLBACK_ITEMS;
@@ -471,16 +461,15 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
     );
   };
 
-  const brandSubtitle =
-    refineIdentity?.tenant?.name ?? t('app.brand_subtitle_fallback', { defaultValue: 'Workspace' });
-
   const agentTooltip = t('topbar.agent_pill_tooltip', {
     defaultValue: 'Nawigacja ⌘K działa; sekcja agenta = MOCK (epik 0.7, Faza 2)',
   });
 
   return (
     <>
-      <BrandLogo subtitle={brandSubtitle} className="px-2 pb-3 pt-1" />
+      <div className="px-2 pb-3 pt-1">
+        <BrandLogo />
+      </div>
 
       <Tooltip>
         <TooltipTrigger asChild>

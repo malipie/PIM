@@ -3,14 +3,16 @@ import { loginAsAdmin } from './helpers/auth';
 
 /**
  * The sidebar brand mark is the "harmon PIM" horizontal lockup from the design
- * system (Design System.html — "Lockup podstawowy · poziomy"): sygnet + Manrope
- * wordmark + orange PIM badge. Guards against a regression back to the old
- * "P" square / plain app-title mark.
+ * system ("Lockup podstawowy · poziomy"), shipped as a single image asset.
+ * Guards against a regression back to the old "P" square mark.
  */
-test('sidebar renders the harmon brand lockup', async ({ page }) => {
+test('sidebar renders the harmon brand lockup image', async ({ page }) => {
   await loginAsAdmin(page);
 
-  const sidebar = page.getByRole('complementary').first();
-  await expect(sidebar.getByText('harmon', { exact: true })).toBeVisible();
-  await expect(sidebar.getByText('PIM', { exact: true })).toBeVisible();
+  const logo = page.getByRole('complementary').first().getByRole('img', { name: 'harmon PIM' });
+  await expect(logo).toBeVisible();
+  // The asset must actually decode (not a broken src).
+  await expect
+    .poll(() => logo.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
 });
