@@ -2016,7 +2016,20 @@
       },
       "validation": {
         "sku_required": "SKU is required",
-        "object_type_missing": "No built-in ObjectType found — run the catalog seeder"
+        "object_type_missing": "No built-in ObjectType found — run the catalog seeder",
+        "attribute_error": "Attribute “{{name}}”: {{message}}",
+        "value": {
+          "below_min": "Value {{value}} is below the minimum {{min}}.",
+          "above_max": "Value {{value}} exceeds the maximum {{max}}.",
+          "numeric": "Value must be a number.",
+          "precision": "Value has more than {{max}} decimal places.",
+          "max_length": "Text exceeds the maximum length {{max}} (currently {{got}}).",
+          "pattern": "Value does not match the required pattern.",
+          "email": "This is not a valid email address.",
+          "option": "The selected value is not an allowed option for this attribute.",
+          "date": "This is not a valid date (ISO 8601).",
+          "color": "This is not a valid color."
+        }
       },
       "variants": {
         "list_title": "Variants list",

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router';
 
 import { toast } from '@/components/ui/toast';
 import { httpErrorDetail, jsonFetch } from '@/lib/http';
+import { localizeAttributeMessage } from './attribute-validation-i18n';
 import {
   collectRelationCodes,
   isAttributeRequired,
@@ -158,7 +159,7 @@ export function useProductDetailForm({
       toast.error(
         t('products.detail.validation.required_fields', {
           defaultValue: 'Uzupełnij wymagane pola: {{fields}}',
-          fields: violations.join(', '),
+          fields: violations.map((code) => attributeLabel(code) ?? code).join(', '),
         }),
       );
       return;
@@ -292,10 +293,16 @@ export function useProductDetailForm({
       // gets the same red highlight as a required-empty one.
       const match = detail?.match(/^Attribute "([^"]+)": (.*)$/s);
       const code = match?.[1];
-      const message = match?.[2];
-      if (code !== undefined && message !== undefined) {
+      const rawMessage = match?.[2];
+      if (code !== undefined && rawMessage !== undefined) {
         setValidationErrors(new Set([code]));
-        toast.error(`Attribute "${attributeLabel(code) ?? code}": ${message}`);
+        toast.error(
+          t('products.detail.validation.attribute_error', {
+            defaultValue: 'Atrybut „{{name}}”: {{message}}',
+            name: attributeLabel(code) ?? code,
+            message: localizeAttributeMessage(rawMessage, t),
+          }),
+        );
       } else {
         toast.error(
           detail ?? t('products.detail.save.failed', { defaultValue: 'Nie udało się zapisać' }),

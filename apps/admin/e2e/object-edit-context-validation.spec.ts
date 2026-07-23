@@ -97,8 +97,9 @@ test('object edit — context in header, orange active tab, validation shows nam
   await input.fill('-4');
   await page.getByRole('button', { name: /^(zapisz zmiany|save changes)$/i }).click();
 
+  // Polish UI → localized message with the attribute NAME (not the code).
   await expect(
-    page.getByText(/Attribute "Pojemność testowa": Value -4 is below min 0/i),
+    page.getByText(/Atrybut.*Pojemność testowa.*Wartość -4 jest poniżej minimum 0/),
   ).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(attrCode)).toHaveCount(0);
 

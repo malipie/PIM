@@ -351,7 +351,7 @@ export function ProductDetailHeader({
           whole page. The locale × channel context lives in the header above. */}
       <div className="border-t border-zinc-100 px-7">
         <div
-          className="scrollbar-tabs flex items-center gap-1 overflow-x-auto"
+          className="scrollbar-tabs flex items-center gap-1 overflow-x-auto overflow-y-hidden pb-1.5"
           role="tablist"
           aria-label={t('products.detail.tabs.aria', { defaultValue: 'Zakładki produktu' })}
         >
