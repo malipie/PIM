@@ -1,9 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
+import { Save } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 
+import { Button } from '@/components/ui/button';
 import { WizardStepper } from '@/components/ui-v2/wizard-stepper';
-import { jsonFetch } from '@/lib/http';
+import { httpErrorDetail, jsonFetch } from '@/lib/http';
 
 import { useDefaultObjectType } from '../../catalog/products/use-default-object-type';
 import { StepArchetype } from './steps/StepArchetype';
@@ -12,7 +15,11 @@ import { StepGenerate } from './steps/StepGenerate';
 import { StepMapping } from './steps/StepMapping';
 import { StepPreview } from './steps/StepPreview';
 import { StepScope } from './steps/StepScope';
-import { type CatalogResponse, catalogResponseToWizardState } from './use-generate-catalog';
+import {
+  type CatalogResponse,
+  catalogResponseToWizardState,
+  useGenerateCatalog,
+} from './use-generate-catalog';
 import { WizardFooter } from './WizardFooter';
 import { CatalogWizardProvider, useCatalogWizard } from './wizard-store';
 
@@ -68,10 +75,13 @@ function EditCatalogWizard({ catalogId }: { catalogId: string }): React.ReactEle
 
 function WizardContent() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { state, dispatch, editCatalogId } = useCatalogWizard();
   // The wizard targets products — the built-in product ObjectType id is
   // auto-resolved (same seam the product create page uses; no picker yet).
   const { objectTypeId } = useDefaultObjectType('product');
+  const { createAndGenerate, updateCatalog, isRunning } = useGenerateCatalog();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const steps = [
     { id: 'scope', label: t('catalogs_pdf.wizard.steps.scope') },
@@ -86,15 +96,77 @@ function WizardContent() {
   // and a kind is always selected — no step gates the wizard here.
   const nextDisabled = false;
 
+  const isEdit = editCatalogId !== null;
+  // The finish CTA lives in the topbar (like the ObjectType edit header) and is
+  // disabled until the draft is submittable. Editing PATCHes the config and does
+  // not need the product ObjectType id (only the create+generate path does).
+  const canSubmit = state.name.trim() !== '' && (isEdit || objectTypeId !== null) && !isRunning;
+
+  const handleCancel = () => {
+    if (state.dirty && !window.confirm(t('catalogs_pdf.wizard.cancel_confirm'))) {
+      return;
+    }
+    void navigate('/catalogs-pdf');
+  };
+
+  const handleFinish = async () => {
+    setSubmitError(null);
+    try {
+      // #2566 — edit mode PATCHes the config (regeneration stays a separate hub
+      // action); create mode POSTs a new catalog then generates.
+      if (editCatalogId !== null) {
+        await updateCatalog(editCatalogId, state);
+      } else {
+        if (objectTypeId === null) {
+          setSubmitError(t('catalogs_pdf.wizard.error_no_object_type'));
+          return;
+        }
+        await createAndGenerate(state, objectTypeId);
+      }
+      void navigate('/catalogs-pdf');
+    } catch (err) {
+      setSubmitError(httpErrorDetail(err) ?? t('catalogs_pdf.wizard.generate_error'));
+    }
+  };
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <header>
-        <h1 className="display text-[24px] font-semibold tracking-tight text-ink">
-          {editCatalogId !== null
-            ? t('catalogs_pdf.wizard.edit_title', { defaultValue: 'Edytuj katalog' })
-            : t('catalogs_pdf.wizard.title')}
-        </h1>
-        <p className="mt-1 text-[13px] text-zinc-500">{t('catalogs_pdf.wizard.lead')}</p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="display text-[24px] font-semibold tracking-tight text-ink">
+            {isEdit
+              ? t('catalogs_pdf.wizard.edit_title', { defaultValue: 'Edytuj katalog' })
+              : t('catalogs_pdf.wizard.title')}
+          </h1>
+          <p className="mt-1 text-[13px] text-zinc-500">{t('catalogs_pdf.wizard.lead')}</p>
+        </div>
+        {/* Persistent action bar, mirroring the ObjectType edit topbar: ghost
+            Anuluj + a filled primary CTA that stays greyed until submittable. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleCancel}
+            disabled={isRunning}
+            className="h-9 rounded-xl px-3 text-[12.5px] text-zinc-600"
+          >
+            {t('catalogs_pdf.wizard.cancel')}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void handleFinish()}
+            disabled={!canSubmit}
+            className="h-9 rounded-xl bg-zinc-900 px-4 text-[12.5px] font-medium text-white hover:bg-zinc-800"
+          >
+            <Save className="size-4" />
+            {isRunning
+              ? t('catalogs_pdf.wizard.generate_running')
+              : isEdit
+                ? t('catalogs_pdf.wizard.edit_save_cta', { defaultValue: 'Zapisz zmiany' })
+                : t('catalogs_pdf.wizard.generate_cta')}
+          </Button>
+        </div>
       </header>
 
       <WizardStepper
@@ -109,16 +181,13 @@ function WizardContent() {
         {state.step === 2 && <StepBranding />}
         {state.step === 3 && <StepMapping />}
         {state.step === 4 && <StepPreview objectTypeId={objectTypeId} />}
-        {state.step === 5 && <StepGenerate objectTypeId={objectTypeId} />}
+        {state.step === 5 && <StepGenerate objectTypeId={objectTypeId} submitError={submitError} />}
       </div>
 
-      {/* On the last step the finish CTA lives inside StepGenerate; the footer
-          only carries Anuluj / Wstecz there (finishSlot = null). */}
-      <WizardFooter
-        stepTitle={steps[state.step]?.label ?? ''}
-        nextDisabled={nextDisabled}
-        finishSlot={null}
-      />
+      {/* The finish CTA lives in the topbar; the footer is step navigation only
+          (Wstecz / Dalej), and the last step drops even those — going back is
+          handled by the clickable stepper. */}
+      <WizardFooter stepTitle={steps[state.step]?.label ?? ''} nextDisabled={nextDisabled} />
     </div>
   );
 }
