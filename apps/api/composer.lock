@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "80f042f7dc85f716af1b1723fd20a252",
+    "content-hash": "a9088c3816805db69ab710f0621bd8c7",
     "packages": [
         {
             "name": "anthropic-ai/sdk",
-            "version": "v0.36.0",
+            "version": "v0.38.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/anthropics/anthropic-sdk-php.git",
-                "reference": "a731fd19d9a11e865cdad6363e8545ead1f0658d"
+                "reference": "167d87e5f24c52f236660e30bff8f0eea4ab00c0"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/anthropics/anthropic-sdk-php/zipball/a731fd19d9a11e865cdad6363e8545ead1f0658d",
-                "reference": "a731fd19d9a11e865cdad6363e8545ead1f0658d",
+                "url": "https://api.github.com/repos/anthropics/anthropic-sdk-php/zipball/167d87e5f24c52f236660e30bff8f0eea4ab00c0",
+                "reference": "167d87e5f24c52f236660e30bff8f0eea4ab00c0",
                 "shasum": ""
             },
             "require": {
@@ -46,7 +46,7 @@
             },
             "suggest": {
                 "aws/aws-sdk-php": "Allows using the AWS Bedrock, AWS gateway, and Bedrock Mantle SDKs",
-                "google/auth": "Allows using the Google Vertex SDK",
+                "google/auth": "Allows using the Google Vertex and Google Cloud gateway SDKs",
                 "mcp/sdk": "Required to use the BetaMcp helpers for integrating MCP servers with the Anthropic SDK"
             },
             "type": "library",
@@ -65,9 +65,9 @@
             "description": "Anthropic PHP SDK",
             "support": {
                 "issues": "https://github.com/anthropics/anthropic-sdk-php/issues",
-                "source": "https://github.com/anthropics/anthropic-sdk-php/tree/v0.36.0"
+                "source": "https://github.com/anthropics/anthropic-sdk-php/tree/v0.38.0"
             },
-            "time": "2026-07-02T19:14:24+00:00"
+            "time": "2026-07-22T16:45:54+00:00"
         },
         {
             "name": "api-platform/doctrine-common",
