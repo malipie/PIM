@@ -290,7 +290,7 @@ export function ProductDetailHeader({
                     })}
                     value={nameValue}
                     onChange={(event) => onFieldChange('name', event.target.value)}
-                    className="font-display mt-1 h-11 rounded-lg border-zinc-200 bg-white text-[26px] font-semibold tracking-tight"
+                    className="font-display mt-1 h-11 w-full max-w-[460px] rounded-lg border-zinc-200 bg-white text-[26px] font-semibold tracking-tight"
                   />
                 ) : (
                   <h1 className="font-display mt-1 text-[26px] font-semibold leading-tight tracking-tight">
@@ -308,28 +308,50 @@ export function ProductDetailHeader({
             )}
           </div>
           {mode === 'edit' ? (
-            <div className="flex flex-col items-center gap-1">
-              <CompletenessRing pct={scopedCompletenessPct} size={72} stroke={6} />
-              {completenessScope !== null ? (
-                <span
-                  className="num rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-500"
-                  title={t('products.completeness.scope_tooltip', {
-                    scope: completenessScope.toUpperCase(),
-                    defaultValue: 'Kompletność dla zakresu {{scope}}',
+            <div className="flex shrink-0 items-start gap-5">
+              {/* Context of edition (language × channel) lifted into the header,
+                  always visible next to the title; the tab strip below scrolls
+                  independently. */}
+              <div className="flex flex-col items-end gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                  {t('products.detail.context.label', {
+                    defaultValue: 'Kontekst edycji · język × kanał',
                   })}
-                >
-                  {completenessScope}
                 </span>
-              ) : null}
+                <LocaleChannelToolbar
+                  locale={locale}
+                  channel={channel}
+                  onLocaleChange={onLocaleChange}
+                  onChannelChange={onChannelChange}
+                  locales={locales}
+                  channels={channels}
+                />
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <CompletenessRing pct={scopedCompletenessPct} size={72} stroke={6} />
+                {completenessScope !== null ? (
+                  <span
+                    className="num rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-zinc-500"
+                    title={t('products.completeness.scope_tooltip', {
+                      scope: completenessScope.toUpperCase(),
+                      defaultValue: 'Kompletność dla zakresu {{scope}}',
+                    })}
+                  >
+                    {completenessScope}
+                  </span>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </div>
       </div>
 
-      {/* Tabs + locale/channel toolbar */}
-      <div className="flex items-center gap-1 border-t border-zinc-100 px-7">
+      {/* Attribute-group tabs — the row scrolls horizontally on its own (navy
+          scrollbar) so a long list of groups never pushes a scrollbar onto the
+          whole page. The locale × channel context lives in the header above. */}
+      <div className="border-t border-zinc-100 px-7">
         <div
-          className="flex flex-1 items-center gap-1"
+          className="scrollbar-tabs flex items-center gap-1 overflow-x-auto overflow-y-hidden pb-1.5"
           role="tablist"
           aria-label={t('products.detail.tabs.aria', { defaultValue: 'Zakładki produktu' })}
         >
@@ -344,7 +366,7 @@ export function ProductDetailHeader({
                 aria-selected={isActive}
                 onClick={() => onSelectTab(tab)}
                 className={cn(
-                  'relative inline-flex h-[44px] items-center gap-2 px-3.5 text-[13px] font-medium tracking-tight',
+                  'relative inline-flex h-[44px] shrink-0 items-center gap-2 px-3.5 text-[13px] font-medium tracking-tight',
                   isActive ? 'text-zinc-900' : 'text-zinc-500 hover:text-zinc-800',
                 )}
               >
@@ -361,7 +383,7 @@ export function ProductDetailHeader({
                 ) : null}
                 {isActive ? (
                   <span
-                    className="absolute -bottom-px left-0 right-0 h-[2px] rounded-t bg-zinc-900"
+                    className="absolute -bottom-px left-0 right-0 h-[2px] rounded-t bg-orange-500"
                     aria-hidden
                   />
                 ) : null}
@@ -369,16 +391,6 @@ export function ProductDetailHeader({
             );
           })}
         </div>
-        {mode === 'edit' ? (
-          <LocaleChannelToolbar
-            locale={locale}
-            channel={channel}
-            onLocaleChange={onLocaleChange}
-            onChannelChange={onChannelChange}
-            locales={locales}
-            channels={channels}
-          />
-        ) : null}
       </div>
     </header>
   );

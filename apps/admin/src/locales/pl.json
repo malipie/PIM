@@ -2046,7 +2046,20 @@
       },
       "validation": {
         "sku_required": "SKU jest wymagane",
-        "object_type_missing": "Brak built-in ObjectType — uruchom seeder katalogu"
+        "object_type_missing": "Brak built-in ObjectType — uruchom seeder katalogu",
+        "attribute_error": "Atrybut „{{name}}”: {{message}}",
+        "value": {
+          "below_min": "Wartość {{value}} jest poniżej minimum {{min}}.",
+          "above_max": "Wartość {{value}} przekracza maksimum {{max}}.",
+          "numeric": "Wartość musi być liczbą.",
+          "precision": "Wartość ma więcej niż {{max}} miejsc po przecinku.",
+          "max_length": "Tekst przekracza maksymalną długość {{max}} (obecnie {{got}}).",
+          "pattern": "Wartość nie pasuje do wymaganego wzorca.",
+          "email": "To nie jest poprawny adres e-mail.",
+          "option": "Wybrana wartość nie jest dozwoloną opcją tego atrybutu.",
+          "date": "To nie jest poprawna data (ISO 8601).",
+          "color": "To nie jest poprawny kolor."
+        }
       },
       "variants": {
         "list_title": "Lista wariantów",

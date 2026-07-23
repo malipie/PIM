@@ -48,6 +48,7 @@ export interface ProductDetailContentProps {
   scopeStatus: ScopeStatus;
   expandedGroups: Set<string>;
   requiredErrors: Set<string>;
+  validationErrors: Set<string>;
   fieldValue: (code: string) => unknown;
   onFieldChange: (code: string, value: unknown) => void;
   onToggleGroup: (groupId: string) => void;
@@ -96,6 +97,7 @@ export function ProductDetailContent({
   scopeStatus,
   expandedGroups,
   requiredErrors,
+  validationErrors,
   fieldValue,
   onFieldChange,
   onToggleGroup,
@@ -158,6 +160,7 @@ export function ProductDetailContent({
               }
               inheritedFrom={scopeStatus[attr.code]?.inherited_from ?? null}
               requiredError={requiredErrors.has(attr.code)}
+              validationError={validationErrors.has(attr.code)}
             />
             {askAiProposalFor?.(attr.code)}
           </div>

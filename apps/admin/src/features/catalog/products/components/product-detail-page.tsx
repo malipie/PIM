@@ -183,6 +183,7 @@ export function ProductDetailPage({
   const {
     dirtyFields,
     requiredErrors,
+    validationErrors,
     expandedGroups,
     isSaving,
     isDeleting,
@@ -486,6 +487,7 @@ export function ProductDetailPage({
               scopeStatus={scopeStatus}
               expandedGroups={expandedGroups}
               requiredErrors={requiredErrors}
+              validationErrors={validationErrors}
               fieldValue={fieldValue}
               onFieldChange={setFieldValue}
               onToggleGroup={toggleGroup}
