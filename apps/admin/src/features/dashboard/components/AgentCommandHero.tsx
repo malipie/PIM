@@ -116,7 +116,7 @@ export function AgentCommandHero() {
             type="submit"
             disabled={busy || unavailable}
             data-testid="agent-hero-submit"
-            className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-[14px] font-semibold text-ink transition-colors hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-70"
+            className="inline-flex items-center gap-2 rounded-2xl bg-cta px-5 py-3 text-[14px] font-semibold text-cta-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-70"
           >
             {t('dashboard.agent.ask', { defaultValue: 'Zapytaj agenta' })}
             {busy ? (

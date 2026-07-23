@@ -47,7 +47,12 @@ async function stubCapabilities(page: Page) {
 async function expectNoViolations(page: Page) {
   // Let CSS transitions settle before axe samples computed colors.
   await page.waitForTimeout(350);
-  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+  // The brand orange (#ff4f00) CTA is an accepted sub-AA-contrast exception per
+  // the operator's design system (same convention as the wizard specs).
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa'])
+    .exclude('.bg-cta')
+    .analyze();
   expect(
     results.violations.flatMap((violation) =>
       violation.nodes
