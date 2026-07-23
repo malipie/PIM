@@ -245,6 +245,30 @@ export function FeedWizardPage() {
     stepId === 'scope' && currentDraft.id === null && productTypeId.data === undefined;
   const stepAllowed = canLeaveStep(stepId, currentDraft, structureValid) && !waitingForTypeId;
 
+  // The finish CTA lives in the persistent topbar; it lights up only on the
+  // last step (once every prior gate has passed) and while nothing is saving.
+  const canFinish = step === last && !saving;
+
+  const handleFinish = () => {
+    void persistDraft().then(async (ok) => {
+      if (!ok) {
+        return;
+      }
+      if (draft.id !== null) {
+        // First publish: queue a regeneration so the public URL has a file
+        // right away (manual trigger — the dedicated first_publish enqueue is
+        // the P4-01 scheduler follow-up).
+        try {
+          await regenerateFeed(draft.id);
+        } catch {
+          // The feed is saved; regeneration can be retried from the hub.
+        }
+      }
+      toast.success(t('api_configurator.feeds.wizard.saved_generating'));
+      void navigate(HUB_PATH);
+    });
+  };
+
   return (
     <div className="max-w-[1180px] space-y-5">
       <div className="flex items-center gap-3">
@@ -269,6 +293,27 @@ export function FeedWizardPage() {
           </p>
         </div>
         {draft.kind !== null && <TemplateBadge kind={draft.kind} />}
+        {/* Persistent action bar (ObjectType-style): ghost Anuluj + a navy
+            finish CTA that stays greyed until the last step is reached. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void navigate(HUB_PATH)}
+            disabled={saving}
+            className="h-9 rounded-xl px-3 text-[12.5px] font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50"
+          >
+            {t('api_configurator.feeds.wizard.cancel')}
+          </button>
+          <button
+            type="button"
+            onClick={handleFinish}
+            disabled={!canFinish}
+            className="flex h-9 items-center gap-1.5 rounded-xl bg-zinc-900 px-4 text-[12.5px] font-semibold text-white soft-shadow transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Rss className="h-4 w-4" aria-hidden />
+            {t('api_configurator.feeds.wizard.save_and_generate')}
+          </button>
+        </div>
       </div>
 
       <nav aria-label={t('api_configurator.feeds.wizard.steps_aria')}>
@@ -396,18 +441,19 @@ export function FeedWizardPage() {
         {stepId === 'preview' && <StepPreview feedId={draft.id} rootPath={rootPath} />}
       </div>
 
+      {/* Footer is step navigation only now (Anuluj + finish moved to the
+          topbar). The last step drops Wstecz/Dalej — going back is via the
+          clickable stepper above. */}
       <div className="flex items-center gap-3 pt-1">
-        <button
-          type="button"
-          onClick={() => (step === 0 ? void navigate(HUB_PATH) : setStep(step - 1))}
-          className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-[13px] font-medium text-zinc-700 hover:bg-zinc-50"
-        >
-          {t(
-            step === 0
-              ? 'api_configurator.feeds.wizard.cancel'
-              : 'api_configurator.feeds.wizard.back',
-          )}
-        </button>
+        {step > 0 && step < last && (
+          <button
+            type="button"
+            onClick={() => setStep(step - 1)}
+            className="h-10 rounded-xl border border-zinc-200 bg-white px-4 text-[13px] font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            {t('api_configurator.feeds.wizard.back')}
+          </button>
+        )}
         <div className="flex-1" />
         <div className="hidden text-[12px] text-zinc-500 sm:block">
           {t('api_configurator.feeds.wizard.progress', {
@@ -415,7 +461,7 @@ export function FeedWizardPage() {
             total: steps.length,
           })}
         </div>
-        {step < last ? (
+        {step < last && (
           <button
             type="button"
             onClick={() => void next()}
@@ -429,34 +475,6 @@ export function FeedWizardPage() {
           >
             {t('api_configurator.feeds.wizard.next')}
             <ArrowRight className="h-4 w-4" aria-hidden />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              void persistDraft().then(async (ok) => {
-                if (!ok) {
-                  return;
-                }
-                if (draft.id !== null) {
-                  // First publish: queue a regeneration so the public URL has
-                  // a file right away (manual trigger — the dedicated
-                  // first_publish enqueue is the P4-01 scheduler follow-up).
-                  try {
-                    await regenerateFeed(draft.id);
-                  } catch {
-                    // The feed is saved; regeneration can be retried from the hub.
-                  }
-                }
-                toast.success(t('api_configurator.feeds.wizard.saved_generating'));
-                void navigate(HUB_PATH);
-              });
-            }}
-            disabled={saving}
-            className="flex h-10 items-center gap-1.5 rounded-xl bg-zinc-900 px-5 text-[13px] font-bold text-white soft-shadow hover:bg-zinc-800 disabled:opacity-50"
-          >
-            <Rss className="h-4 w-4" aria-hidden />
-            {t('api_configurator.feeds.wizard.save_and_generate')}
           </button>
         )}
       </div>

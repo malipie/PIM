@@ -1,7 +1,6 @@
-import { Boxes, FolderTree, Group, Layers, Loader2, Package, Play, Tags } from 'lucide-react';
+import { Boxes, FolderTree, Group, Layers, Loader2, Package, Tags } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
 import { toast } from '@/components/ui/toast';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { FormatPill } from '@/components/ui-v2/format-pill';
@@ -10,7 +9,7 @@ import { HttpError } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 import { entityTypeLabelKey } from '../../sessions/session-format';
-import { type RunError, saveProfile, updateProfile, useRunExport } from '../use-run-export';
+import { saveProfile, updateProfile } from '../use-run-export';
 import { useWizard } from '../wizard-store';
 
 const ENTITY_ICONS: Record<string, typeof Package> = {
@@ -30,9 +29,7 @@ const ENTITY_ICONS: Record<string, typeof Package> = {
  */
 export function StepSummary() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { state, dispatch } = useWizard();
-  const { run, isRunning } = useRunExport();
   const [profileNameInput, setProfileNameInput] = useState(state.profileName);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -85,42 +82,6 @@ export function StepSummary() {
       }
     } finally {
       setSavingProfile(false);
-    }
-  };
-
-  const onRun = async () => {
-    try {
-      const result = await run(state);
-      if (result.kind === 'sync') {
-        toast.success(t('exports.wizard.summary.sync_done', { filename: result.filename }));
-        void navigate('/integrations/exports/sessions');
-        return;
-      }
-      toast.success(t('exports.wizard.summary.async_started'));
-      void navigate('/integrations/exports/sessions', {
-        state: { highlightSession: result.sessionId },
-      });
-    } catch (error) {
-      const runError = error as Partial<RunError>;
-      if (runError.status === 422) {
-        toast.error(t('exports.wizard.summary.error_422', { detail: runError.detail ?? '' }));
-        dispatch({ type: 'GO_TO_STEP', step: 2 });
-        return;
-      }
-      if (runError.status === 403) {
-        toast.error(t('exports.wizard.summary.error_403'));
-        return;
-      }
-      // A defined status means the server responded but with something we can't
-      // download (e.g. an error body leaking through with an ok-ish status) —
-      // distinct from a real network failure where fetch rejects (no status).
-      if (typeof runError.status === 'number') {
-        toast.error(
-          t('exports.wizard.summary.error_invalid_response', { detail: runError.detail ?? '' }),
-        );
-        return;
-      }
-      toast.error(t('exports.wizard.summary.error_network'));
     }
   };
 
@@ -263,23 +224,6 @@ export function StepSummary() {
         {mode === 'sync'
           ? t('exports.wizard.summary.note_sync')
           : t('exports.wizard.summary.note_async')}
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          disabled={isRunning}
-          onClick={() => void onRun()}
-          data-testid="run-export"
-          className="focus-ring inline-flex h-11 items-center gap-2 rounded-xl bg-cta px-6 text-[14px] font-semibold text-cta-foreground transition enabled:hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isRunning ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-          ) : (
-            <Play className="size-4" aria-hidden />
-          )}
-          {t('exports.wizard.summary.run_cta')}
-        </button>
       </div>
     </div>
   );

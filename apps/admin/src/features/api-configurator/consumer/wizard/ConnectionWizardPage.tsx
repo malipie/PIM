@@ -183,6 +183,27 @@ export function ConnectionWizardPage() {
             )}
           </p>
         </div>
+        {/* Persistent action bar (ObjectType-style): ghost Anuluj + a navy
+            finish CTA that stays greyed until the last step is reached. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(HUB)}
+            disabled={saving}
+            className="h-9 rounded-xl px-3 text-[12.5px] text-zinc-600"
+          >
+            {t('app.cancel')}
+          </Button>
+          <Button
+            onClick={() => navigate(HUB)}
+            disabled={!isLast || saving}
+            className="h-9 rounded-xl bg-zinc-900 px-4 text-[12.5px] font-medium text-white hover:bg-zinc-800"
+          >
+            <Check className="size-4" aria-hidden="true" />
+            {t('api_configurator.wizard.finish')}
+          </Button>
+        </div>
       </div>
 
       {isEdit && !prefilled ? (
@@ -278,10 +299,15 @@ export function ConnectionWizardPage() {
             </div>
           ) : null}
 
+          {/* Footer is step navigation only (Anuluj + finish moved to the
+              topbar). The last step drops Wstecz/Dalej — going back is via the
+              clickable stepper above. */}
           <div className="flex items-center gap-3 pt-1">
-            <Button variant="outline" onClick={handleBack} disabled={saving}>
-              {step === 0 ? t('app.cancel') : t('api_configurator.wizard.back')}
-            </Button>
+            {step > 0 && !isLast ? (
+              <Button variant="outline" onClick={handleBack} disabled={saving}>
+                {t('api_configurator.wizard.back')}
+              </Button>
+            ) : null}
             <div className="flex-1" />
             <div className="text-[12px] text-zinc-500">
               {t('api_configurator.wizard.step_counter', {
@@ -289,17 +315,12 @@ export function ConnectionWizardPage() {
                 total: steps.length,
               })}
             </div>
-            {isLast ? (
-              <Button onClick={() => navigate(HUB)}>
-                {t('api_configurator.wizard.finish')}
-                <ArrowRight className="ml-1.5 size-4" aria-hidden="true" />
-              </Button>
-            ) : (
+            {!isLast ? (
               <Button onClick={handleNext} disabled={(step === 0 && !canLeaveStep0) || saving}>
                 {saving ? t('api_configurator.wizard.saving') : t('api_configurator.wizard.next')}
                 <ArrowRight className="ml-1.5 size-4" aria-hidden="true" />
               </Button>
-            )}
+            ) : null}
           </div>
         </>
       ) : null}
