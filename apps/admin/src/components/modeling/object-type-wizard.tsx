@@ -363,8 +363,10 @@ export function ObjectTypeWizard() {
             })}
           </p>
         </div>
+        {/* Single navy action bar (ObjectType-style); the finish CTA lives
+            here, not duplicated in the step footer. */}
         <div className="flex shrink-0 items-center gap-2">
-          <Button asChild variant="ghost">
+          <Button asChild variant="ghost" className="h-9 rounded-xl px-3 text-[13px]">
             <Link to="/modeling/object-types">
               {t('object_type_wizard.cancel', { defaultValue: 'Anuluj' })}
             </Link>
@@ -373,7 +375,7 @@ export function ObjectTypeWizard() {
             type="button"
             disabled={submitting}
             onClick={() => void handleSubmit()}
-            className="gap-1.5"
+            className="h-9 gap-1.5 rounded-xl bg-zinc-900 px-4 text-[13px] text-white hover:bg-zinc-800"
           >
             <Check className="size-3.5" />
             {submitting
@@ -813,6 +815,8 @@ export function ObjectTypeWizard() {
               </p>
             ) : null}
 
+            {/* Footer is step navigation only; the finish CTA is the navy
+                "Utwórz typ" in the topbar. */}
             <div className="flex items-center justify-between border-t border-zinc-100 pt-3">
               <Button variant="ghost" onClick={goPrev} disabled={step === 1}>
                 {t('object_type_wizard.prev', { defaultValue: '← Poprzedni' })}
@@ -821,18 +825,7 @@ export function ObjectTypeWizard() {
                 <Button onClick={goNext}>
                   {t('object_type_wizard.next', { defaultValue: 'Dalej →' })}
                 </Button>
-              ) : (
-                <Button
-                  onClick={() => void handleSubmit()}
-                  disabled={submitting}
-                  className="gap-1.5"
-                >
-                  <Check className="size-3.5" />
-                  {submitting
-                    ? t('object_type_wizard.submitting', { defaultValue: 'Tworzenie…' })
-                    : t('object_type_wizard.submit', { defaultValue: 'Utwórz typ' })}
-                </Button>
-              )}
+              ) : null}
             </div>
           </CardContent>
         </Card>

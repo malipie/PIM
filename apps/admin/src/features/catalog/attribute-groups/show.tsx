@@ -361,7 +361,7 @@ function Editor({
   const groupName = resolveLabel(group.label, locale);
 
   return (
-    <div className={cn('-m-6 space-y-0', dirty ? 'pb-24' : '')}>
+    <div className="-m-6 space-y-0">
       {/* Sticky header */}
       <div className="sticky top-0 z-10 flex items-start gap-4 border-b border-zinc-200 bg-zinc-50/95 px-7 py-5 backdrop-blur">
         <button
@@ -387,20 +387,39 @@ function Editor({
             /modeling/attribute-groups/{group.code}
           </div>
         </div>
+        {/* Single action bar in the sticky topbar: ghost Anuluj (revert) +
+            navy Save greyed until there are changes. */}
         <div className="flex shrink-0 items-center gap-2">
           <AuditLogIndicator />
           {!isLockedSystemGroup ? (
-            <Button
-              size="sm"
-              disabled={saving}
-              onClick={() => {
-                void saveAndExit();
-              }}
-              className="h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800"
-            >
-              <Save className="size-4" />
-              {t('attribute_groups.save_changes', { defaultValue: 'Zapisz zmiany' })}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={cancel}
+                disabled={saving || !dirty}
+                className="h-9 rounded-xl"
+              >
+                {t('app.cancel', { defaultValue: 'Anuluj' })}
+              </Button>
+              <Button
+                size="sm"
+                disabled={saving || !dirty}
+                onClick={() => {
+                  void saveAndExit();
+                }}
+                className={cn(
+                  'h-9 rounded-xl',
+                  dirty && !saving
+                    ? 'bg-zinc-900 text-white hover:bg-zinc-800'
+                    : 'bg-zinc-200 text-zinc-500',
+                )}
+              >
+                <Save className="size-4" />
+                {t('attribute_groups.save_changes', { defaultValue: 'Zapisz zmiany' })}
+              </Button>
+            </>
           ) : null}
         </div>
       </div>
@@ -685,41 +704,10 @@ function Editor({
         ) : null}
       </div>
 
-      {dirty ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white shadow-lg">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-6 py-4">
-            <span className="text-[13px] text-muted-foreground">
-              {t('attribute_groups.dirty_count', {
-                defaultValue: '{{count}} pól zmienionych',
-                count: dirtyFields,
-              })}
-            </span>
-            {error !== null ? <span className="text-[12px] text-destructive">{error}</span> : null}
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={cancel}
-                disabled={saving}
-                className="h-9 rounded-xl"
-              >
-                {t('app.cancel', { defaultValue: 'Anuluj' })}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={saving}
-                onClick={() => {
-                  void save();
-                }}
-                className="h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800"
-              >
-                {t('attribute_groups.save_changes', { defaultValue: 'Zapisz zmiany' })}
-              </Button>
-            </div>
-          </div>
-        </div>
+      {error !== null ? (
+        <p className="px-7 pb-4 text-[12px] text-destructive" role="alert">
+          {error}
+        </p>
       ) : null}
 
       {/* DP-08 (#2039) — mounted only while open (fresh state per opening). */}
