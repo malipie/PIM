@@ -313,7 +313,7 @@ export function ProductDetailHeader({
                   always visible next to the title; the tab strip below scrolls
                   independently. */}
               <div className="flex flex-col items-end gap-1.5">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
                   {t('products.detail.context.label', {
                     defaultValue: 'Kontekst edycji · język × kanał',
                   })}
