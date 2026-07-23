@@ -1,36 +1,27 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
 
-import { httpErrorDetail } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 import { SHEET_SLOTS } from '../types';
-import { useGenerateCatalog } from '../use-generate-catalog';
 import { useCatalogWizard } from '../wizard-store';
 
 interface StepGenerateProps {
   /** Built-in product ObjectType id — required to POST /api/catalogs. */
   objectTypeId: string | null;
+  /** Submit error lifted from the topbar finish action (create/generate). */
+  submitError: string | null;
 }
 
 /**
- * CPDF-P5-02 step 6 — summary + finish. "Utwórz i generuj" POSTs
- * /api/catalogs then /api/catalogs/{id}/generate, then navigates back to
- * /catalogs-pdf (the runs list lands in CPDF-P5-03). Errors surface inline.
+ * CPDF-P5-02 step 6 — summary + name field. The finish CTA ("Utwórz i generuj")
+ * lives in the wizard topbar now (#2680); this step only renders the summary,
+ * the catalog-name input, and surfaces validation + submit errors inline.
  */
-export function StepGenerate({ objectTypeId }: StepGenerateProps) {
+export function StepGenerate({ objectTypeId, submitError }: StepGenerateProps) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { state, dispatch, editCatalogId } = useCatalogWizard();
-  const { createAndGenerate, updateCatalog, isRunning } = useGenerateCatalog();
-  const [error, setError] = useState<string | null>(null);
-  const isEdit = editCatalogId !== null;
+  const { state, dispatch } = useCatalogWizard();
 
   const nameValid = state.name.trim() !== '';
-  // Editing PATCHes the existing catalog and does not need the product
-  // ObjectType id (that seam is only used to POST a new catalog + generate).
-  const canSubmit = nameValid && (isEdit || objectTypeId !== null) && !isRunning;
 
   const summaryRows: Array<{ label: string; value: string }> = [
     { label: t('catalogs_pdf.wizard.summary_name'), value: state.name.trim() || '—' },
@@ -54,26 +45,6 @@ export function StepGenerate({ objectTypeId }: StepGenerateProps) {
       value: SHEET_SLOTS.filter((slot) => state.fieldMappings[slot]?.trim()).length.toString(),
     },
   ];
-
-  const handleFinish = async () => {
-    setError(null);
-    try {
-      // #2566 — edit mode PATCHes the config (regeneration stays a separate
-      // hub action); create mode POSTs a new catalog + generates.
-      if (editCatalogId !== null) {
-        await updateCatalog(editCatalogId, state);
-      } else {
-        if (objectTypeId === null) {
-          setError(t('catalogs_pdf.wizard.error_no_object_type'));
-          return;
-        }
-        await createAndGenerate(state, objectTypeId);
-      }
-      void navigate('/catalogs-pdf');
-    } catch (err) {
-      setError(httpErrorDetail(err) ?? t('catalogs_pdf.wizard.generate_error'));
-    }
-  };
 
   return (
     <div className="space-y-5 rounded-2xl border border-zinc-200 bg-surface p-7 shadow-card">
@@ -125,29 +96,11 @@ export function StepGenerate({ objectTypeId }: StepGenerateProps) {
           {t('catalogs_pdf.wizard.error_no_object_type')}
         </p>
       )}
-      {error !== null && (
+      {submitError !== null && (
         <p className="rounded-xl border border-brick-200 bg-brick-50 px-4 py-3 text-[13px] text-brick-700">
-          {error}
+          {submitError}
         </p>
       )}
-
-      <button
-        type="button"
-        onClick={() => void handleFinish()}
-        disabled={!canSubmit}
-        className={cn(
-          'focus-ring h-10 rounded-xl px-5 text-[13px] font-semibold transition',
-          canSubmit
-            ? 'bg-cta text-cta-foreground hover:bg-accent-hover'
-            : 'cursor-not-allowed bg-zinc-100 text-zinc-500',
-        )}
-      >
-        {isRunning
-          ? t('catalogs_pdf.wizard.generate_running')
-          : isEdit
-            ? t('catalogs_pdf.wizard.edit_save_cta', { defaultValue: 'Zapisz zmiany' })
-            : t('catalogs_pdf.wizard.generate_cta')}
-      </button>
     </div>
   );
 }

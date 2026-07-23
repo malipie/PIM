@@ -92,6 +92,12 @@ test('CPDF-P5-02 — catalog wizard: steps, generate, navigate back, a11y', asyn
   ).toBeVisible();
   await expect(page.getByRole('button', { name: /^zakres$|^scope$/i })).toBeVisible();
 
+  // #2680 — the finish CTA now lives in the persistent topbar and stays
+  // disabled until the draft is submittable (name is only set on step 6).
+  const finishCta = page.getByRole('button', { name: /utwórz i generuj|create and generate/i });
+  await expect(finishCta).toBeVisible();
+  await expect(finishCta).toBeDisabled();
+
   const next = page.getByRole('button', { name: /^dalej$|^next$/i });
 
   // Step 1 — scope. The live assortment count (#2567) shows how many products
@@ -127,7 +133,13 @@ test('CPDF-P5-02 — catalog wizard: steps, generate, navigate back, a11y', asyn
   await next.click();
 
   // Step 6 — generate: name required, then create + generate + navigate back.
+  // #2680 — the last step drops the footer nav (Wstecz/Dalej); going back is
+  // via the clickable stepper, and the finish action is the topbar CTA.
+  await expect(page.getByRole('button', { name: /^wstecz$|^back$/i })).toHaveCount(0);
   await page.getByLabel(/nazwa katalogu|catalog name/i).fill('Katalog testowy');
+
+  // The topbar CTA enables once the catalog name is set.
+  await expect(finishCta).toBeEnabled();
 
   // a11y — scan the last step's main content before submitting. Kill CSS
   // transitions/animations first: axe otherwise samples mid-transition blend
