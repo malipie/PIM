@@ -104,6 +104,12 @@ export interface AttrRowProps {
    * required attribute is empty: red highlight + "Pole wymagane" note.
    */
   requiredError?: boolean;
+  /**
+   * Set when the backend rejected this attribute's value (min/max, pattern, …)
+   * on the last save: same red highlight as {@link requiredError}, no note (the
+   * server message is surfaced as a toast).
+   */
+  validationError?: boolean;
 }
 
 /**
@@ -132,6 +138,7 @@ export function AttrRow({
   isInherited = false,
   inheritedFrom = null,
   requiredError = false,
+  validationError = false,
 }: AttrRowProps) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language === 'pl' ? 'pl' : 'en';
@@ -165,7 +172,7 @@ export function AttrRow({
       className={cn(
         'grid grid-cols-[180px_minmax(0,1fr)_auto] items-start gap-3 rounded-xl px-3 py-2.5',
         'group transition-colors hover:bg-white/60',
-        requiredError && 'bg-rose-50/60 ring-1 ring-rose-300',
+        (requiredError || validationError) && 'bg-rose-50/60 ring-1 ring-rose-300',
       )}
     >
       <div className="flex items-center gap-1.5 pt-1.5 text-[13px] font-medium text-zinc-600">

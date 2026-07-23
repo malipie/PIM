@@ -72,6 +72,9 @@ export function useProductDetailForm({
   const [dirtyFields, setDirtyFields] = useState<Record<string, unknown>>({});
   // #1350 — codes of required attributes that blocked the last save.
   const [requiredErrors, setRequiredErrors] = useState<Set<string>>(new Set());
+  // Codes of attributes rejected by the backend value validation (min/max,
+  // pattern, …) on the last save — same red highlight as required-empty.
+  const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -95,6 +98,25 @@ export function useProductDetailForm({
       next.delete(code);
       return next;
     });
+    setValidationErrors((prev) => {
+      if (!prev.has(code)) return prev;
+      const next = new Set(prev);
+      next.delete(code);
+      return next;
+    });
+  };
+
+  // Resolve an attribute's display label (for validation messages) against the
+  // active value locale, degrading through EN/PL like AttrRow does.
+  const attributeLabel = (code: string): string | null => {
+    for (const group of groups) {
+      for (const attr of group.attributes) {
+        if (attr.code !== code) continue;
+        const label = attr.label as Record<string, string>;
+        return label[locale] ?? label.en ?? label.pl ?? Object.values(label)[0] ?? null;
+      }
+    }
+    return null;
   };
 
   const fieldValue = (code: string): unknown => {
@@ -142,6 +164,7 @@ export function useProductDetailForm({
       return;
     }
     setRequiredErrors(new Set());
+    setValidationErrors(new Set());
     setIsSaving(true);
     try {
       if (mode === 'create') {
@@ -263,10 +286,21 @@ export function useProductDetailForm({
     } catch (error) {
       // #1179 — surface the server's Problem Details `detail` (e.g. duplicate
       // identifier 409) instead of the generic copy.
-      toast.error(
-        httpErrorDetail(error) ??
-          t('products.detail.save.failed', { defaultValue: 'Nie udało się zapisać' }),
-      );
+      const detail = httpErrorDetail(error);
+      // Value-validation 422 arrives as `Attribute "<code>": <message>`. Swap
+      // the raw code for the attribute's display name and flag that field so it
+      // gets the same red highlight as a required-empty one.
+      const match = detail?.match(/^Attribute "([^"]+)": (.*)$/s);
+      const code = match?.[1];
+      const message = match?.[2];
+      if (code !== undefined && message !== undefined) {
+        setValidationErrors(new Set([code]));
+        toast.error(`Attribute "${attributeLabel(code) ?? code}": ${message}`);
+      } else {
+        toast.error(
+          detail ?? t('products.detail.save.failed', { defaultValue: 'Nie udało się zapisać' }),
+        );
+      }
     } finally {
       setIsSaving(false);
     }
@@ -305,6 +339,7 @@ export function useProductDetailForm({
   return {
     dirtyFields,
     requiredErrors,
+    validationErrors,
     expandedGroups,
     isSaving,
     isDeleting,

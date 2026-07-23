@@ -308,4 +308,24 @@
       "tnum" 1,
       "ss01" 1;
   }
+  /* Slim navy scrollbar for horizontally-scrolling strips (e.g. the object
+     edit attribute-group tabs). Scoped so overflow lives on the strip, never
+     the whole page. */
+  .scrollbar-tabs {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-zinc-700) transparent;
+  }
+  .scrollbar-tabs::-webkit-scrollbar {
+    height: 6px;
+  }
+  .scrollbar-tabs::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-tabs::-webkit-scrollbar-thumb {
+    background-color: var(--color-zinc-700);
+    border-radius: 9999px;
+  }
+  .scrollbar-tabs:hover::-webkit-scrollbar-thumb {
+    background-color: var(--color-zinc-800);
+  }
 }
