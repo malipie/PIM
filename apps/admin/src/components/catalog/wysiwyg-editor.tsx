@@ -112,7 +112,7 @@ export function WysiwygEditor({
   const lastEmittedRef = useRef(value);
 
   useEffect(() => {
-    if (value !== lastEmittedRef.current) {
+    if (normalizeHtml(value) !== normalizeHtml(lastEmittedRef.current)) {
       lastEmittedRef.current = value;
       editor.tf.setValue(htmlToSlate(value) as never);
     }
@@ -137,7 +137,12 @@ export function WysiwygEditor({
         editor={editor}
         onChange={({ value: next }) => {
           const html = slateToHtml(next as SlateNode[]);
-          if (html === lastEmittedRef.current) return;
+          // An empty document serialises to `<p></p>`, but an untouched field
+          // holds `''`. Comparing the normalised forms stops an empty editor
+          // from emitting a spurious change on mount/normalisation — which used
+          // to dirty the field with `<p></p>` and mask a freshly-refetched
+          // value (e.g. an accepted Ask AI proposal) until a page reload.
+          if (normalizeHtml(html) === normalizeHtml(lastEmittedRef.current)) return;
           lastEmittedRef.current = html;
           onChange(html);
         }}
@@ -275,6 +280,16 @@ function flatten(node: Node, marks: Pick<SlateNode, 'bold' | 'italic' | 'underli
 
 function slateToHtml(nodes: SlateNode[]): string {
   return nodes.map(serializeNode).join('');
+}
+
+/**
+ * Collapse the "empty document" serialisations (`''`, `<p></p>`, or a single
+ * whitespace-only paragraph) to `''` so the editor treats them as equal — an
+ * untouched field must not report itself as changed.
+ */
+function normalizeHtml(html: string): string {
+  const stripped = html.replace(/<p>(\s|&nbsp;)*<\/p>/gi, '').trim();
+  return stripped;
 }
 
 function serializeNode(node: SlateNode): string {
