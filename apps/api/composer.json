@@ -9,7 +9,7 @@
         "php": ">=8.4",
         "ext-ctype": "*",
         "ext-iconv": "*",
-        "anthropic-ai/sdk": "^0.36.0",
+        "anthropic-ai/sdk": "^0.40.0",
         "api-platform/doctrine-orm": "^4.3.17",
         "api-platform/symfony": "^4.3.17",
         "damienharper/auditor-bundle": "^6.3",
