@@ -2,6 +2,18 @@
 
 > Plik startowy zasiany twardymi wytycznymi z `Project Plan/01-architektura-pim.md`. Po każdej korekcie operatora lub odkrytym wzorcu (sukces ALBO porażka) — dopisz wpis. Czytaj przed każdą sesją.
 
+## Lessons z porządkowania Dependabota (2026-07-28, 21 otwartych PR-ów, #2699)
+
+### Package Quirks
+- **Dependabot rozwiązuje composera BEZ pluginów, więc Flex nie działa.** `extra.symfony.require: "7.4.*"` to constraint egzekwowany przez `symfony/flex` w trakcie `composer update`; Dependabot go nie ładuje, więc **każdy** bump dowolnego pakietu może przeciągnąć nieprzypięte komponenty tranzytywne Symfony na 8.x. `symfony/var-exporter` 8 łamie Doctrine LazyGhost → `cache:clear` [KO] → wszystkie joby PHP padają na kroku „Install dependencies" w 16–38 s, z komunikatem `Script cache:clear returned with error code 1` i **bez** widocznej przyczyny w logu. Trzy PR-e (#2695/#2697/#2698) leżały z tego powodu. Trwały fix: wpisy w `conflict` (`"symfony/<komponent>": ">=8.0"`) dla 29 komponentów tranzytywnych — działają niezależnie od Flexa, więc lock Dependabota od razu rozwiązuje się na 7.4. Pinowanie w `require` jest gorsze: robi z nich zależności bezpośrednie i mnoży PR-y Dependabota.
+- **Nie ufaj wersji docelowej z PR-a Dependabota przy advisory.** #2656 bumpował `react-router` 8.0.1 → 8.2.0, podczas gdy GHSA-qwww-vcr4-c8h2 obejmuje `>=7.12.0 <8.3.0` — merge tego PR-a **nie zdjąłby** czerwonej bramki audytu. Zawsze sprawdź `Patched versions` z `pnpm audit`, nie tytuł PR-a.
+
+### Patterns to Follow
+- **Batch zamiast 21 przebiegów CI.** Przy stercie PR-ów Dependabota taniej jest zrobić jedną gałąź maintenance (bump constraintów + `pnpm install` + `composer update <lista> --with-all-dependencies` w kontenerze), przepuścić jeden przebieg CI i zamknąć oryginały jako superseded. Jeden przebieg PHPUnit to ~30 min wall-clock — 21 przebiegów to dzień.
+- **Zielony PR Dependabota sprzed tygodnia ≠ zielony po merge'u sąsiada.** Locki są wspólne, więc pierwszy merge unieważnia pozostałe. Batch omija ten problem w całości.
+- **`composer update` z `bump-after-update` przepisuje constrainty w `composer.json`** (np. `"phpstan/phpstan": "^2.2.3"` → `"^2.2.6"`). To zamierzone i zgodne z polityką „najnowsza stabilna", ale trzeba to zauważyć w diffie i opisać w PR, żeby nie wyglądało na przypadkowe zawężenie.
+- **`apps/api/config/reference.php` regeneruje się przy `cache:clear` po bumpie doctrine-bundle** — artefakt generowany, wchodzi do commitu bumpa, nie jest ręczną zmianą.
+
 ## Lessons z AICG-P0-02/P1-02 (2026-07-10, czerwony main po CPDF + deptrac cache + test schema)
 
 ### Patterns to Avoid
