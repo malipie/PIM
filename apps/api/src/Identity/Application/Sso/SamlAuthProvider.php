@@ -36,6 +36,7 @@ final class SamlAuthProvider
 {
     public function __construct(
         private readonly SsoProviderRepositoryInterface $providers,
+        private readonly SsoConfigCipher $configCipher,
     ) {
     }
 
@@ -165,7 +166,8 @@ final class SamlAuthProvider
             ));
         }
 
-        $config = $provider->getConfig();
+        // #2725 — credentials live encrypted at rest; reveal them for the call.
+        $config = $this->configCipher->reveal($provider->getConfig());
         $required = ['sp_entity_id', 'sp_acs_url', 'idp_entity_id', 'idp_sso_url', 'idp_x509cert'];
         foreach ($required as $key) {
             if (!isset($config[$key]) || !\is_string($config[$key]) || '' === $config[$key]) {
