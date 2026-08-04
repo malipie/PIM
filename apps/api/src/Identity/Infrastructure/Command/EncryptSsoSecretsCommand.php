@@ -53,6 +53,10 @@ final class EncryptSsoSecretsCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $dryRun = $input->getOption('dry-run');
 
+        // tenant-safe: infrastructure (admin-only CLI sweep). Encrypting a
+        // secret at rest is deliberately tenant-agnostic — an operator runs
+        // this once per deployment and every tenant's rows must be covered,
+        // so scoping it to one tenant would leave the rest exposed.
         /** @var list<array{id: string, config: string}> $rows */
         $rows = $this->connection->fetchAllAssociative('SELECT id, config::text AS config FROM sso_providers');
 
@@ -68,6 +72,7 @@ final class EncryptSsoSecretsCommand extends Command
             if ($dryRun) {
                 continue;
             }
+            // tenant-safe: per-row UPDATE keyed by primary key (id from the sweep above).
             $this->connection->executeStatement(
                 'UPDATE sso_providers SET config = CAST(:config AS jsonb) WHERE id = :id',
                 [
