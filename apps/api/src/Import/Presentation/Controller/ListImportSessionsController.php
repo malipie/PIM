@@ -6,13 +6,12 @@ namespace App\Import\Presentation\Controller;
 
 use App\Backup\Domain\Entity\Backup;
 use App\Identity\Contracts\Attribute\RequiresPermission;
-use App\Identity\Domain\Entity\User;
+use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Import\Domain\Entity\ImportSession;
 use App\Import\Domain\Enum\ImportSessionStatus;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -37,7 +36,7 @@ final class ListImportSessionsController
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly Security $security,
+        private readonly CurrentUserProvider $currentUser,
     ) {
     }
 
@@ -49,8 +48,8 @@ final class ListImportSessionsController
     #[RequiresPermission(module: 'import_session', action: 'read')]
     public function __invoke(Request $request): JsonResponse
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
+        $userId = $this->currentUser->userId();
+        if (null === $userId) {
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
         }
 
@@ -79,8 +78,8 @@ final class ListImportSessionsController
             ->where('s.tenant = :tenant')
             ->andWhere('s.userId = :userId')
             ->orderBy('s.createdAt', 'DESC')
-            ->setParameter('tenant', $user->getTenant())
-            ->setParameter('userId', $user->getId());
+            ->setParameter('tenant', $this->currentUser->tenant())
+            ->setParameter('userId', $userId);
 
         if ($status instanceof ImportSessionStatus) {
             $qb->andWhere('s.status = :status')->setParameter('status', $status->value);

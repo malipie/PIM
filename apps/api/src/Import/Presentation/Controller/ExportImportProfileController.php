@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Import\Presentation\Controller;
 
 use App\Identity\Contracts\Attribute\RequiresPermission;
-use App\Identity\Domain\Entity\User;
+use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Import\Domain\Entity\ImportProfile;
 use App\Import\Domain\Repository\ImportProfileRepositoryInterface;
 use DateTimeImmutable;
 use DateTimeInterface;
 use InvalidArgumentException;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -33,7 +32,7 @@ final class ExportImportProfileController
 
     public function __construct(
         private readonly ImportProfileRepositoryInterface $profiles,
-        private readonly Security $security,
+        private readonly CurrentUserProvider $currentUser,
     ) {
     }
 
@@ -46,8 +45,8 @@ final class ExportImportProfileController
     #[RequiresPermission(module: 'import_profile', action: 'read')]
     public function __invoke(string $id): JsonResponse
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
+        $userId = $this->currentUser->userId();
+        if (null === $userId) {
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
         }
 
@@ -61,7 +60,7 @@ final class ExportImportProfileController
         if (!$profile instanceof ImportProfile) {
             throw new NotFoundHttpException(\sprintf('Import profile "%s" was not found.', $id));
         }
-        if ($profile->getUserId()->toRfc4122() !== $user->getId()->toRfc4122()) {
+        if ($profile->getUserId()->toRfc4122() !== $userId->toRfc4122()) {
             throw new NotFoundHttpException(\sprintf('Import profile "%s" was not found.', $id));
         }
 

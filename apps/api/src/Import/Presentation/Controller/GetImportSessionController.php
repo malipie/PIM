@@ -6,12 +6,11 @@ namespace App\Import\Presentation\Controller;
 
 use App\Backup\Domain\Entity\Backup;
 use App\Identity\Contracts\Attribute\RequiresPermission;
-use App\Identity\Domain\Entity\User;
+use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Import\Domain\Entity\ImportSession;
 use App\Import\Domain\Repository\ImportSessionRepositoryInterface;
 use DateTimeInterface;
 use InvalidArgumentException;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -27,7 +26,7 @@ final class GetImportSessionController
 {
     public function __construct(
         private readonly ImportSessionRepositoryInterface $sessions,
-        private readonly Security $security,
+        private readonly CurrentUserProvider $currentUser,
     ) {
     }
 
@@ -86,8 +85,8 @@ final class GetImportSessionController
 
     private function loadSession(string $rawId): ImportSession
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
+        $userId = $this->currentUser->userId();
+        if (null === $userId) {
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
         }
 
@@ -101,7 +100,7 @@ final class GetImportSessionController
         if (!$session instanceof ImportSession) {
             throw new NotFoundHttpException(\sprintf('Import session "%s" was not found.', $rawId));
         }
-        if ($session->getUserId()->toRfc4122() !== $user->getId()->toRfc4122()) {
+        if ($session->getUserId()->toRfc4122() !== $userId->toRfc4122()) {
             throw new NotFoundHttpException(\sprintf('Import session "%s" was not found.', $rawId));
         }
 

@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Import\Presentation\Controller;
 
 use App\Identity\Contracts\Attribute\RequiresPermission;
-use App\Identity\Domain\Entity\User;
+use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Import\Application\Service\HealthCheckService;
 use App\Import\Domain\Entity\ImportSource;
 use App\Import\Domain\Repository\ImportSourceRepositoryInterface;
 use DateTimeInterface;
 use InvalidArgumentException;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -29,7 +28,7 @@ final class TestImportSourceConnectionController
     public function __construct(
         private readonly ImportSourceRepositoryInterface $sources,
         private readonly HealthCheckService $healthCheck,
-        private readonly Security $security,
+        private readonly CurrentUserProvider $currentUser,
     ) {
     }
 
@@ -42,8 +41,8 @@ final class TestImportSourceConnectionController
     #[RequiresPermission(module: 'import_source', action: 'read')]
     public function __invoke(string $id): JsonResponse
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
+        $userId = $this->currentUser->userId();
+        if (null === $userId) {
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
         }
 
@@ -57,7 +56,7 @@ final class TestImportSourceConnectionController
         if (!$source instanceof ImportSource) {
             throw new NotFoundHttpException(\sprintf('Import source "%s" was not found.', $id));
         }
-        if ($source->getUserId()->toRfc4122() !== $user->getId()->toRfc4122()) {
+        if ($source->getUserId()->toRfc4122() !== $userId->toRfc4122()) {
             throw new NotFoundHttpException(\sprintf('Import source "%s" was not found.', $id));
         }
 

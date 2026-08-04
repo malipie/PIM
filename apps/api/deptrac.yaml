@@ -197,6 +197,15 @@ parameters:
                 must:
                     - type: directory
                       value: 'src/Agent/.*'
+                    # #2736 — the Doctrine migrations under
+                    # src/Agent/Infrastructure/Migrations live in the
+                    # `AgentMigrations\` namespace, not `App\`, so the Vendor
+                    # catch-all ("anything not under App\") claimed them too
+                    # and deptrac warned they were in two layers at once.
+                    # Layer assignment must be deterministic here of all
+                    # places: ADR-0024 makes the Agent boundary fail-closed.
+                    - type: classNameRegex
+                      value: '#^App\\Agent\\#'
                 must_not:
                     - type: directory
                       value: 'src/Agent/Contracts/.*'
@@ -236,7 +245,8 @@ parameters:
 
         # ─── Import / Export (ADR-0019, IMP2-1.1 #1463) ────────────────
         # Target ruleset: only *_Contracts + Shared. Existing reaches into
-        # Catalog_Internals are baselined below and burned down by #1466.
+        # Catalog_Internals are baselined below; the remaining burndown is
+        # tracked by #2736 (#1466 is closed).
         # Import splits off a Contracts seam (ADR-0024, AGENT-P0-02): agent
         # tools reach the import engine (StructuralImport, AutoMapper) only
         # through src/Import/Contracts.
@@ -635,17 +645,26 @@ parameters:
     # Every entry below is a TODO; new violations not in this list fail the
     # build through CI.
     #
-    # AUD-053 (W3-1) burndown — the dominant cluster here is the repeated
+    # AUD-053 (W3-1) burndown — the dominant cluster here was the repeated
     # `Identity\Domain\Entity\User` leak: ~17 controllers reached for the
     # concrete User entity just to read the authenticated principal's id /
     # tenant off the security token. W3-1 introduced the seam
     # `Identity\Contracts\Auth\CurrentUserProvider` and migrated the first
     # batch off it (Backup TriggerBackupController + 4 Import controllers:
-    # ImportReportCsv, ImportThroughput, ListScheduleRuns, UpcomingSchedules),
-    # deleting their baseline entries below. The remaining User-leak
-    # controllers + the Export/Import → Catalog\Domain reaches stay baselined
-    # and are tracked as the #1466 burndown follow-up — each migrates to the
-    # same seam (User) or a Catalog Contracts seam, one controller at a time.
+    # ImportReportCsv, ImportThroughput, ListScheduleRuns, UpcomingSchedules).
+    # #2736 migrated the second batch — 10 more Import controllers
+    # (GetImportSession, ImportSessionState, ListImportSessions, ParsePreview,
+    # RollbackImport, ScheduleState, StartStructuralImport,
+    # TestImportSourceConnection, DuplicateImportProfile, ExportImportProfile)
+    # — deleting their entries below.
+    #
+    # WHAT REMAINS (tracked by #2736, NOT by the closed #1466):
+    #   - 7 User-leak entries in API Platform state processors + the three
+    #     controllers whose User reach is entangled with other Catalog reaches
+    #     (ImportImportProfile, StartImport, ValidateDryRun) — same mechanical
+    #     migration, kept out of #2736 to keep the diff reviewable.
+    #   - the Export/Import -> Catalog\Domain reaches, which need a Catalog
+    #     Contracts seam rather than a swap (design work, not mechanics).
     skip_violations:
         App\Catalog\Application\DemoCatalogSeeder:
             - App\Asset\Domain\Entity\Asset
@@ -685,7 +704,8 @@ parameters:
         # 3. IMP2-1.1 (#1463): Import/Export layers added with target ruleset
         #    (*_Contracts + Shared only). Existing reaches into Catalog/Channel/
         #    Identity internals + Identity voters importing Import entities are
-        #    baselined here; #1466 (shared writer core) burns the bulk down.
+        #    baselined here; the shared writer core (#1466, closed) removed the
+        #    bulk — what is left is tracked by #2736.
         App\Export\Application\Builder\ExportBuilder:
             - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\Attribute
@@ -806,7 +826,7 @@ parameters:
         # Structural import (attribute / attribute-group definitions) upserts
         # configuration entities through the Catalog CQRS commands + the shared
         # idempotent assignment service — the same Import→Catalog seam as the
-        # CatalogObject importer, baselined here pending the #1466 burndown.
+        # CatalogObject importer, baselined here pending the #2736 burndown.
         # AGENT-P5-04 (#1973) — agent schema rollback deletes through the
         # same guarded CQRS commands the modeling UI uses (identical
         # baseline pattern as the structural creators below).
@@ -878,25 +898,9 @@ parameters:
             - App\Catalog\Domain\ObjectKind
             - App\Catalog\Domain\Repository\ObjectTypeAttributeRepositoryInterface
             - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
-        App\Import\Presentation\Controller\DuplicateImportProfileController:
-            - App\Identity\Domain\Entity\User
-        App\Import\Presentation\Controller\ExportImportProfileController:
-            - App\Identity\Domain\Entity\User
-        App\Import\Presentation\Controller\GetImportSessionController:
-            - App\Identity\Domain\Entity\User
         App\Import\Presentation\Controller\ImportImportProfileController:
             - App\Catalog\Domain\Entity\ObjectType
             - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
-            - App\Identity\Domain\Entity\User
-        App\Import\Presentation\Controller\ImportSessionStateController:
-            - App\Identity\Domain\Entity\User
-        App\Import\Presentation\Controller\ListImportSessionsController:
-            - App\Identity\Domain\Entity\User
-        App\Import\Presentation\Controller\ParsePreviewController:
-            - App\Identity\Domain\Entity\User
-        App\Import\Presentation\Controller\RollbackImportController:
-            - App\Identity\Domain\Entity\User
-        App\Import\Presentation\Controller\ScheduleStateController:
             - App\Identity\Domain\Entity\User
         App\Import\Presentation\Controller\StartImportController:
             - App\Catalog\Domain\Entity\ObjectType
@@ -905,10 +909,6 @@ parameters:
             - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\Attribute
             - App\Catalog\Domain\Repository\AttributeRepositoryInterface
-        App\Import\Presentation\Controller\StartStructuralImportController:
-            - App\Identity\Domain\Entity\User
-        App\Import\Presentation\Controller\TestImportSourceConnectionController:
-            - App\Identity\Domain\Entity\User
         App\Import\Presentation\Controller\ValidateDryRunController:
             - App\Catalog\Domain\Entity\ObjectType
             - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface

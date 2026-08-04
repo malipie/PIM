@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace App\Import\Presentation\Controller;
 
 use App\Identity\Contracts\Attribute\RequiresPermission;
-use App\Identity\Domain\Entity\User;
+use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Import\Application\Service\Archive\ArchiveSecurityException;
 use App\Import\Application\Service\Archive\XlsxArchiveGuard;
 use App\Import\Application\Service\FileParserService;
 use App\Import\Application\Service\StagedFileService;
 use App\Import\Domain\Enum\FileEncoding;
 use App\Import\Domain\Exception\InvalidImportFileException;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -43,7 +42,7 @@ final class ParsePreviewController
     public function __construct(
         private readonly FileParserService $parser,
         private readonly StagedFileService $stagedFiles,
-        private readonly Security $security,
+        private readonly CurrentUserProvider $currentUser,
         private readonly XlsxArchiveGuard $xlsxArchiveGuard,
     ) {
     }
@@ -56,8 +55,8 @@ final class ParsePreviewController
     #[RequiresPermission(module: 'imports', action: 'run')]
     public function __invoke(Request $request): JsonResponse
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
+        $userId = $this->currentUser->userId();
+        if (null === $userId) {
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
         }
 
@@ -68,7 +67,10 @@ final class ParsePreviewController
 
         // IMP2-2.7 (#1483) — file-size guardrail before we copy/parse anything,
         // so an oversized upload gets a clear 422 in the wizard preview.
-        $tenant = $user->getTenant();
+        $tenant = $this->currentUser->tenant();
+        if (null === $tenant) {
+            throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
+        }
         $maxFileBytes = $tenant->getImportMaxFileSize() ?? self::DEFAULT_MAX_FILE_BYTES;
         if ((int) $file->getSize() > $maxFileBytes) {
             throw new UnprocessableEntityHttpException(\sprintf(
@@ -144,8 +146,8 @@ final class ParsePreviewController
             $file->getPathname(),
             $originalName,
             (int) $file->getSize(),
-            $user->getTenant(),
-            $user->getId(),
+            $tenant,
+            $userId,
         );
 
         return new JsonResponse(
