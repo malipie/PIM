@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Identity\Application;
 
 use App\Identity\Domain\Entity\User;
+use App\Shared\Application\Crypto\SecretCipher;
 use Doctrine\ORM\EntityManagerInterface;
 use OTPHP\TOTP;
 use OTPHP\TOTPInterface;
@@ -28,6 +29,13 @@ use const PASSWORD_ARGON2ID;
  * resolve the authenticated `User` and pass it in. Recovery codes are
  * hashed with the standard Symfony password hasher (Argon2id by
  * default) so a database leak never exposes them in cleartext.
+ *
+ * #2726 — the TOTP secret is encrypted at rest through {@see SecretCipher}.
+ * It cannot be hashed like the recovery codes: TOTP verification needs the
+ * secret back, so a leaked `users` dump (backup, replica) would otherwise let
+ * an attacker mint valid second factors for every enrolled user and MFA would
+ * be decorative. Every read goes through the cipher, which passes pre-#2726
+ * plaintext rows through unchanged so enrolments migrate on their next write.
  */
 final readonly class TotpEnrolmentService
 {
@@ -42,6 +50,7 @@ final readonly class TotpEnrolmentService
 
     public function __construct(
         private EntityManagerInterface $em,
+        private SecretCipher $cipher,
     ) {
     }
 
@@ -63,7 +72,7 @@ final readonly class TotpEnrolmentService
 
         [$cleartextCodes, $hashedCodes] = $this->generateBackupCodes();
 
-        $user->startTotpEnrolment($secret, $hashedCodes);
+        $user->startTotpEnrolment($this->cipher->protect($secret), $hashedCodes);
         $this->em->flush();
 
         return [
@@ -78,7 +87,7 @@ final readonly class TotpEnrolmentService
      */
     public function confirm(User $user, string $code): bool
     {
-        $secret = $user->getTotpSecret();
+        $secret = $this->cipher->reveal($user->getTotpSecret());
         if (null === $secret || '' === $secret || '' === $code) {
             return false;
         }
@@ -126,6 +135,8 @@ final readonly class TotpEnrolmentService
         \assert(null !== $secret && '' !== $secret, 'rotateBackupCodes requires an active enrolment');
         $wasEnabled = $user->isTotpEnabled();
         $previousEnabledAt = $user->getTotpEnabledAt();
+        // The stored value is re-used verbatim — already protected (or legacy
+        // plaintext), so rotating codes must not double-encrypt it.
         $user->startTotpEnrolment($secret, $hashedCodes);
         if ($wasEnabled) {
             $user->confirmTotpEnrolment($previousEnabledAt);
@@ -142,7 +153,7 @@ final readonly class TotpEnrolmentService
      */
     public function verify(User $user, string $code): bool
     {
-        $secret = $user->getTotpSecret();
+        $secret = $this->cipher->reveal($user->getTotpSecret());
         if (!$user->isTotpEnabled() || null === $secret || '' === $secret || '' === $code) {
             return false;
         }
