@@ -1970,7 +1970,9 @@
         "empty_hint": "Dodaj kategorię aby aktywować dziedziczenie dodatkowych pól formularza.",
         "is_primary": "Kategoria główna",
         "set_primary": "Ustaw jako główną",
-        "detach": "Odepnij kategorię"
+        "detach": "Odepnij kategorię",
+        "error_detach": "Nie udało się odpiąć kategorii.",
+        "error_promote": "Nie udało się ustawić kategorii głównej."
       },
       "locale": {
         "label": "Język",

@@ -2055,7 +2055,9 @@
         "is_primary": "Primary category",
         "set_primary": "Set as primary",
         "subtitle": "Category assignment determines the inherited form fields.",
-        "title": "Categories"
+        "title": "Categories",
+        "error_detach": "Could not detach the category.",
+        "error_promote": "Could not set the primary category."
       }
     },
     "advanced_filter": {
