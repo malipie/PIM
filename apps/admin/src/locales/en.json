@@ -2074,6 +2074,12 @@
       "aria": "View mode",
       "excel": "Excel",
       "grid": "Cards"
+    },
+    "bulk_wizard": {
+      "stat_selected": "selected",
+      "stat_sample": "in sample",
+      "stat_sample_skipped": "skipped (sample)",
+      "stat_sample_errors": "errors (sample)"
     }
   },
   "api_configurator": {

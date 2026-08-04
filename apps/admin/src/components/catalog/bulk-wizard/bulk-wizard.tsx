@@ -32,9 +32,10 @@ interface BulkWizardProps {
 interface BulkActionPreview {
   action: string;
   target_count: number;
-  success_count: number;
-  skipped_count: number;
-  error_count: number;
+  /** #2735 — counts are scoped to the 5-object sample, not extrapolated. */
+  sample_size: number;
+  sample_error_count: number;
+  sample_skipped_count: number;
   sample: Array<{ id: string; sku: string; before: unknown; after: unknown }>;
 }
 
@@ -348,10 +349,30 @@ export function BulkWizard({ open, selectedIds, onClose, onApplied }: BulkWizard
           {step === 3 && preview && (
             <div>
               <div className="grid grid-cols-4 gap-4 mb-5 rounded-2xl bg-zinc-50/70 border border-zinc-100 p-4">
-                <Stat n={preview.target_count} label="zaznaczonych" tone="zinc" />
-                <Stat n={preview.success_count} label="do zmiany" tone="emerald" />
-                <Stat n={preview.skipped_count} label="pominięte" tone="amber" />
-                <Stat n={preview.error_count} label="błędy" tone="rose" />
+                <Stat
+                  n={preview.target_count}
+                  label={t('products.bulk_wizard.stat_selected', { defaultValue: 'zaznaczonych' })}
+                  tone="zinc"
+                />
+                <Stat
+                  n={preview.sample_size}
+                  label={t('products.bulk_wizard.stat_sample', { defaultValue: 'w próbce' })}
+                  tone="emerald"
+                />
+                <Stat
+                  n={preview.sample_skipped_count}
+                  label={t('products.bulk_wizard.stat_sample_skipped', {
+                    defaultValue: 'pominięte (próbka)',
+                  })}
+                  tone="amber"
+                />
+                <Stat
+                  n={preview.sample_error_count}
+                  label={t('products.bulk_wizard.stat_sample_errors', {
+                    defaultValue: 'błędy (próbka)',
+                  })}
+                  tone="rose"
+                />
               </div>
               <div className="rounded-2xl border border-zinc-200 overflow-hidden">
                 <div

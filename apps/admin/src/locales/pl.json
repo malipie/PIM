@@ -2088,6 +2088,12 @@
       "scope_locale_aria": "Język kontekstu filtra",
       "scope_clear": "Wyczyść kontekst",
       "scope_truncated": "Wynik przybliżony — zawęź filtr (limit 10 000 obiektów w kontekście)."
+    },
+    "bulk_wizard": {
+      "stat_selected": "zaznaczonych",
+      "stat_sample": "w próbce",
+      "stat_sample_skipped": "pominięte (próbka)",
+      "stat_sample_errors": "błędy (próbka)"
     }
   },
   "api_configurator": {
