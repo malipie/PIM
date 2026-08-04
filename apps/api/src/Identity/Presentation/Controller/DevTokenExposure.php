@@ -19,23 +19,24 @@ namespace App\Identity\Presentation\Controller;
  * This trait gates the field on the kernel environment. Consuming
  * controllers take the environment as a constructor argument (bound to
  * `%kernel.environment%` in services.yaml) so the guard is unit-testable
- * without booting a prod kernel: in `prod` the field is omitted entirely
- * (not nulled — the key must be absent so no contract reader treats it as
- * present-but-empty); in dev/test it is returned verbatim, preserving the
- * existing operator workflow.
+ * without booting a prod kernel: only the explicit `dev`/`test` allowlist
+ * gets the token (#2727 — a denylist on 'prod' leaked it on staging,
+ * preprod, or an APP_ENV typo); everywhere else the field is omitted
+ * entirely (not nulled — the key must be absent so no contract reader
+ * treats it as present-but-empty).
  */
 trait DevTokenExposure
 {
     /**
      * Returns the `token_dev_only` payload fragment to merge into a JSON
-     * response. Empty (key absent) on prod; `['token_dev_only' => $token]`
-     * everywhere else.
+     * response. `['token_dev_only' => $token]` on the dev/test allowlist;
+     * empty (key absent) everywhere else.
      *
      * @return array{token_dev_only?: string|null}
      */
     private function devTokenPayload(?string $token): array
     {
-        if ('prod' === $this->devTokenEnvironment) {
+        if (!\in_array($this->devTokenEnvironment, ['dev', 'test'], true)) {
             return [];
         }
 
