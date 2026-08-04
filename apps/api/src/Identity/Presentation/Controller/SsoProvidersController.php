@@ -124,6 +124,11 @@ final readonly class SsoProvidersController
         }
         $stringConfig = self::ensureStringKeyed($config);
 
+        $restriction = self::missingDirectoryRestriction($kind, $stringConfig);
+        if (null !== $restriction) {
+            return $this->problem(Response::HTTP_UNPROCESSABLE_ENTITY, 'Unprocessable Entity', $restriction);
+        }
+
         $enabled = isset($payload['enabled']) ? (bool) $payload['enabled'] : false;
 
         $provider = new SsoProvider(
@@ -178,6 +183,10 @@ final readonly class SsoProvidersController
                 $provider->getConfig(),
                 self::ensureStringKeyed($payload['config']),
             );
+            $restriction = self::missingDirectoryRestriction($provider->getKind(), $merged);
+            if (null !== $restriction) {
+                return $this->problem(Response::HTTP_UNPROCESSABLE_ENTITY, 'Unprocessable Entity', $restriction);
+            }
             $provider->updateConfig($merged);
         }
 
@@ -279,6 +288,39 @@ final readonly class SsoProvidersController
             SsoProvider::KIND_MICROSOFT_365 => 'Microsoft 365',
             SsoProvider::KIND_SAML => 'SAML 2.0',
             default => 'SSO Provider',
+        };
+    }
+
+    /**
+     * #2728 — a provider without a directory restriction accepts ANY account
+     * the IdP will authenticate, and {@see \App\Identity\Application\Sso\SsoUserResolver}
+     * auto-provisions each one as `viewer` — read access to the tenant's whole
+     * catalogue. Google needs the Workspace domain; Microsoft needs a concrete
+     * Azure directory (`common` is the multi-tenant endpoint, i.e. everyone).
+     * SAML carries its restriction in the IdP certificate + entity id, so it
+     * has no equivalent key.
+     *
+     * Returns the problem detail when the restriction is missing, null when the
+     * config is acceptable.
+     *
+     * @param array<string, mixed> $config
+     */
+    private static function missingDirectoryRestriction(string $kind, array $config): ?string
+    {
+        $value = static function (string $key) use ($config): ?string {
+            $raw = $config[$key] ?? null;
+
+            return \is_string($raw) && '' !== trim($raw) ? trim($raw) : null;
+        };
+
+        return match ($kind) {
+            SsoProvider::KIND_GOOGLE_WORKSPACE => null === $value('hosted_domain')
+                ? '`config.hosted_domain` is required for Google Workspace SSO — without it any Google account (including personal Gmail) could sign in and be auto-provisioned.'
+                : null,
+            SsoProvider::KIND_MICROSOFT_365 => (null === $value('tenant_id') || 'common' === $value('tenant_id'))
+                ? '`config.tenant_id` must name a concrete Azure directory for Microsoft 365 SSO — `common` accepts any Microsoft account, including personal ones.'
+                : null,
+            default => null,
         };
     }
 

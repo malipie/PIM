@@ -107,16 +107,26 @@ final class GoogleAuthProvider
         // here too because Google's enforcement is advisory; the resource
         // owner response may still include a Gmail address if the user
         // bypassed the hint.
-        if (isset($config['hosted_domain'])) {
-            $expectedDomain = $config['hosted_domain'];
-            $emailDomain = substr($email, (int) strrpos($email, '@') + 1);
-            if ($emailDomain !== $expectedDomain) {
-                throw new RuntimeException(\sprintf(
-                    'Google account "%s" is not in the allowed hosted_domain "%s".',
-                    $email,
-                    $expectedDomain,
-                ));
-            }
+        // #2728 — fail CLOSED when the restriction is absent. With an
+        // "External" Google Cloud app and no hosted_domain, any private Gmail
+        // account passing OAuth used to be auto-provisioned as `viewer`, i.e.
+        // read access to the tenant's whole catalogue. A provider configured
+        // without the restriction is a misconfiguration, not a permission to
+        // accept everyone — so the login is refused rather than provisioning.
+        $expectedDomain = $config['hosted_domain'] ?? null;
+        if (!\is_string($expectedDomain) || '' === $expectedDomain) {
+            throw new RuntimeException(
+                'Google SSO provider has no hosted_domain restriction — refusing to authenticate. '
+                .'Set the Workspace domain on the provider before enabling SSO.',
+            );
+        }
+        $emailDomain = substr($email, (int) strrpos($email, '@') + 1);
+        if ($emailDomain !== $expectedDomain) {
+            throw new RuntimeException(\sprintf(
+                'Google account "%s" is not in the allowed hosted_domain "%s".',
+                $email,
+                $expectedDomain,
+            ));
         }
 
         return $email;

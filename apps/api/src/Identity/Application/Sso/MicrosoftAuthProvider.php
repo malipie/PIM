@@ -92,6 +92,19 @@ final class MicrosoftAuthProvider
             throw new RuntimeException('Microsoft user has no email claim (mail or userPrincipalName).');
         }
 
+        // #2728 — the directory restriction must be explicit. `common` is the
+        // multi-tenant endpoint: it accepts ANY Microsoft account (including
+        // personal ones), and the resolver would auto-provision each as a
+        // `viewer` with read access to the tenant's catalogue. Refuse rather
+        // than silently accept the whole world.
+        $directory = $config['tenant_id'] ?? null;
+        if (!\is_string($directory) || '' === $directory || 'common' === $directory) {
+            throw new RuntimeException(
+                'Microsoft SSO provider has no directory (tenant_id) restriction — refusing to authenticate. '
+                .'Set the Azure directory id on the provider before enabling SSO.',
+            );
+        }
+
         return $email;
     }
 
