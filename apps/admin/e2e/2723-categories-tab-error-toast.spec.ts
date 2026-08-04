@@ -141,10 +141,15 @@ test('a failed category detach surfaces the backend detail in a toast', async ({
     .first()
     .click();
 
-  // PCAT change-warning dialog guards the detach — confirm it.
+  // Two surfaces render category chips: CategoriesTab (detaches straight away)
+  // and the sidebar CategorySelectorCard (guards the detach behind the PCAT
+  // change-warning dialog). Which one the page mounts depends on the object
+  // kind, so confirm the dialog only when it actually appears instead of
+  // assuming one of the two layouts.
   const warning = page.getByRole('dialog', { name: /zmiana kategorii/i });
-  await expect(warning).toBeVisible();
-  await warning.getByRole('button', { name: /potwierdź zmianę/i }).click();
+  if (await warning.isVisible().catch(() => false)) {
+    await warning.getByRole('button', { name: /potwierdź zmianę/i }).click();
+  }
 
   // The backend detail lands in an error toast and the chip stays.
   await expect(page.getByRole('alert').filter({ hasText: detail })).toBeVisible();
