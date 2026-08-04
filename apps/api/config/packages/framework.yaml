@@ -49,8 +49,11 @@ framework:
             interval: '1 hour'
 
         # Integration sync limiter (10 syncs / hour / tenant).
-        # Reserved for BaseLinker (#74) and Shopify (#81) sync
-        # endpoints in Faza 1.
+        # Consumed by OutboundTriggerSubscriber since #2730: one catalog edit
+        # enqueues a FULL sync of the binding's slice, so a burst of manual
+        # edits could otherwise flood the remote. Exhausting it skips the
+        # ENQUEUE, never the user's write. Future BaseLinker (#74) / Shopify
+        # (#81) trigger endpoints share the same budget.
         integration_sync:
             policy: 'fixed_window'
             limit: 10
