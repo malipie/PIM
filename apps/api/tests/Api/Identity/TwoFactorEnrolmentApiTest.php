@@ -11,6 +11,7 @@ use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Rbac\RbacMatrix;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Identity\Domain\Repository\UserRepositoryInterface;
+use App\Shared\Application\Crypto\SecretCipher;
 use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
 use OTPHP\TOTP;
@@ -89,9 +90,20 @@ final class TwoFactorEnrolmentApiTest extends ApiTestCase
             self::assertMatchesRegularExpression('/^[0-9a-f]{10}$/', $code);
         }
 
-        // Persistence side: secret is stored, 2FA NOT yet enabled.
+        // Persistence side: secret is stored ENCRYPTED (#2726 — a leaked
+        // `users` dump must not yield mintable second factors), 2FA NOT yet
+        // enabled.
         $admin = $this->reloadAdmin();
-        self::assertSame($body['secret'], $admin->getTotpSecret());
+        $stored = $admin->getTotpSecret();
+        self::assertIsString($stored);
+        self::assertNotSame($body['secret'], $stored, 'the base32 secret must never sit in the column');
+        self::assertStringNotContainsString($body['secret'], $stored);
+        self::assertStringStartsWith('enc:v', $stored, 'the column holds a SecretCipher envelope');
+        self::assertSame(
+            $body['secret'],
+            self::getContainer()->get(SecretCipher::class)->reveal($stored),
+            'and it decrypts back to the secret the authenticator app scanned',
+        );
         self::assertFalse($admin->isTotpEnabled());
         self::assertCount(TotpEnrolmentService::BACKUP_CODE_COUNT, $admin->getTotpBackupCodes());
     }

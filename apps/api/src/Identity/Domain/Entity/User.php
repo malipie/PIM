@@ -67,9 +67,14 @@ class User extends AggregateRoot implements UserInterface, PasswordAuthenticated
      * {@see \App\Identity\Application\TotpEnrolmentService::enrol},
      * confirmed by `confirmTotpEnrolment()`.
      *
-     * Stored unencrypted in the column for now — production deployment
-     * will wrap reads/writes through the BYOK encrypter introduced in
-     * 0.11.12 (ADR-0017) once 2FA exits the dev fixtures.
+     * Encrypted at rest since #2726: the column holds a
+     * {@see \App\Shared\Application\Crypto\SecretCipher} envelope
+     * (`enc:v{N}:{base64}`), produced with the AES-256-GCM master key
+     * (ADR-0017). Reads go through
+     * {@see \App\Identity\Application\TotpEnrolmentService}, which reveals
+     * it; rows written before #2726 stay plaintext and migrate on their next
+     * write, so this getter may return either form — never treat it as the
+     * base32 secret directly.
      */
     private ?string $totpSecret;
 
