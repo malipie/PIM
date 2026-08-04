@@ -49,6 +49,10 @@ final class EncryptTotpSecretsCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $dryRun = $input->getOption('dry-run');
 
+        // tenant-safe: infrastructure (admin-only CLI sweep). Encrypting a
+        // secret at rest is deliberately tenant-agnostic — an operator runs
+        // this once per deployment and every tenant's rows must be covered,
+        // so scoping it to one tenant would leave the rest exposed.
         /** @var list<array{id: string, totp_secret: string}> $rows */
         $rows = $this->connection->fetchAllAssociative(
             "SELECT id, totp_secret FROM users WHERE totp_secret IS NOT NULL AND totp_secret <> '' AND totp_secret NOT LIKE 'enc:v%'",
@@ -64,6 +68,7 @@ final class EncryptTotpSecretsCommand extends Command
             if ($dryRun) {
                 continue;
             }
+            // tenant-safe: per-row UPDATE keyed by primary key (id from the sweep above).
             $this->connection->executeStatement(
                 'UPDATE users SET totp_secret = :secret WHERE id = :id',
                 ['secret' => $this->cipher->protect($row['totp_secret']), 'id' => $row['id']],
