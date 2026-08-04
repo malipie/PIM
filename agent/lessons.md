@@ -2,6 +2,10 @@
 
 > Plik startowy zasiany twardymi wytycznymi z `Project Plan/01-architektura-pim.md`. Po każdej korekcie operatora lub odkrytym wzorcu (sukces ALBO porażka) — dopisz wpis. Czytaj przed każdą sesją.
 
+## Lessons z untrack config/reference.php (2026-08-04, trwały fix flip-flopa)
+
+- **`apps/api/config/reference.php` jest od teraz untracked + w `.gitignore`** — koniec z rytuałem `git checkout --` przed stage (wcześniej 7 wpisów w tym pliku o tym szumie). Przyczyna flip-flopa (zdiagnozowana w code review): MercureBundle warunkuje `defaultNull()` na `url` vs `public_url` przez `function_exists('mercure_publish')`, a tę funkcję rejestruje tylko SAPI serwera FrankenPHP — kompilacja przez worker (request w dev) i przez CLI (`cache:clear`) generowały więc dwa różne warianty pliku na zmianę. Plik jest debug-only (PhpConfigReferenceDumpPass), bez konsumentów w runtime/CI, regeneruje się lokalnie sam — untracking jest bezstratny. Stare wpisy o `checkout --` poniżej są historyczne.
+
 ## Lessons z porządkowania Dependabota (2026-07-28, 21 otwartych PR-ów, #2699)
 
 ### Package Quirks
