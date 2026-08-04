@@ -31,6 +31,7 @@ final class MicrosoftAuthProvider
 {
     public function __construct(
         private readonly SsoProviderRepositoryInterface $providers,
+        private readonly SsoConfigCipher $configCipher,
     ) {
     }
 
@@ -127,7 +128,8 @@ final class MicrosoftAuthProvider
             ));
         }
 
-        $config = $provider->getConfig();
+        // #2725 — credentials live encrypted at rest; reveal them for the call.
+        $config = $this->configCipher->reveal($provider->getConfig());
         if (!isset($config['client_id'], $config['client_secret'])) {
             throw new RuntimeException('Microsoft SSO config missing client_id or client_secret.');
         }

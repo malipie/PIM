@@ -35,7 +35,7 @@ class SsoProvider
     /**
      * Provider-specific config — client_id, encrypted client_secret,
      * hosted_domain (Google), tenant_id (Microsoft), idp_metadata_xml
-     * (SAML), etc. Secrets MUST be encrypted at the application layer
+     * (SAML), etc. Secrets ARE encrypted at the application layer (#2725, SsoConfigCipher)
      * via ByokKeyManager before persistence.
      *
      * @var array<string, mixed>

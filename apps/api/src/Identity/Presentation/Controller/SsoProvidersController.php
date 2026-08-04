@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Presentation\Controller;
 
+use App\Identity\Application\Sso\SsoConfigCipher;
 use App\Identity\Application\SsoProviderResponseBuilder;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Domain\Entity\SsoProvider;
@@ -26,11 +27,14 @@ use Symfony\Component\Uid\Uuid;
  *   - PATCH  /api/sso/providers/{id} — update name / config / enabled
  *   - DELETE /api/sso/providers/{id} — remove
  *
- * Secret handling: `client_secret`, `idp_certificate`, `private_key` etc.
- * are stored as-is in the JSONB config for now. The {@see SsoProviderResponseBuilder}
- * masks them with `'****'` on read so the admin UI never sees them
- * after creation. Encryption via ByokKeyManager (per SsoProvider docblock)
- * lands in 0.11 — not a blocker for the UI surface since reads stay safe.
+ * Secret handling: `client_secret`, `idp_certificate`, `private_key` and
+ * `sp_private_key` are ENCRYPTED at rest since #2725 — {@see SsoConfigCipher}
+ * wraps those leaves of the JSONB config before it is persisted, so a database
+ * dump no longer hands over the tenant's IdP credentials. The
+ * {@see SsoProviderResponseBuilder} additionally masks them with `'****'` on
+ * read so the admin UI never sees them after creation; a config PATCH that
+ * echoes the mask back keeps the stored value (see
+ * mergeConfigPreservingMaskedSecrets below).
  *
  * Test-connection endpoint is intentionally NOT in this controller —
  * it lives on the SSO bundle's callback path (`/api/auth/sso/.../login`)
@@ -54,6 +58,7 @@ final readonly class SsoProvidersController
         private Security $security,
         private SsoProviderRepositoryInterface $providers,
         private SsoProviderResponseBuilder $builder,
+        private SsoConfigCipher $configCipher,
     ) {
     }
 
@@ -135,7 +140,7 @@ final readonly class SsoProvidersController
             tenantId: $caller->getTenant()->getId(),
             kind: $kind,
             name: $name,
-            config: $stringConfig,
+            config: $this->configCipher->protect($stringConfig),
             enabled: $enabled,
         );
         $this->providers->save($provider);
@@ -179,6 +184,10 @@ final readonly class SsoProvidersController
             // overwriting the real secret with the mask. The FE always
             // round-trips the read shape on edit, so this is how secrets
             // survive an "edit name" submission without re-entering them.
+            // The merge compares against the STORED shape (masked-placeholder
+            // detection only needs to know a key exists), then the result is
+            // re-protected: values kept from the current config are already
+            // enveloped and stay untouched, freshly submitted ones get wrapped.
             $merged = self::mergeConfigPreservingMaskedSecrets(
                 $provider->getConfig(),
                 self::ensureStringKeyed($payload['config']),
@@ -187,7 +196,7 @@ final readonly class SsoProvidersController
             if (null !== $restriction) {
                 return $this->problem(Response::HTTP_UNPROCESSABLE_ENTITY, 'Unprocessable Entity', $restriction);
             }
-            $provider->updateConfig($merged);
+            $provider->updateConfig($this->configCipher->protect($merged));
         }
 
         if (\array_key_exists('enabled', $payload)) {
@@ -332,17 +341,11 @@ final readonly class SsoProvidersController
      */
     private static function mergeConfigPreservingMaskedSecrets(array $current, array $next): array
     {
-        $secretMarkers = ['client_secret', 'private_key', 'idp_certificate', 'sp_private_key'];
         $merged = $next;
         foreach ($next as $key => $value) {
-            $lowerKey = strtolower($key);
-            $isSecret = false;
-            foreach ($secretMarkers as $marker) {
-                if ($lowerKey === $marker || str_contains($lowerKey, $marker)) {
-                    $isSecret = true;
-                    break;
-                }
-            }
+            // #2725 — one definition of "this key holds a credential", shared
+            // with SsoConfigCipher so masking and encryption cannot drift.
+            $isSecret = SsoConfigCipher::isSecretKey($key);
             // If a secret-shaped field was sent as the masked placeholder,
             // keep the existing value instead of overwriting it.
             if ($isSecret && '****' === $value && isset($current[$key])) {
