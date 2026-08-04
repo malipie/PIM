@@ -159,6 +159,7 @@ final class GenerateCatalogHandlerTest extends KernelTestCase
 
         return new GenerateCatalogHandler(
             $em,
+            $em->getConnection(),
             $this->runs(),
             $this->profiles(),
             $regenerator,

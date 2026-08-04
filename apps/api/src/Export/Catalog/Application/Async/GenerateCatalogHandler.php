@@ -14,6 +14,7 @@ use App\Export\Catalog\Domain\Repository\CatalogRunRepositoryInterface;
 use App\Shared\Application\AbstractBatchHandler;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -58,6 +59,7 @@ final class GenerateCatalogHandler extends AbstractBatchHandler
 
     public function __construct(
         EntityManagerInterface $entityManager,
+        private readonly Connection $connection,
         private readonly CatalogRunRepositoryInterface $runs,
         private readonly CatalogProfileRepositoryInterface $profiles,
         private readonly CatalogRegenerator $regenerator,
@@ -121,10 +123,18 @@ final class GenerateCatalogHandler extends AbstractBatchHandler
         $onChunk = function (int $processed) use ($runId, $run): void {
             $this->progress->progress($run, $processed, null, null);
 
-            // The in-memory run is stale inside the long render loop; the cancel
-            // endpoint writes straight to the row — poll the persisted status.
-            $current = $this->runs->findById($runId);
-            if (null !== $current && CatalogRunStatus::Cancelled === $current->getStatus()) {
+            // #2733 — the in-memory run is stale inside the long render loop and
+            // an ORM find() can serve it straight from the identity map without
+            // ever hitting SQL, so the cancel written by the endpoint would be
+            // invisible. Poll the persisted status with raw SQL, exactly like
+            // ExportJobHandler/FeedRunHandler do (tenant-safe: primary-key read,
+            // run id resolved through the tenant-scoped repository above, RLS
+            // GUC active on the worker session).
+            $statusNow = $this->connection->fetchOne(
+                'SELECT status FROM catalog_runs WHERE id = :id',
+                ['id' => $runId->toRfc4122()],
+            );
+            if (CatalogRunStatus::Cancelled->value === $statusNow) {
                 throw new CatalogCancelledException('Catalog generation cancelled by the user.');
             }
         };
