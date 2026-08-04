@@ -77,6 +77,17 @@ pim.localhost, localhost {
         reverse_proxy mercure:80
     }
 
+    # #2729 — the Prometheus scrape endpoint must NOT be reachable from the
+    # public origin: it exposes DB-latency histograms, RBAC denial counters and
+    # worker memory, which is free recon (and a timing side-channel) for anyone
+    # who can curl the host. Prometheus scrapes `api:80` over the internal
+    # docker network (docker/prometheus/prometheus.yml), so blackholing it at
+    # the edge costs nothing. Must precede the /api* matcher — Caddy takes the
+    # most specific handle.
+    handle /api/metrics* {
+        respond 404
+    }
+
     # API — Symfony / API Platform under FrankenPHP worker mode.
     handle /api* {
         # IMP2-2.8 (#1484) — edge backstop on request body size. The limit chain is
