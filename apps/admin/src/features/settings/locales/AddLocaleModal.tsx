@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
-import { jsonFetch } from '@/lib/http';
+import { httpErrorDetail, jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 import type { TenantLocaleListItem } from './types';
@@ -69,6 +69,8 @@ export function AddLocaleModal({
   const [submittingCode, setSubmittingCode] = useState<string | null>(null);
   const [makeMandatory, setMakeMandatory] = useState(false);
   const [impact, setImpact] = useState<{ missing: number; total: number } | null>(null);
+  /** #2739 — a failed impact preview used to vanish, so the operator decided blind. */
+  const [impactError, setImpactError] = useState<string | null>(null);
   const [selectedForPreview, setSelectedForPreview] = useState<string | null>(null);
 
   useEffect(() => {
@@ -109,6 +111,7 @@ export function AddLocaleModal({
   const previewImpactFor = async (code: string) => {
     setSelectedForPreview(code);
     setImpact(null);
+    setImpactError(null);
     try {
       const response = await jsonFetch<{
         productsInTenant: number;
@@ -122,8 +125,14 @@ export function AddLocaleModal({
         missing: response.objectsMissingValuesInLocale,
         total: response.productsInTenant,
       });
-    } catch {
+    } catch (err) {
       setImpact(null);
+      setImpactError(
+        httpErrorDetail(err) ??
+          t('settings.locales.add_modal.impact_failed', {
+            defaultValue: 'Nie udało się policzyć wpływu dodania języka.',
+          }),
+      );
     }
   };
 
@@ -255,6 +264,11 @@ export function AddLocaleModal({
                 missing: impact.missing,
                 total: impact.total,
               })}
+            </span>
+          )}
+          {selectedForPreview && impactError !== null && (
+            <span className="mr-auto text-xs text-destructive" role="alert">
+              {impactError}
             </span>
           )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>

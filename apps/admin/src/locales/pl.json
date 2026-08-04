@@ -557,7 +557,8 @@
         "already_active": "Już aktywny",
         "activating": "Aktywuję…",
         "cancel": "Anuluj",
-        "toast_activated": "{{code}} aktywowany."
+        "toast_activated": "{{code}} aktywowany.",
+        "impact_failed": "Nie udało się policzyć wpływu dodania języka."
       }
     },
     "users": {
@@ -2096,6 +2097,9 @@
       "stat_sample": "w próbce",
       "stat_sample_skipped": "pominięte (próbka)",
       "stat_sample_errors": "błędy (próbka)"
+    },
+    "list": {
+      "action_failed": "Operacja nie powiodła się."
     }
   },
   "api_configurator": {
@@ -2596,7 +2600,8 @@
       "unmapped_remote": "Niezmapowane pola zewnętrzne · {{count}}",
       "all_remote_mapped": "Brak — wszystkie pola wykorzystane",
       "endpoint_scope": "Endpoint",
-      "endpoint_all": "Wszystkie endpointy"
+      "endpoint_all": "Wszystkie endpointy",
+      "validation_failed": "Nie udało się zwalidować mapowań."
     },
     "sync": {
       "back": "Wróć do połączeń",

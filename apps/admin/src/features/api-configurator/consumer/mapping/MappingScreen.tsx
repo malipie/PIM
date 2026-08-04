@@ -124,9 +124,25 @@ export function MappingScreen({ embedded = false }: { embedded?: boolean } = {})
         method: 'post',
         values: {},
       },
-      { onSuccess: ({ data }) => setValidation(data as unknown as ValidateResult) },
+      {
+        onSuccess: ({ data }) => setValidation(data as unknown as ValidateResult),
+        // #2739 — without this the panel simply did not render on a failed
+        // call, so "validation passed" and "validation crashed" looked
+        // identical. Surface it as an invalid result with the reason.
+        onError: (err) =>
+          setValidation({
+            valid: false,
+            errors: [
+              err?.message ??
+                t('api_configurator.mapping.validation_failed', {
+                  defaultValue: 'Nie udało się zwalidować mapowań.',
+                }),
+            ],
+            warnings: [],
+          }),
+      },
     );
-  }, [apiUrl, connectionId, runValidate]);
+  }, [apiUrl, connectionId, runValidate, t]);
 
   // Re-validate whenever the mapping set changes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-run on mapping count/version, not the callback identity
