@@ -186,10 +186,10 @@ final class ImageDownloadHandler extends AbstractBatchHandler
         if (!$session instanceof ImportSession) {
             return;
         }
-        foreach ($pendingLogs as $entry) {
-            $this->persistLog($session, $entry['job'], $entry['type'], $entry['message'], $entry['value']);
-        }
         foreach ($pendingWrites as $write) {
+            // Idempotent by construction: re-applying writes the SAME asset ids
+            // into the envelope and re-links assets already linked, so a
+            // redelivery converges instead of duplicating.
             $this->applyWrite($session, $write['job'], $write['downloaded'], $tenant);
         }
         // The session entity is intentionally NOT mutated here — its counters
@@ -198,22 +198,56 @@ final class ImageDownloadHandler extends AbstractBatchHandler
         // increment or a decrement and strand the session non-terminal.
         $this->flushAndClear();
 
+        // #2731 — the same statement CLAIMS the batch: a redelivery after a
+        // partially applied batch (retry, or a worker killed mid-apply) would
+        // otherwise add the counters and the ImportLog rows a second time.
+        // `NOT (processed_image_batches @> …)` makes the claim atomic against
+        // concurrent consumers; no row returned means "already accounted".
         $row = $this->entityManager->getConnection()->fetchAssociative(
             'UPDATE import_sessions'
             .' SET images_downloaded = images_downloaded + :d,'
             .'     images_failed = images_failed + :f,'
-            .'     pending_image_batches = GREATEST(0, pending_image_batches - 1)'
+            .'     pending_image_batches = GREATEST(0, pending_image_batches - 1),'
+            .'     processed_image_batches = processed_image_batches || to_jsonb(CAST(:batch AS text))'
             .' WHERE id = :id'
+            .'   AND NOT (processed_image_batches @> to_jsonb(CAST(:batch AS text)))'
             .' RETURNING pending_image_batches, row_phase_complete',
             [
                 'd' => $downloaded,
                 'f' => $failed,
                 'id' => $message->importSessionId->toRfc4122(),
+                'batch' => $this->batchKey($message),
             ],
         );
-        $pendingRaw = \is_array($row) ? $row['pending_image_batches'] : 1;
+
+        if (!\is_array($row)) {
+            $this->logger->info('Import media batch already accounted — skipping counters and logs.', [
+                'import_session_id' => $message->importSessionId->toRfc4122(),
+                'batch' => $this->batchKey($message),
+            ]);
+
+            return;
+        }
+
+        // Logs are written only for the attempt that won the claim, so a
+        // redelivery cannot duplicate the operator-facing warnings. Clear the
+        // unit of work FIRST: the counters just moved by raw SQL, and a stale
+        // ImportSession still managed by the dispatching run handler (sync
+        // transport) would otherwise be flushed back over them. Then re-attach
+        // a managed tenant so the assignment listener can stamp the new rows.
+        $this->entityManager->clear();
+        $this->reattachTenant($message->tenantId);
+        $session = $this->sessions->findById($message->importSessionId);
+        if ($session instanceof ImportSession) {
+            foreach ($pendingLogs as $entry) {
+                $this->persistLog($session, $entry['job'], $entry['type'], $entry['message'], $entry['value']);
+            }
+            $this->flushAndClear();
+        }
+
+        $pendingRaw = $row['pending_image_batches'];
         $pending = \is_scalar($pendingRaw) ? (int) $pendingRaw : 1;
-        $rowPhaseDone = \is_array($row) && (bool) $row['row_phase_complete'];
+        $rowPhaseDone = (bool) $row['row_phase_complete'];
 
         // The batch that drives the counter to zero AFTER the row phase is done
         // finalizes the session (success / partial) and removes the now-spent
@@ -233,6 +267,27 @@ final class ImageDownloadHandler extends AbstractBatchHandler
                 }
             }
         }
+    }
+
+    /**
+     * #2731 — the batch's idempotency key. Messages serialized before #2731
+     * carry no batchId; they fall back to a key derived from the message's
+     * job shape, which is stable across redeliveries of the SAME message and
+     * distinct from sibling batches of the same session.
+     */
+    private function batchKey(ImageDownloadMessage $message): string
+    {
+        if ($message->batchId instanceof Uuid) {
+            return $message->batchId->toRfc4122();
+        }
+
+        $shape = array_map(
+            static fn (ImageDownloadJob $job): string => $job->objectId.'|'.$job->attributeCode
+                .'|'.implode(',', $job->urls).'|'.implode(',', $job->zipNames),
+            $message->jobs,
+        );
+
+        return 'legacy:'.hash('sha256', implode("\n", $shape));
     }
 
     /**

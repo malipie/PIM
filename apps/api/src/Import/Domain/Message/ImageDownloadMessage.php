@@ -19,12 +19,17 @@ final readonly class ImageDownloadMessage
     /**
      * @param list<ImageDownloadJob> $jobs
      * @param ?string                $zipStoragePath MinIO path of the run's ZIP (zip mode, IMP2-1.13); null in http mode
+     * @param ?Uuid                  $batchId        idempotency key (#2731) — the session records accounted batches, so a
+     *                                               redelivery after a partial run cannot double-count images or duplicate
+     *                                               logs. Null only for messages serialized before #2731 (legacy path:
+     *                                               accounted unconditionally, as before)
      */
     public function __construct(
         public Uuid $importSessionId,
         public Uuid $tenantId,
         public array $jobs,
         public ?string $zipStoragePath = null,
+        public ?Uuid $batchId = null,
     ) {
     }
 }

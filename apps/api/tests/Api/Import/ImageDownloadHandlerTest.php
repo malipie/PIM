@@ -206,6 +206,36 @@ final class ImageDownloadHandlerTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function redeliveredBatchDoesNotDoubleCountOrDuplicateLogs(): void
+    {
+        // #2731 — a retry after a partially applied batch re-runs the whole
+        // handler. Content-hash dedup already protects the assets, but the
+        // counters were additive and the logs re-inserted, so one redelivery
+        // doubled `images_failed` and the operator-facing warnings.
+        [$sessionId, $objectId] = $this->seed();
+        $batchId = Uuid::v7();
+        $message = new ImageDownloadMessage($sessionId, $this->tenantId(), [
+            new ImageDownloadJob($objectId, 'photo', null, null, [], ['http://10.0.0.1/private.png'], 2, 'MED-1'),
+        ], null, $batchId);
+
+        // Private host → SSRF-rejected without a request, so no HTTP mock needed.
+        $this->handler(new MockHttpClient([]))($message);
+        $this->handler(new MockHttpClient([]))($message);
+
+        $em = $this->em();
+        $em->clear();
+        $session = $em->find(ImportSession::class, $sessionId);
+        \assert($session instanceof ImportSession);
+        self::assertSame(1, $session->getImagesFailed(), 'the redelivery must not add the failure twice');
+
+        $logs = $em->getConnection()->fetchOne(
+            "SELECT COUNT(*) FROM import_logs WHERE error_type='image_not_found' AND import_session_id = :s",
+            ['s' => $sessionId->toRfc4122()],
+        );
+        self::assertSame(1, (int) (\is_scalar($logs) ? $logs : 0), 'the redelivery must not duplicate the warning log');
+    }
+
+    #[Test]
     public function crossTenantExistingUuidIsDroppedWithWarning(): void
     {
         [$sessionId, $objectId] = $this->seed();

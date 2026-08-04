@@ -1232,7 +1232,9 @@ final class ImportRunHandler extends AbstractBatchHandler
             // handler runs (TenantContextRebindingMiddleware) — mirrors the
             // ImportRunMessage dispatch; without it the worker dead-letters.
             $this->messageBus->dispatch(
-                new ImageDownloadMessage($session->getId(), $tenant->getId(), $batch, $zipStoragePath),
+                // #2731 — per-batch idempotency key: the handler records it on
+                // the session so a redelivery cannot double-count images.
+                new ImageDownloadMessage($session->getId(), $tenant->getId(), $batch, $zipStoragePath, Uuid::v7()),
                 [new TenantStamp($tenant->getId())],
             );
         }
