@@ -2915,7 +2915,8 @@
       "webhook_rotate_secret": "Regenerate secret",
       "webhook_secret_new": "New HMAC secret (shown once)",
       "webhook_secret_warning": "Capture this now — old subscribers must update. Closing this view discards it.",
-      "webhook_history_note": "Delivery history + retry log lands in a follow-up (Faza 1 monitoring)."
+      "webhook_history_note": "Delivery history + retry log lands in a follow-up (Faza 1 monitoring).",
+      "webhook_rotate_failed": "Secret regeneration failed — the old secret is still active."
     },
     "validation": {
       "code_format": "Code must be lowercase letters, digits, dashes or underscores.",

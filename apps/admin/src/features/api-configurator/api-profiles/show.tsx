@@ -167,6 +167,7 @@ function WebhookSection({ profile }: { profile: ApiProfileRow }) {
   const [testResult, setTestResult] = useState<TestWebhookResult | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
   const [rotatedSecret, setRotatedSecret] = useState<string | null>(null);
+  const [rotateError, setRotateError] = useState<string | null>(null);
   const { mutate: testMutate, mutation: testMutation } = useCustomMutation();
   const { mutate: rotateMutate, mutation: rotateMutation } = useCustomMutation();
 
@@ -181,6 +182,8 @@ function WebhookSection({ profile }: { profile: ApiProfileRow }) {
         url: `${apiUrl}/api_profiles/${profile.id}/test_webhook`,
         method: 'post',
         values: {},
+        // Inline testError below is the error surface — skip the global toast.
+        errorNotification: false,
       },
       {
         onSuccess: ({ data }) => {
@@ -195,16 +198,24 @@ function WebhookSection({ profile }: { profile: ApiProfileRow }) {
 
   function handleRotate(): void {
     setRotatedSecret(null);
+    setRotateError(null);
     rotateMutate(
       {
         url: `${apiUrl}/api_profiles/${profile.id}/rotate_webhook_secret`,
         method: 'post',
         values: {},
+        // Inline rotateError below is the error surface — skip the global toast.
+        errorNotification: false,
       },
       {
         onSuccess: ({ data }) => {
           const result = data as unknown as RotateSecretResult;
           setRotatedSecret(result.webhookSecret);
+        },
+        onError: (err) => {
+          // #2724 — a silent failure here reads as "secret rotated" while the
+          // old secret is still live; surface the failure explicitly.
+          setRotateError(err?.message ?? t('api_profiles.show.webhook_rotate_failed'));
         },
       },
     );
@@ -293,6 +304,11 @@ function WebhookSection({ profile }: { profile: ApiProfileRow }) {
           {testError !== null && (
             <p className="text-sm text-destructive" role="alert">
               {testError}
+            </p>
+          )}
+          {rotateError !== null && (
+            <p className="text-sm text-destructive" role="alert">
+              {rotateError}
             </p>
           )}
 

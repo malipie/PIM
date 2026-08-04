@@ -20,6 +20,7 @@ import { SettingsLayout } from '@/layout/SettingsLayout';
 import { authProvider } from '@/lib/auth-provider';
 import { dataProvider } from '@/lib/data-provider';
 import { AGENT_ENABLED } from '@/lib/features';
+import { notificationProvider } from '@/lib/refine-notification-provider';
 
 /**
  * Lazy-loads a page module that exports the component as a named
@@ -349,6 +350,7 @@ function App() {
         <Refine
           authProvider={authProvider}
           dataProvider={dataProvider}
+          notificationProvider={notificationProvider}
           resources={[
             {
               name: 'products',

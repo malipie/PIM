@@ -2931,7 +2931,8 @@
       "webhook_rotate_secret": "Regeneruj sekret",
       "webhook_secret_new": "Nowy sekret HMAC (pokazywany raz)",
       "webhook_secret_warning": "Skopiuj go teraz — starzy subskrybenci muszą zaktualizować. Zamknięcie widoku usuwa wartość.",
-      "webhook_history_note": "Historia dostaw + log retry dochodzi w follow-up (monitoring Faza 1)."
+      "webhook_history_note": "Historia dostaw + log retry dochodzi w follow-up (monitoring Faza 1).",
+      "webhook_rotate_failed": "Nie udało się zregenerować sekretu — stary sekret pozostaje aktywny."
     },
     "validation": {
       "code_format": "Kod może zawierać tylko małe litery, cyfry, myślniki i podkreślenia.",
