@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Import\Presentation\Controller;
 
 use App\Identity\Contracts\Attribute\RequiresPermission;
-use App\Identity\Domain\Entity\User;
+use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Import\Application\Handler\StructuralImportRunHandler;
 use App\Import\Application\Service\Archive\ArchiveSecurityException;
 use App\Import\Application\Service\Archive\XlsxArchiveGuard;
@@ -15,12 +15,12 @@ use App\Import\Domain\Entity\StagedFile;
 use App\Import\Domain\Repository\ImportSessionRepositoryInterface;
 use App\Shared\Application\BulkOperationInProgressException;
 use App\Shared\Application\TenantContext;
+use App\Shared\Domain\Tenant;
 use DateTimeInterface;
 use InvalidArgumentException;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
 use RuntimeException;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -58,7 +58,7 @@ final class StartStructuralImportController
     public function __construct(
         private readonly ImportSessionRepositoryInterface $sessions,
         private readonly StructuralImportRunHandler $runHandler,
-        private readonly Security $security,
+        private readonly CurrentUserProvider $currentUser,
         private readonly TenantContext $tenantContext,
         private readonly FilesystemOperator $importsStorage,
         private readonly StagedFileService $stagedFiles,
@@ -71,11 +71,14 @@ final class StartStructuralImportController
     #[RequiresPermission(module: 'imports', action: 'run')]
     public function __invoke(Request $request): JsonResponse
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
+        $userId = $this->currentUser->userId();
+        if (null === $userId) {
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
         }
-        $tenant = $user->getTenant();
+        $tenant = $this->currentUser->tenant();
+        if (null === $tenant) {
+            throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
+        }
         $this->tenantContext->set($tenant);
 
         $reservation = $this->importTriggerLimiter->create($tenant->getId()->toRfc4122())->consume();
@@ -91,7 +94,7 @@ final class StartStructuralImportController
             throw new BadRequestHttpException(\sprintf('"structural_kind" must be one of: %s.', implode(', ', self::ALLOWED_KINDS)));
         }
 
-        $stagedFile = $this->resolveStagedFile($request, $user);
+        $stagedFile = $this->resolveStagedFile($request, $tenant, $userId);
         $file = $request->files->get('file');
         if (null === $stagedFile && !$file instanceof UploadedFile) {
             throw new BadRequestHttpException('Either "staged_file_id" or a "file" multipart field is required.');
@@ -129,7 +132,7 @@ final class StartStructuralImportController
         }
 
         $session = new ImportSession(
-            userId: $user->getId(),
+            userId: $userId,
             targetObjectType: null,
             fileName: $originalName,
             fileSizeBytes: $fileSizeBytes,
@@ -177,7 +180,7 @@ final class StartStructuralImportController
         return new JsonResponse($this->serialise($reload), Response::HTTP_OK);
     }
 
-    private function resolveStagedFile(Request $request, User $user): ?StagedFile
+    private function resolveStagedFile(Request $request, Tenant $tenant, Uuid $userId): ?StagedFile
     {
         $raw = (string) $request->request->get('staged_file_id', '');
         if ('' === $raw) {
@@ -188,7 +191,7 @@ final class StartStructuralImportController
         } catch (InvalidArgumentException) {
             throw new BadRequestHttpException(\sprintf('Invalid staged_file_id "%s".', $raw));
         }
-        $staged = $this->stagedFiles->resolveOwned($id, $user->getTenant(), $user->getId());
+        $staged = $this->stagedFiles->resolveOwned($id, $tenant, $userId);
         if (null === $staged) {
             throw new NotFoundHttpException(\sprintf('Staged file "%s" was not found.', $raw));
         }

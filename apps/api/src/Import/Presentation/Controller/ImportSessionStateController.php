@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Import\Presentation\Controller;
 
 use App\Identity\Contracts\Attribute\RequiresPermission;
-use App\Identity\Domain\Entity\User;
+use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Import\Domain\Entity\ImportSession;
 use App\Import\Domain\Message\ImportRunMessage;
 use App\Import\Domain\Repository\ImportSessionRepositoryInterface;
@@ -13,7 +13,6 @@ use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Messenger\Stamp\TenantStamp;
 use InvalidArgumentException;
 use LogicException;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -36,7 +35,7 @@ final class ImportSessionStateController
 {
     public function __construct(
         private readonly ImportSessionRepositoryInterface $sessions,
-        private readonly Security $security,
+        private readonly CurrentUserProvider $currentUser,
         private readonly MessageBusInterface $bus,
     ) {
     }
@@ -117,8 +116,8 @@ final class ImportSessionStateController
 
     private function loadOwned(string $rawId): ImportSession
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
+        $userId = $this->currentUser->userId();
+        if (null === $userId) {
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
         }
 
@@ -129,7 +128,7 @@ final class ImportSessionStateController
         }
 
         $session = $this->sessions->findById($id);
-        if (!$session instanceof ImportSession || $session->getUserId()->toRfc4122() !== $user->getId()->toRfc4122()) {
+        if (!$session instanceof ImportSession || $session->getUserId()->toRfc4122() !== $userId->toRfc4122()) {
             throw new NotFoundHttpException(\sprintf('Import session "%s" was not found.', $rawId));
         }
 

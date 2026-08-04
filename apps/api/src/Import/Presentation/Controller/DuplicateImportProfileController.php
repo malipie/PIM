@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Import\Presentation\Controller;
 
 use App\Identity\Contracts\Attribute\RequiresPermission;
-use App\Identity\Domain\Entity\User;
+use App\Identity\Contracts\Auth\CurrentUserProvider;
 use App\Import\Domain\Entity\ImportProfile;
 use App\Import\Domain\Repository\ImportProfileRepositoryInterface;
 use DateTimeInterface;
 use InvalidArgumentException;
 use RuntimeException;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -31,7 +30,7 @@ final class DuplicateImportProfileController
 
     public function __construct(
         private readonly ImportProfileRepositoryInterface $profiles,
-        private readonly Security $security,
+        private readonly CurrentUserProvider $currentUser,
     ) {
     }
 
@@ -44,8 +43,8 @@ final class DuplicateImportProfileController
     #[RequiresPermission(module: 'import_profile', action: 'write')]
     public function __invoke(string $id): JsonResponse
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
+        $userId = $this->currentUser->userId();
+        if (null === $userId) {
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
         }
 
@@ -59,7 +58,7 @@ final class DuplicateImportProfileController
         if (!$source instanceof ImportProfile) {
             throw new NotFoundHttpException(\sprintf('Import profile "%s" was not found.', $id));
         }
-        if ($source->getUserId()->toRfc4122() !== $user->getId()->toRfc4122()) {
+        if ($source->getUserId()->toRfc4122() !== $userId->toRfc4122()) {
             throw new NotFoundHttpException(\sprintf('Import profile "%s" was not found.', $id));
         }
 
@@ -68,11 +67,11 @@ final class DuplicateImportProfileController
             throw new NotFoundHttpException('Profile is not bound to a tenant.');
         }
 
-        $name = $this->uniqueName($source->getName(), $tenant, $user->getId());
-        $code = $this->uniqueCode(ImportProfile::slugify($name), $tenant, $user->getId());
+        $name = $this->uniqueName($source->getName(), $tenant, $userId);
+        $code = $this->uniqueCode(ImportProfile::slugify($name), $tenant, $userId);
 
         $clone = new ImportProfile(
-            userId: $user->getId(),
+            userId: $userId,
             name: $name,
             targetObjectType: $source->getTargetObjectType(),
             code: $code,
