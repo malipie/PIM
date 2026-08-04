@@ -20,8 +20,11 @@ use Psr\Log\NullLogger;
  * is returned for the caller (sync runner) to dead-letter if still throttled.
  *
  * The per-tenant anti-abuse budget is enforced separately at the sync-trigger
- * edge (the existing `integration_sync` limiter, 10/h/tenant), not per HTTP
- * call — a per-call bucket would starve legitimate bulk syncs.
+ * edge — the `integration_sync` limiter (10/h/tenant), consumed by
+ * {@see \App\Integration\Generic\Application\Subscriber\OutboundTriggerSubscriber}
+ * since #2730 (before that the limiter was configured but nothing consumed it,
+ * and this paragraph described a control that did not exist). Deliberately not
+ * per HTTP call — a per-call bucket would starve legitimate bulk syncs.
  */
 final readonly class BackoffRestClient implements RemoteRequester
 {

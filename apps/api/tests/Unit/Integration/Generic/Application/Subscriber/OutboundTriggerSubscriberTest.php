@@ -10,11 +10,17 @@ use App\Integration\Generic\Application\Subscriber\OutboundTriggerSubscriber;
 use App\Integration\Generic\Application\Sync\SyncRunScope;
 use App\Integration\Generic\Domain\Entity\Connection;
 use App\Integration\Generic\Domain\Entity\SyncBinding;
+use App\Integration\Generic\Domain\Entity\SyncRun;
 use App\Integration\Generic\Domain\Enum\SyncDirection;
 use App\Integration\Generic\Domain\Message\OutboundSyncMessage;
 use App\Integration\Generic\Domain\Repository\SyncBindingRepositoryInterface;
+use App\Integration\Generic\Domain\Repository\SyncRunRepositoryInterface;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Component\Uid\Uuid;
 
 final class OutboundTriggerSubscriberTest extends TestCase
@@ -100,6 +106,46 @@ final class OutboundTriggerSubscriberTest extends TestCase
         self::assertSame([], $bus->dispatched);
     }
 
+    #[Test]
+    public function doesNotEnqueueWhenARunOfTheBindingIsAlreadyInFlight(): void
+    {
+        // #2730 — the in-flight run will pick the fresh values up anyway, so a
+        // second full push of the same slice is pure waste against the remote.
+        $type = Uuid::v7();
+        $connection = new Connection('c', 'C', 'https://x');
+        $binding = $this->binding($connection, $type, SyncDirection::Outbound);
+        $bus = $this->bus();
+
+        $this->subscriber($bus, [$binding], bulk: false, runInFlight: new SyncRun($binding, SyncDirection::Outbound))(
+            new ObjectAttributesChanged(Uuid::v7(), Uuid::v7(), ['name'], objectTypeId: $type),
+        );
+
+        self::assertSame([], $bus->dispatched);
+    }
+
+    #[Test]
+    public function stopsEnqueueingOnceTheTenantBudgetIsExhausted(): void
+    {
+        // #2730 — the integration_sync limiter (10/h/tenant) was configured but
+        // never consumed; a burst of manual edits could flood the remote.
+        $type = Uuid::v7();
+        $connection = new Connection('c', 'C', 'https://x');
+        $binding = $this->binding($connection, $type, SyncDirection::Outbound);
+        $tenantId = Uuid::v7();
+        $limiter = new RateLimiterFactory(
+            ['id' => 'integration_sync_test', 'policy' => 'fixed_window', 'limit' => 2, 'interval' => '1 hour'],
+            new InMemoryStorage(),
+        );
+
+        $bus = $this->bus();
+        $subscriber = $this->subscriber($bus, [$binding], bulk: false, limiter: $limiter);
+        foreach (range(1, 5) as $ignored) {
+            $subscriber(new ObjectAttributesChanged(Uuid::v7(), $tenantId, ['name'], objectTypeId: $type));
+        }
+
+        self::assertCount(2, $bus->dispatched, 'the tenant budget caps how many runs a burst can enqueue');
+    }
+
     private function binding(Connection $connection, Uuid $objectTypeId, SyncDirection $direction): SyncBinding
     {
         return new SyncBinding($connection, $objectTypeId, $direction);
@@ -113,6 +159,8 @@ final class OutboundTriggerSubscriberTest extends TestCase
         array $bindings,
         bool $bulk,
         ?SyncRunScope $scope = null,
+        ?SyncRun $runInFlight = null,
+        ?RateLimiterFactoryInterface $limiter = null,
     ): OutboundTriggerSubscriber {
         $guard = $this->createStub(BulkGuard::class);
         $guard->method('isBulk')->willReturn($bulk);
@@ -120,7 +168,27 @@ final class OutboundTriggerSubscriberTest extends TestCase
         $repo = $this->createStub(SyncBindingRepositoryInterface::class);
         $repo->method('findEnabled')->willReturn($bindings);
 
-        return new OutboundTriggerSubscriber($guard, $repo, $scope ?? new SyncRunScope(), $bus);
+        $runs = $this->createStub(SyncRunRepositoryInterface::class);
+        $runs->method('findRunningByBinding')->willReturn($runInFlight);
+
+        return new OutboundTriggerSubscriber(
+            $guard,
+            $repo,
+            $runs,
+            $scope ?? new SyncRunScope(),
+            $bus,
+            $limiter ?? self::unlimitedLimiter(),
+            new NullLogger(),
+        );
+    }
+
+    /** A budget generous enough that only the tests that ask for a tight one see 429s. */
+    private static function unlimitedLimiter(): RateLimiterFactoryInterface
+    {
+        return new RateLimiterFactory(
+            ['id' => 'integration_sync_test', 'policy' => 'fixed_window', 'limit' => 1000, 'interval' => '1 hour'],
+            new InMemoryStorage(),
+        );
     }
 
     private function bus(): RecordingMessageBus
