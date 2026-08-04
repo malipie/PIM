@@ -71,6 +71,25 @@ export function emptyDraft(): FeedDraft {
 }
 
 /** Edit mode — prefill from GET /api/feeds/:id. */
+/**
+ * #2740 — the wire rows are typed `Record<string, unknown>`; keep only the ones
+ * that actually carry a `slot` instead of asserting the whole array is already
+ * `SlotMapping[]`. A backend shape change then drops the unusable rows rather
+ * than handing the mapper undefined slots.
+ */
+export function toSlotMappings(rows: Array<Record<string, unknown>>): SlotMapping[] {
+  const out: SlotMapping[] = [];
+  for (const row of rows) {
+    if (typeof row.slot !== 'string') continue;
+    out.push({
+      slot: row.slot,
+      source: (row.source ?? null) as SlotMapping['source'],
+      transform: (row.transform ?? null) as SlotMapping['transform'],
+    });
+  }
+  return out;
+}
+
 export function draftFromFeed(feed: FeedRow): FeedDraft {
   return {
     id: feed.id,
@@ -82,7 +101,7 @@ export function draftFromFeed(feed: FeedRow): FeedDraft {
     locale: feed.locale ?? 'pl',
     currency: feed.currency,
     channelId: feed.channel_id,
-    mappings: feed.field_mappings as unknown as SlotMapping[],
+    mappings: toSlotMappings(feed.field_mappings),
     filterDsl: (feed.filter as FilterDsl | null) ?? null,
     skipPolicy: feed.validation_policy ?? 'skip_invalid',
     cron: feed.schedule_cron,

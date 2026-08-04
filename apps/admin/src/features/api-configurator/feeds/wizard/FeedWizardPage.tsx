@@ -12,12 +12,7 @@ import { httpErrorDetail } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 import { createFeed, fetchFeed, patchFeed, regenerateFeed } from '../api/feeds';
-import {
-  type SlotMapping,
-  sanitizeMappings,
-  useFeedMapping,
-  useSaveFeedMapping,
-} from '../api/mapping';
+import { sanitizeMappings, useFeedMapping, useSaveFeedMapping } from '../api/mapping';
 import { type FeedTemplateInfo, useFeedTemplates, useProductObjectTypeId } from '../api/templates';
 import { TemplateBadge } from '../components/primitives';
 import {
@@ -41,6 +36,7 @@ import {
   patchPayload,
   slugifyCode,
   stepsFor,
+  toSlotMappings,
 } from './wizard-state';
 
 const HUB_PATH = '/integrations/api-configurator/feeds';
@@ -161,9 +157,7 @@ export function FeedWizardPage() {
         ...prev,
         kind: template.kind,
         descriptor: template.descriptor,
-        mappings: template.default_mappings.map((mapping) => ({
-          ...mapping,
-        })) as unknown as SlotMapping[],
+        mappings: toSlotMappings(template.default_mappings.map((mapping) => ({ ...mapping }))),
         name: nextName,
         code: prev.codeTouched ? prev.code : slugifyCode(nextName),
       };

@@ -13,6 +13,7 @@ import { useNavigate, useParams } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { objectWithKeys } from '@/lib/runtime-guards';
 
 import {
   CoverageBar,
@@ -125,7 +126,20 @@ export function MappingScreen({ embedded = false }: { embedded?: boolean } = {})
         values: {},
       },
       {
-        onSuccess: ({ data }) => setValidation(data as unknown as ValidateResult),
+        onSuccess: ({ data }) => {
+          const parsed = objectWithKeys<ValidateResult>(data, ['valid', 'errors', 'warnings']);
+          setValidation(
+            parsed ?? {
+              valid: false,
+              errors: [
+                t('api_configurator.mapping.validation_failed', {
+                  defaultValue: 'Nie udało się zwalidować mapowań.',
+                }),
+              ],
+              warnings: [],
+            },
+          );
+        },
         // #2739 — without this the panel simply did not render on a failed
         // call, so "validation passed" and "validation crashed" looked
         // identical. Surface it as an invalid result with the reason.
