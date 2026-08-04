@@ -79,6 +79,36 @@ final class DevTokenExposureTest extends TestCase
         );
     }
 
+    /**
+     * #2727 — the guard is an ALLOWLIST, not a denylist on 'prod': any
+     * unexpected environment (staging, preprod, an APP_ENV typo) must be
+     * treated like prod, or knowing a victim's email mints a readable
+     * reset token there.
+     */
+    #[Test]
+    #[DataProvider('unexpectedEnvironments')]
+    public function unexpectedEnvironmentOmitsTokenDevOnly(string $environment): void
+    {
+        $body = $this->invoke('password_reset', $environment);
+
+        self::assertArrayNotHasKey(
+            'token_dev_only',
+            $body,
+            \sprintf("environment '%s' leaked token_dev_only (allowlist bypass)", $environment),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unexpectedEnvironments(): iterable
+    {
+        yield 'staging' => ['staging'];
+        yield 'preprod' => ['preprod'];
+        yield 'typo' => ['pord'];
+        yield 'empty' => [''];
+    }
+
     #[Test]
     #[DataProvider('leakSites')]
     public function nonProdEnvironmentKeepsTokenDevOnly(string $controllerKey): void
