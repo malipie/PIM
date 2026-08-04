@@ -13,6 +13,7 @@ use App\Identity\Contracts\Attribute\RequiresPermission;
 use stdClass;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -116,7 +117,8 @@ final class ProfileTestController
         /** @var array<string, mixed>|false $payload */
         $payload = json_decode((string) json_encode($document), true);
         if (!\is_array($payload)) {
-            return new JsonResponse(['error' => 'OpenAPI document could not be encoded.'], 500);
+            // #2743 — RFC 7807 through the shared listener, not an ad-hoc shape.
+            throw new HttpException(500, 'OpenAPI document could not be encoded.');
         }
 
         $payload = $this->narrowOpenApiToProfile($payload, $profile);

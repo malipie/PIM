@@ -5,8 +5,12 @@ import { INITIAL_WIZARD_STATE } from '../types';
 import type { RunError } from '../use-run-export';
 import { useRunExport } from '../use-run-export';
 
+// #2743 — the hook now goes through the shared client's rawFetch (which owns
+// the 401 → refresh → replay path) instead of building the request itself, so
+// the double stands in for that helper and still lets the tests drive the raw
+// Response through the global fetch stub below.
 vi.mock('@/lib/http', () => ({
-  getAccessToken: () => 'test-token',
+  rawFetch: (path: string, init?: RequestInit) => fetch(path, init),
   jsonFetch: vi.fn(),
   HttpError: class HttpError extends Error {},
 }));

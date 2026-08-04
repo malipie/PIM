@@ -1,5 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { coerceExcelValue } from './excel-cell-coerce';
 
 export interface ExcelColumn<T extends Record<string, unknown>> {
@@ -89,6 +90,7 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
   /** GRID-P2-02 — resize commit keyed by the column's `modelKey`. */
   onColumnResize?: (modelKey: string, width: number) => void;
 }) {
+  const { t } = useTranslation();
   const [active, setActive] = useState<CellAddress | null>(null);
   const [selectionEnd, setSelectionEnd] = useState<CellAddress | null>(null);
   const [editing, setEditing] = useState<CellAddress | null>(null);
@@ -414,7 +416,10 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
                   {onColumnResize !== undefined && col.modelKey !== undefined ? (
                     <button
                       type="button"
-                      aria-label={`Resize ${col.label}`}
+                      aria-label={t('grid.resize_column', {
+                        label: col.label,
+                        defaultValue: `Zmień szerokość kolumny ${col.label}`,
+                      })}
                       data-testid={`excel-resize-${col.modelKey}`}
                       onPointerDown={(event) => {
                         const th = (event.currentTarget as HTMLElement).parentElement;

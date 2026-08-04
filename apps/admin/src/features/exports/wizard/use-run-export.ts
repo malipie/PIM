@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { getAccessToken, HttpError, jsonFetch } from '@/lib/http';
+import { HttpError, jsonFetch, rawFetch } from '@/lib/http';
 
 import type { WizardState } from './types';
 
@@ -16,9 +16,22 @@ interface RunResultSync {
 
 export type RunResult = RunResultAsync | RunResultSync;
 
-export interface RunError {
-  status: number;
-  detail: string;
+/**
+ * #2743 — a real Error subclass, not a bare object literal. Throwing a plain
+ * `{status, detail}` lost the stack and slipped past every generic handler
+ * doing `err instanceof Error` (which then reported the untranslated 'unknown'
+ * fallback instead of the reason).
+ */
+export class RunError extends Error {
+  readonly status: number;
+  readonly detail: string;
+
+  constructor(status: number, detail: string) {
+    super(detail);
+    this.name = 'RunError';
+    this.status = status;
+    this.detail = detail;
+  }
 }
 
 /** Build the POST /api/products/export payload from the wizard state. */
@@ -56,18 +69,14 @@ export function useRunExport() {
   const run = async (state: WizardState): Promise<RunResult> => {
     setIsRunning(true);
     try {
-      const token = getAccessToken();
-      const headers: Record<string, string> = {
-        'content-type': 'application/json',
-        accept: 'application/json, application/octet-stream, text/csv',
-      };
-      if (token !== null) {
-        headers.authorization = `Bearer ${token}`;
-      }
-      const response = await fetch('/api/products/export', {
+      // #2743 — rawFetch keeps the raw Response (the happy path is a binary
+      // download) while riding the shared 401 → refresh → replay path.
+      const response = await rawFetch('/api/products/export', {
         method: 'POST',
-        headers,
-        credentials: 'same-origin',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, application/octet-stream, text/csv',
+        },
         body: JSON.stringify(buildExportPayload(state)),
       });
 
@@ -79,7 +88,7 @@ export function useRunExport() {
         } catch {
           // non-JSON error body — keep the HTTP status fallback
         }
-        throw { status: response.status, detail } satisfies RunError;
+        throw new RunError(response.status, detail);
       }
 
       const contentType = response.headers.get('content-type') ?? '';
@@ -100,10 +109,10 @@ export function useRunExport() {
       ];
       if (!DOWNLOADABLE_CONTENT_TYPES.some((type) => contentType.includes(type))) {
         const text = await response.text();
-        throw {
-          status: response.status,
-          detail: text.slice(0, 300) || `Unexpected response content-type: ${contentType}`,
-        } satisfies RunError;
+        throw new RunError(
+          response.status,
+          text.slice(0, 300) || `Unexpected response content-type: ${contentType}`,
+        );
       }
 
       const blob = await response.blob();

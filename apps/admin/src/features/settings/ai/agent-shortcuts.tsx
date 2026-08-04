@@ -48,7 +48,10 @@ export function AgentShortcuts() {
   const { t } = useTranslation();
 
   return (
-    <aside className="mt-6 space-y-3 lg:mt-0" aria-label="Skróty agenta">
+    <aside
+      className="mt-6 space-y-3 lg:mt-0"
+      aria-label={t('settings.ai.shortcuts_aria', { defaultValue: 'Skróty agenta' })}
+    >
       <ShortcutCard
         to="/agent/inbox"
         testid="agent-shortcut-inbox"
