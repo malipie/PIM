@@ -3,6 +3,10 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-08-04: Untrack auto-generowanego `config/reference.php` (lean chore po code review)
+- **Zgłoszenie**: operator poprosił o code review pending zmiany (skill `agent/ai-code-review.skill`); review zdiagnozował, że dirty diff w `reference.php` to środowiskowy flip-flop generatora (FrankenPHP SAPI vs CLI — szczegóły w lessons.md na górze), opisany już 7× jako szum. Operator wybrał trwały fix.
+- **✅ Fix**: `git rm --cached` + wpis w `apps/api/.gitignore`; plik regeneruje się lokalnie w debug, zero konsumentów w runtime/CI. Koniec rytuału `git checkout --` przed stage.
+
 ## 2026-07-28: Porządkowanie Dependabota — 21 PR-ów → jeden batch (#2699)
 - **Zgłoszenie operatora**: „wyczyść otwarte tickety po dependabocie".
 - **Stan zastany**: 21 otwartych PR-ów Dependabota + **dwie bramki czerwone na main**: (1) „Dependency audit" — `react-router` GHSA-qwww-vcr4-c8h2 (podatne `>=7.12.0 <8.3.0`, mieliśmy 8.0.1; **PR #2656 bumpował do 8.2.0, czyli nadal w podatnym zakresie**) + `brace-expansion` GHSA-mh99-v99m-4gvg tranzytywnie przez `openapi-typescript`; (2) trzy PR-e composerowe (#2695/#2697/#2698) z **kompletnie czerwonym CI** — wszystkie joby PHP padały na „Install dependencies" w 16–38 s.
