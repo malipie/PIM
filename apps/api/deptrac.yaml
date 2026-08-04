@@ -915,6 +915,14 @@ parameters:
             - App\Identity\Domain\Entity\User
         # IMP2-1.4 (#1466) writer touchpoint; IMP2-1.7 (#1470) category +
         # status/enabled write — per-chunk category resolve + replace/append.
+        # #2737 — the category-assignment methods moved OUT of ImportRunHandler
+        # into this collaborator. The Catalog reaches are RELOCATED, not new:
+        # the same three tokens were already baselined under the handler below,
+        # and the burndown (a Catalog Contracts seam) is tracked by #2736.
+        App\Import\Application\Service\ImportCategoryOps:
+            - App\Catalog\Domain\Entity\CatalogObject
+            - App\Catalog\Domain\Entity\ObjectCategory
+            - App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface
         App\Import\Application\Handler\ImportRunHandler:
             - App\Catalog\Application\BatchValueWriter
             # DP-07 (#2037, ADR-0025) — cross-field rules: the prime pass loads
@@ -931,11 +939,9 @@ parameters:
             - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\Attribute
             - App\Catalog\Domain\Entity\CatalogObject
-            - App\Catalog\Domain\Entity\ObjectCategory
             - App\Catalog\Domain\Entity\ObjectType
             - App\Catalog\Domain\ObjectKind
             - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
-            - App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface
             # IMP2-1.8 galleries — per-chunk asset existence prefetch
             - App\Asset\Domain\Repository\AssetRepositoryInterface
         # IMP2-1.12 media — the download handler writes the {asset_id} envelope

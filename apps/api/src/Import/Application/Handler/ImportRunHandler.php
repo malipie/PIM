@@ -7,18 +7,18 @@ namespace App\Import\Application\Handler;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
-use App\Catalog\Domain\Entity\ObjectCategory;
 use App\Catalog\Domain\ObjectKind;
 use App\Import\Application\Service\AttributeAutoCreator;
+use App\Import\Application\Service\ImportCategoryOps;
 use App\Import\Application\Service\ImportColumnGrammar;
 use App\Import\Application\Service\ImportObjectCreator;
 use App\Import\Application\Service\ImportProgressPublisher;
+use App\Import\Application\Service\ImportRowCells;
 use App\Import\Application\Service\ImportRowDecision;
 use App\Import\Application\Service\ImportRowReader;
 use App\Import\Application\Service\ImportUndoLogger;
 use App\Import\Application\Service\ImportValidationService;
 use App\Import\Application\Service\Media\AssetUrlResolver;
-use App\Import\Application\Service\MultiValueSplitter;
 use App\Import\Application\Service\ObjectResolver;
 use App\Import\Application\Service\OptionAutoCreator;
 use App\Import\Application\Service\RelationImportStep;
@@ -155,7 +155,6 @@ final class ImportRunHandler extends AbstractBatchHandler
         private readonly \App\Catalog\Application\CrossFieldRulesValidator $crossFieldRules,
         private readonly \App\Catalog\Domain\Repository\AttributeRepositoryInterface $attributeRepository,
         private readonly \App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface $catalogObjects,
-        private readonly \App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface $objectCategories,
         private readonly \App\Asset\Domain\Repository\AssetRepositoryInterface $assets,
         private readonly ImportProgressPublisher $progressPublisher,
         private readonly TenantContext $tenantContext,
@@ -165,6 +164,8 @@ final class ImportRunHandler extends AbstractBatchHandler
         private readonly AssetUrlResolver $assetUrlResolver,
         private readonly MessageBusInterface $messageBus,
         private readonly \App\Catalog\Application\BulkContext $bulkContext,
+        private readonly ImportRowCells $rowCells,
+        private readonly ImportCategoryOps $categoryOps,
         int $batchSize = 200,
     ) {
         parent::__construct($entityManager, $batchSize);
@@ -707,58 +708,6 @@ final class ImportRunHandler extends AbstractBatchHandler
     }
 
     /**
-     * SKU is non-localised — the first resolved `sku` value with content
-     * wins. Falls back to a synthetic code so a row that somehow passed
-     * validation without one still persists rather than collides on an
-     * empty unique key.
-     *
-     * @param list<ResolvedImportValue> $resolvedValues
-     */
-    private function skuFrom(array $resolvedValues, int $rowNumber): string
-    {
-        foreach ($resolvedValues as $resolved) {
-            if ('sku' === $resolved->attributeCode
-                && null !== $resolved->rawValue
-                && '' !== $resolved->rawValue) {
-                return $resolved->rawValue;
-            }
-        }
-
-        return \sprintf('IMPORT-%d', $rowNumber);
-    }
-
-    /**
-     * @param array<string, string> $columnMapping
-     */
-    private function skuColumnHeader(array $columnMapping): string
-    {
-        foreach ($columnMapping as $header => $attributeCode) {
-            if ('sku' === $attributeCode) {
-                return $header;
-            }
-        }
-
-        return 'sku';
-    }
-
-    /**
-     * IMP2-1.9 — a compact rendering of the raw cells for the `columnValue`
-     * of a parse-failure log, so the operator can identify the offending
-     * (e.g. section/junk) row in the report. Truncated to keep logs sane.
-     *
-     * @param array<string, string|null> $cells
-     */
-    private function rawRowSnippet(array $cells): string
-    {
-        $snippet = implode(' | ', array_map(
-            static fn (?string $value): string => $value ?? '',
-            array_values($cells),
-        ));
-
-        return mb_substr($snippet, 0, 500);
-    }
-
-    /**
      * IMP2-1.9 (item 2) — flag rows whose identifier-attribute value collides,
      * BEFORE they reach the flush. A value already used by a DIFFERENT object
      * in the catalog (queried once per chunk via the trigger-maintained
@@ -980,118 +929,6 @@ final class ImportRunHandler extends AbstractBatchHandler
     }
 
     /**
-     * IMP2-1.7 — pipe-split list of category codes from the cell mapped to a
-     * reserved category target (`code-a|code-b|code-c`). Trimmed, empties
-     * dropped, order preserved (first becomes primary). The validator emits a
-     * per-code CategoryNotFound warning; unresolved codes are simply absent
-     * from the resolved set the writer assigns.
-     *
-     * @param array<string, string|null> $cells
-     * @param array<string, string>      $columnMapping
-     *
-     * @return list<string>
-     */
-    private function extractCategoryCodes(array $cells, array $columnMapping): array
-    {
-        foreach ($columnMapping as $columnHeader => $target) {
-            if (!ReservedMappingTarget::isCategory($target)) {
-                continue;
-            }
-            $cell = $cells[$columnHeader] ?? null;
-            if (null === $cell || '' === $cell) {
-                continue;
-            }
-
-            // Pipe or newline (#1719) — external exports pack category lists
-            // with embedded newlines in one quoted cell.
-            return MultiValueSplitter::split($cell);
-        }
-
-        return [];
-    }
-
-    /**
-     * IMP2-1.7 (D2 collection policy) — true when the category column maps to
-     * the append target; default (plain `__category__`) is replace.
-     *
-     * @param array<string, string> $columnMapping
-     */
-    private function categoryAppend(array $columnMapping): bool
-    {
-        return \in_array(ReservedMappingTarget::CATEGORY_APPEND, $columnMapping, true);
-    }
-
-    /**
-     * IMP2-1.7 — validated publication status pulled from the `__status__`
-     * column (lower-cased), or null when the column is absent/empty (D2 — do
-     * not touch). The validator already rejected out-of-enum values.
-     *
-     * @param array<string, string|null> $cells
-     * @param array<string, string>      $columnMapping
-     */
-    private function extractStatus(array $cells, array $columnMapping): ?string
-    {
-        $raw = $this->reservedCell($cells, $columnMapping, ReservedMappingTarget::STATUS);
-
-        return null === $raw ? null : strtolower($raw);
-    }
-
-    /**
-     * IMP2-1.7 — enabled flag from the `__enabled__` column, or null when
-     * absent/empty. Accepts true|1 (→true) / false|0 (→false); the validator
-     * rejected anything else.
-     *
-     * @param array<string, string|null> $cells
-     * @param array<string, string>      $columnMapping
-     */
-    private function extractEnabled(array $cells, array $columnMapping): ?bool
-    {
-        $raw = $this->reservedCell($cells, $columnMapping, ReservedMappingTarget::ENABLED);
-        if (null === $raw) {
-            return null;
-        }
-
-        return \in_array(strtolower($raw), ['1', 'true'], true);
-    }
-
-    /**
-     * IMP2-1.8 — parse the `__variant_axes__` cell (`code:v1,v2|code:v3`) into
-     * the stored shape, or null when absent/empty (D2 — do not touch).
-     *
-     * @param array<string, string|null> $cells
-     * @param array<string, string>      $columnMapping
-     *
-     * @return ?list<array{code: string, values: list<string>}>
-     */
-    private function extractVariantAxes(array $cells, array $columnMapping): ?array
-    {
-        $raw = $this->reservedCell($cells, $columnMapping, ReservedMappingTarget::VARIANT_AXES);
-        if (null === $raw) {
-            return null;
-        }
-
-        $axes = [];
-        foreach (explode('|', $raw) as $part) {
-            $part = trim($part);
-            if ('' === $part) {
-                continue;
-            }
-            [$code, $valuesRaw] = array_pad(explode(':', $part, 2), 2, '');
-            $code = trim($code);
-            if ('' === $code) {
-                continue;
-            }
-            $values = array_values(array_filter(
-                array_map('trim', explode(',', $valuesRaw)),
-                static fn (string $value): bool => '' !== $value,
-            ));
-            $axes[] = ['code' => $code, 'values' => $values];
-        }
-
-        return [] === $axes ? null : $axes;
-    }
-
-    /**
      * IMP2-1.8 — buffer a parent link for pass 2 when the row carries a
      * non-empty `__parent_sku__` cell. Existence / cycle validation happens
      * in pass 2 once every object is written.
@@ -1101,7 +938,7 @@ final class ImportRunHandler extends AbstractBatchHandler
      */
     private function recordParentLink(string $childSku, array $cells, array $columnMapping, int $rowNumber): void
     {
-        $parentSku = $this->reservedCell($cells, $columnMapping, ReservedMappingTarget::PARENT_SKU);
+        $parentSku = $this->rowCells->reservedCell($cells, $columnMapping, ReservedMappingTarget::PARENT_SKU);
         if (null !== $parentSku) {
             $this->relationStep->recordParent($childSku, $parentSku, $rowNumber);
         }
@@ -1240,28 +1077,6 @@ final class ImportRunHandler extends AbstractBatchHandler
         }
 
         return $this->refreshSession($session);
-    }
-
-    /**
-     * First non-empty (trimmed) cell whose mapping targets the given reserved
-     * marker, or null.
-     *
-     * @param array<string, string|null> $cells
-     * @param array<string, string>      $columnMapping
-     */
-    private function reservedCell(array $cells, array $columnMapping, string $target): ?string
-    {
-        foreach ($columnMapping as $columnHeader => $mapped) {
-            if ($mapped !== $target) {
-                continue;
-            }
-            $cell = $cells[$columnHeader] ?? null;
-            if (null !== $cell && '' !== trim($cell)) {
-                return trim($cell);
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -1454,7 +1269,7 @@ final class ImportRunHandler extends AbstractBatchHandler
                 tenant: $tenant,
                 skuSeenInFile: $skuSeenInFile,
             );
-            $sku = $cells[$this->skuColumnHeader($columnMapping)] ?? null;
+            $sku = $cells[$this->rowCells->skuColumnHeader($columnMapping)] ?? null;
             $blocking = array_values(array_filter(
                 $errors,
                 static fn (ValidationError $error): bool => $error->isRowBlocking(),
@@ -1482,7 +1297,7 @@ final class ImportRunHandler extends AbstractBatchHandler
                         errorType: ImportErrorType::InvalidValue,
                         level: ImportLogLevel::Error,
                         message: 'Row could not be parsed: '.$exception->getMessage(),
-                        columnValue: $this->rawRowSnippet($cells),
+                        columnValue: $this->rowCells->rawRowSnippet($cells),
                     );
                 }
             }
@@ -1545,7 +1360,7 @@ final class ImportRunHandler extends AbstractBatchHandler
                     $existing = $existingByKey[$row['matchKey']] ?? null;
                     $code = null !== $existing
                         ? $existing->getCode()
-                        : $this->skuFrom($row['resolvedValues'], $row['rowNumber']);
+                        : $this->rowCells->skuFrom($row['resolvedValues'], $row['rowNumber']);
                     $this->recordParentLink($code, $row['cells'], $columnMapping, $row['rowNumber']);
                     $this->recordRelationLinks($code, $row['resolvedValues'], $attributesByCode, $row['rowNumber']);
                     // The prior run already logged this row's before-state; keep
@@ -1578,14 +1393,14 @@ final class ImportRunHandler extends AbstractBatchHandler
                 if (ImportRowDecision::Create === $decision) {
                     $created = $this->creator->create(
                         objectType: $this->requireTargetObjectType($session),
-                        sku: $this->skuFrom($row['resolvedValues'], $row['rowNumber']),
+                        sku: $this->rowCells->skuFrom($row['resolvedValues'], $row['rowNumber']),
                         resolvedValues: $row['resolvedValues'],
                         attributesByCode: $attributesByCode,
                         importSessionId: $session->getId(),
-                        categories: $this->resolveCategories($this->extractCategoryCodes($row['cells'], $columnMapping), $categoryByCode),
-                        status: $this->extractStatus($row['cells'], $columnMapping),
-                        enabled: $this->extractEnabled($row['cells'], $columnMapping),
-                        variantAxes: $this->extractVariantAxes($row['cells'], $columnMapping),
+                        categories: $this->categoryOps->resolveCategories($this->rowCells->extractCategoryCodes($row['cells'], $columnMapping), $categoryByCode),
+                        status: $this->rowCells->extractStatus($row['cells'], $columnMapping),
+                        enabled: $this->rowCells->extractEnabled($row['cells'], $columnMapping),
+                        variantAxes: $this->rowCells->extractVariantAxes($row['cells'], $columnMapping),
                         existingAssetIds: $existingAssetIds,
                         createMissingOptions: $session->createMissingOptions(),
                     );
@@ -1597,7 +1412,7 @@ final class ImportRunHandler extends AbstractBatchHandler
                     $this->bulkTouchedIds[] = $created->object->getId()->toRfc4122();
                     // IMP2-1.8: buffer parent + relation links; resolved in
                     // pass 2 once every object exists (target row may precede).
-                    $createdSku = $this->skuFrom($row['resolvedValues'], $row['rowNumber']);
+                    $createdSku = $this->rowCells->skuFrom($row['resolvedValues'], $row['rowNumber']);
                     $this->recordParentLink($createdSku, $row['cells'], $columnMapping, $row['rowNumber']);
                     $this->recordRelationLinks($createdSku, $row['resolvedValues'], $attributesByCode, $row['rowNumber']);
                     $this->collectMediaJobs($mediaJobs, $session, $created->object->getId(), $row, $attributesByCode);
@@ -1610,9 +1425,9 @@ final class ImportRunHandler extends AbstractBatchHandler
                         $existing,
                         $row['resolvedValues'],
                         $attributesByCode,
-                        $this->extractStatus($row['cells'], $columnMapping),
-                        $this->extractEnabled($row['cells'], $columnMapping),
-                        $this->extractVariantAxes($row['cells'], $columnMapping),
+                        $this->rowCells->extractStatus($row['cells'], $columnMapping),
+                        $this->rowCells->extractEnabled($row['cells'], $columnMapping),
+                        $this->rowCells->extractVariantAxes($row['cells'], $columnMapping),
                         $existingAssetIds,
                         $session->createMissingOptions(),
                     );
@@ -1635,12 +1450,12 @@ final class ImportRunHandler extends AbstractBatchHandler
                     // IMP2-1.7: category replace/append runs after the value
                     // pass (replaceForProduct flushes around the primary index).
                     // Empty cell = untouched (D2), so only collect non-empty.
-                    $categoryCodes = $this->extractCategoryCodes($row['cells'], $columnMapping);
+                    $categoryCodes = $this->rowCells->extractCategoryCodes($row['cells'], $columnMapping);
                     if ([] !== $categoryCodes) {
                         $pendingCategoryOps[] = [
                             'product' => $existing,
                             'codes' => $categoryCodes,
-                            'append' => $this->categoryAppend($columnMapping),
+                            'append' => $this->rowCells->categoryAppend($columnMapping),
                         ];
                     }
                 } else {
@@ -1715,7 +1530,7 @@ final class ImportRunHandler extends AbstractBatchHandler
         // IMP2-1.7: category replace/append for UPDATE rows, after the value
         // writes are staged (replaceForProduct flushes the EM in its own
         // transaction to DELETE-then-INSERT around the primary unique index).
-        $this->applyCategoryOps($pendingCategoryOps, $categoryByCode);
+        $this->categoryOps->applyCategoryOps($pendingCategoryOps, $categoryByCode);
 
         return \count($prepared);
     }
@@ -1737,7 +1552,7 @@ final class ImportRunHandler extends AbstractBatchHandler
             if (!$row['rowOk']) {
                 continue;
             }
-            foreach ($this->extractCategoryCodes($row['cells'], $columnMapping) as $code) {
+            foreach ($this->rowCells->extractCategoryCodes($row['cells'], $columnMapping) as $code) {
                 // Key to dedupe, but keep the string code as the VALUE: PHP
                 // coerces a numeric-string array key to int (e.g. an IdoSell
                 // category id "1214553885"), and an int reaching findByCode's
@@ -1807,84 +1622,6 @@ final class ImportRunHandler extends AbstractBatchHandler
     }
 
     /**
-     * @param list<string>                 $codes
-     * @param array<string, CatalogObject> $categoryByCode
-     *
-     * @return list<CatalogObject>
-     */
-    private function resolveCategories(array $codes, array $categoryByCode): array
-    {
-        $out = [];
-        foreach ($codes as $code) {
-            if (isset($categoryByCode[$code])) {
-                $out[] = $categoryByCode[$code];
-            }
-        }
-
-        return $out;
-    }
-
-    /**
-     * @param list<array{product: CatalogObject, codes: list<string>, append: bool}> $ops
-     * @param array<string, CatalogObject>                                           $categoryByCode
-     */
-    private function applyCategoryOps(array $ops, array $categoryByCode): void
-    {
-        foreach ($ops as $op) {
-            $categories = $this->resolveCategories($op['codes'], $categoryByCode);
-            if ([] === $categories) {
-                // All codes unresolved — leave existing assignments untouched
-                // rather than wiping a product from a typo (D2-safe; per-code
-                // warnings already surfaced).
-                continue;
-            }
-
-            if ($op['append']) {
-                $this->appendCategories($op['product'], $categories);
-
-                continue;
-            }
-
-            $ids = array_map(static fn (CatalogObject $c): Uuid => $c->getId(), $categories);
-            $this->objectCategories->replaceForProduct($op['product'], $ids, $ids[0]);
-        }
-    }
-
-    /**
-     * Append categories to an object's existing assignments without
-     * duplicates (D2 append policy). Position continues after the current
-     * max; if the object had no primary, the first appended becomes primary.
-     *
-     * @param list<CatalogObject> $categories
-     */
-    private function appendCategories(CatalogObject $product, array $categories): void
-    {
-        $existingIds = [];
-        $maxPosition = -1;
-        $hasPrimary = false;
-        foreach ($this->objectCategories->findByProduct($product) as $assignment) {
-            $existingIds[$assignment->getCategory()->getId()->toRfc4122()] = true;
-            $maxPosition = max($maxPosition, $assignment->getPosition());
-            $hasPrimary = $hasPrimary || $assignment->isPrimary();
-        }
-
-        $position = $maxPosition + 1;
-        foreach ($categories as $category) {
-            if (isset($existingIds[$category->getId()->toRfc4122()])) {
-                continue;
-            }
-            $primary = !$hasPrimary;
-            $this->entityManager->persist(new ObjectCategory(
-                product: $product,
-                category: $category,
-                isPrimary: $primary,
-                position: $position++,
-            ));
-            $hasPrimary = $hasPrimary || $primary;
-        }
-    }
-
-    /**
      * IMP2-1.3 — the row match key: the cell mapped to the configured
      * identifier attribute, or the SKU cell by default (trimmed).
      *
@@ -1910,6 +1647,6 @@ final class ImportRunHandler extends AbstractBatchHandler
             return '';
         }
 
-        return trim($this->skuFrom($resolvedValues, $rowNumber));
+        return trim($this->rowCells->skuFrom($resolvedValues, $rowNumber));
     }
 }
