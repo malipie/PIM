@@ -112,4 +112,20 @@ final class WebhookDeliveryHandlerTest extends TestCase
 
         $this->expectNotToPerformAssertions();
     }
+
+    public function testRedeliveryOfDeliveredRowDoesNotPostAgain(): void
+    {
+        // #2732 — a worker killed after a successful POST but before ack (or a
+        // manual messenger:failed:retry on a delivered row) redelivers the
+        // message; the receiver must not get a duplicate event.
+        [$handler, , $delivery] = $this->handlerFor(200);
+
+        ($handler)(new WebhookDeliveryMessage($delivery->getId(), Uuid::v7()));
+        self::assertSame(WebhookDeliveryStatus::Delivered, $delivery->getStatus());
+
+        ($handler)(new WebhookDeliveryMessage($delivery->getId(), Uuid::v7()));
+
+        self::assertSame(1, $delivery->getAttempts(), 'the second invocation must not attempt a POST');
+        self::assertSame(WebhookDeliveryStatus::Delivered, $delivery->getStatus());
+    }
 }
