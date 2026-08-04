@@ -313,7 +313,6 @@ final class ImportPauseResumeTest extends CatalogApiTestCase
             crossFieldRules: self::getContainer()->get(\App\Catalog\Application\CrossFieldRulesValidator::class),
             attributeRepository: self::getContainer()->get(\App\Catalog\Domain\Repository\AttributeRepositoryInterface::class),
             catalogObjects: self::getContainer()->get(\App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface::class),
-            objectCategories: self::getContainer()->get(\App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface::class),
             assets: self::getContainer()->get(\App\Asset\Domain\Repository\AssetRepositoryInterface::class),
             progressPublisher: self::getContainer()->get(\App\Import\Application\Service\ImportProgressPublisher::class),
             tenantContext: self::getContainer()->get(TenantContext::class),
@@ -323,6 +322,8 @@ final class ImportPauseResumeTest extends CatalogApiTestCase
             assetUrlResolver: self::getContainer()->get(\App\Import\Application\Service\Media\AssetUrlResolver::class),
             messageBus: self::getContainer()->get(\Symfony\Component\Messenger\MessageBusInterface::class),
             bulkContext: self::getContainer()->get(\App\Catalog\Application\BulkContext::class),
+            rowCells: self::getContainer()->get(\App\Import\Application\Service\ImportRowCells::class),
+            categoryOps: self::getContainer()->get(\App\Import\Application\Service\ImportCategoryOps::class),
             batchSize: $batchSize,
         );
     }
