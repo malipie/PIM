@@ -24,9 +24,10 @@ alerting:
 scrape_configs:
   - job_name: "pim-api"
     metrics_path: /api/metrics
-    # Scraping the public Caddy hostname produces a fresh worker pick per
-    # scrape (random LB across the worker pool). The rolling-max alert
-    # rule in alerts.yml makes that randomness acceptable.
+    # Scraped directly on the internal docker network — the edge Caddy 404s
+    # /api/metrics (#2729), and the endpoint must never be publicly reachable.
+    # Each scrape lands on a fresh worker pick (random LB across the worker
+    # pool); the rolling-max alert rule in alerts.yml makes that acceptable.
     scheme: http
     static_configs:
       - targets: ["api:80"]

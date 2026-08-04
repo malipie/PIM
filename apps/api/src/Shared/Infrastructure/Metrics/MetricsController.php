@@ -33,7 +33,7 @@ final readonly class MetricsController
     }
 
     #[Route(path: '/api/metrics', name: 'app_metrics', methods: ['GET'])]
-    #[NoPermissionRequired(reason: 'Prometheus scrape endpoint — authenticated upstream by network ACL / Caddy basic-auth, not RBAC.')]
+    #[NoPermissionRequired(reason: 'Prometheus scrape endpoint — reachable only from the internal docker network (api:80); the edge Caddy 404s /api/metrics (#2729), so it is never exposed to the public origin and needs no RBAC.')]
     public function __invoke(): Response
     {
         $resident = \memory_get_usage(true);

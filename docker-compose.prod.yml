@@ -392,9 +392,11 @@ services:
   #
   # PROD-04. The Symfony API already exposes Prometheus-format metrics on
   # /api/metrics (frankenphp_worker_memory_bytes, db_query_duration_seconds
-  # histogram). Prometheus scrapes through the edge Caddy → api routing,
-  # evaluates the alert rules in alerts.yml, and pushes firing groups to
-  # alertmanager below.
+  # histogram). Prometheus scrapes the api service DIRECTLY over the internal
+  # docker network (api:80, see docker/prometheus/prometheus.yml) — the edge
+  # Caddy 404s /api/metrics so the endpoint is never publicly reachable
+  # (#2729). It evaluates the alert rules in alerts.yml and pushes firing
+  # groups to alertmanager below.
   #
   # The 256 MiB worker-memory ceiling lives in alerts.yml as
   # FrankenphpWorkerMemoryHigh — CLAUDE.md §3.10 calls this out as the
