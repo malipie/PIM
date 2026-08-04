@@ -6,7 +6,9 @@ namespace App\Integration\Generic\Infrastructure\Doctrine\Repository;
 
 use App\Integration\Generic\Domain\Entity\SyncBinding;
 use App\Integration\Generic\Domain\Entity\SyncRun;
+use App\Integration\Generic\Domain\Enum\SyncRunStatus;
 use App\Integration\Generic\Domain\Repository\SyncRunRepositoryInterface;
+use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Uid\Uuid;
@@ -45,6 +47,24 @@ class DoctrineSyncRunRepository extends ServiceEntityRepository implements SyncR
 
         /** @var list<SyncRun> $result */
         $result = $qb->getQuery()->getResult();
+
+        return $result;
+    }
+
+    public function findRunningByBinding(SyncBinding $binding, DateTimeImmutable $since): ?SyncRun
+    {
+        $qb = $this->createQueryBuilder('r')
+            ->where('r.binding = :binding')
+            ->andWhere('r.status = :status')
+            ->andWhere('r.startedAt > :since')
+            ->orderBy('r.startedAt', 'DESC')
+            ->setMaxResults(1)
+            ->setParameter('binding', $binding)
+            ->setParameter('status', SyncRunStatus::Running->value)
+            ->setParameter('since', $since);
+
+        /** @var SyncRun|null $result */
+        $result = $qb->getQuery()->getOneOrNullResult();
 
         return $result;
     }
