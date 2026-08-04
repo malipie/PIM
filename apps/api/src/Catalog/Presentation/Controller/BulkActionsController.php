@@ -29,6 +29,8 @@ use App\Shared\Application\UserIdentityAware;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use DateTimeInterface;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -112,6 +114,7 @@ final class BulkActionsController
         private readonly BulkDeleteHandler $deleteHandler,
         private readonly BulkDuplicateHandler $duplicateHandler,
         private readonly BulkOperationLock $bulkLock,
+        private readonly LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -170,17 +173,27 @@ final class BulkActionsController
                     'before' => $before,
                     'after' => $after,
                 ];
-            } catch (Throwable) {
+            } catch (Throwable $exception) {
                 ++$errors;
+                // A broken preview diff (e.g. a malformed JSONB envelope) must
+                // be diagnosable, not swallowed (#2735).
+                $this->logger->warning('Bulk preview diff failed for an object.', [
+                    'object_id' => $id,
+                    'action' => $action,
+                    'exception' => $exception::class,
+                ]);
             }
         }
 
+        // #2735 — the counts are scoped to the 5-object sample and say so:
+        // the old shape extrapolated `success_count = target_count - errors`,
+        // claiming thousands of unverified objects would succeed.
         return new JsonResponse([
             'action' => $action,
             'target_count' => \count($targetIds),
-            'success_count' => \count($targetIds) - $skipped - $errors,
-            'skipped_count' => $skipped,
-            'error_count' => $errors,
+            'sample_size' => \count($sampleIds),
+            'sample_error_count' => $errors,
+            'sample_skipped_count' => $skipped,
             'sample' => $sample,
         ]);
     }
