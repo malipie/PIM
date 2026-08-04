@@ -20,8 +20,8 @@ use PHPStan\Rules\RuleErrorBuilder;
  * AUD-011 (W1-8) — enforces the NON-NEGOTIABLE FrankenPHP worker-mode guard-rail
  * from `Project Plan/01-architektura-pim.md` §3.10 pkt 5 / CLAUDE.md §3.10:
  *
- *   "CI gate: PHPStan custom rule blokująca handlery Messenger, które flushują
- *    w pętli bez clear() — automatyczna detekcja wzorca."
+ *   "CI gate: a custom PHPStan rule rejecting Messenger handlers that flush
+ *    inside a loop without clear() — automated detection of the pattern."
  *
  * Why static enforcement: in FrankenPHP worker mode the PHP process lives
  * between requests, so Doctrine's identity map keeps every persisted entity

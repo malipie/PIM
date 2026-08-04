@@ -2,6 +2,23 @@
 
 > Plik startowy zasiany twardymi wytycznymi z `Project Plan/01-architektura-pim.md`. Po każdej korekcie operatora lub odkrytym wzorcu (sukces ALBO porażka) — dopisz wpis. Czytaj przed każdą sesją.
 
+## Lessons z całościowego code review (2026-08-04, #2722–#2743)
+
+### Patterns to Follow
+- **Świadome odejścia w kliencie HTTP dokumentuj JAKO KOD, nie komentarzem.** Dwa miejsca (`use-run-export`, `ExportSessionsView`) budowały żądanie ręcznie z `getAccessToken()`, żeby dostać surowy `Response` do pobrania pliku — i przy okazji traciły ścieżkę 401→refresh→replay, więc pierwszy download po hard-reloadzie padał. Fix: `rawFetch()` w `lib/http.ts` — ten sam lifecycle auth, surowa odpowiedź dla wołającego. Gdy potrzebujesz obejść wrapper, dopisz wariant do wrappera zamiast kopiować nagłówki.
+- **Sekret w JEDNEJ kolumnie → koperta `enc:v{N}:` (`SecretCipher`), nie dwie kolumny.** BYOK ma dedykowane `ciphertext` + `version`, ale `users.totp_secret` i liście `sso_providers.config` tego nie mają. Koperta pakuje wersję klucza w wartość, a wartości bez prefiksu przechodzą jako legacy plaintext — deploy nie psuje istniejących enrolmentów/providerów, migrują przy najbliższym zapisie. Sweep to **komenda**, nie migracja: szyfrowanie potrzebuje klucza aplikacji, którego migracje nie mają.
+- **Guard „restrykcja katalogu" fail-closed, nie `if (isset(...))`.** Sprawdzenie `hosted_domain` istniało, ale tylko gdy pole było ustawione — brak pola otwierał SSO dla dowolnego Gmaila (auto-provisioning jako `viewer`). Warunkowe sprawdzenie zabezpieczenia to brak zabezpieczenia; walidacja przy zapisie NIE wystarcza, bo nie chroni wierszy sprzed reguły.
+
+### Patterns to Avoid
+- **Ekstrapolacja próbki na całość w odpowiedzi API.** `bulk-actions/preview` liczył `success_count = target_count - errors` na próbce 5 obiektów i przy 10k targetów twierdził „9997 OK". Licz to, co sprawdziłeś (`sample_size`/`sample_error_count`), resztę zostaw nienazwaną.
+- **Komentarz odraczający zabezpieczenie bez numeru OTWARTEGO issue.** Cztery miejsca deklarowały kontrolę „for now / lands in 0.11" (SSO, TOTP, `/api/metrics`, docblock `BackoffRestClient` o limiterze), której nikt nie trackował — a jedna z nich (limiter `integration_sync`) po prostu nie istniała w kodzie. Jeśli piszesz „TODO: zabezpieczyć", podaj żywy ticket.
+- **Spec E2E zakładający jeden wariant layoutu.** `2723-categories-tab-error-toast` czekał na modal, który renderuje tylko sidebarowy `CategorySelectorCard`; `CategoriesTab` odpina od razu. Lokalnie mountował się wariant z modalem, w CI drugi → czerwona bramka Playwright na **niepowiązanych** PR-ach. Warunkuj krok na `isVisible()`, gdy dwie powierzchnie renderują tę samą akcję.
+
+### Toolchain quirks
+- **`composer phpstan` potrafi zgłosić `Ignored error pattern ... was not matched` na zimnym cache dev** (`property.deprecated` w `Tenant.php`). To artefakt lokalny — konfiguracja sama to opisuje („with the warmed dev container in place before analysis"). Zanim uznasz main za zepsuty: `cache:warmup --env=dev`, a potem sprawdź bramkę „Quality (PHP)" na main.
+- **Bramka `lint-raw-sql.sh` wymaga markera `// tenant-safe: <powód>` przy KAŻDYM surowym SQL** — w tym w komendach CLI, które są cross-tenant z założenia (sweepy szyfrowania). Marker jest tani, brak markera = czerwony „PHP static" w 8 s.
+- **Gałąź odbita od gałęzi (nie od main) dziedziczy jej braki.** `feat/identity-encrypt-sso-secrets` wyszła z gałęzi TOTP i nie miała commita z markerem `tenant-safe` — CI czerwone na pliku, którego PR w ogóle nie dotyczył. Rebase na gałąź-rodzica, nie ręczne kopiowanie plików (cherry-pick `-n` robi konflikt modify/delete).
+
 ## Lessons z untrack config/reference.php (2026-08-04, trwały fix flip-flopa)
 
 - **`apps/api/config/reference.php` jest od teraz untracked + w `.gitignore`** — koniec z rytuałem `git checkout --` przed stage (wcześniej 7 wpisów w tym pliku o tym szumie). Przyczyna flip-flopa (zdiagnozowana w code review): MercureBundle warunkuje `defaultNull()` na `url` vs `public_url` przez `function_exists('mercure_publish')`, a tę funkcję rejestruje tylko SAPI serwera FrankenPHP — kompilacja przez worker (request w dev) i przez CLI (`cache:clear`) generowały więc dwa różne warianty pliku na zmianę. Plik jest debug-only (PhpConfigReferenceDumpPass), bez konsumentów w runtime/CI, regeneruje się lokalnie sam — untracking jest bezstratny. Stare wpisy o `checkout --` poniżej są historyczne.

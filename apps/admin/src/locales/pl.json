@@ -1015,6 +1015,9 @@
         "missing_draft": "Definicja musi zawierać stan początkowy „draft”.",
         "pct_range": "Podaj liczbę całkowitą 0–100."
       }
+    },
+    "ai": {
+      "shortcuts_aria": "Skróty agenta"
     }
   },
   "catalogs_pdf": {
@@ -4273,6 +4276,7 @@
     "paste": {
       "report_mixed": "Wklejono {{applied}}, pominięto {{skipped}}",
       "report_ok": "Wklejono {{applied}} komórek"
-    }
+    },
+    "resize_column": "Zmień szerokość kolumny {{label}}"
   }
 }

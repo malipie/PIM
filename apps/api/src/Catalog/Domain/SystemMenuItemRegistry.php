@@ -22,7 +22,7 @@ namespace App\Catalog\Domain;
  * on the FE to enforce.
  *
  * `comingSoon: true` items render as disabled `<span>` in the sidebar
- * with a "Wkrótce" badge — the route is null so a NavLink would 404.
+ * with a "coming soon" badge — the route is null so a NavLink would 404.
  *
  * `route: null` is reserved for coming-soon entries; everything else
  * routes to a real admin page that exists today.
@@ -76,10 +76,10 @@ final class SystemMenuItemRegistry
             ],
             // Top-level „Integracje" hub — Imports MVP (0.13/UI-09) + sub-tab
             // API Configurator (Profile API, VIEW-08) + placeholdery Exports /
-            // Connectors. Kiedyś (krótkofalowo po IMP-09) `publications` i
-            // `integrations` były osobnymi top-level itemami; konsolidacja
-            // została zrobiona po smoke teście operatora który wskazał
-            // duplikację (PR follow-up po #472).
+            // Connectors. Briefly after IMP-09 `publications` and
+            // `integrations` were separate top-level items; they were merged
+            // after an operator smoke test pointed out
+            // the duplication (PR follow-up after #472).
             'integrations' => [
                 'route' => '/integrations',
                 'icon' => 'Plug2',

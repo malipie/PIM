@@ -10,6 +10,7 @@ use App\ApiConfigurator\Domain\Repository\ApiProfileRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -73,7 +74,10 @@ final class ProfileOpenApiController
         // OpenApi object does NOT produce that structure.
         $payload = $this->normalizer->normalize($this->openApiFactory->__invoke([]), 'json');
         if (!\is_array($payload)) {
-            return new JsonResponse(['error' => 'OpenAPI document could not be normalized.'], 500);
+            // #2743 — let the RFC 7807 listener serialise it, like every other
+            // error surface in the API (an ad-hoc {error: …} shape forced clients
+            // to parse two formats).
+            throw new HttpException(500, 'OpenAPI document could not be normalized.');
         }
 
         return new JsonResponse($this->narrow($payload, $profile));

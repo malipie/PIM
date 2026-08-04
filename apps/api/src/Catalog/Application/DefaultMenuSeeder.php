@@ -83,7 +83,7 @@ final readonly class DefaultMenuSeeder
                 );
             }
 
-            // 3-8. Reszta system items (bez `dashboard`, który już jest na pozycji 0).
+            // 3-8. The remaining system items (minus `dashboard`, already at position 0).
             foreach (SystemMenuItemRegistry::defaultOrder() as $systemKey) {
                 if ('dashboard' === $systemKey) {
                     continue;

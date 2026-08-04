@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router';
 
 import { toast } from '@/components/ui/toast';
-import { getAccessToken, jsonFetch } from '@/lib/http';
+import { jsonFetch, rawFetch } from '@/lib/http';
 
 import { useExportSessions, useInvalidateExportSessions } from '../hooks/useExportSessions';
 import { useExportSessionsStream } from '../hooks/useExportSessionsStream';
@@ -91,18 +91,15 @@ export function ExportSessionsView(): React.ReactElement {
     // window.open() drops the Authorization header (JWT-guarded endpoint
     // would 401 in the new tab) — fetch with Bearer + blob anchor instead.
     try {
-      const token = getAccessToken();
-      const headers: Record<string, string> = {
-        accept:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv, application/json',
-      };
-      if (token !== null) {
-        headers.authorization = `Bearer ${token}`;
-      }
-      const response = await fetch(`/api/exports/sessions/${id}/download`, {
+      // #2743 — rawFetch keeps the raw Response (blob download) while riding
+      // the shared 401 → refresh → replay path, so the first download after a
+      // hard reload recovers instead of failing.
+      const response = await rawFetch(`/api/exports/sessions/${id}/download`, {
         method: 'GET',
-        headers,
-        credentials: 'same-origin',
+        headers: {
+          accept:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv, application/json',
+        },
       });
       if (!response.ok) {
         throw new Error(`Download failed: HTTP ${response.status}`);

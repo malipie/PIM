@@ -177,6 +177,47 @@ async function fetchInternal<T>(path: string, init: InternalJsonRequestInit): Pr
 }
 
 /**
+ * #2743 — raw `fetch` that still rides the shared auth lifecycle.
+ *
+ * Callers that need the raw {@link Response} (binary downloads, streamed
+ * bodies, hand-rolled content-type negotiation) used to build the request
+ * themselves with `getAccessToken()`. That skipped the 401 → refresh → replay
+ * path, so the FIRST such call after a hard reload — when the in-memory token
+ * is gone but the refresh cookie is still valid — failed instead of recovering.
+ *
+ * The response is returned untouched: this helper owns authentication, the
+ * caller owns interpretation.
+ */
+export async function rawFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const send = async (): Promise<Response> => {
+    const headers = new Headers(init.headers);
+    if (accessToken) {
+      headers.set('authorization', `Bearer ${accessToken}`);
+    }
+    return fetch(path, { ...init, headers, credentials: 'same-origin' });
+  };
+
+  if (!accessToken && refreshInFlight) {
+    await refreshInFlight.catch(() => {
+      // Refresh failed — send tokenless and let the caller handle the 401.
+    });
+  }
+
+  const response = await send();
+  if (response.status !== 401) {
+    return response;
+  }
+
+  try {
+    await refreshAccessToken();
+  } catch {
+    return response;
+  }
+
+  return send();
+}
+
+/**
  * POST /api/auth/refresh, parse `{token}`, store it in memory.
  *
  * The single-flight guard collapses concurrent callers onto one network

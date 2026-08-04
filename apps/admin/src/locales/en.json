@@ -1005,6 +1005,9 @@
         "missing_draft": "The definition must contain the initial \"draft\" place.",
         "pct_range": "Enter an integer between 0 and 100."
       }
+    },
+    "ai": {
+      "shortcuts_aria": "Agent shortcuts"
     }
   },
   "catalogs_pdf": {
@@ -4247,6 +4250,7 @@
     "paste": {
       "report_mixed": "Pasted {{applied}}, skipped {{skipped}}",
       "report_ok": "Pasted {{applied}} cells"
-    }
+    },
+    "resize_column": "Resize column {{label}}"
   }
 }
