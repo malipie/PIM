@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\ApiConfigurator\Application\Handler;
 
 use App\ApiConfigurator\Application\WebhookDeliveryClient;
+use App\ApiConfigurator\Domain\Enum\WebhookDeliveryStatus;
 use App\ApiConfigurator\Domain\Message\WebhookDeliveryMessage;
 use App\ApiConfigurator\Domain\Repository\ApiProfileRepositoryInterface;
 use App\ApiConfigurator\Domain\Repository\WebhookDeliveryRepositoryInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -28,6 +31,7 @@ final readonly class WebhookDeliveryHandler
         private WebhookDeliveryRepositoryInterface $deliveries,
         private ApiProfileRepositoryInterface $profiles,
         private WebhookDeliveryClient $client,
+        private LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -35,6 +39,17 @@ final readonly class WebhookDeliveryHandler
     {
         $delivery = $this->deliveries->findById($message->deliveryId);
         if (null === $delivery) {
+            return;
+        }
+
+        // #2732 — redelivery guard: a worker killed after a successful POST but
+        // before ack (or a manual messenger:failed:retry on a delivered row)
+        // must not POST the same event to the receiver a second time.
+        if (WebhookDeliveryStatus::Delivered === $delivery->getStatus()) {
+            $this->logger->info('Webhook delivery skipped — already delivered.', [
+                'delivery' => $message->deliveryId->toRfc4122(),
+            ]);
+
             return;
         }
 
