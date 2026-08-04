@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
+import { objectWithKeys } from '@/lib/runtime-guards';
 
 import { JsonView, Segmented } from '../../../components/primitives';
 import type { RemoteEndpointRow } from './StepEndpoints';
@@ -66,7 +67,10 @@ export function StepSchema({ connectionId }: { connectionId: string | null }) {
       },
       {
         onSuccess: ({ data }) => {
-          const payload = data as unknown as DiscoverResult;
+          const payload = objectWithKeys<DiscoverResult>(data, ['fields']);
+          if (payload === null) {
+            return;
+          }
           setDiscovered(payload);
           setAccepted(new Set(payload.fields.map((field) => field.path)));
         },

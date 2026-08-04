@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
-
+import { objectWithKeys } from '@/lib/runtime-guards';
 import { AuthBadge, JsonView, SecurityNote } from '../../components/primitives';
+
 import type { ConnectionTestResult, WizardForm } from './types';
 
 interface StepTestProps {
@@ -46,7 +47,16 @@ export function StepTest({ form, connectionId }: StepTestProps) {
     mutate(
       { url: `${apiUrl}/connections/${connectionId}/test`, method: 'post', values: {} },
       {
-        onSuccess: ({ data }) => setResult(data as unknown as ConnectionTestResult),
+        onSuccess: ({ data }) => {
+          const parsed = objectWithKeys<ConnectionTestResult>(data, ['status']);
+          if (parsed === null) {
+            setError(
+              t('api_configurator.wizard.test_failed', { defaultValue: 'Test nie powiódł się.' }),
+            );
+            return;
+          }
+          setResult(parsed);
+        },
         onError: (err) => setError(err?.message ?? t('api_configurator.wizard.test_failed')),
       },
     );

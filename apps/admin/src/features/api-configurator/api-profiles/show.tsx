@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 
 import { Button } from '@/components/ui/button';
+import { objectWithKeys } from '@/lib/runtime-guards';
 
 import type { ApiProfileRow } from './list';
 
@@ -187,7 +188,17 @@ function WebhookSection({ profile }: { profile: ApiProfileRow }) {
       },
       {
         onSuccess: ({ data }) => {
-          setTestResult(data as unknown as TestWebhookResult);
+          const parsed = objectWithKeys<TestWebhookResult>(data, [
+            'url',
+            'statusCode',
+            'durationMs',
+            'success',
+          ]);
+          if (parsed === null) {
+            setTestError(t('api_profiles.show.webhook_test_failed'));
+            return;
+          }
+          setTestResult(parsed);
         },
         onError: (err) => {
           setTestError(err?.message ?? t('api_profiles.show.webhook_test_failed'));
@@ -209,7 +220,11 @@ function WebhookSection({ profile }: { profile: ApiProfileRow }) {
       },
       {
         onSuccess: ({ data }) => {
-          const result = data as unknown as RotateSecretResult;
+          const result = objectWithKeys<RotateSecretResult>(data, ['webhookSecret', 'note']);
+          if (result === null) {
+            setRotateError(t('api_profiles.show.webhook_rotate_failed'));
+            return;
+          }
           setRotatedSecret(result.webhookSecret);
         },
         onError: (err) => {
