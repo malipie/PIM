@@ -18,6 +18,7 @@ use App\Integration\Generic\Domain\Repository\SyncRunRepositoryInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -85,6 +86,34 @@ final class SyncRunRepositoryTest extends KernelTestCase
 
         $this->activateTenantFilter($beta);
         self::assertCount(0, $this->runs()->findByBinding($binding));
+    }
+
+    #[Test]
+    public function findRunningByBindingHonoursStatusAndTimeFloor(): void
+    {
+        // #2722 — the redelivery guard: only a still-running, recent run of the
+        // binding blocks a new one.
+        $alpha = $this->createTenant('alpha');
+        $this->activateTenantFilter($alpha);
+        $binding = $this->createBinding($alpha);
+
+        $run = new SyncRun($binding, SyncDirection::Outbound);
+        $run->assignTenant($alpha);
+        $this->runs()->save($run);
+
+        $floor = new DateTimeImmutable('-6 hours');
+        $found = $this->runs()->findRunningByBinding($binding, $floor);
+        self::assertNotNull($found);
+        self::assertTrue($run->getId()->equals($found->getId()));
+
+        // A run older than the floor is treated as orphaned — it must not
+        // block the binding.
+        self::assertNull($this->runs()->findRunningByBinding($binding, new DateTimeImmutable('+1 minute')));
+
+        // A finalized run never blocks.
+        $run->markFinished();
+        $this->runs()->save($run);
+        self::assertNull($this->runs()->findRunningByBinding($binding, $floor));
     }
 
     private function runs(): SyncRunRepositoryInterface

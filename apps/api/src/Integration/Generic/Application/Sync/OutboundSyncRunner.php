@@ -26,9 +26,11 @@ use App\Integration\Generic\Infrastructure\Http\RemoteRequester;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use JsonException;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
+use Throwable;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -71,6 +73,7 @@ final readonly class OutboundSyncRunner
         private RecordSelector $recordSelector,
         private SyncRunScope $runScope,
         private Sleeper $sleeper,
+        private ManagerRegistry $managerRegistry,
     ) {
     }
 
@@ -79,18 +82,28 @@ final readonly class OutboundSyncRunner
         // Name the active connection so this run's own catalog writes (remote-id
         // capture) cannot re-enqueue its bindings via the on-change trigger.
         $this->runScope->enter($binding->getConnection()->getId());
+
+        $run = new SyncRun($binding, SyncDirection::Outbound);
+        $this->runs->save($run);
+        $runId = $run->getId();
+
         try {
-            return $this->doRun($binding, $dryRun);
+            return $this->doRun($run, $binding, $dryRun);
+        } catch (Throwable $exception) {
+            // #2722 — finalize before the transport retries: a run left
+            // `running` would both dangle forever in the UI and let the retry
+            // re-push every record from scratch (duplicate creates on the
+            // remote for match-key-less WriteCreate endpoints).
+            SyncRunFinalizer::markFailedAfterException($this->managerRegistry, $runId);
+
+            throw $exception;
         } finally {
             $this->runScope->leave();
         }
     }
 
-    private function doRun(SyncBinding $binding, bool $dryRun): SyncRun
+    private function doRun(SyncRun $run, SyncBinding $binding, bool $dryRun): SyncRun
     {
-        $run = new SyncRun($binding, SyncDirection::Outbound);
-        $this->runs->save($run);
-
         $writeEndpoint = $binding->getWriteEndpoint();
         if (null === $writeEndpoint) {
             $run->markFinished(SyncRunStatus::Failed);

@@ -3,6 +3,12 @@
 > Zwięzły status bieżący (CLAUDE.md §Workflow pkt 2). Pełna historia: `git log`, GitHub Issues/milestones, `agent/lessons.md`, `Project Plan/*`.
 > Przepisany 2026-06-13 (poprzednie 2066 linii append-only logu, m.in. epiki NUI/UI/RBAC — w historii gita).
 
+## 2026-08-04: Całościowy code review projektu → 3 tickety naprawcze 🔴 (#2722/#2723/#2724)
+- **Zgłoszenie**: „zrób code review tego projektu przy użyciu `agent/ai-code-review.md`" → 5 równoległych przejść (bezpieczeństwo / poprawność+pamięć / architektura / frontend / integracje+agent) na całym codebase (deptrac + OpenAPI export odpalone live w kontenerze).
+- **Wynik**: 3×🔴, 18×🟡, 6×🟢. Werdykt: kondycja bardzo dobra (0 aktywnie eksploatowalnych luk; flush+clear, limity agenta 8.5, approval flow, bulk per-action permissions — wszystkie czyste), ale 3 findingi wymagają naprawy.
+- **✅ Tickety rozpisane (10-sekcyjne plany wg SKILL-BUG-FIX-TICKET)**: [#2722](https://github.com/malipie/PIM/issues/2722) outbound sync — finalizacja SyncRun + guard idempotencji (duplikaty na remote przy retry/redeliver); [#2723](https://github.com/malipie/PIM/issues/2723) categories-tab — połknięte błędy mutacji (recydywa UI-02); [#2724](https://github.com/malipie/PIM/issues/2724) rotate webhook secret bez onError + globalny notificationProvider dla Refine.
+- **Następny krok**: implementacja #2722–#2724 po akceptacie operatora; osobne decyzje dla klastra 🟡 „obiecane szyfrowanie bez ticketu" (SSO/TOTP plaintext, DevTokenExposure denylist) + deptrac baseline (zamknięty #1466). Pełne wyniki review w rozmowie + memory `project-code-review-2026-08`.
+
 ## 2026-08-04: Untrack auto-generowanego `config/reference.php` (lean chore po code review)
 - **Zgłoszenie**: operator poprosił o code review pending zmiany (skill `agent/ai-code-review.skill`); review zdiagnozował, że dirty diff w `reference.php` to środowiskowy flip-flop generatora (FrankenPHP SAPI vs CLI — szczegóły w lessons.md na górze), opisany już 7× jako szum. Operator wybrał trwały fix.
 - **✅ Fix**: `git rm --cached` + wpis w `apps/api/.gitignore`; plik regeneruje się lokalnie w debug, zero konsumentów w runtime/CI. Koniec rytuału `git checkout --` przed stage.

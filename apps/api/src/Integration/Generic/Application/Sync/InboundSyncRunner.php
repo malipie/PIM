@@ -21,10 +21,12 @@ use App\Integration\Generic\Infrastructure\Http\RecordSelector;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
+use Throwable;
 
 /**
  * Runs one inbound (remote → PIM) sync of a {@see SyncBinding} (APIC-P3-04).
@@ -50,6 +52,7 @@ final readonly class InboundSyncRunner
         private SyncRunRepositoryInterface $runs,
         private EntityManagerInterface $em,
         private TenantContext $tenantContext,
+        private ManagerRegistry $managerRegistry,
         private SyncRunScope $runScope = new SyncRunScope(),
         private LoggerInterface $logger = new NullLogger(),
     ) {
@@ -60,18 +63,28 @@ final readonly class InboundSyncRunner
         // Anti-loop (#2636): this run's catalog writes must not re-enqueue the
         // same connection's outbound bindings via the on-change trigger.
         $this->runScope->enter($binding->getConnection()->getId());
+
+        $run = new SyncRun($binding, SyncDirection::Inbound);
+        $run->setCursorBefore($binding->getCursor());
+        $this->runs->save($run);
+        $runId = $run->getId();
+
         try {
-            return $this->doRun($binding);
+            return $this->doRun($run, $binding);
+        } catch (Throwable $exception) {
+            // #2722 — a mid-run throw must not leave the run dangling as
+            // `running` (the cursor itself is crash-safe, so a retry resumes
+            // the pull; only the audit status needs the terminal stamp).
+            SyncRunFinalizer::markFailedAfterException($this->managerRegistry, $runId);
+
+            throw $exception;
         } finally {
             $this->runScope->leave();
         }
     }
 
-    private function doRun(SyncBinding $binding): SyncRun
+    private function doRun(SyncRun $run, SyncBinding $binding): SyncRun
     {
-        $run = new SyncRun($binding, SyncDirection::Inbound);
-        $run->setCursorBefore($binding->getCursor());
-        $this->runs->save($run);
         $runId = $run->getId();
         $bindingId = $binding->getId();
 

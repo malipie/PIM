@@ -38,6 +38,7 @@ use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Tests\Unit\Integration\Generic\Application\Sync\RecordingSleeper;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -118,6 +119,7 @@ final class SyncMemoryBenchmarkTest extends KernelTestCase
             self::getContainer()->get(SyncRunRepositoryInterface::class),
             $this->em(),
             $this->tenantContext(),
+            $this->managerRegistry(),
             new SyncRunScope(),
         );
 
@@ -150,6 +152,7 @@ final class SyncMemoryBenchmarkTest extends KernelTestCase
             new RecordSelector(),
             new SyncRunScope(),
             new RecordingSleeper(),
+            $this->managerRegistry(),
         );
 
         \memory_reset_peak_usage();
@@ -359,5 +362,10 @@ final class SyncMemoryBenchmarkTest extends KernelTestCase
         \assert($em instanceof EntityManagerInterface);
 
         return $em;
+    }
+
+    private function managerRegistry(): ManagerRegistry
+    {
+        return self::getContainer()->get('doctrine');
     }
 }

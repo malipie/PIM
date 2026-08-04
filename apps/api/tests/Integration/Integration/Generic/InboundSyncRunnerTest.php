@@ -30,6 +30,7 @@ use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Tests\Unit\Integration\Generic\Infrastructure\Http\Pagination\RecordingRequester;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Zenstruck\Foundry\Test\Factories;
@@ -168,7 +169,13 @@ final class InboundSyncRunnerTest extends KernelTestCase
             self::getContainer()->get(SyncRunRepositoryInterface::class),
             $this->em(),
             $this->tenantContext(),
+            $this->managerRegistry(),
         );
+    }
+
+    private function managerRegistry(): ManagerRegistry
+    {
+        return self::getContainer()->get('doctrine');
     }
 
     private function repository(): CatalogObjectRepositoryInterface

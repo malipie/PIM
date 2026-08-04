@@ -14,6 +14,7 @@ use App\Catalog\Domain\Entity\ObjectValue;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Provenance;
 use App\Channel\Domain\Entity\Channel;
+use App\Integration\Generic\Application\Handler\OutboundSyncHandler;
 use App\Integration\Generic\Application\Sync\OutboundBodyEncoder;
 use App\Integration\Generic\Application\Sync\OutboundSyncRunner;
 use App\Integration\Generic\Application\Sync\PayloadBuilder;
@@ -22,18 +23,23 @@ use App\Integration\Generic\Domain\Entity\Connection;
 use App\Integration\Generic\Domain\Entity\FieldMapping;
 use App\Integration\Generic\Domain\Entity\RemoteEndpoint;
 use App\Integration\Generic\Domain\Entity\SyncBinding;
+use App\Integration\Generic\Domain\Entity\SyncRun;
 use App\Integration\Generic\Domain\Enum\MappingDirection;
 use App\Integration\Generic\Domain\Enum\RemoteEndpointRole;
 use App\Integration\Generic\Domain\Enum\SyncDirection;
 use App\Integration\Generic\Domain\Enum\SyncRunStatus;
 use App\Integration\Generic\Domain\GenericRestResponse;
+use App\Integration\Generic\Domain\Message\OutboundSyncMessage;
+use App\Integration\Generic\Domain\Repository\SyncBindingRepositoryInterface;
 use App\Integration\Generic\Domain\Repository\SyncRunRepositoryInterface;
 use App\Integration\Generic\Infrastructure\Http\RecordSelector;
+use App\Integration\Generic\Infrastructure\Http\RemoteRequester;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Tests\Unit\Integration\Generic\Application\Sync\RecordingSleeper;
 use App\Tests\Unit\Integration\Generic\Infrastructure\Http\Pagination\RecordingRequester;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -490,6 +496,70 @@ final class OutboundSyncRunnerTest extends KernelTestCase
         self::assertCount(0, $requester->calls, 'nothing may be pushed on a broken scope reference');
     }
 
+    #[Test]
+    public function midRunThrowFinalizesTheRunAsFailed(): void
+    {
+        // #2722 — a run left `running` by an unexpected fault would both dangle
+        // forever in the UI and let the transport retry re-push every record
+        // from scratch (duplicate creates on the remote).
+        $this->seedObject('A-1', 'Widget');
+        $binding = $this->seedBinding();
+
+        $requester = new class implements RemoteRequester {
+            public function request(
+                Connection $connection,
+                string $method,
+                string $url,
+                array $query = [],
+                array $headers = [],
+                ?string $body = null,
+            ): GenericRestResponse {
+                throw new RuntimeException('boom — unexpected mid-run fault');
+            }
+        };
+
+        try {
+            $this->runner($requester)->run($binding);
+            self::fail('Expected the mid-run fault to propagate to the transport.');
+        } catch (RuntimeException $exception) {
+            self::assertStringContainsString('boom', $exception->getMessage());
+        }
+
+        $runs = $this->runs()->findByBinding($this->reloadBinding($binding->getId()));
+        self::assertCount(1, $runs);
+        self::assertSame(SyncRunStatus::Failed, $runs[0]->getStatus());
+        self::assertNotNull($runs[0]->getFinishedAt());
+    }
+
+    #[Test]
+    public function handlerSkipsWhenARunOfTheBindingIsAlreadyRunning(): void
+    {
+        // #2722 — a redelivered message (4h redeliver_timeout vs a long push)
+        // must not start a second concurrent run of the same binding.
+        $this->seedObject('A-1', 'Widget');
+        $binding = $this->seedBinding();
+
+        $active = new SyncRun($binding, SyncDirection::Outbound);
+        $active->assignTenant($this->tenant);
+        $this->runs()->save($active);
+
+        $requester = new RecordingRequester(default: new GenericRestResponse(201, [], '{}', 1, 2));
+        $handler = new OutboundSyncHandler(
+            self::getContainer()->get(SyncBindingRepositoryInterface::class),
+            $this->runs(),
+            $this->runner($requester),
+        );
+        $handler(new OutboundSyncMessage($binding->getId(), $this->tenant->getId()));
+
+        self::assertCount(0, $requester->calls, 'the guarded handler must not push anything');
+        self::assertCount(1, $this->runs()->findByBinding($binding), 'no second run may be created');
+    }
+
+    private function runs(): SyncRunRepositoryInterface
+    {
+        return self::getContainer()->get(SyncRunRepositoryInterface::class);
+    }
+
     private function seedChannel(string $code): Channel
     {
         $channel = new Channel($code, ucfirst($code));
@@ -603,7 +673,7 @@ final class OutboundSyncRunnerTest extends KernelTestCase
         return $binding;
     }
 
-    private function runner(RecordingRequester $requester, ?RecordingSleeper $sleeper = null): OutboundSyncRunner
+    private function runner(RemoteRequester $requester, ?RecordingSleeper $sleeper = null): OutboundSyncRunner
     {
         return new OutboundSyncRunner(
             self::getContainer()->get(\App\Integration\Generic\Domain\Repository\FieldMappingRepositoryInterface::class),
@@ -618,12 +688,18 @@ final class OutboundSyncRunnerTest extends KernelTestCase
             new RecordSelector(),
             new SyncRunScope(),
             $sleeper ?? new RecordingSleeper(),
+            $this->managerRegistry(),
         );
     }
 
     private function tenantContext(): TenantContext
     {
         return self::getContainer()->get(TenantContext::class);
+    }
+
+    private function managerRegistry(): ManagerRegistry
+    {
+        return self::getContainer()->get('doctrine');
     }
 
     private function em(): EntityManagerInterface
