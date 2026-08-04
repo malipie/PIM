@@ -53,6 +53,16 @@ final readonly class PublishToChannelTool implements AgentToolInterface
         return 'publications.publish_unpublish';
     }
 
+    /**
+     * ADR-0032 (#2742) — this stays `Action` only while
+     * {@see \App\Channel\Contracts\ChannelPublishPort} has no real
+     * implementation (`available=false`, so nothing is published). The decision
+     * is recorded: publishing through the agent MUST move to `ToolKind::Write`
+     * and materialise into `pending_changes` BEFORE the first connector lands
+     * (epic 0.8 BaseLinker / 0.9 Shopify). Publication has external effects a
+     * PIM-side unpublish cannot undo — the offer was already visible, indexed
+     * and possibly ingested by price comparison sites.
+     */
     public function kind(): ToolKind
     {
         return ToolKind::Action;
