@@ -14,9 +14,21 @@ import { toast } from '@/components/ui/toast';
  * `progress` (undoable mutations) is intentionally a no-op — the project does
  * not use undoable mutations, and a countdown toast would be noise.
  */
+
+/**
+ * Notification keys Refine emits from hooks whose screen ALREADY renders an
+ * inline error. Refine hardcodes these keys (no per-call opt-out on the auth
+ * hooks), so the suppression lives here. `login-error` covers the sign-in form,
+ * which sets a form-level error under the password field — without this the
+ * user gets the same failure twice, and the auth E2E hits a strict-mode
+ * violation on two `role="alert"` nodes.
+ */
+const SUPPRESSED_KEYS = new Set(['login-error']);
+
 export const notificationProvider: NotificationProvider = {
-  open: ({ type, message, description }) => {
+  open: ({ type, message, description, key }) => {
     if (type === 'progress') return;
+    if (typeof key === 'string' && SUPPRESSED_KEYS.has(key)) return;
     const text =
       typeof description === 'string' && description !== '' && description !== message
         ? `${message}: ${description}`
