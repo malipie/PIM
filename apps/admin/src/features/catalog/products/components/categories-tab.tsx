@@ -8,7 +8,8 @@ import {
   type CurrentAssignment,
 } from '@/components/catalog/category-picker-dialog';
 import { Button } from '@/components/ui/button';
-import { jsonFetch } from '@/lib/http';
+import { toast } from '@/components/ui/toast';
+import { httpErrorDetail, jsonFetch } from '@/lib/http';
 import { objectKeys } from '@/lib/object-query-keys';
 import { cn } from '@/lib/utils';
 
@@ -94,9 +95,13 @@ export function CategoriesTab({ productId, objectTypeId, kind = 'product' }: Pro
         accept: 'application/json',
       });
       await refresh();
-    } catch {
-      // intentionally swallow — caller will see stale state, error
-      // banner is reserved for picker-driven failures
+    } catch (err) {
+      toast.error(
+        httpErrorDetail(err) ??
+          t('products.detail.categories.error_detach', {
+            defaultValue: 'Nie udało się odpiąć kategorii.',
+          }),
+      );
     } finally {
       setBusyCategoryId(null);
     }
@@ -113,8 +118,13 @@ export function CategoriesTab({ productId, objectTypeId, kind = 'product' }: Pro
         body: { categoryId, isPrimary: true },
       });
       await refresh();
-    } catch {
-      // see comment above
+    } catch (err) {
+      toast.error(
+        httpErrorDetail(err) ??
+          t('products.detail.categories.error_promote', {
+            defaultValue: 'Nie udało się ustawić kategorii głównej.',
+          }),
+      );
     } finally {
       setBusyCategoryId(null);
     }

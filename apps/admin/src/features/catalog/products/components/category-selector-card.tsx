@@ -8,7 +8,8 @@ import {
   type CurrentAssignment,
 } from '@/components/catalog/category-picker-dialog';
 import { Button } from '@/components/ui/button';
-import { jsonFetch } from '@/lib/http';
+import { toast } from '@/components/ui/toast';
+import { httpErrorDetail, jsonFetch } from '@/lib/http';
 import { objectKeys } from '@/lib/object-query-keys';
 import { cn } from '@/lib/utils';
 
@@ -167,9 +168,13 @@ export function CategorySelectorCard(props: Props) {
         accept: 'application/json',
       });
       await refresh();
-    } catch {
-      // Intentionally swallow — UI stays at the previous chip state if the
-      // network call fails; full-banner errors are reserved for the picker.
+    } catch (err) {
+      toast.error(
+        httpErrorDetail(err) ??
+          t('products.detail.categories.error_detach', {
+            defaultValue: 'Nie udało się odpiąć kategorii.',
+          }),
+      );
     } finally {
       setBusyCategoryId(null);
     }
@@ -207,8 +212,13 @@ export function CategorySelectorCard(props: Props) {
         body: { categoryId, isPrimary: true },
       });
       await refresh();
-    } catch {
-      // see comment on runDetach
+    } catch (err) {
+      toast.error(
+        httpErrorDetail(err) ??
+          t('products.detail.categories.error_promote', {
+            defaultValue: 'Nie udało się ustawić kategorii głównej.',
+          }),
+      );
     } finally {
       setBusyCategoryId(null);
     }
