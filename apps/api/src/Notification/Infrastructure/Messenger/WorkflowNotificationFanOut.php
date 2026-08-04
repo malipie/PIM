@@ -13,6 +13,8 @@ use App\Notification\Contracts\NotifierPort;
 use App\Shared\Application\TenantContext;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use App\Workflow\Contracts\TransitionLogPort;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Uid\Uuid;
 
@@ -41,6 +43,7 @@ final readonly class WorkflowNotificationFanOut
         private PermissionGranteesInterface $grantees,
         private TransitionLogPort $transitionLog,
         private TenantContext $tenantContext,
+        private LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -49,6 +52,8 @@ final readonly class WorkflowNotificationFanOut
     {
         $tenant = $this->tenantContext->get();
         if (null === $tenant) {
+            $this->logDroppedNotification(self::TYPE_SUBMITTED, $event->objectId);
+
             return;
         }
 
@@ -84,6 +89,8 @@ final readonly class WorkflowNotificationFanOut
     {
         $tenant = $this->tenantContext->get();
         if (null === $tenant) {
+            $this->logDroppedNotification(self::TYPE_UNPUBLISH_REQUESTED, $event->objectId);
+
             return;
         }
 
@@ -119,5 +126,20 @@ final readonly class WorkflowNotificationFanOut
         return $this->transitionLog
             ->latestForObject($objectId, ObjectEditorialWorkflow::TRANSITION_SUBMIT_FOR_REVIEW)
             ?->actorUserId;
+    }
+
+    /**
+     * #2734 — the message is TenantAware, so a missing context on the worker is
+     * an infrastructure fault, not a normal case. The notification is dropped
+     * either way (recipients cannot be resolved without a tenant), but it must
+     * never disappear silently — "the reviewer never got notified" is
+     * undebuggable without this trace.
+     */
+    private function logDroppedNotification(string $type, Uuid $objectId): void
+    {
+        $this->logger->warning('Workflow notification dropped — no tenant context on the worker.', [
+            'type' => $type,
+            'object_id' => $objectId->toRfc4122(),
+        ]);
     }
 }
