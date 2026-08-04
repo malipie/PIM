@@ -29,10 +29,45 @@ Mapa `attribute.code → wartość`. Każda wartość to **envelope** (nie raw v
   "type": "object",
   "additionalProperties": {
     "type": "object",
-    "required": ["value"],
+    "description": "Envelope wartości. Nośnik wartości zależy od typu atrybutu — patrz `oneOf` niżej (#2738: poprzednia wersja wymagała `value` dla WSZYSTKICH typów, co odrzucało poprawne koperty select/multiselect/price produkowane przez writer).",
+    "oneOf": [
+      {
+        "title": "scalar (text, wysiwyg, number, boolean, date, metric…)",
+        "required": ["value"]
+      },
+      {
+        "title": "select",
+        "required": ["option_code"]
+      },
+      {
+        "title": "multiselect",
+        "required": ["option_codes"]
+      },
+      {
+        "title": "price",
+        "required": ["amount", "currency"]
+      }
+    ],
     "properties": {
       "value": {
-        "description": "Wartość atrybutu w typie zgodnym z Attribute.type. Dla select to `code` opcji (np. \"red\"); dla multiselect tablica codes (np. [\"new\",\"sale\"]); dla price obiekt {amount, currency}; dla date string ISO YYYY-MM-DD; dla boolean true/false; dla text/wysiwyg string."
+        "description": "Wartość skalarna atrybutu w typie zgodnym z Attribute.type: dla date string ISO YYYY-MM-DD; dla boolean true/false; dla text/wysiwyg string; dla number liczba. Typy select / multiselect / price NIE używają tego pola — mają własne nośniki niżej."
+      },
+      "option_code": {
+        "type": "string",
+        "description": "Kod wybranej opcji dla atrybutu typu select (np. \"red\")."
+      },
+      "option_codes": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Kody wybranych opcji dla atrybutu typu multiselect (np. [\"new\",\"sale\"])."
+      },
+      "amount": {
+        "type": ["number", "string"],
+        "description": "Kwota dla atrybutu typu price (para z `currency`)."
+      },
+      "currency": {
+        "type": "string",
+        "description": "Kod waluty ISO 4217 dla atrybutu typu price (np. \"PLN\")."
       },
       "locale": {
         "type": ["string", "null"],
