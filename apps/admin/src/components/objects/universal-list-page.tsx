@@ -73,7 +73,7 @@ import { useAttributeOptionLabels } from '@/lib/grid/grid-attribute-cell';
 import { clampColumnWidth, overridesFromColumns, setColumnWidth } from '@/lib/grid/overrides';
 import type { GridColumn, GridColumnOverride, ViewColumnSeed } from '@/lib/grid/types';
 import { useGridColumns } from '@/lib/grid/use-grid-columns';
-import { jsonFetch } from '@/lib/http';
+import { httpErrorDetail, jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 const CmdKPalette = lazy(() =>
@@ -590,7 +590,10 @@ export function UniversalListPage({
         [masterId]: list.map(catalogObjectToRow),
       }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'unknown');
+      toast.error(
+        httpErrorDetail(err) ??
+          t('products.list.action_failed', { defaultValue: 'Operacja nie powiodła się.' }),
+      );
     }
   };
 
@@ -828,7 +831,10 @@ export function UniversalListPage({
         next.delete(row.id);
         return next;
       });
-      toast.error(err instanceof Error ? err.message : 'unknown');
+      toast.error(
+        httpErrorDetail(err) ??
+          t('products.list.action_failed', { defaultValue: 'Operacja nie powiodła się.' }),
+      );
     }
   };
 
@@ -1042,7 +1048,10 @@ export function UniversalListPage({
                 capped: response.capped,
               });
             } catch (err) {
-              toast.error(err instanceof Error ? err.message : 'unknown');
+              toast.error(
+                httpErrorDetail(err) ??
+                  t('products.list.action_failed', { defaultValue: 'Operacja nie powiodła się.' }),
+              );
             } finally {
               setCrossPageLoading(false);
             }

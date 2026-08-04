@@ -555,7 +555,8 @@
         "already_active": "Already active",
         "activating": "Activating…",
         "cancel": "Cancel",
-        "toast_activated": "{{code}} activated."
+        "toast_activated": "{{code}} activated.",
+        "impact_failed": "Could not compute the impact of adding this locale."
       }
     },
     "users": {
@@ -2082,6 +2083,9 @@
       "stat_sample": "in sample",
       "stat_sample_skipped": "skipped (sample)",
       "stat_sample_errors": "errors (sample)"
+    },
+    "list": {
+      "action_failed": "The operation failed."
     }
   },
   "api_configurator": {
@@ -2582,7 +2586,8 @@
       "unmapped_remote": "Unmapped external fields · {{count}}",
       "all_remote_mapped": "None — all fields used",
       "endpoint_scope": "Endpoint",
-      "endpoint_all": "All endpoints"
+      "endpoint_all": "All endpoints",
+      "validation_failed": "Mapping validation failed."
     },
     "sync": {
       "back": "Back to connections",
