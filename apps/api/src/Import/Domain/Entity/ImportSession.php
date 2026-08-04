@@ -115,6 +115,17 @@ class ImportSession extends AggregateRoot implements TenantScoped
     private bool $rowPhaseComplete = false;
 
     /**
+     * #2731 — idempotency keys of the media batches already accounted for on
+     * this session. Written exclusively by the atomic claim statement in
+     * {@see \App\Import\Application\Handler\ImageDownloadHandler} (never
+     * through the ORM), so a redelivered batch cannot double-count images or
+     * duplicate its logs. Mapped so the schema stays in sync with the column.
+     *
+     * @var list<string>
+     */
+    private array $processedImageBatches = [];
+
+    /**
      * IMP2-2.3 — crash/pause checkpoint: the last data-row index whose chunk
      * was flushed. A resumed run skips writes at or below this offset (the
      * objects already exist) and continues the persisted counters, so a

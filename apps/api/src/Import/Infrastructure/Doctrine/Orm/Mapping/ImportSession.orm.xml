@@ -97,6 +97,12 @@
                 <option name="default">false</option>
             </options>
         </field>
+        <field name="processedImageBatches" type="json" column="processed_image_batches">
+            <options>
+                <option name="default">[]</option>
+                <option name="jsonb">true</option>
+            </options>
+        </field>
 
         <field name="checkpointOffset" type="integer" column="checkpoint_offset" nullable="true"/>
         <field name="checkpointPhase" type="string" length="16" column="checkpoint_phase" nullable="true"/>
