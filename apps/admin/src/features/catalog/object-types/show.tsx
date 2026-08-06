@@ -920,7 +920,7 @@ export function ObjectTypeShowPage() {
         <span className="num">
           {t('object_types.footer_version', {
             defaultValue: 'v{{version}} · model schema rev {{rev}}',
-            version: '1.0.0-rc.4',
+            version: __APP_VERSION__,
             rev: objectType.schemaVersion ?? 1,
           })}
         </span>

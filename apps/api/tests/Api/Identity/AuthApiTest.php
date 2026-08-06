@@ -172,19 +172,6 @@ final class AuthApiTest extends ApiTestCase
     }
 
     #[Test]
-    public function viewerRoleCannotDeleteProduct(): void
-    {
-        // After #33 (ADR-009 data migration) the legacy `Product` entity
-        // and its `/api/products` ApiResource are gone. The voter contract
-        // (#26) still exists but targets `App\Catalog\Domain\Entity\Product`
-        // which no longer compiles. Sugar paths `/api/products` on
-        // `CatalogObject` + a fresh CatalogObjectVoter land in #41 (epic
-        // 0.4 ApiResource exposure) + #57 (Resource ObjectTypes admin UI).
-        // Restoring this exact test depends on those.
-        self::markTestSkipped('Pending #41 sugar paths + voter on CatalogObject; Product entity removed in #33.');
-    }
-
-    #[Test]
     public function fixtureAdminPasswordIsHashedWithArgon2id(): void
     {
         $repository = self::getContainer()->get(UserRepositoryInterface::class);

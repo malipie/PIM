@@ -1157,7 +1157,7 @@
     "search_agent_placeholder": "Ask the agent or search...",
     "agent_mock_tooltip": "MOCK · Agent layer requires implementation (epic 0.7, Phase 2)",
     "history": "History",
-    "agent_pill_tooltip": "⌘K navigation works; the agent section is a MOCK (epic 0.7, Phase 2)"
+    "agent_pill_tooltip": "Search & navigate with ⌘K; the AI agent chat lives in the \"AI Agent\" section"
   },
   "mock": {
     "label": "MOCK",
