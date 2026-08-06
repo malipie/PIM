@@ -25,6 +25,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Uid\Uuid;
 
 use const DATE_ATOM;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * RBAC-P2-008 (#657) — magic-link invitation orchestrator.
@@ -62,7 +63,10 @@ final class InvitationService
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly MailerInterface $mailer,
         private readonly LoggerInterface $logger,
-        private readonly string $appBaseUrl = 'https://pim.localhost',
+        #[Autowire(env: 'APP_BASE_URL')]
+        private readonly string $appBaseUrl,
+        #[Autowire(env: 'MAILER_FROM')]
+        private readonly string $mailerFrom,
     ) {
     }
 
@@ -105,7 +109,7 @@ final class InvitationService
         // covers test scenarios.
         try {
             $email = new TemplatedEmail()
-                ->from(new Address('noreply@pim.localhost', 'Cortex PIM'))
+                ->from(new Address($this->mailerFrom, 'Cortex PIM'))
                 ->to(new Address($email))
                 ->subject(\sprintf('Zaproszenie do %s — Cortex PIM', $tenant->getName()))
                 ->htmlTemplate('email/invitation.html.twig')

@@ -19,6 +19,7 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Uid\Uuid;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Manual user creation (#867) — alternative to the magic-link invitation
@@ -48,7 +49,10 @@ final class UserCreateService
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly MailerInterface $mailer,
         private readonly LoggerInterface $logger,
-        private readonly string $appBaseUrl = 'https://pim.localhost',
+        #[Autowire(env: 'APP_BASE_URL')]
+        private readonly string $appBaseUrl,
+        #[Autowire(env: 'MAILER_FROM')]
+        private readonly string $mailerFrom,
     ) {
     }
 
@@ -138,7 +142,7 @@ final class UserCreateService
     ): void {
         try {
             $message = new TemplatedEmail()
-                ->from(new Address('noreply@pim.localhost', 'Cortex PIM'))
+                ->from(new Address($this->mailerFrom, 'Cortex PIM'))
                 ->to(new Address($recipientEmail))
                 ->subject(\sprintf('Twoje konto PIM w %s jest gotowe', $tenant->getName()))
                 ->htmlTemplate('email/user_welcome.html.twig')
