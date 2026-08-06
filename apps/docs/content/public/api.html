@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cortex PIM — dokumentacja API (REST)</title>
+    <style>
+      html, body { margin: 0; padding: 0; }
+      .docs-back {
+        position: fixed; top: 10px; right: 16px; z-index: 1000;
+        font: 13px/1.4 system-ui, sans-serif;
+      }
+      .docs-back a { color: #3451b2; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <nav class="docs-back"><a href="/docs/">← Dokumentacja</a></nav>
+    <!-- Scalar API Reference — self-hosted standalone bundle (edge CSP blocks
+         CDNs). The spec is the committed docs/api-spec snapshot: the CI
+         "OpenAPI spec drift" gate keeps it byte-identical with the running
+         API, so this page is always current without touching a live stack. -->
+    <script id="api-reference" data-url="/docs/api-spec/v0.json"></script>
+    <script src="/docs/vendor/scalar-standalone.js"></script>
+  </body>
+</html>
