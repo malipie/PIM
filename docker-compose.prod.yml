@@ -412,7 +412,7 @@ services:
   # `pg_hba.conf` accepts scram from inside the docker network — see
   # docker/postgres/Dockerfile if customising auth methods.
   pgbouncer:
-    image: edoburu/pgbouncer:1.23.1
+    image: edoburu/pgbouncer:v1.23.1-p3
     # YAML anchors live in the base compose file; overlay files can't dereference
     # them so we restate restart policy + resource caps inline.
     restart: unless-stopped
