@@ -341,10 +341,10 @@ final class FilterDslResolverTest extends TestCase
     public function testTypedTextDescendsToValue(): void
     {
         $sql = $this->typedResolver(['brand' => AttributeType::Text])
-            ->toCountSql(['attr' => 'brand', 'op' => '=', 'value' => 'Samsung']);
+            ->toCountSql(['attr' => 'brand', 'op' => '=', 'value' => 'Voltix']);
 
         self::assertNotNull($sql);
-        self::assertStringContainsString("NULLIF((co.attributes_indexed->'brand'->>'value'), '') = 'Samsung'", $sql);
+        self::assertStringContainsString("NULLIF((co.attributes_indexed->'brand'->>'value'), '') = 'Voltix'", $sql);
     }
 
     public function testTypedDateAfterComparesIsoText(): void

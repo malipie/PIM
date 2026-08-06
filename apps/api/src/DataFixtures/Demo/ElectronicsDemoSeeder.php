@@ -487,7 +487,7 @@ final class ElectronicsDemoSeeder
         if (\in_array('computing', $bundles, true)) {
             $ram = self::pick(['8gb', '16gb', '32gb', '64gb']);
             $storage = self::pick(['128gb', '256gb', '512gb', '1tb', '2tb']);
-            $extras['cpu'] = ['value' => self::pick(['Snapdragon 8 Gen 3', 'Apple M3', 'Intel Core Ultra 7', 'AMD Ryzen 7 8840U', 'MediaTek Dimensity 9300', 'Intel Core i5-1340P'])];
+            $extras['cpu'] = ['value' => self::pick(['Quorvex Q8 Gen 3', 'Aurion M3', 'Corvex Ultra 7', 'Vexar R7 8840U', 'Nexcore D9300', 'Corvex U5-1340'])];
             $extras['ram'] = ['option_code' => $ram];
             $extras['storage'] = ['option_code' => $storage];
             $extras['os'] = ['option_code' => $def['os'] ?? 'none'];
