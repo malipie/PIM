@@ -1,6 +1,6 @@
 name: Security audit
 
-# composer audit + pnpm audit on every PR + nightly main.
+# composer audit + pnpm audit on every PR + nightly on main.
 # Blocks merge on high/critical CVEs (failed audit returns non-zero).
 #
 # #2148 — composer + pnpm audit share one job (was two) so a single PR
@@ -8,9 +8,11 @@ name: Security audit
 # sequentially; each still fails the job independently.
 
 on:
+  # No push:main — the same commit was audited on the PR minutes earlier and a
+  # squash changes the SHA, not composer.lock/pnpm-lock.yaml. Freshly published
+  # CVEs in UNCHANGED dependencies are what the nightly cron is for (it caught
+  # 5 real failures in the measured week).
   pull_request:
-  push:
-    branches: [main]
   schedule:
     - cron: "17 3 * * *"
 
