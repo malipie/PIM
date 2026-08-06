@@ -1,8 +1,7 @@
 # Changelog
 
 All notable changes to PIM. Format follows [Keep a Changelog](https://keepachangelog.com/),
-versioning per epic milestones (`0.X.Y` matches ticket numbering in
-`Project Plan/02-plan-projektu-pim.md`).
+versioning per epic milestones (`0.X.Y` matches the internal epic/ticket numbering).
 
 ## [Unreleased]
 
@@ -63,8 +62,7 @@ versioning per epic milestones (`0.X.Y` matches ticket numbering in
   - Activated the previously-MOCK "+ Create test object" button —
     one-click product creation pre-populated with the selected
     category as primary. (#480 / PR #489)
-  - OpenAPI snapshot regenerated, epik documentation in
-    `Project Plan/UI/epik-10-product-categories.md`. (#481 / this PR)
+  - OpenAPI snapshot regenerated. (#481 / this PR)
 
 ### Added — chore (deps maintenance)
 
@@ -124,6 +122,6 @@ versioning per epic milestones (`0.X.Y` matches ticket numbering in
 - **0.10.6** `/api/profiles/{code}/test` + `/api/profiles/{code}/openapi.json`
   per-profile OpenAPI export. (PR #238)
 
-For older history (epics 0.1 — 0.9), see git log + `agent/current_status.md`.
+For older history (epics 0.1 — 0.9), see git log.
 
 [Unreleased]: https://github.com/malipie/PIM/compare/main...HEAD

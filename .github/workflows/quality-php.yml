@@ -21,24 +21,12 @@ on:
       - "**/*.md"
       - "docs/**"
       - "!docs/api-spec/**"
-      - "Project Plan/**"
-      - "Testy/**"
-      - "Zrodla/**"
-      - "agent/**"
-      - "agent_sample/**"
-      - "backups/**"
   push:
     branches: [main]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
       - "!docs/api-spec/**"
-      - "Project Plan/**"
-      - "Testy/**"
-      - "Zrodla/**"
-      - "agent/**"
-      - "agent_sample/**"
-      - "backups/**"
 
 concurrency:
   group: quality-php-${{ github.ref }}

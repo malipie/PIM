@@ -28,7 +28,6 @@ assignees: malipie
 
 ## Powiązania
 
-- Architektura: `Project Plan/01-architektura-pim.md` sekcja X.Y
-- Plan: `Project Plan/02-plan-projektu-pim.md` ticket 0.X.Y
+- Architektura: `docs/adr/` / `docs/architecture/` (ADR-NNNN)
 - Blocked by: #N (jeśli zależy od innego ticketu)
 - Related to: #N (jeśli powiązany luźniej)

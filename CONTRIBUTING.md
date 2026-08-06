@@ -17,8 +17,8 @@ pnpm dev                  # full stack (Caddy + FrankenPHP + Postgres + …)
 `127.0.0.1 pim.localhost` to `/etc/hosts`. Caddy ships with a local CA — accept
 the cert on first request or trust the CA at the OS level.
 
-For the full lay of the land see the top-level [README.md](README.md) and the
-project plan under [`Project Plan/`](Project%20Plan/).
+For the full lay of the land see the top-level [README.md](README.md),
+[`docs/architecture/`](docs/architecture/) and the ADRs in [`docs/adr/`](docs/adr/).
 
 ## Branch naming
 
@@ -70,7 +70,7 @@ ApiResource declaration. Tenant filter applied via TenantAssignmentListener.
 Refs #32
 ```
 
-Polish is fine in `Project Plan/*`, `agent/*`, GitHub issues, PR descriptions
+Polish is fine in project docs, GitHub issues, PR descriptions
 and review comments — that's our internal language. Code, identifiers,
 comments and commit metadata are English.
 
@@ -141,12 +141,9 @@ gate decision.
 
 ## Where to look when stuck
 
-- [`CLAUDE.md`](CLAUDE.md) — the project constitution (also the system prompt
-  for Claude Code sessions).
-- [`Project Plan/01-architektura-pim.md`](Project%20Plan/01-architektura-pim.md) —
-  ADRs, model, ops topology.
-- [`Project Plan/02-plan-projektu-pim.md`](Project%20Plan/02-plan-projektu-pim.md) —
-  phases, milestones, backlog, risks.
-- [`agent/lessons.md`](agent/lessons.md) — patterns to follow / avoid, package
-  quirks, toolchain gotchas. **Read this before every session.**
-- [`agent/current_status.md`](agent/current_status.md) — where we are right now.
+- [`docs/adr/`](docs/adr/) — Architecture Decision Records (index in
+  [`docs/adr/README.md`](docs/adr/README.md)).
+- [`docs/architecture/`](docs/architecture/) — C4 diagrams, bounded contexts,
+  concurrency matrix.
+- [`docs/development/adding-a-field-or-endpoint.md`](docs/development/adding-a-field-or-endpoint.md) —
+  end-to-end vertical slice walkthrough.
