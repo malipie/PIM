@@ -1,6 +1,13 @@
 name: Quality (PHP)
 
-# Runs on every PR + push to main. Branch protection on main requires this to pass.
+# Runs on every PR; on push to main only the cheap static gates run — the
+# heavy matrix is revalidated nightly (see `schedule` below). Rationale: a
+# squash merge produces a new SHA over a tree that the PR already validated
+# minutes earlier, and re-running the full matrix on main cost ~133 CI min/day
+# for zero failures in the measured week (CI minutes audit, 2026-08-06).
+# NOTE: there is no branch protection on this repo today (the protection API
+# answers 403 on the current plan and `branches/main` reports
+# "protected": false), so these gates are advisory, not enforcing.
 # See ticket #11 (0.0.11) for the full quality gates rationale.
 
 on:
@@ -17,6 +24,9 @@ on:
   # docs/api-spec/** is NOT ignored (it is re-included via `!`): the openapi-spec
   # job diffs docs/api-spec/v0.json, so a spec change must still re-trigger.
   pull_request:
+    # `labeled` is required for the opt-in benchmark gate below: without it a
+    # freshly applied `run-benchmarks` label would not re-trigger the run.
+    types: [opened, synchronize, reopened, labeled]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
@@ -27,6 +37,13 @@ on:
       - "**/*.md"
       - "docs/**"
       - "!docs/api-spec/**"
+  # Nightly full validation of main. Compensates for the heavy jobs that no
+  # longer run on push (matrix, benchmark, agent-removability): nothing is
+  # dropped, it moves to a ≤24h window. `schedule` ignores paths filters and
+  # only runs on the default branch, which is exactly the intent.
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
 
 concurrency:
   group: quality-php-${{ github.ref }}
@@ -152,6 +169,35 @@ jobs:
             exit 1
           fi
 
+      # AGENT-P0-09 / ADR-0024 — cheap half of the open-core gate, kept on
+      # EVERY PR: the core must not reference App\Agent. The full job (delete
+      # the module, recompile, re-run PHPStan/Deptrac/PHPUnit, rebuild the
+      # admin) is ~1.7 min of mostly repeated work and moved to the nightly
+      # run. Catches use/FQCN leaks — the ~95% case; DI/string leaks still
+      # need the full job, hence the nightly.
+      - name: Core must not reference App\Agent (ADR-0024)
+        run: |
+          if grep -RFn --exclude-dir=Agent 'App\Agent' src config tests \
+               | grep -vE '^(config/services_agent\.yaml|config/packages/agent\.yaml|tests/(Unit|Integration|Api)/Agent/)'; then
+            echo "::error::core references App\Agent outside the agent module — see ADR-0024"
+            exit 1
+          fi
+
+      # The `unit,architecture` matrix leg was ~90% job overhead (0.83 min of
+      # which ~34s is setup) and needed no database, yet the matrix gave it a
+      # dedicated postgres:16-alpine service. Folding it into this job removes
+      # one job and one container per PR. phpunit.dist.xml marks both suites
+      # as kernel-free; `agent-removability` already runs them without a DB.
+      - name: PHPUnit (unit + architecture)
+        run: php bin/phpunit --testsuite unit,architecture
+        env:
+          APP_ENV: test
+          APP_DEBUG: "0"
+          MESSENGER_TRANSPORT_DSN: in-memory://
+          MERCURE_JWT_SECRET: ci-mercure-key-at-least-256-bits-long
+          JWT_PASSPHRASE: ci
+          APP_DEFAULT_TENANT_CODE: demo
+
   semgrep-cortex:
     # RBAC-P6-008 / #720 — Cortex-specific Semgrep rules (the static-
     # analysis companion to PHPStan's RequiresPermissionAnnotationRule).
@@ -207,14 +253,24 @@ jobs:
     # below (was a sequential step here, ~4 min reclaimed by running it concurrently).
     name: PHPUnit
     runs-on: ubuntu-latest
+    # Skipped on push:main (the PR validated this very tree; a squash only
+    # changes the SHA) and on npm bumps (a JS dependency cannot break PHPStan
+    # or PHPUnit — composer bumps still get the full matrix). Job-level `if:`
+    # rather than workflow `paths:` on purpose: a skipped job reports as
+    # passed, a workflow that never starts leaves a required check hanging in
+    # "Expected" forever if protection is ever turned on.
+    if: >-
+      ${{ github.event_name != 'push'
+      && !startsWith(github.head_ref, 'dependabot/npm_and_yarn/') }}
     strategy:
       fail-fast: false
       matrix:
         # AUD-084 — `api` was the dominant leg (~1412s, ~45% of it Catalog);
         # split three ways (Catalog / Import+Identity / the rest via <exclude>)
         # so the legs run concurrently. See phpunit.dist.xml testsuites.
+        # `unit,architecture` moved into the `static` job — it needed no
+        # database and was almost entirely setup overhead.
         suite:
-          - "unit,architecture"
           - "integration"
           - "api-catalog"
           - "api-heavy"
@@ -285,6 +341,15 @@ jobs:
     # sequential step (~4 min off the critical path). Same env/setup as above.
     name: PHPUnit benchmarks (import-benchmark)
     runs-on: ubuntu-latest
+    # ~11.6 billable min on every push for a gate that did not fire once in
+    # the measured week. The main leak vector (flush without clear in a loop)
+    # stays blocked on every PR statically by
+    # src/PHPStan/Rules/FlushWithoutClearInLoopRule.php in the `static` job.
+    # Here: nightly, manual dispatch, or the `run-benchmarks` PR label.
+    if: >-
+      ${{ github.event_name == 'schedule'
+      || github.event_name == 'workflow_dispatch'
+      || contains(github.event.pull_request.labels.*.name, 'run-benchmarks') }}
     services:
       postgres:
         image: postgres:16-alpine
@@ -369,6 +434,16 @@ jobs:
     # dependency, never this job. DoD gate for every epic-0.7 ticket.
     name: Agent removability (open-core gate)
     runs-on: ubuntu-latest
+    # The cheap half of this gate (grep for App\Agent in the core) now runs on
+    # every PR inside `static`. The expensive half — delete the module and
+    # recompile everything, of which ~48s of 110s is a repeated PHPStan — runs
+    # nightly, on demand, or on PRs labelled `agent`. Epic 0.7 is Phase 2 work
+    # and src/Agent barely moves.
+    # WHEN EPIC 0.7 STARTS: put this back on every PR.
+    if: >-
+      ${{ github.event_name == 'schedule'
+      || github.event_name == 'workflow_dispatch'
+      || contains(github.event.pull_request.labels.*.name, 'agent') }}
     steps:
       - uses: actions/checkout@v7
 

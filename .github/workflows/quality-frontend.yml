@@ -1,6 +1,10 @@
 name: Quality (Frontend)
 
-# Runs on every PR + push to main. Branch protection on main requires this to pass.
+# Runs on every PR; on push to main only the fast checks run — Playwright is
+# revalidated nightly (see `schedule`). A squash merge re-validates a tree the
+# PR already covered, which cost ~38 CI min/day for no new signal (CI minutes
+# audit, 2026-08-06). There is no branch protection on this repo today, so
+# these gates are advisory, not enforcing.
 
 on:
   pull_request:
@@ -31,6 +35,11 @@ on:
       - "pnpm-workspace.yaml"
       - "turbo.json"
       - ".github/workflows/quality-frontend.yml"
+  # Nightly full run on main — the safety net for Playwright no longer running
+  # on push and for composer-bump PRs that skip E2E.
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
 
 concurrency:
   group: quality-frontend-${{ github.ref }}
@@ -93,6 +102,16 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
+    # The single most expensive job in the repo (~28 min, 24% of all CI
+    # minutes). Skipped on push:main (same tree as the PR, new SHA only) and
+    # on composer bumps, where the real gate is the kernel-booting api-* test
+    # suites. npm bumps KEEP E2E — for radix/slate/tailwind/vite it is the
+    # only runtime gate; biome+tsc+vitest+build only prove it compiles.
+    if: >-
+      ${{ github.event_name == 'schedule'
+      || github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'pull_request'
+          && !startsWith(github.head_ref, 'dependabot/composer/')) }}
     # 20 got outgrown by the suite (~16.5m tests + ~4m stack setup): the job
     # died as "canceled" AFTER "15x passed", masquerading as merge-ref flake.
     # Keep headroom; revisit when the suite gets sharded.

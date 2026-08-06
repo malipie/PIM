@@ -34,6 +34,10 @@ jobs:
   build:
     name: Build docs site
     runs-on: ubuntu-latest
+    # Fail fast and visibly instead of sitting in a saturated queue for hours
+    # and ending as `cancelled` (which does not show red): 4 of the 5 runs in
+    # the measured week never started.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
