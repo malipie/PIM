@@ -11,6 +11,7 @@ use App\Catalog\Application\BuiltInSystemAttributesSeeder;
 use App\Catalog\Application\DefaultMenuSeeder;
 use App\Channel\Domain\Entity\Locale;
 use App\Channel\Domain\Entity\TenantLocale;
+use App\Identity\Application\PrdPermissionSeeder;
 use App\Identity\Application\RbacSeeder;
 use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\User;
@@ -63,6 +64,7 @@ final class TenantBootstrapCommand extends Command
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly UserPasswordHasherInterface $passwordHasher,
+        private readonly PrdPermissionSeeder $prdPermissionSeeder,
         private readonly RbacSeeder $rbacSeeder,
         private readonly RoleRepositoryInterface $roleRepository,
         private readonly PermissionRepositoryInterface $permissionRepository,
@@ -166,7 +168,15 @@ final class TenantBootstrapCommand extends Command
             return Command::INVALID;
         }
 
-        // 1. Global RBAC baseline (4 built-in roles + legacy permission codes).
+        // 1. Global RBAC baseline. The PRD §3.2 permission catalogue comes
+        //    first: SeedTenantPrdRolesService below resolves its role
+        //    templates against these codes, and on a migrations-only
+        //    database they do not exist yet (the codes used to ship only in
+        //    dev fixtures — see PrdPermissionSeeder).
+        $created = $this->prdPermissionSeeder->seed();
+        if ($created > 0) {
+            $io->text(\sprintf('PRD permission catalogue: %d code(s) added.', $created));
+        }
         $this->rbacSeeder->seed();
 
         // 2. Tenant (reuse when present — idempotent re-runs).

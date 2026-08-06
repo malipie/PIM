@@ -15,6 +15,9 @@
   `allow 443/tcp`, `allow 443/udp` (HTTP/3), `deny` reszta. Compose publikuje wyłącznie
   porty Caddy — pozostałe serwisy są tylko w sieci wewnętrznej.
 - **SSH**: klucze zamiast haseł (`PasswordAuthentication no`), opcjonalnie fail2ban.
+- **Firewall dostawcy (poza hostem!)**: panel hostingu (np. Hetzner Cloud
+  Firewall) musi przepuszczać **80** i **443** — sam `ufw` nie wystarczy.
+  Nietypowe porty (np. 8443 na czas testów bez domeny) domyślnie NIE są otwarte.
 - **DNS**: rekord `A`/`AAAA` dla `DOMAIN` → IP hosta, PRZED pierwszym `up`
   (Let's Encrypt potrzebuje rozwiązywalnej domeny). Dla poczty: SPF/DKIM/DMARC
   na domenie nadawcy (`MAILER_FROM`) — patrz #2139.
@@ -74,15 +77,14 @@ Prod NIGDY nie autogeneruje pary kluczy (gate w entrypoint jest dev/test-only):
 
 ```bash
 docker compose ... exec -T api php bin/console lexik:jwt:generate-keypair
-# passphrase = JWT_PASSPHRASE z .env.prod; klucze lądują w wolumenie api_var? NIE —
-# w config/jwt/ wewnątrz kontenera. Trwałość: wygeneruj do wolumenu:
-docker compose ... exec -T api sh -c 'ls -la config/jwt/'
+docker compose ... exec -T api sh -c 'ls -la config/jwt/'   # private.pem + public.pem
 ```
 
-> Uwaga: `config/jwt/` w obrazie jest efemeryczne — po `up --force-recreate`
-> klucze znikną i wszystkie sesje wygasną. Dla trwałości skopiuj parę na hosta
-> (`docker compose cp api:/app/config/jwt ./secrets-jwt/`) i przywracaj przy
-> odtwarzaniu kontenera, albo dodaj dedykowany named volume na config/jwt.
+Klucze lądują w named volume `api_jwt` (montowany na `/app/config/jwt` w api
+i workerze), więc **przeżywają przebudowę obrazu i `up --force-recreate`**.
+Bez tego wolumenu każdy `build` kasował parę i logowanie padało na
+`JWTEncodeFailureException` — wykryte przy pierwszym realnym deployu.
+Rotacja kluczy = `--overwrite` + restart api/worker (unieważnia sesje).
 
 ## 5. Bootstrap tenanta + dane demo
 
@@ -129,8 +131,11 @@ docker compose ... exec -T api php bin/console pim:agent:seed-content-defaults
 
 - Rotacja sekretów: `docs/operations/secrets-runbook.md` + `credentials-rotation.md`.
 - Aktualizacje: `git fetch && git checkout <nowy-tag>` → `build api worker` →
-  `up -d` → `doctrine:migrations:migrate` → smoke pkt 1-3. Worker sam przeładuje
-  kod w ≤1h (`--time-limit=3600`), ale po zmianach DI zrób `restart worker`.
+  `up -d` → **`exec api php bin/console cache:clear`** → `restart api worker` →
+  `doctrine:migrations:migrate` → smoke pkt 1-3.
+  `cache:clear` jest OBOWIĄZKOWY: `/app/var` to named volume, więc skompilowany
+  kontener DI z poprzedniej wersji przesłania świeży cache z obrazu i nowy kod
+  wywala się na starych sygnaturach serwisów (`TypeError: Argument #N`).
 - Skalowanie workerów: `up -d --scale worker=4`.
 - Retencja logów kontenerów: skonfiguruj `log-driver: json-file` z limitami w
   /etc/docker/daemon.json (`max-size=50m`, `max-file=5`) — RODO: logi zawierają e-maile.
