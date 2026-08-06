@@ -1,0 +1,61 @@
+# Application logging (go-live gap, 2026-08-06 recon): until now the API ran
+# on the framework's bare default logger — no levels, no channels, no JSON.
+# Containers log to stderr; the docker log driver (or a shipper) owns
+# retention. GDPR note: request logs can carry user e-mails — keep the
+# json-file driver capped on the host (see deploy runbook §7).
+
+monolog:
+    channels:
+        # Deprecations separated so prod can drop them from the main stream.
+        - deprecation
+
+when@dev:
+    monolog:
+        handlers:
+            main:
+                type: stream
+                path: php://stderr
+                level: debug
+                channels: ["!event", "!deprecation"]
+
+when@test:
+    monolog:
+        handlers:
+            # Only surface log noise when a test actually errors.
+            main:
+                type: fingers_crossed
+                action_level: error
+                handler: nested
+                channels: ["!event", "!deprecation"]
+            nested:
+                type: stream
+                path: php://stderr
+                level: debug
+
+when@prod:
+    monolog:
+        handlers:
+            # Buffered: INFO+ context is emitted only when an ERROR occurs,
+            # so steady-state stderr stays quiet but incidents arrive with
+            # the 50 preceding records attached.
+            main:
+                type: fingers_crossed
+                action_level: error
+                buffer_size: 50
+                handler: nested
+                excluded_http_codes: [404, 405]
+                channels: ["!event", "!deprecation"]
+            nested:
+                type: stream
+                path: php://stderr
+                level: info
+                formatter: monolog.formatter.json
+            # Operational lane: WARNING+ always lands on stderr (JSON) even
+            # without a triggering error — rate-limit hits, retries, degraded
+            # dependencies.
+            warnings:
+                type: stream
+                path: php://stderr
+                level: warning
+                formatter: monolog.formatter.json
+                channels: ["!event", "!deprecation"]
