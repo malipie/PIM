@@ -59,11 +59,10 @@ If any of these fail, fix before writing your first PR — the CI rejects the sa
 
 Pick something contained: add a new `AttributeOption` to an existing `Attribute`, or extend `BuiltInObjectTypeSeeder`. Workflow:
 
-1. Read [CLAUDE.md](CLAUDE.md) — operator + agent contract for this project.
-2. Read [Project Plan/02-plan-projektu-pim.md](Project%20Plan/02-plan-projektu-pim.md) section for the epic you are working on.
-3. Read [agent/lessons.md](agent/lessons.md) — patterns to follow / avoid.
-4. Branch off main, push to GitHub, open a PR. Required CI checks are: `PHPStan max`, `PHP-CS-Fixer (dry-run)`, `Deptrac (architectural fitness)`, `PHPUnit`, `Playwright E2E`, `Biome strict`, `TypeScript noEmit`, `Vite build (smoke)`.
-5. Use Conventional Commits (`feat(catalog): ...`, `refactor(asset): ...`, `fix(identity): ...`). Commit subject ≤72 chars; body in English.
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md) — conventions, quality gates, PR flow.
+2. Read [docs/development/adding-a-field-or-endpoint.md](docs/development/adding-a-field-or-endpoint.md) — the end-to-end vertical slice.
+3. Branch off main, push to GitHub, open a PR. Required CI checks are: `PHPStan max`, `PHP-CS-Fixer (dry-run)`, `Deptrac (architectural fitness)`, `PHPUnit`, `Playwright E2E`, `Biome strict`, `TypeScript noEmit`, `Vite build (smoke)`.
+4. Use Conventional Commits (`feat(catalog): ...`, `refactor(asset): ...`, `fix(identity): ...`). Commit subject ≤72 chars; body in English.
 
 ## Day 10 — bigger feature
 
@@ -76,4 +75,4 @@ Read the architecture in this order:
 
 Then pick a BC, follow its `Domain/Application/Infrastructure/Contracts` ring, and add the use case. New aggregates extend `Shared\Domain\AggregateRoot` and emit events; subscribers live next to the BC that reacts. Cross-BC reads go through `<BC>\Contracts\Query\*` DTOs; cross-BC writes go through events.
 
-When in doubt: look at the latest audit report under `docs/audits/` and the domain reports in `docs/audit/` (the old `Zrodla/...` checklist path is gitignored and does not exist in a fresh clone).
+When in doubt: start from the ADR index in [docs/adr/README.md](docs/adr/README.md) and the security model deep-dives (`docs/multi-tenancy.md`, `docs/rbac.md`).

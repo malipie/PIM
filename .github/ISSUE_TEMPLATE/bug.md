@@ -34,4 +34,4 @@ assignees: malipie
 ## Powiązania
 
 - Powiązany ticket: #N
-- Architektura: `Project Plan/01-architektura-pim.md` sekcja X.Y
+- Architektura: `docs/adr/` / `docs/architecture/` (ADR-NNNN)

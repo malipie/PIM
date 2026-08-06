@@ -20,14 +20,30 @@ Icon?
 .SynologyWorkingDirectory
 @SynoEAStream
 
-# Pre-Sprint-0 referencje (puste, niepotrzebne w repo)
-agent_sample/
-
 # Lokalne backupy (pg_dump + MinIO snapshoty) — zostają na Synology, nie w repo
 /backups/
 
 # Lokalne źródła referencyjne (Akeneo, Pimcore extracts) — nie wysyłamy na repo
 Zrodla/
+
+# Dokumenty wewnętrzne projektu (2026-08, przygotowanie do publikacji) — zostają
+# na dysku operatora, ale nie są commitowane ani deployowane. Dokumentacja
+# produktowa (docs/adr, docs/api, docs/runbook, ...) oraz docs/api-spec/
+# (bramka CI "OpenAPI spec drift") pozostają w repo.
+/CLAUDE.md
+/Project Plan/
+/agent/
+/apps/api/agent/
+/Testy/
+/docs/Tests/
+/docs/audit/
+/docs/audits/
+/docs/rbac-audit/
+/docs/perf/
+docs/security/red-team-findings-2026-07.md
+docs/security/deep-audit-2026-07.md
+docs/security/regression-5-critical-2026-07.md
+docs/security/tenant-isolation-matrix-2026-07.md
 
 # Symfony / PHP
 /apps/api/vendor/
@@ -113,7 +129,6 @@ docker-compose.override.yml
 # but NOT the Symfony vault under config/secrets/.
 /secrets/
 
-# Audyt 2026-06 — surowe outputy skanerów (regenerowalne, entropia myli secret-scan)
-docs/audit/2026-06/raw/
+# Surowe outputy narzędzi (regenerowalne)
 scripts/load/results/
 apps/admin/playwright-report-browser-matrix/

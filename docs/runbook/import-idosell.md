@@ -1,7 +1,7 @@
-# Runbook — import produktów z eksportu IdoSell/IAI (estetino)
+# Runbook — import produktów z eksportu IdoSell/IAI
 
 Procedura A→Z importu pliku eksportu IdoSell/IAI (np.
-`products_export-estetino.pl-2026-06-23_22.29.csv`) do PIM **bez błędu**, z
+`products_export-<sklep>-<data>.csv`) do PIM **bez błędu**, z
 auto-utworzeniem brakujących opcji select, pobraniem zdjęć z URL i obsługą
 wielu wartości upakowanych w jednej komórce.
 
@@ -60,8 +60,8 @@ import się nie wywróci). Importer nie tworzy kategorii ze ścieżki.
 
 ```bash
 python3 tools/transform-idosell.py \
-  "Zrodla/importy/products_export-estetino.pl-2026-06-23_22.29.csv"
-# → Zrodla/importy/products_export-estetino.pl-2026-06-23_22.29-pim.csv
+  "Zrodla/importy/products_export-<sklep>-<data>.csv"
+# → Zrodla/importy/products_export-<sklep>-<data>-pim.csv
 ```
 
 Skrypt loguje na stderr parametry spoza słownika `PARAM_TO_CODE` (slugowane

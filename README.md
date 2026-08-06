@@ -2,7 +2,7 @@
 
 Agentic-first PIM platform. Konkurent PIMcore/Akeneo.
 
-**Status:** aktualna sub-faza, epik i blokery — zawsze w [`agent/current_status.md`](agent/current_status.md) (ten plik celowo nie hardcoduje fazy, żeby nie dryfował).
+**Status:** MVP ukończone — wersja **1.0.0-alpha** (start testowy). Otwarte pozycje przed pełnym go-live śledzi epik GOLIVE (issues z labelem `epik-GOLIVE`).
 
 ## Stack (MVP)
 
@@ -10,19 +10,18 @@ PHP 8.4 + Symfony 7.4 LTS + API Platform 4 + FrankenPHP 2.x worker mode · Postg
 
 ## Dokumentacja
 
-- **`CLAUDE.md`** — konstytucja projektu (system prompt dla Claude Code)
 - **`CONTRIBUTING.md`** + **`ONBOARDING.md`** — onboarding nowego developera
 - **`docs/development/adding-a-field-or-endpoint.md`** — jak dodać pole/endpoint (vertical slice backend↔front)
 - **`apps/admin/README.md`** — panel admina (Refine + shadcn): komendy, shared-types
 - **`CHANGELOG.md`** — release history per epic
-- **`Project Plan/01-architektura-pim.md`** — pełna architektura, ADR, model danych
-- **`Project Plan/02-plan-projektu-pim.md`** — fazy, milestones, backlog, ryzyka
 - **`docs/adr/`** — Architecture Decision Records (najnowszy numer = `ls docs/adr/`)
+- **`docs/architecture/`** — C4 context/container, bounded contexts, concurrency matrix
 - **`docs/runbook/restore.md`** — pgBackRest PITR walkthrough
 - **`docs/runbook/disaster-recovery.md`** — incident-response playbook (key rotation, breach forensics, async drift)
 - **`docs/multi-tenancy.md`** + **`docs/rbac.md`** — security model deep-dive
-- **`agent/current_status.md`** — aktualna sub-faza i postęp
-- **`agent/lessons.md`** — patterns to follow / avoid, package quirks
+
+> Dokumenty planistyczne i robocze projektu (plan epików, notatki sesji, materiały testów
+> manualnych, raporty audytów) są utrzymywane poza repozytorium.
 
 ## Struktura monorepo
 
@@ -37,7 +36,7 @@ PHP 8.4 + Symfony 7.4 LTS + API Platform 4 + FrankenPHP 2.x worker mode · Postg
 │   └── caddy/      Edge Caddyfile — single-origin proxy
 ├── docker-compose.yml  Cały stack dev: Caddy + FrankenPHP + Postgres + Redis +
 │                       Meilisearch + MinIO + Mercure + Mailpit
-└── Project Plan/   Architektura, plan, ADR-y
+└── docs/           ADR-y, architektura, runbooki, spec OpenAPI
 ```
 
 ## Wymagania
@@ -101,11 +100,6 @@ Caddy ma własny lokalny CA — przy pierwszym `pnpm dev` przeglądarka wymaga z
   `.gitignore` celowo łapie `.env` oraz każde `.env.*` (poza allowlistą
   `.env.example`, `apps/api/.env`, `apps/api/.env.test`). Nigdy nie commituj
   pliku z realnym hasłem.
-
-> **Uwaga (operator):** `.env.dev` jest *trackowany* na starszych branchach
-> (sprzed W0-7), a *nietrackowany* na `main`. Przełączenie/`pull` może skasować
-> Twój realny `.env.dev` — zrób backup do `/tmp` przed checkoutem, potem przywróć
-> i zrestartuj stack.
 
 ### `pim:db:reset` — reset bazy w jednym kroku
 
@@ -203,7 +197,7 @@ Artefakty failure (screenshot / video / trace) lądują w `apps/admin/test-resul
 
 ## Troubleshooting (dzień pierwszy)
 
-Znane quirki środowiska dev — symptom → heal (#2179; źródło: `agent/lessons.md`):
+Znane quirki środowiska dev — symptom → heal (#2179):
 
 | Symptom | Przyczyna | Heal |
 |---|---|---|
@@ -245,7 +239,7 @@ Pełen runbook: [`docs/runbook/restore.md`](docs/runbook/restore.md). Production
 
 ## Następny krok
 
-MVP-Alpha — epik 0.1 zamknięty. Następny: epik 0.2 (Identity & Access, [#24-#30](https://github.com/malipie/PIM/issues?q=is%3Aopen+label%3A%22epik-0.2%22)). Pełny plan w [`Project Plan/02-plan-projektu-pim.md`](Project%20Plan/02-plan-projektu-pim.md), aktualny status w [`agent/current_status.md`](agent/current_status.md).
+MVP ukończone (wersja 1.0.0-alpha). Do pełnego go-live pozostały pozycje śledzone w issues z labelem [`epik-GOLIVE`](https://github.com/malipie/PIM/issues?q=is%3Aopen+label%3A%22epik-GOLIVE%22): wybór hostingu + deploy produkcyjny (#2138), SMTP deliverability (#2139), RODO (#2140), soft-launch (#2141) oraz hardening wydajności (#2231, #2233, #2234).
 
 ## Licencja
 
