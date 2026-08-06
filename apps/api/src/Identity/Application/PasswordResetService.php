@@ -18,6 +18,7 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * RBAC-P2-009 (#658) — password reset orchestrator.
@@ -48,7 +49,10 @@ final class PasswordResetService
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly MailerInterface $mailer,
         private readonly LoggerInterface $logger,
-        private readonly string $appBaseUrl = 'https://pim.localhost',
+        #[Autowire(env: 'APP_BASE_URL')]
+        private readonly string $appBaseUrl,
+        #[Autowire(env: 'MAILER_FROM')]
+        private readonly string $mailerFrom,
     ) {
     }
 
@@ -82,7 +86,7 @@ final class PasswordResetService
         // existence + mail delivery success.
         try {
             $message = new TemplatedEmail()
-                ->from(new Address('noreply@pim.localhost', 'Cortex PIM'))
+                ->from(new Address($this->mailerFrom, 'Cortex PIM'))
                 ->to(new Address($email))
                 ->subject('Reset hasła — Cortex PIM')
                 ->htmlTemplate('email/password-reset.html.twig')

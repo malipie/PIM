@@ -55,7 +55,19 @@ class AppFixtures extends Fixture implements DependentFixtureInterface
         return [PrdPermissionFixtures::class];
     }
 
+    /**
+     * Dev/test fixture password. An online/demo deployment can override via
+     * PIM_SEED_ADMIN_PASSWORD; the 'changeme' fallback keeps ~60 PHPUnit and
+     * Playwright logins working locally and in CI.
+     */
     private const string DEFAULT_ADMIN_PASSWORD = 'changeme';
+
+    private static function adminPassword(): string
+    {
+        $env = $_SERVER['PIM_SEED_ADMIN_PASSWORD'] ?? $_ENV['PIM_SEED_ADMIN_PASSWORD'] ?? null;
+
+        return \is_string($env) && '' !== $env ? $env : self::DEFAULT_ADMIN_PASSWORD;
+    }
 
     public function __construct(
         private readonly TenantContext $tenantContext,
@@ -180,7 +192,7 @@ class AppFixtures extends Fixture implements DependentFixtureInterface
             $admin = new User(
                 $tenant,
                 $email,
-                $this->passwordHasher->hashPassword($stub, self::DEFAULT_ADMIN_PASSWORD),
+                $this->passwordHasher->hashPassword($stub, self::adminPassword()),
                 [],
             );
             $admin->addRole($superAdmin);
@@ -225,7 +237,7 @@ class AppFixtures extends Fixture implements DependentFixtureInterface
         $reviewer = new User(
             $demoTenant,
             $reviewerEmail,
-            $this->passwordHasher->hashPassword($reviewerStub, self::DEFAULT_ADMIN_PASSWORD),
+            $this->passwordHasher->hashPassword($reviewerStub, self::adminPassword()),
             [],
         );
         $reviewer->addRole($reviewerRole);
@@ -243,7 +255,7 @@ class AppFixtures extends Fixture implements DependentFixtureInterface
         $operator = new User(
             $tenants[0],
             $operatorEmail,
-            $this->passwordHasher->hashPassword($operatorStub, self::DEFAULT_ADMIN_PASSWORD),
+            $this->passwordHasher->hashPassword($operatorStub, self::adminPassword()),
             [],
         );
         $operator->addRole($platformOperator);

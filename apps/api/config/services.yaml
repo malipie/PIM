@@ -643,6 +643,7 @@ services:
         arguments:
             $rawKeysByVersion:
                 1: '%env(default::APP_BYOK_KEY_V1)%'
+            $appEnv: '%kernel.environment%'
 
     App\Shared\Application\Crypto\EncryptionServiceInterface:
         alias: App\Shared\Infrastructure\Crypto\AesGcmEncryptionService

@@ -168,6 +168,8 @@ final class DevTokenExposureTest extends TestCase
             passwordHasher: $this->createStub(UserPasswordHasherInterface::class),
             mailer: $this->createStub(MailerInterface::class),
             logger: new NullLogger(),
+            appBaseUrl: 'https://pim.localhost',
+            mailerFrom: 'noreply@pim.localhost',
         );
 
         return new PasswordResetController(
@@ -246,6 +248,8 @@ final class DevTokenExposureTest extends TestCase
             passwordHasher: $this->createStub(UserPasswordHasherInterface::class),
             mailer: $this->createStub(MailerInterface::class),
             logger: new NullLogger(),
+            appBaseUrl: 'https://pim.localhost',
+            mailerFrom: 'noreply@pim.localhost',
         );
     }
 

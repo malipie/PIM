@@ -32,8 +32,10 @@ final readonly class AesGcmEncryptionService implements EncryptionServiceInterfa
     /**
      * @param array<int, string> $rawKeysByVersion map of version → base64-encoded
      *                                             32-byte key (the env var format)
+     * @param string             $appEnv           kernel.environment — prod refuses
+     *                                             the all-zero placeholder key
      */
-    public function __construct(array $rawKeysByVersion)
+    public function __construct(array $rawKeysByVersion, private string $appEnv = 'dev')
     {
         if ([] === $rawKeysByVersion) {
             throw new RuntimeException(
@@ -53,6 +55,16 @@ final readonly class AesGcmEncryptionService implements EncryptionServiceInterfa
             if (false === $raw || 32 !== \strlen($raw)) {
                 throw new RuntimeException(\sprintf(
                     'BYOK master key version %d is not a valid base64 32-byte string.',
+                    $version,
+                ));
+            }
+            // The tracked .env ships an all-zero placeholder so dev boots out
+            // of the box. That key is public by definition — production must
+            // never encrypt SSO/TOTP/BYOK/integration secrets with it.
+            if ('prod' === $this->appEnv && $raw === str_repeat("\0", 32)) {
+                throw new RuntimeException(\sprintf(
+                    'BYOK master key version %d is the all-zero placeholder from the tracked .env. '.
+                    'Generate a real key (php -r "echo base64_encode(random_bytes(32));") and set APP_BYOK_KEY_V1.',
                     $version,
                 ));
             }
