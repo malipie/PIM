@@ -1,0 +1,55 @@
+name: Release
+
+# Tag-driven release (CLAUDE-era wymóg: wersjonowany snapshot OpenAPI per tag,
+# krok CI — nie ręczny). Flow:
+#   1. Release PR dokłada docs/api-spec/v<wersja>.json (kopia v0.json — bramka
+#      „OpenAPI spec drift" gwarantuje, że v0 == żywy kontrakt) + sekcję
+#      CHANGELOG i bump wersji w package.json.
+#   2. Po merge: `git tag v<wersja> && git push origin v<wersja>`.
+#   3. Ten workflow weryfikuje spójność snapshotu i wersji, po czym tworzy
+#      GitHub Release z notatkami z CHANGELOG i specem w załączniku.
+# Weryfikacja (a nie commit z workflow) — main jest chroniony przed
+# bezpośrednim pushem; snapshot wchodzi normalnym PR-em.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify snapshot + versions match the tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SNAPSHOT="docs/api-spec/v${VERSION}.json"
+          test -f "$SNAPSHOT" || { echo "::error::Missing ${SNAPSHOT} — the release PR must snapshot the spec before tagging."; exit 1; }
+          diff -q "$SNAPSHOT" docs/api-spec/v0.json || { echo "::error::${SNAPSHOT} differs from v0.json — snapshot again from the tagged commit."; exit 1; }
+          grep -q "\"version\": \"${VERSION}\"" package.json || { echo "::error::package.json version does not match tag ${GITHUB_REF_NAME}."; exit 1; }
+          grep -q "^## \[${VERSION}\]" CHANGELOG.md || { echo "::error::CHANGELOG.md has no section for ${VERSION}."; exit 1; }
+
+      - name: Extract CHANGELOG section
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" {on=1; next}
+            on && /^## \[/ {exit}
+            on {print}
+          ' CHANGELOG.md > /tmp/release-notes.md
+          echo "--- notes ---"; cat /tmp/release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            --title "PIM ${GITHUB_REF_NAME}" \
+            --notes-file /tmp/release-notes.md \
+            --prerelease \
+            "docs/api-spec/v${VERSION}.json#OpenAPI spec ${GITHUB_REF_NAME}"
