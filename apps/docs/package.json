@@ -1,0 +1,16 @@
+{
+  "name": "@pim/docs",
+  "version": "1.0.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/sync-content.mjs",
+    "dev": "pnpm sync && vitepress dev content",
+    "build": "pnpm sync && vitepress build content",
+    "preview": "vitepress preview content"
+  },
+  "devDependencies": {
+    "@scalar/api-reference": "^1.25.0",
+    "vitepress": "^1.6.0"
+  }
+}

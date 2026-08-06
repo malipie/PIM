@@ -1,0 +1,97 @@
+name: Docs (build & publish)
+
+# Automatyczna dokumentacja (decyzja operatora 2026-08-06): strona docs
+# (VitePress + Scalar na snapshot OpenAPI) buduje się przy KAŻDEJ zmianie
+# źródeł i — po włączeniu deployu — sama publikuje się na serwer pod /docs.
+#
+# UWAGA na pułapkę paths: quality-php.yml celowo IGNORUJE `docs/**` i `**/*.md`
+# (paths-ignore). Ten workflow ma własne `paths`, bo bez tego zmiana treści
+# dokumentacji nigdy nie wywołałaby przebudowy strony.
+#
+# Deploy jest uzbrajany zmienną repo DOCS_DEPLOY_ENABLED=true + sekretami
+# DOCS_DEPLOY_{HOST,USER,PATH,SSH_KEY}. Bez nich workflow kończy się na
+# artefakcie (build-only) — brak serwera nie czerwieni CI.
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "apps/docs/**"
+      - ".github/workflows/docs-publish.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "apps/docs/**"
+      - ".github/workflows/docs-publish.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: docs-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build docs site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (sync allow-listed docs + OpenAPI spec + Scalar, VitePress build)
+        run: pnpm --filter @pim/docs build
+
+      - name: Sanity-check output
+        run: |
+          test -f apps/docs/dist/index.html
+          test -f apps/docs/dist/api.html
+          test -f apps/docs/dist/api-spec/v0.json
+          test -f apps/docs/dist/vendor/scalar-standalone.js
+          echo "dist size: $(du -sh apps/docs/dist | cut -f1)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs-dist
+          path: apps/docs/dist
+          retention-days: 14
+
+  deploy:
+    name: Publish to server
+    needs: build
+    # Only real pushes to main publish; PR builds stop at the artifact.
+    # DOCS_DEPLOY_ENABLED is a repository *variable* — flip to `true` once
+    # the production host exists (see docs/operations/deploy-runbook.md).
+    if: github.event_name != 'pull_request' && vars.DOCS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: docs-dist
+          path: dist
+
+      - name: Rsync to /srv/docs on the production host
+        env:
+          DEPLOY_HOST: ${{ secrets.DOCS_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DOCS_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DOCS_DEPLOY_PATH }}
+          SSH_KEY: ${{ secrets.DOCS_DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes" \
+            dist/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          echo "Docs published to $DEPLOY_HOST:$DEPLOY_PATH"

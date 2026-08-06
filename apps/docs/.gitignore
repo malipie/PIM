@@ -1,0 +1,8 @@
+# Synced at build time from repo docs/ (single source of truth) — never commit copies.
+content/guide/
+content/developer/
+content/public/api-spec/
+content/public/vendor/
+content/.vitepress/cache/
+content/.vitepress/dist/
+dist/
