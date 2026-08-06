@@ -11,6 +11,7 @@ use App\Catalog\Application\BuiltInSystemAttributesSeeder;
 use App\Catalog\Application\DefaultMenuSeeder;
 use App\Channel\Domain\Entity\Locale;
 use App\Channel\Domain\Entity\TenantLocale;
+use App\Identity\Application\PrdPermissionSeeder;
 use App\Identity\Application\RbacSeeder;
 use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\User;
@@ -19,6 +20,7 @@ use App\Identity\Domain\Repository\PermissionRepositoryInterface;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
+use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -63,6 +65,7 @@ final class TenantBootstrapCommand extends Command
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly UserPasswordHasherInterface $passwordHasher,
+        private readonly PrdPermissionSeeder $prdPermissionSeeder,
         private readonly RbacSeeder $rbacSeeder,
         private readonly RoleRepositoryInterface $roleRepository,
         private readonly PermissionRepositoryInterface $permissionRepository,
@@ -166,7 +169,15 @@ final class TenantBootstrapCommand extends Command
             return Command::INVALID;
         }
 
-        // 1. Global RBAC baseline (4 built-in roles + legacy permission codes).
+        // 1. Global RBAC baseline. The PRD §3.2 permission catalogue comes
+        //    first: SeedTenantPrdRolesService below resolves its role
+        //    templates against these codes, and on a migrations-only
+        //    database they do not exist yet (the codes used to ship only in
+        //    dev fixtures — see PrdPermissionSeeder).
+        $created = $this->prdPermissionSeeder->seed();
+        if ($created > 0) {
+            $io->text(\sprintf('PRD permission catalogue: %d code(s) added.', $created));
+        }
         $this->rbacSeeder->seed();
 
         // 2. Tenant (reuse when present — idempotent re-runs).
@@ -268,7 +279,7 @@ final class TenantBootstrapCommand extends Command
         $localeRepo = $this->em->getRepository(Locale::class);
         $default = $localeRepo->findOneBy(['code' => $defaultCode]);
         if (!$default instanceof Locale) {
-            throw new \RuntimeException(\sprintf(
+            throw new RuntimeException(\sprintf(
                 'Locale "%s" is missing — run doctrine:migrations:migrate first (the locale seed migration provides it).',
                 $defaultCode,
             ));
@@ -278,7 +289,7 @@ final class TenantBootstrapCommand extends Command
         if ('' !== $secondaryCode && $secondaryCode !== $defaultCode) {
             $secondary = $localeRepo->findOneBy(['code' => $secondaryCode]);
             if (!$secondary instanceof Locale) {
-                throw new \RuntimeException(\sprintf('Locale "%s" is missing — run migrations first.', $secondaryCode));
+                throw new RuntimeException(\sprintf('Locale "%s" is missing — run migrations first.', $secondaryCode));
             }
             $this->em->persist(new TenantLocale($secondary, false, true, $default, 1, $tenant));
         }

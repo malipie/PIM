@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\DataFixtures\Identity;
 
-use App\Identity\Domain\Entity\Permission;
+use App\Identity\Application\PrdPermissionSeeder;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
-use Symfony\Component\Uid\Uuid;
 
 /**
  * RBAC-P1-006 (#645) — seeds the ~50 atomic permissions from
@@ -20,6 +19,10 @@ use Symfony\Component\Uid\Uuid;
  *   resource=`settings.users`, action=`manage` — preserving the namespace
  *   in resource while keeping the verb in action. The full PRD code
  *   stays as `code` (unique by separate constraint).
+ *
+ * The catalogue itself now lives in {@see PrdPermissionSeeder} so production
+ * (where this fixtures class does not exist) seeds the exact same list —
+ * see that class for the incident that motivated the move.
  *
  * Idempotency:
  *   Fixture checks `permissions.code` before INSERT — re-running it after
@@ -37,161 +40,12 @@ use Symfony\Component\Uid\Uuid;
  */
 final class PrdPermissionFixtures extends Fixture
 {
-    /**
-     * The ~50 atomic permissions from PRD-PIM-rbac §3.2 macierz.
-     * Order: Cross-tenant → Products → Categories → Multimedia →
-     * Modeling → Publications → Imports → Exports → Workflow →
-     * Cmd+K agent → Settings → API tokens → Audit → Tenant lifecycle.
-     *
-     * @var list<string>
-     */
-    private const array PRD_PERMISSION_CODES = [
-        // Cross-tenant (Super Admin only)
-        'platform.tenants.list',
-        'platform.tenants.manage',
-        'platform.audit.view_all',
-        'platform.break_glass_recovery',
-
-        // Produkty
-        'products.view',
-        'products.add',
-        'products.edit',
-        'products.delete',
-        'products.bulk_operations',
-        'products.approve_pending_changes',
-
-        // Kategorie
-        'categories.view',
-        'categories.add_edit',
-        'categories.delete',
-
-        // Multimedia (DAM)
-        'multimedia.view',
-        'multimedia.add_edit_own',
-        'multimedia.add_edit_any',
-        'multimedia.delete',
-
-        // Modelowanie
-        'modeling.view',
-        'modeling.attributes.add_edit',
-        'modeling.attribute_groups.add_edit',
-        'modeling.object_types.add',
-        'modeling.delete_custom',
-        'modeling.approve_schema_ops',
-        'modeling.auto_grant_new_object_types',
-
-        // Publikacje
-        'publications.view',
-        'publications.publish_unpublish',
-
-        // Imports
-        'imports.view_own',
-        'imports.view_all',
-        'imports.run',
-
-        // Exports
-        'exports.view_own',
-        'exports.view_all',
-        'exports.run',
-
-        // Workflow
-        'workflow.view',
-        'workflow.approve_reject',
-        'workflow.edit_any_state',
-        // WFL-P1-01 (#2415) — PRD §3.8 state-policy codes, seeded dormant
-        // by RBAC Phase 3 docs and activated by the object_editorial guards.
-        'workflow.edit_in_review',
-        'workflow.transition.unpublish',
-        'workflow.manage_definitions',
-
-        // Cmd+K agent
-        'agent.schema_ops',
-        'agent.bulk_actions',
-        'agent.approve_pending',
-
-        // Settings
-        'settings.users.manage',
-        'settings.roles.manage',
-        'settings.tenant.manage',
-        'settings.locales.manage',
-        'settings.billing.manage',
-        'settings.integrations.manage',
-        'settings.integration_secrets.read',
-        // AICG-P1-03 (#2329, ADR-0030) — AI content settings
-        // (ContentRecipe + BrandVoiceProfile): read = list/view,
-        // create = add + clone built-in, admin = edit/delete/set-default.
-        'settings.ai_content.read',
-        'settings.ai_content.create',
-        'settings.ai_content.admin',
-
-        // API tokens
-        'api_tokens.own.crud',
-        'api_tokens.all.view_revoke',
-
-        // Audit
-        'audit.view_own',
-        'audit.view_cross_user',
-
-        // Tenant lifecycle
-        'tenant.delete',
-
-        // ULV-04a (#985) — generic ObjectType-scoped verbs for the
-        // universal ObjectListView. Cover every ObjectType (built-in +
-        // custom). The legacy per-kind codes (products.*, categories.*,
-        // multimedia.* etc.) keep working in parallel; ULV-04a only adds
-        // the generic verbs the universal list endpoint and per-ObjectType
-        // voter consume.
-        //
-        // Per-ObjectType grant scoping (e.g. `object.view` granted only
-        // for ObjectType=Cars but not Bikes) is enforced by the new
-        // `ObjectScopedVoter` via the user_role_assignments scope payload
-        // (locale/channel/attribute_group_scope already exists; a future
-        // RBAC ticket adds object_type_scope without touching the
-        // permission catalogue here).
-        'object.view',
-        'object.add',
-        'object.edit',
-        'object.delete',
-        'object.export',
-    ];
+    public function __construct(private readonly PrdPermissionSeeder $seeder)
+    {
+    }
 
     public function load(ObjectManager $manager): void
     {
-        $repo = $manager->getRepository(Permission::class);
-        $created = 0;
-
-        foreach (self::PRD_PERMISSION_CODES as $code) {
-            if (null !== $repo->findOneBy(['code' => $code])) {
-                continue; // idempotent — already seeded
-            }
-
-            [$resource, $action] = self::splitCode($code);
-            $manager->persist(new Permission(
-                resource: $resource,
-                action: $action,
-                code: $code,
-                id: Uuid::v7(),
-            ));
-            ++$created;
-        }
-
-        if ($created > 0) {
-            $manager->flush();
-        }
-    }
-
-    /**
-     * Split a PRD permission code into (resource, action) on the LAST dot.
-     *
-     * @return array{0: string, 1: string}
-     */
-    private static function splitCode(string $code): array
-    {
-        $lastDot = strrpos($code, '.');
-        if (false === $lastDot) {
-            return ['', $code];
-        }
-
-        return [substr($code, 0, $lastDot), substr($code, $lastDot + 1)];
+        $this->seeder->seed();
     }
 }

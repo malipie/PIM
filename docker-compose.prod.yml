@@ -129,8 +129,15 @@ services:
     # dev vendor volume over the image. That would shadow the hardened prod
     # image (composer --no-dev, warmed cache — AUD-044) with whatever sits on
     # the host, so prod re-declares the mounts with only the var volume.
+    #
+    # api_jwt keeps the LexikJWT keypair OUTSIDE the container layer: prod
+    # provisions it once (lexik:jwt:generate-keypair, see the deploy runbook)
+    # and without a volume every `docker compose build` wiped it, so logins
+    # died with JWTEncodeFailureException after the next image rebuild
+    # (hit on the first real deployment of v1.0.0-alpha.1).
     volumes: !override
       - api_var:/app/var
+      - api_jwt:/app/config/jwt
 
   # ─── Symfony Messenger worker pool ────────────────────────────────────────
   #
@@ -225,9 +232,11 @@ services:
           cpus: "1.0"
     # Same rationale as the api service: run on the image's code + vendor,
     # not the host checkout (the base compose merge would otherwise keep the
-    # ./apps/api bind-mount and the dev vendor volume).
+    # ./apps/api bind-mount and the dev vendor volume). The worker validates
+    # JWTs too, so it shares the persistent keypair volume.
     volumes: !override
       - api_var:/app/var
+      - api_jwt:/app/config/jwt
 
   # In production the frontend is a built artifact (apps/admin/dist) served by
   # Caddy as static files, not the Vite dev server. We park `admin` under a
@@ -570,3 +579,5 @@ services:
 volumes:
   prometheus_data:
   alertmanager_data:
+  # Provisioned once per deployment; survives image rebuilds and recreates.
+  api_jwt:
