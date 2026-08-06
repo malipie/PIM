@@ -107,6 +107,30 @@ services:
       # the fallback to non-prod, but clearing the value here removes it at the
       # source too, so even a misconfigured APP_ENV cannot resurrect it.
       APP_DEFAULT_TENANT_CODE: ""
+      # ── Go-live gaps (#2138 recon 2026-08-06) — all fail-loud ──────────────
+      # Mail: apps/api/.env ships MAILER_DSN=null://null (mail silently
+      # dropped) and a pim.localhost base URL / sender. On prod every one of
+      # these must be real or invitations + password resets are dead links.
+      MAILER_DSN: ${MAILER_DSN:?MAILER_DSN is required in prod — SMTP relay DSN, e.g. `smtp://user:pass@relay:587` (no default; the dev value null://null drops all mail).}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required in prod — public origin used in e-mail links, e.g. `https://pim.example.com` (no default).}
+      MAILER_FROM: ${MAILER_FROM:?MAILER_FROM is required in prod — sender address on a deliverable domain (SPF/DKIM aligned), e.g. `noreply@pim.example.com` (no default).}
+      # BYOK master key: the tracked .env carries an all-zero placeholder that
+      # the application additionally refuses on APP_ENV=prod (AesGcm guard).
+      APP_BYOK_KEY_V1: ${APP_BYOK_KEY_V1:?APP_BYOK_KEY_V1 is required in prod — `php -r 'echo base64_encode(random_bytes(32));'` (no default; encrypts SSO/TOTP/BYOK/integration secrets).}
+      # JWT keypair passphrase — pair provisioned explicitly on the host
+      # (lexik:jwt:generate-keypair, see docs/operations/deploy-runbook.md);
+      # the entrypoint autogen is dev/test-only by design.
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?JWT_PASSPHRASE is required in prod — passphrase of the provisioned JWT keypair (no default).}
+      # Mercure URLs must point at the real public origin or SSE topics
+      # mismatch what the SPA subscribes to (window.location.origin).
+      MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL:?MERCURE_PUBLIC_URL is required in prod — `https://<domain>/.well-known/mercure` (no default).}
+      MERCURE_TOPIC_BASE: ${MERCURE_TOPIC_BASE:?MERCURE_TOPIC_BASE is required in prod — `https://<domain>` (no default).}
+    # The base compose bind-mounts the host checkout (./apps/api:/app) and a
+    # dev vendor volume over the image. That would shadow the hardened prod
+    # image (composer --no-dev, warmed cache — AUD-044) with whatever sits on
+    # the host, so prod re-declares the mounts with only the var volume.
+    volumes: !override
+      - api_var:/app/var
 
   # ─── Symfony Messenger worker pool ────────────────────────────────────────
   #
@@ -154,11 +178,21 @@ services:
       # worker sees locks acquired by inline imports and vice-versa.
       LOCK_DSN: redis://redis:6379
       MERCURE_URL: http://mercure/.well-known/mercure
-      MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL:-https://pim.localhost/.well-known/mercure}
+      # Same fail-loud posture as the api service — a worker publishing SSE
+      # progress under pim.localhost topics is invisible to the real SPA.
+      MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL:?MERCURE_PUBLIC_URL is required in prod — `https://<domain>/.well-known/mercure` (no default).}
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:?MERCURE_JWT_SECRET is required in prod — min 256 bits, e.g. `openssl rand -hex 32` (no default).}
-      MERCURE_TOPIC_BASE: ${MERCURE_TOPIC_BASE:-https://pim.localhost}
+      MERCURE_TOPIC_BASE: ${MERCURE_TOPIC_BASE:?MERCURE_TOPIC_BASE is required in prod — `https://<domain>` (no default).}
       MEILI_URL: http://meilisearch:7700
       MEILI_KEY: ${MEILI_MASTER_KEY:?MEILI_MASTER_KEY is required in prod — `openssl rand -base64 32` (no default).}
+      # Go-live gaps (#2138) — the worker sends async mail (invitations
+      # queued through Messenger) and encrypts integration credentials, so it
+      # needs the same mail/BYOK/JWT posture as the api container.
+      MAILER_DSN: ${MAILER_DSN:?MAILER_DSN is required in prod — SMTP relay DSN (no default).}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required in prod — public origin for e-mail links (no default).}
+      MAILER_FROM: ${MAILER_FROM:?MAILER_FROM is required in prod — sender address (no default).}
+      APP_BYOK_KEY_V1: ${APP_BYOK_KEY_V1:?APP_BYOK_KEY_V1 is required in prod (no default).}
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?JWT_PASSPHRASE is required in prod (no default).}
     # Worker entrypoint: drain `async` then exit cleanly. Docker restarts the
     # container, the loop continues. Two distinct exit triggers:
     #   --memory-limit 256M : PHP self-checks RSS after each handle, exits 0
@@ -173,6 +207,12 @@ services:
       - "messenger:consume"
       - "async"
       - "import"
+      # Scheduler transports — without a consumer the MaintenanceSchedule
+      # (export/audit/staged-file retention, tenant purge) and SyncSchedule
+      # (integration:sync:dispatch-due) are inert in prod. The dev worker
+      # already consumes both; keep prod at parity.
+      - "scheduler_maintenance"
+      - "scheduler_integration_sync"
       - "--memory-limit=256M"
       - "--time-limit=3600"
       - "--failure-limit=5"
@@ -183,7 +223,10 @@ services:
         limits:
           memory: 512M
           cpus: "1.0"
-    volumes:
+    # Same rationale as the api service: run on the image's code + vendor,
+    # not the host checkout (the base compose merge would otherwise keep the
+    # ./apps/api bind-mount and the dev vendor volume).
+    volumes: !override
       - api_var:/app/var
 
   # In production the frontend is a built artifact (apps/admin/dist) served by
@@ -213,6 +256,23 @@ services:
         condition: service_healthy
       mercure:
         condition: service_started
+    environment:
+      # Public site host for the prod Caddyfile site block (auto-TLS via
+      # Let's Encrypt). Bare domain, no scheme: e.g. `pim.example.com`.
+      DOMAIN: ${DOMAIN:?DOMAIN is required in prod — public host served by Caddy, e.g. `pim.example.com` (no default).}
+      # ACME account e-mail for certificate expiry notices.
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required in prod — e-mail registered with Let's Encrypt (no default).}
+    # Prod serves the BUILT SPA bundle (apps/admin/dist — `pnpm --filter
+    # @pim/admin build` on the host before `up`, see deploy runbook) and the
+    # docs site as static files; the Vite dev server stays parked under the
+    # dev-only profile. The docs mount may be an empty dir until the docs
+    # pipeline publishes — Caddy just 404s under /docs then.
+    volumes: !override
+      - ./docker/caddy/Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - ./apps/admin/dist:/srv/admin:ro
+      - ./apps/docs/dist:/srv/docs:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
   # ─── Data-layer secret hardening (AUD-009 / W1-4) ─────────────────────────
   #
@@ -306,9 +366,12 @@ services:
       MIRROR_SOURCE_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required in prod (no default).}
       MIRROR_SOURCE_SECRET: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required in prod (no default).}
       MIRROR_SOURCE_BUCKET: pim-assets
-      MIRROR_TARGET_URL: ${MIRROR_TARGET_URL:?MIRROR_TARGET_URL is required for asset replication — endpoint of the SECOND MinIO/S3 region (no default).}
-      MIRROR_TARGET_KEY: ${MIRROR_TARGET_KEY:?MIRROR_TARGET_KEY is required for asset replication (no default).}
-      MIRROR_TARGET_SECRET: ${MIRROR_TARGET_SECRET:?MIRROR_TARGET_SECRET is required for asset replication (no default).}
+      # The mirror script enforces these at runtime (fail-loud on start);
+      # compose-level `:?` would break `config -q` for deploys that do not
+      # enable the `dr` profile at all (interpolation ignores profiles).
+      MIRROR_TARGET_URL: ${MIRROR_TARGET_URL:-}
+      MIRROR_TARGET_KEY: ${MIRROR_TARGET_KEY:-}
+      MIRROR_TARGET_SECRET: ${MIRROR_TARGET_SECRET:-}
       MIRROR_TARGET_BUCKET: ${MIRROR_TARGET_BUCKET:-pim-assets-replica}
       # --watch keeps the mirror live (event-driven) instead of one-shot.
       MIRROR_WATCH: "1"
@@ -321,6 +384,10 @@ services:
       SERVER_NAME: ":80"
       MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET:?MERCURE_JWT_SECRET is required in prod — min 256 bits, e.g. `openssl rand -hex 32` (no default).}
       MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET:?MERCURE_JWT_SECRET is required in prod — min 256 bits, e.g. `openssl rand -hex 32` (no default).}
+      # The base compose pins cors_origins to pim.localhost — on any real
+      # domain the browser's EventSource would be refused by the hub.
+      MERCURE_EXTRA_DIRECTIVES: |
+        cors_origins ${MERCURE_CORS_ORIGINS:?MERCURE_CORS_ORIGINS is required in prod — public origin(s) of the SPA, e.g. `https://pim.example.com` (no default).}
 
   # ─── PgBouncer (transaction-mode connection pooler) ───────────────────────
   #
@@ -433,9 +500,12 @@ services:
   # ─── Alertmanager (routes Prometheus alerts to receivers) ─────────────────
   #
   # PROD-04. Minimal config that groups + dedupes alerts. ALERTMANAGER_WEBHOOK_URL
-  # in env points at the operator's choice of receiver (PagerDuty / Slack /
-  # Opsgenie / generic webhook). Default is example.invalid so an unconfigured
-  # deploy fails loudly during smoke instead of silently swallowing alerts.
+  # points at the operator's receiver (PagerDuty / Slack / Opsgenie / generic
+  # webhook) and is FAIL-LOUD: Alertmanager does NOT expand env vars inside its
+  # config file (the previous `${VAR:-default}` in alertmanager.yml was Compose
+  # syntax that never fired — alerts went to a literal string). The entrypoint
+  # below substitutes the __WEBHOOK_URL__ placeholder at container start, so
+  # the routed URL is the real one and an unset env aborts `compose config`.
   alertmanager:
     image: prom/alertmanager:v0.27.0
     restart: unless-stopped
@@ -445,13 +515,18 @@ services:
           memory: 128M
           cpus: "0.25"
     environment:
-      ALERTMANAGER_WEBHOOK_URL: ${ALERTMANAGER_WEBHOOK_URL:-http://example.invalid/}
+      ALERTMANAGER_WEBHOOK_URL: ${ALERTMANAGER_WEBHOOK_URL:?ALERTMANAGER_WEBHOOK_URL is required in prod — webhook receiving Prometheus alerts (Slack/PagerDuty/healthchecks bridge); without it nobody hears the 7 alert rules fire (no default).}
     volumes:
-      - ./docker/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./docker/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml.tpl:ro
       - alertmanager_data:/alertmanager
+    entrypoint: ["/bin/sh", "-c"]
     command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-      - "--storage.path=/alertmanager"
+      - >-
+        sed "s|__WEBHOOK_URL__|$${ALERTMANAGER_WEBHOOK_URL}|g"
+        /etc/alertmanager/alertmanager.yml.tpl > /tmp/alertmanager.yml
+        && exec /bin/alertmanager
+        --config.file=/tmp/alertmanager.yml
+        --storage.path=/alertmanager
     expose:
       - "9093"
     healthcheck:

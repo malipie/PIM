@@ -71,6 +71,10 @@ jobs:
         working-directory: .
         run: bash scripts/lint-tracked-secrets.sh
 
+      - name: Lint prod env template completeness
+        working-directory: .
+        run: bash scripts/lint-prod-env-example.sh
+
       # GOLIVE #2192 — PHP twin of the admin max-lines guard: baseline-frozen
       # count of src/ files over 800 lines (currently 1: ImportRunHandler).
       - name: API max-lines guard
