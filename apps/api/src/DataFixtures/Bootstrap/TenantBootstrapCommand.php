@@ -20,6 +20,7 @@ use App\Identity\Domain\Repository\PermissionRepositoryInterface;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
+use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -278,7 +279,7 @@ final class TenantBootstrapCommand extends Command
         $localeRepo = $this->em->getRepository(Locale::class);
         $default = $localeRepo->findOneBy(['code' => $defaultCode]);
         if (!$default instanceof Locale) {
-            throw new \RuntimeException(\sprintf(
+            throw new RuntimeException(\sprintf(
                 'Locale "%s" is missing — run doctrine:migrations:migrate first (the locale seed migration provides it).',
                 $defaultCode,
             ));
@@ -288,7 +289,7 @@ final class TenantBootstrapCommand extends Command
         if ('' !== $secondaryCode && $secondaryCode !== $defaultCode) {
             $secondary = $localeRepo->findOneBy(['code' => $secondaryCode]);
             if (!$secondary instanceof Locale) {
-                throw new \RuntimeException(\sprintf('Locale "%s" is missing — run migrations first.', $secondaryCode));
+                throw new RuntimeException(\sprintf('Locale "%s" is missing — run migrations first.', $secondaryCode));
             }
             $this->em->persist(new TenantLocale($secondary, false, true, $default, 1, $tenant));
         }
