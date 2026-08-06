@@ -31,11 +31,6 @@
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
         Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-        # Prod CSP: the built admin bundle needs no inline/eval script.
-        # style-src keeps 'unsafe-inline' for runtime CSS injection
-        # (Radix/Tailwind). connect-src 'self' covers the Mercure SSE on the
-        # same origin.
-        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
         Cross-Origin-Opener-Policy "same-origin"
         Cross-Origin-Resource-Policy "same-origin"
         -Server
@@ -60,6 +55,7 @@
     }
 
     handle /api* {
+        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
         # Edge backstop on request body size (IMP2-2.8): Caddy 150MB >
         # php.ini post_max_size 110MB > application limit 100MB, so the
         # readable RFC 7807 error from the app fires first on normal
@@ -71,10 +67,15 @@
     }
 
     # Documentation site (user guides + API reference) — static build
-    # published by the docs pipeline into /srv/docs. The docs generator
-    # (VitePress) ships small inline bootstrap scripts, so this subtree
-    # carries its own CSP with 'unsafe-inline' — scoped here only, the
-    # admin SPA keeps the strict policy above.
+    # published by the docs pipeline into /srv/docs.
+    #
+    # VitePress emits the page-chunk hash map as an INLINE script
+    # (window.__VP_HASH_MAP__). Under the strict policy the browser blocked
+    # it, the client router could not resolve the chunk for a clicked page
+    # and in-site navigation silently died — direct URLs worked (server-
+    # rendered HTML), every menu link did not. Hence 'unsafe-inline' scoped
+    # to this subtree only; the docs are static, take no user input and
+    # carry no session.
     handle_path /docs* {
         header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
         root * /srv/docs
@@ -84,6 +85,7 @@
 
     # Admin SPA — built bundle, client-side router fallback to index.html.
     handle {
+        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
         root * /srv/admin
         try_files {path} /index.html
         file_server
