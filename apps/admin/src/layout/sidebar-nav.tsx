@@ -22,7 +22,6 @@ import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation } from 'react-router';
 
 import { BrandLogo } from '@/components/brand/brand-logo';
-import { MockBadge } from '@/components/ui/mock-badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { hasFeature, hasPermission, isMenuRefVisible, useIdentity } from '@/lib/identity';
 import { type EffectiveMenuItem, useEffectiveMenu } from '@/lib/use-effective-menu';
@@ -462,7 +461,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
   };
 
   const agentTooltip = t('topbar.agent_pill_tooltip', {
-    defaultValue: 'Nawigacja ⌘K działa; sekcja agenta = MOCK (epik 0.7, Faza 2)',
+    defaultValue: 'Wyszukiwanie i nawigacja ⌘K; czat agenta AI w sekcji „Agent AI"',
   });
 
   return (
@@ -490,7 +489,6 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
             <kbd className="hidden rounded border border-zinc-200 bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-500 sm:inline">
               ⌘K
             </kbd>
-            <MockBadge tooltip={agentTooltip} />
           </button>
         </TooltipTrigger>
         <TooltipContent side="right">{agentTooltip}</TooltipContent>

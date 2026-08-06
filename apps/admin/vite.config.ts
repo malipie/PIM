@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
@@ -9,11 +10,22 @@ import { defineConfig } from 'vite';
 // and Vite build.
 const here = path.dirname(fileURLToPath(import.meta.url));
 
+// Real app version for the footer — package.json is the single source
+// (release bumps it together with the git tag); APP_VERSION env can
+// override at build time (e.g. CI stamping an exact tag).
+const pkg = JSON.parse(readFileSync(path.resolve(here, 'package.json'), 'utf8')) as {
+  version: string;
+};
+const appVersion = process.env.APP_VERSION ?? pkg.version;
+
 // HMR through Caddy reverse proxy: WebSocket upgrades on the same single origin (pim.localhost).
 // The Vite dev server listens on 0.0.0.0:5173 inside the container; Caddy forwards / and the
 // HMR socket. See Caddyfile in repo root.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   resolve: {
     alias: {
       '@': path.resolve(here, './src'),

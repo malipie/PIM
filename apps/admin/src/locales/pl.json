@@ -1169,7 +1169,7 @@
     "search_agent_placeholder": "Zapytaj agenta lub szukaj...",
     "agent_mock_tooltip": "MOCK · Agent layer wymaga oprogramowania (epik 0.7, Faza 2)",
     "history": "Historia",
-    "agent_pill_tooltip": "Nawigacja ⌘K działa; sekcja agenta = MOCK (epik 0.7, Faza 2)"
+    "agent_pill_tooltip": "Wyszukiwanie i nawigacja ⌘K; czat agenta AI w sekcji „Agent AI\""
   },
   "mock": {
     "label": "MOCK",
