@@ -5,6 +5,43 @@ versioning per epic milestones (`0.X.Y` matches the internal epic/ticket numberi
 
 ## [Unreleased]
 
+_(nic jeszcze — kolejne zmiany po 1.0.0-alpha.1)_
+
+## [1.0.0-alpha.1] — 2026-08-06
+
+Pierwsze wydanie oznaczone tagiem: **MVP ukończone, start testowy (alpha)**.
+Zakres = całość prac epików 0.1–0.11 + RBAC + integracje substrate + agent AI
+(historia poniżej i w git log). W ramach przygotowania do publikacji:
+
+### Added
+- Produkcyjny edge: `docker/caddy/Caddyfile.prod` (auto-TLS, statyczny bundle
+  admina, strona `/docs`), kompletny `.env.prod.example` + guard CI spójności,
+  runbook deploy end-to-end (`docs/operations/deploy-runbook.md`). (#2775)
+- `pim:tenant:bootstrap` — prod-safe utworzenie tenanta + ownera (hasło z env,
+  idempotentne); parametryzacja haseł seedów (`PIM_SEED_ADMIN_PASSWORD`). (#2773)
+- Strona dokumentacji `apps/docs` (VitePress + Scalar na snapshot OpenAPI)
+  z automatyczną publikacją (workflow `docs-publish`). (#2777)
+- MonologBundle: JSON na stderr w prod (fingers_crossed + pas WARNING). (#2776)
+
+### Changed
+- Dokumenty wewnętrzne (Project Plan, notatki agenta, protokoły testów, audyty)
+  wyłączone z repozytorium — pozostaje dokumentacja produktowa i `docs/api-spec`. (#2770)
+- Linki maili i nadawca z env (`APP_BASE_URL`, `MAILER_FROM`); Mercure
+  sparametryzowany pod realną domenę; worker prod konsumuje transporty
+  schedulera; obraz prod nie jest już przesłaniany bind-mountem. (#2773, #2775)
+- Dane demo „electronics" na fikcyjnych markach (Voltix, Aurion, Kyodo...). (#2774)
+- Stopka pokazuje realną wersję z `package.json` (build-time). (#2772)
+
+### Fixed
+- Alertmanager: webhook faktycznie podstawiany (render template w entrypoint —
+  wcześniej alerty szły na literalny string). (#2775)
+- Guard na all-zero `APP_BYOK_KEY_V1` przy `APP_ENV=prod`. (#2773)
+- `symfony/http-client` w `require` (dotąd require-dev + dryf do 8.x). (#2776)
+
+### Security
+- Rotacja dev `JWT_PASSPHRASE` (wartość historyczna w git history unieważniona)
+  + wymiana pary kluczy dev.
+
 ### Added — epik NUI (Retrofit UI v2, 2026-06-11/12)
 
 - **NUI-01..13** retrofit widoków do nowego designu `PIM-nowoczesny`
@@ -124,4 +161,5 @@ versioning per epic milestones (`0.X.Y` matches the internal epic/ticket numberi
 
 For older history (epics 0.1 — 0.9), see git log.
 
-[Unreleased]: https://github.com/malipie/PIM/compare/main...HEAD
+[Unreleased]: https://github.com/malipie/PIM/compare/v1.0.0-alpha.1...HEAD
+[1.0.0-alpha.1]: https://github.com/malipie/PIM/releases/tag/v1.0.0-alpha.1
