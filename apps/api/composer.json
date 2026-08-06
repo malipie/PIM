@@ -41,10 +41,12 @@
         "symfony/expression-language": "7.4.*",
         "symfony/flex": "^2.10",
         "symfony/framework-bundle": "7.4.*",
+        "symfony/http-client": "7.4.*",
         "symfony/mailer": "7.4.*",
         "symfony/mercure-bundle": "^0.4.2",
         "symfony/messenger": "7.4.*",
         "symfony/mime": "7.4.*",
+        "symfony/monolog-bundle": "^4.0",
         "symfony/property-access": "7.4.*",
         "symfony/property-info": "7.4.*",
         "symfony/rate-limiter": "7.4.*",
@@ -114,7 +116,6 @@
         ]
     },
     "conflict": {
-        "symfony/symfony": "*",
         "symfony/cache": ">=8.0",
         "symfony/clock": ">=8.0",
         "symfony/config": ">=8.0",
@@ -129,6 +130,7 @@
         "symfony/http-kernel": ">=8.0",
         "symfony/intl": ">=8.0",
         "symfony/lock": ">=8.0",
+        "symfony/monolog-bridge": ">=8.0",
         "symfony/options-resolver": ">=8.0",
         "symfony/password-hasher": ">=8.0",
         "symfony/process": ">=8.0",
@@ -138,6 +140,7 @@
         "symfony/security-http": ">=8.0",
         "symfony/stopwatch": ">=8.0",
         "symfony/string": ">=8.0",
+        "symfony/symfony": "*",
         "symfony/translation": ">=8.0",
         "symfony/twig-bridge": ">=8.0",
         "symfony/type-info": ">=8.0",
@@ -167,7 +170,6 @@
         "roave/security-advisories": "dev-latest",
         "symfony/browser-kit": "7.4.*",
         "symfony/css-selector": "7.4.*",
-        "symfony/http-client": "7.4.*",
         "zenstruck/foundry": "^2.11.0"
     }
 }
