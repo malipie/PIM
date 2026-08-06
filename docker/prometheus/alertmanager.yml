@@ -1,9 +1,12 @@
-# Alertmanager routing config for the prod stack.
+# Alertmanager routing config TEMPLATE for the prod stack.
 #
-# PROD-04 — minimal config that groups + dedupes alerts and routes to
-# a single webhook receiver. The webhook URL is read from environment
-# (set via Compose secrets / .env on the prod host) so this file can
-# stay in version control without leaking the destination.
+# PROD-04 — minimal config that groups + dedupes alerts and routes to a
+# single webhook receiver. Alertmanager does NOT expand environment
+# variables in its config file, so the compose service renders this
+# template at container start: the entrypoint substitutes __WEBHOOK_URL__
+# with $ALERTMANAGER_WEBHOOK_URL (fail-loud in docker-compose.prod.yml)
+# and starts Alertmanager on the rendered copy. The file stays in version
+# control without leaking the destination.
 #
 # Add real receivers (PagerDuty, Slack, Opsgenie) by extending the
 # `receivers:` block — Alertmanager docs:
@@ -27,7 +30,7 @@ route:
 receivers:
   - name: default-webhook
     webhook_configs:
-      - url: ${ALERTMANAGER_WEBHOOK_URL:-http://example.invalid/}
+      - url: __WEBHOOK_URL__
         send_resolved: true
 
 inhibit_rules:

@@ -1,0 +1,91 @@
+# PIM edge Caddy — PRODUCTION site (single-origin, same topology as dev).
+#
+# Mounted over /etc/caddy/Caddyfile by docker-compose.prod.yml. Differences
+# from the dev Caddyfile (docker/caddy/Caddyfile):
+#   - real domain from {$DOMAIN} with automatic Let's Encrypt TLS
+#     (no local_certs, no debug),
+#   - the SPA is the BUILT bundle served by file_server from /srv/admin
+#     (apps/admin/dist mounted read-only) — no Vite dev server,
+#   - /docs* serves the generated documentation site from /srv/docs
+#     (apps/docs/dist) with a docs-scoped CSP,
+#   - CSP script-src drops 'unsafe-inline'/'unsafe-eval' — the built
+#     admin bundle has one external module script, no inline, no eval
+#     (AUD-074).
+#
+# Route order (most specific handle wins):
+#   /.well-known/mercure → Mercure hub (SSE)
+#   /api/metrics         → 404 blackhole (#2729 — Prometheus scrapes api:80
+#                          over the internal network, never the edge)
+#   /api/*               → FrankenPHP / Symfony / API Platform
+#   /docs/*              → static docs site
+#   /*                   → static admin SPA (index.html fallback for the router)
+
+{
+    email {$ACME_EMAIL}
+}
+
+(common_security_prod) {
+    header {
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        # Prod CSP: the built admin bundle needs no inline/eval script.
+        # style-src keeps 'unsafe-inline' for runtime CSS injection
+        # (Radix/Tailwind). connect-src 'self' covers the Mercure SSE on the
+        # same origin.
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Resource-Policy "same-origin"
+        -Server
+        -X-Powered-By
+    }
+}
+
+# `localhost` rides along for the container healthcheck (base compose probes
+# https://localhost/api with --no-check-certificate); Caddy issues an internal
+# self-signed cert for it while {$DOMAIN} gets a real ACME certificate.
+{$DOMAIN}, localhost {
+    import common_security_prod
+
+    # Mercure hub — must precede the /api* matcher.
+    handle /.well-known/mercure* {
+        reverse_proxy mercure:80
+    }
+
+    # #2729 — metrics stay internal-only.
+    handle /api/metrics* {
+        respond 404
+    }
+
+    handle /api* {
+        # Edge backstop on request body size (IMP2-2.8): Caddy 150MB >
+        # php.ini post_max_size 110MB > application limit 100MB, so the
+        # readable RFC 7807 error from the app fires first on normal
+        # oversizes and the edge only stops extreme payloads.
+        request_body {
+            max_size 150MB
+        }
+        reverse_proxy api:80
+    }
+
+    # Documentation site (user guides + API reference) — static build
+    # published by the docs pipeline into /srv/docs. The docs generator
+    # (VitePress) ships small inline bootstrap scripts, so this subtree
+    # carries its own CSP with 'unsafe-inline' — scoped here only, the
+    # admin SPA keeps the strict policy above.
+    handle_path /docs* {
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+        root * /srv/docs
+        try_files {path} {path}/index.html /index.html
+        file_server
+    }
+
+    # Admin SPA — built bundle, client-side router fallback to index.html.
+    handle {
+        root * /srv/admin
+        try_files {path} /index.html
+        file_server
+    }
+}

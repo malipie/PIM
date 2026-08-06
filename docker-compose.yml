@@ -175,8 +175,9 @@ services:
       # on a fresh install could only fail. Keep every doctrine DSN setup-free.
       MESSENGER_IMPORT_TRANSPORT_DSN: doctrine://default?auto_setup=0
       MERCURE_URL: http://mercure/.well-known/mercure
-      MERCURE_PUBLIC_URL: https://pim.localhost/.well-known/mercure
+      MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL:-https://pim.localhost/.well-known/mercure}
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-!ChangeMercureKeyAtLeast256BitsLong!}
+      MERCURE_TOPIC_BASE: ${MERCURE_TOPIC_BASE:-https://pim.localhost}
       MEILI_URL: http://meilisearch:7700
       MEILI_KEY: ${MEILI_MASTER_KEY:-masterKeyPleaseChangeMe}
       # GOLIVE #2181 (cold-start L10) — S3 credentials follow MINIO_ROOT_* like
@@ -284,7 +285,7 @@ services:
       # on a fresh install could only fail. Keep every doctrine DSN setup-free.
       MESSENGER_IMPORT_TRANSPORT_DSN: doctrine://default?auto_setup=0
       MERCURE_URL: http://mercure/.well-known/mercure
-      MERCURE_PUBLIC_URL: https://pim.localhost/.well-known/mercure
+      MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL:-https://pim.localhost/.well-known/mercure}
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-!ChangeMercureKeyAtLeast256BitsLong!}
       MERCURE_TOPIC_BASE: ${MERCURE_TOPIC_BASE:-https://pim.localhost}
       MEILI_URL: http://meilisearch:7700
@@ -517,7 +518,7 @@ services:
       # topics). Without it the hub answers 401. Re-adding `anonymous`
       # re-opens the cross-tenant SSE leak.
       MERCURE_EXTRA_DIRECTIVES: |
-        cors_origins https://pim.localhost https://localhost
+        cors_origins ${MERCURE_CORS_ORIGINS:-https://pim.localhost https://localhost}
     expose:
       - "80"
     volumes:
