@@ -94,3 +94,31 @@
   --vp-custom-block-tip-bg: rgb(255 79 0 / 12%);
   --vp-custom-block-tip-code-bg: rgb(255 79 0 / 20%);
 }
+
+/*
+ * Logotyp w pasku nawigacji.
+ *
+ * Lockup „harmon PIM" ma proporcję 6.45:1, więc jakiekolwiek wymuszenie
+ * szerokości niezależnie od wysokości zgniata napis i czyni go nieczytelnym.
+ * Skalujemy TYLKO wysokością, szerokość zostaje automatyczna.
+ *
+ * 22px to kompromis: mieści się w 55px pasku razem z odstępami, a litery
+ * pozostają czytelne (przy 20px człon „PIM" zaczynał się zlewać).
+ */
+:root {
+  --vp-nav-logo-height: 22px;
+}
+
+.VPNavBarTitle .VPImage,
+.VPNavBarTitle img,
+.VPNavScreen .VPImage,
+.VPNavScreen img {
+  height: var(--vp-nav-logo-height);
+  width: auto;
+  max-width: none;
+}
+
+/* Bez tytułu tekstowego obok logo pasek ma zbędny odstęp po prawej. */
+.VPNavBarTitle .title {
+  gap: 0;
+}

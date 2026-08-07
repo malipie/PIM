@@ -24,7 +24,11 @@ export default defineConfig({
     // Logotyp zamiast napisu — ten sam plik co w panelu, żeby oba interfejsy
     // pokazywały identyczny lockup. Klik prowadzi na stronę produktu, nie na
     // stronę główną dokumentacji (tam prowadzi pozycja w nawigacji).
-    logo: { src: '/brand-logo.png', alt: 'harmon PIM', width: 132, height: 20 },
+    // Bez width/height: VitePress i tak narzuca własną wysokość, a sztywna
+    // szerokość przy niej ściskała lockup w poziomie (proporcja pliku to
+    // 6.45:1). Rozmiar ustawia brand.css — wyłącznie wysokością, szerokość
+    // wyliczana automatycznie.
+    logo: { src: '/brand-logo.png', alt: 'harmon PIM' },
     siteTitle: false,
     logoLink: { link: 'https://harmonpim.pl', target: '_self' },
     nav: [

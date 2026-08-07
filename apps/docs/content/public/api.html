@@ -23,7 +23,8 @@
         font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
       }
       .harmon-bar a { text-decoration: none; }
-      .harmon-bar img { height: 20px; width: auto; display: block; }
+      /* Skalowanie wyłącznie wysokością — proporcja lockupu to 6.45:1. */
+      .harmon-bar img { height: 22px; width: auto; display: block; }
       .harmon-bar .back { color: #bd3a08; font-weight: 500; }
       .harmon-bar .back:hover { color: #e64700; }
 
@@ -43,7 +44,7 @@
   <body>
     <header class="harmon-bar">
       <a href="https://harmonpim.pl" aria-label="harmon PIM — strona produktu">
-        <img src="/docs/brand-logo.png" alt="harmon PIM" width="132" height="20" />
+        <img src="/docs/brand-logo.png" alt="harmon PIM" />
       </a>
       <a class="back" href="/docs/">← Dokumentacja</a>
     </header>
