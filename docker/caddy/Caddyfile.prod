@@ -79,8 +79,30 @@
     handle_path /docs* {
         header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
         root * /srv/docs
-        try_files {path} {path}/index.html /index.html
+        # {path}.html obsługuje czyste adresy z VitePressa (cleanUrls):
+        # /docs/selfhost serwuje selfhost.html. Bezpośrednie linki z .html
+        # dalej działają, bo pierwszy warunek trafia w plik.
+        try_files {path} {path}.html {path}/index.html
         file_server
+    }
+
+    # Brakująca podstrona dokumentacji spadała na /index.html i wracała jako
+    # 200 ze stroną główną — mylące dla czytelnika i dla wyszukiwarek. Docs
+    # nie ma już fallbacku w try_files, więc file_server zgłasza błąd 404,
+    # a ten blok podaje wygenerowane przez VitePress 404.html z właściwym
+    # kodem. `handle_errors` musi stać na poziomie site'u (Caddy nie pozwala
+    # zagnieździć go w handle_path). Zasięg ograniczony matcherem: SPA ma
+    # własny fallback i nigdy tu nie trafia, a /api zwraca odpowiedzi z
+    # backendu, które nie są błędami Caddy'ego.
+    handle_errors {
+        @docs404 expression {err.status_code} == 404 && path('/docs/*')
+        handle @docs404 {
+            root * /srv/docs
+            rewrite * /404.html
+            file_server {
+                status 404
+            }
+        }
     }
 
     # Admin SPA — built bundle, client-side router fallback to index.html.

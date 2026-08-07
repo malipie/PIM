@@ -7,6 +7,10 @@ export default defineConfig({
   title: 'Harmon PIM',
   description: 'Dokumentacja użytkownika i API systemu Harmon PIM',
   base: '/docs/',
+  // Adresy bez .html (/docs/selfhost zamiast /docs/selfhost.html). Edge Caddy
+  // dokłada `try_files {path}.html`, więc bezpośrednie linki z .html też dalej
+  // działają — nic z wcześniej rozesłanych adresów się nie psuje.
+  cleanUrls: true,
   // The prod Caddy mounts apps/docs/dist as /srv/docs (docker-compose.prod.yml).
   outDir: '../dist',
   lastUpdated: false,
@@ -20,6 +24,8 @@ export default defineConfig({
       { text: 'Przewodniki', link: '/guide/feeds' },
       { text: 'Dla developerów', link: '/developer/rbac' },
       { text: 'API (REST)', link: '/api.html', target: '_self' },
+      { text: 'Self-hosting', link: '/selfhost' },
+      { text: 'Licencja', link: '/licence' },
     ],
     sidebar: [
       {
@@ -29,6 +35,13 @@ export default defineConfig({
           { text: 'Workflow (przepływy akceptacji)', link: '/guide/workflow' },
           { text: 'Konfigurator API', link: '/guide/api-configurator' },
           { text: 'Agent AI', link: '/guide/agent' },
+        ],
+      },
+      {
+        text: 'Wdrożenie i licencja',
+        items: [
+          { text: 'Self-hosting', link: '/selfhost' },
+          { text: 'Licencja', link: '/licence' },
         ],
       },
       {
