@@ -837,7 +837,7 @@
         "system_notice_title": "System template:",
         "system_notice_body": "nazwa i kod są read-only, ale możesz dostosowywać permissions, restrykcje atrybutów, locale & channel scope. Roli nie można usunąć.",
         "platform_notice_title": "Platform-level role.",
-        "platform_notice_body": "Edycja wymaga uprawnień Cortex operator + MFA re-auth. Każda zmiana logowana jako SUPER_ADMIN_RECOVERY.",
+        "platform_notice_body": "Edycja wymaga uprawnień operatora platformy + MFA re-auth. Każda zmiana logowana jako SUPER_ADMIN_RECOVERY.",
         "system_template_cannot_delete": "System template — nie można usunąć",
         "cache_invalidation_note": "Zmiana macierzy permissions invalidates cache wszystkich userów z tą rolą (Mercure SSE event).",
         "tab_matrix": "Macierz uprawnień",

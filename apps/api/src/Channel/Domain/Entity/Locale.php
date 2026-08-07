@@ -12,7 +12,7 @@ use Symfony\Component\Validator\Constraints as Assert;
  *
  * Locales are global infrastructure rows — every tenant references the
  * same `pl_PL` row rather than carrying its own copy. The seeded set in
- * the migration covers the ISO 639-1 + ISO 3166 catalog used by Cortex
+ * the migration covers the ISO 639-1 + ISO 3166 catalog used by Harmon
  * (~45 entries today, 14 of them `is_popular=true` for the CEE+DACH
  * dropdown shortlist).
  *

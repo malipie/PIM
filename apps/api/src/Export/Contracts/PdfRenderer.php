@@ -7,7 +7,7 @@ namespace App\Export\Contracts;
 /**
  * Renders an HTML document to a PDF binary (ADR-0027, CPDF-P0-03).
  *
- * The port keeps the renderer swappable so a stock Cortex install needs no
+ * The port keeps the renderer swappable so a stock Harmon install needs no
  * extra infrastructure:
  *   - {@see \App\Export\Catalog\Infrastructure\Renderer\DompdfRenderer} —
  *     in-process, pure PHP, the default (zero infra);

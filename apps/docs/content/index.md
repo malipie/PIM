@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: Cortex PIM
+  name: Harmon PIM
   text: Product Information Management
   tagline: Dokumentacja użytkownika, integratora i API — wersja 1.0.0-alpha
   actions:

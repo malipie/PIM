@@ -142,7 +142,7 @@ final class UserCreateService
     ): void {
         try {
             $message = new TemplatedEmail()
-                ->from(new Address($this->mailerFrom, 'Cortex PIM'))
+                ->from(new Address($this->mailerFrom, 'Harmon PIM'))
                 ->to(new Address($recipientEmail))
                 ->subject(\sprintf('Twoje konto PIM w %s jest gotowe', $tenant->getName()))
                 ->htmlTemplate('email/user_welcome.html.twig')

@@ -109,9 +109,9 @@ final class InvitationService
         // covers test scenarios.
         try {
             $email = new TemplatedEmail()
-                ->from(new Address($this->mailerFrom, 'Cortex PIM'))
+                ->from(new Address($this->mailerFrom, 'Harmon PIM'))
                 ->to(new Address($email))
-                ->subject(\sprintf('Zaproszenie do %s — Cortex PIM', $tenant->getName()))
+                ->subject(\sprintf('Zaproszenie do %s — Harmon PIM', $tenant->getName()))
                 ->htmlTemplate('email/invitation.html.twig')
                 ->context([
                     'recipient_email' => $email,

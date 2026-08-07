@@ -86,9 +86,9 @@ final class PasswordResetService
         // existence + mail delivery success.
         try {
             $message = new TemplatedEmail()
-                ->from(new Address($this->mailerFrom, 'Cortex PIM'))
+                ->from(new Address($this->mailerFrom, 'Harmon PIM'))
                 ->to(new Address($email))
-                ->subject('Reset hasła — Cortex PIM')
+                ->subject('Reset hasła — Harmon PIM')
                 ->htmlTemplate('email/password-reset.html.twig')
                 ->context([
                     'recipient_email' => $email,

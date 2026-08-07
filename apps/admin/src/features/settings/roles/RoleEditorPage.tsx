@@ -527,7 +527,7 @@ export function RoleEditorPage() {
             </span>
             {t('settings.roles.editor.platform_notice_body', {
               defaultValue:
-                'Edycja wymaga uprawnień Cortex operator + MFA re-auth. Każda zmiana logowana jako SUPER_ADMIN_RECOVERY.',
+                'Edycja wymaga uprawnień operatora platformy + MFA re-auth. Każda zmiana logowana jako SUPER_ADMIN_RECOVERY.',
             })}
           </span>
         </div>

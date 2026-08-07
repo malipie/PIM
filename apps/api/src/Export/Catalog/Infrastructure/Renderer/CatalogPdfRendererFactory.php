@@ -13,7 +13,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * `CATALOG_PDF_RENDERER=gotenberg` + a non-empty `GOTENBERG_URL` activate the
  * headless-Chromium sidecar; anything else — including a requested gotenberg
  * with no URL configured — falls back to the zero-infra in-process Dompdf
- * default, so a stock Cortex install never needs the sidecar (R3).
+ * default, so a stock Harmon install never needs the sidecar (R3).
  */
 final class CatalogPdfRendererFactory
 {

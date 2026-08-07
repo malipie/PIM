@@ -14,7 +14,7 @@ use Throwable;
 /**
  * In-process PDF renderer backed by dompdf/dompdf (ADR-0027, CPDF-P0-03).
  *
- * The default adapter: pure PHP, no sidecar, so a stock Cortex install renders
+ * The default adapter: pure PHP, no sidecar, so a stock Harmon install renders
  * catalogs without any extra infrastructure. It is the only class in the repo
  * that touches {@see Dompdf}. Remote asset fetching stays off — the
  * catalog render service streams product images as data URIs upstream
