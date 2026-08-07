@@ -15,12 +15,20 @@ export default defineConfig({
   outDir: '../dist',
   lastUpdated: false,
   // Source docs link into repo files (../../apps/api/src/...) — valid inside
-  // the repository, dead on the published site. Alpha decision (operator
+  // the repository, dead on the published site. Decyzja operatora
   // 2026-08-06): publish with relative source links unresolved rather than
   // fork the content; revisit when docs get a dedicated editing pass.
   ignoreDeadLinks: true,
+  head: [['link', { rel: 'icon', href: '/docs/favicon.svg' }]],
   themeConfig: {
+    // Logotyp zamiast napisu — ten sam plik co w panelu, żeby oba interfejsy
+    // pokazywały identyczny lockup. Klik prowadzi na stronę produktu, nie na
+    // stronę główną dokumentacji (tam prowadzi pozycja w nawigacji).
+    logo: { src: '/brand-logo.png', alt: 'harmon PIM', width: 132, height: 20 },
+    siteTitle: false,
+    logoLink: { link: 'https://harmonpim.pl', target: '_self' },
     nav: [
+      { text: 'Dokumentacja', link: '/' },
       { text: 'Przewodniki', link: '/guide/feeds' },
       { text: 'Dla developerów', link: '/developer/rbac' },
       { text: 'API (REST)', link: '/api.html', target: '_self' },

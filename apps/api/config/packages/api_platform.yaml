@@ -1,7 +1,7 @@
 api_platform:
     title: PIM API
     description: Product Information Management — REST API surface (per ADR-009 generic ObjectType + sugar paths).
-    version: 0.1.0
+    version: 1.8.7
 
     # Resource declarations live next to the bounded contexts in
     # Infrastructure/ApiPlatform/Resource (per ADR-0011 — Domain stays
