@@ -162,7 +162,7 @@ final class RbacMetricsRegistry
             'cortex_mfa_enrollment_percentage' => 'Share of authenticated users in the tenant who have MFA enrolled, updated by a daily cron + on every enrol/disable.',
             'cortex_failed_login_attempts_total' => 'Number of 401 responses on /api/auth/login, labelled by tenant.',
             'cortex_super_admin_recovery_total' => 'Number of successful POST /api/admin/break-glass invocations. Audit-grade — always notify Slack #security.',
-            default => 'Cortex RBAC counter.',
+            default => 'Harmon RBAC counter.',
         };
     }
 }

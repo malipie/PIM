@@ -19,7 +19,7 @@ use RuntimeException;
  * — SAML uses XML-signed assertions instead of OAuth code exchange.
  *
  * Config (stored w SsoProvider.config JSON):
- *   - sp_entity_id (this Cortex PIM tenant's SAML EntityID)
+ *   - sp_entity_id (this Harmon PIM tenant's SAML EntityID)
  *   - sp_acs_url (Assertion Consumer Service URL — our callback)
  *   - idp_entity_id (Identity Provider EntityID, e.g. Okta org)
  *   - idp_sso_url (where to redirect for SSO login)

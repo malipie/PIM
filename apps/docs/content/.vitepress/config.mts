@@ -4,8 +4,8 @@ import { defineConfig } from 'vitepress';
 // /srv/docs). The base path makes every asset/link /docs-prefixed.
 export default defineConfig({
   lang: 'pl-PL',
-  title: 'Cortex PIM',
-  description: 'Dokumentacja użytkownika i API systemu Cortex PIM',
+  title: 'Harmon PIM',
+  description: 'Dokumentacja użytkownika i API systemu Harmon PIM',
   base: '/docs/',
   // The prod Caddy mounts apps/docs/dist as /srv/docs (docker-compose.prod.yml).
   outDir: '../dist',

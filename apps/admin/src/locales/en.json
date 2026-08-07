@@ -829,7 +829,7 @@
         "system_notice_title": "System template:",
         "system_notice_body": "name and code are read-only, but you can tune permissions, attribute restrictions, locale & channel scope. The role cannot be deleted.",
         "platform_notice_title": "Platform-level role.",
-        "platform_notice_body": "Editing requires Cortex operator privileges + MFA re-auth. Every change is logged as SUPER_ADMIN_RECOVERY.",
+        "platform_notice_body": "Editing requires platform operator privileges + MFA re-auth. Every change is logged as SUPER_ADMIN_RECOVERY.",
         "system_template_cannot_delete": "System template — cannot be deleted",
         "cache_invalidation_note": "Saving the matrix invalidates the permission cache for every user with this role (Mercure SSE event).",
         "tab_matrix": "Permission matrix",

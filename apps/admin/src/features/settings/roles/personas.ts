@@ -5,7 +5,7 @@
  * Role.persona; until then RolesListView renders these literals.
  */
 export const ROLE_PERSONAS: Record<string, string> = {
-  super_admin: 'Marcin · operator platformy Cortex',
+  super_admin: 'Marcin · operator platformy',
   tenant_owner: 'Tomasz · właściciel firmy',
   admin: 'Piotr · IT / co-owner',
   catalog_manager: 'Kasia · operacje katalogu',
