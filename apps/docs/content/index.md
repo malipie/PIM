@@ -3,7 +3,7 @@ layout: home
 hero:
   name: Harmon PIM
   text: Product Information Management
-  tagline: Dokumentacja użytkownika, integratora i API — wersja 1.0.0-alpha
+  tagline: Dokumentacja użytkownika, integratora i API — wersja 1.8.7
   actions:
     - theme: brand
       text: Przewodniki użytkownika
@@ -21,7 +21,7 @@ features:
     details: Agent AI jako pełnoprawna metoda interakcji — czat, generowanie treści i propozycje zmian z akceptacją człowieka.
 ---
 
-::: info Wersja alpha
-Ta dokumentacja jest generowana automatycznie z repozytorium przy każdej zmianie.
-Sekcje będą uzupełniane w kolejnych iteracjach.
+::: info Wersja 1.8.7
+Ta dokumentacja jest generowana automatycznie z repozytorium przy każdej zmianie,
+więc opisuje dokładnie ten kod, który działa na produkcji.
 :::

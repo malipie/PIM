@@ -4,17 +4,49 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Harmon PIM — dokumentacja API (REST)</title>
+    <link rel="icon" href="/docs/favicon.svg" />
     <style>
       html, body { margin: 0; padding: 0; }
-      .docs-back {
-        position: fixed; top: 10px; right: 16px; z-index: 1000;
-        font: 13px/1.4 system-ui, sans-serif;
+
+      /* Scalar renderuje własny, pełnoekranowy layout, więc marka wchodzi jako
+         cienki pasek nad nim, a nie wstrzyknięciem w jego wnętrze (to
+         ostatnie łamałoby się przy każdej aktualizacji biblioteki).
+         Wysokość paska jest odjęta od widoku Scalara niżej. */
+      :root { --harmon-bar: 48px; }
+
+      .harmon-bar {
+        position: fixed; inset: 0 0 auto 0; height: var(--harmon-bar);
+        z-index: 1000; display: flex; align-items: center;
+        justify-content: space-between; gap: 16px; padding: 0 16px;
+        box-sizing: border-box;
+        background: #ffffff; border-bottom: 1px solid #e4e7ec;
+        font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
       }
-      .docs-back a { color: #3451b2; text-decoration: none; }
+      .harmon-bar a { text-decoration: none; }
+      .harmon-bar img { height: 20px; width: auto; display: block; }
+      .harmon-bar .back { color: #bd3a08; font-weight: 500; }
+      .harmon-bar .back:hover { color: #e64700; }
+
+      /* Ciemny motyw Scalara ustawia .dark-mode na <html>. */
+      html.dark-mode .harmon-bar { background: #0f0f11; border-bottom-color: #2a2a2e; }
+      html.dark-mode .harmon-bar .back { color: #ff8f64; }
+
+      body { padding-top: var(--harmon-bar); }
+      /* Scalar liczy wysokość swojego układu ze 100vh — bez tej korekty pasek
+         wypychałby dolną krawędź poza ekran i tworzył podwójny pasek
+         przewijania. */
+      body > #app,
+      body > .scalar-app,
+      body > div[class*="scalar"] { height: calc(100vh - var(--harmon-bar)); }
     </style>
   </head>
   <body>
-    <nav class="docs-back"><a href="/docs/">← Dokumentacja</a></nav>
+    <header class="harmon-bar">
+      <a href="https://harmonpim.pl" aria-label="harmon PIM — strona produktu">
+        <img src="/docs/brand-logo.png" alt="harmon PIM" width="132" height="20" />
+      </a>
+      <a class="back" href="/docs/">← Dokumentacja</a>
+    </header>
     <!-- Scalar API Reference — self-hosted standalone bundle (edge CSP blocks
          CDNs). The spec is the committed docs/api-spec snapshot: the CI
          "OpenAPI spec drift" gate keeps it byte-identical with the running

@@ -18,6 +18,6 @@ zapis z pliku `LICENSE` w repozytorium: wszelkie prawa zastrzeżone.
 
 ## Stan obecny
 
-Oprogramowanie jest w wersji **alpha** i nie zostało jeszcze udostępnione
-publicznie na żadnej licencji otwartej. Jeżeli rozważasz wdrożenie u siebie,
-napisz — ustalimy warunki indywidualnie: [kontakt](https://harmonpim.pl).
+Oprogramowanie w wersji **1.8.7** nie zostało udostępnione publicznie na żadnej
+licencji otwartej. Jeżeli rozważasz wdrożenie u siebie, napisz — ustalimy
+warunki indywidualnie: [kontakt](https://harmonpim.pl).

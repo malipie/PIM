@@ -3,7 +3,7 @@
     "info": {
         "title": "PIM API",
         "description": "Product Information Management \u2014 REST API surface (per ADR-009 generic ObjectType + sugar paths).",
-        "version": "0.1.0"
+        "version": "1.8.7"
     },
     "servers": [
         {
@@ -27114,7 +27114,7 @@
             },
             "Locale-locale.read": {
                 "type": "object",
-                "description": "BCP-47-shaped locale code (`pl_PL`, `en_US`, \u2026) shared across tenants.\n\nLocales are global infrastructure rows \u2014 every tenant references the\nsame `pl_PL` row rather than carrying its own copy. The seeded set in\nthe migration covers the ISO 639-1 + ISO 3166 catalog used by Cortex\n(~45 entries today, 14 of them `is_popular=true` for the CEE+DACH\ndropdown shortlist).\n\nNo TenantScoped: the table sits on the audit allowlist as global\ninfrastructure, like `permissions` and the global RBAC roles.",
+                "description": "BCP-47-shaped locale code (`pl_PL`, `en_US`, \u2026) shared across tenants.\n\nLocales are global infrastructure rows \u2014 every tenant references the\nsame `pl_PL` row rather than carrying its own copy. The seeded set in\nthe migration covers the ISO 639-1 + ISO 3166 catalog used by Harmon\n(~45 entries today, 14 of them `is_popular=true` for the CEE+DACH\ndropdown shortlist).\n\nNo TenantScoped: the table sits on the audit allowlist as global\ninfrastructure, like `permissions` and the global RBAC roles.",
                 "properties": {
                     "id": {
                         "type": [
@@ -27205,7 +27205,7 @@
                         ]
                     }
                 ],
-                "description": "BCP-47-shaped locale code (`pl_PL`, `en_US`, \u2026) shared across tenants.\n\nLocales are global infrastructure rows \u2014 every tenant references the\nsame `pl_PL` row rather than carrying its own copy. The seeded set in\nthe migration covers the ISO 639-1 + ISO 3166 catalog used by Cortex\n(~45 entries today, 14 of them `is_popular=true` for the CEE+DACH\ndropdown shortlist).\n\nNo TenantScoped: the table sits on the audit allowlist as global\ninfrastructure, like `permissions` and the global RBAC roles."
+                "description": "BCP-47-shaped locale code (`pl_PL`, `en_US`, \u2026) shared across tenants.\n\nLocales are global infrastructure rows \u2014 every tenant references the\nsame `pl_PL` row rather than carrying its own copy. The seeded set in\nthe migration covers the ISO 639-1 + ISO 3166 catalog used by Harmon\n(~45 entries today, 14 of them `is_popular=true` for the CEE+DACH\ndropdown shortlist).\n\nNo TenantScoped: the table sits on the audit allowlist as global\ninfrastructure, like `permissions` and the global RBAC roles."
             },
             "ObjectType-admin.read": {
                 "type": "object",
@@ -29227,7 +29227,7 @@
         },
         {
             "name": "Locale",
-            "description": "BCP-47-shaped locale code (`pl_PL`, `en_US`, \u2026) shared across tenants.\n\nLocales are global infrastructure rows \u2014 every tenant references the\nsame `pl_PL` row rather than carrying its own copy. The seeded set in\nthe migration covers the ISO 639-1 + ISO 3166 catalog used by Cortex\n(~45 entries today, 14 of them `is_popular=true` for the CEE+DACH\ndropdown shortlist).\n\nNo TenantScoped: the table sits on the audit allowlist as global\ninfrastructure, like `permissions` and the global RBAC roles."
+            "description": "BCP-47-shaped locale code (`pl_PL`, `en_US`, \u2026) shared across tenants.\n\nLocales are global infrastructure rows \u2014 every tenant references the\nsame `pl_PL` row rather than carrying its own copy. The seeded set in\nthe migration covers the ISO 639-1 + ISO 3166 catalog used by Harmon\n(~45 entries today, 14 of them `is_popular=true` for the CEE+DACH\ndropdown shortlist).\n\nNo TenantScoped: the table sits on the audit allowlist as global\ninfrastructure, like `permissions` and the global RBAC roles."
         },
         {
             "name": "AssetStorage",

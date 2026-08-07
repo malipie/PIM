@@ -1,6 +1,6 @@
 {
   "name": "pim",
-  "version": "1.0.0-alpha.1",
+  "version": "1.8.7",
   "private": true,
   "description": "PIM — Product Information Management (single-tenant deployed, multi-tenant ready)",
   "packageManager": "pnpm@10.33.2",
