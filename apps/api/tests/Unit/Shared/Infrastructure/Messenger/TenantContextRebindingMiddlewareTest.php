@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
+use App\Shared\Application\TenantAgnosticMessage;
 use App\Shared\Application\TenantAwareMessage;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
@@ -111,6 +112,76 @@ final class TenantContextRebindingMiddlewareTest extends TestCase
         $this->expectExceptionMessage('carries no tenant context');
 
         $middleware->handle($envelope, $this->makeStack());
+    }
+
+    /**
+     * #2803 — the maintenance scheduler emits a payload that has no tenant
+     * to declare. Before the marker existed the middleware rejected every
+     * firing, so five daily jobs never ran once in production and the
+     * worker killed itself after each fifth failure.
+     */
+    #[Test]
+    public function asyncMessageMarkedTenantAgnosticPassesThroughWithoutTenant(): void
+    {
+        $context = new TenantContext();
+        $middleware = new TenantContextRebindingMiddleware($this->makeRepo(), $context);
+
+        $message = new class implements TenantAgnosticMessage {};
+        $envelope = new Envelope($message)->with(new ConsumedByWorkerStamp());
+
+        $seenInsideHandler = 'unset';
+        $middleware->handle($envelope, $this->makeStack(static function () use ($context, &$seenInsideHandler): void {
+            $seenInsideHandler = $context->get();
+        }));
+
+        self::assertNull($seenInsideHandler, 'tenant-agnostic work must run with an empty context, not a stale one');
+        self::assertNull($context->get());
+    }
+
+    /**
+     * The marker must not become a way to smuggle tenant-scoped work past
+     * the guard: an unmarked message with no tenant still fails loudly.
+     */
+    #[Test]
+    public function markerDoesNotWeakenTheGuardForOtherMessages(): void
+    {
+        $context = new TenantContext();
+        $middleware = new TenantContextRebindingMiddleware($this->makeRepo(), $context);
+
+        $envelope = new Envelope(new stdClass())->with(new ConsumedByWorkerStamp());
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('carries no tenant context');
+
+        $middleware->handle($envelope, $this->makeStack());
+    }
+
+    /**
+     * A tenant-agnostic handler must not inherit whatever tenant the
+     * previous message on the same worker boot left behind.
+     */
+    #[Test]
+    public function tenantAgnosticMessageDoesNotInheritPreviousTenant(): void
+    {
+        $tenant = new Tenant('alpha', 'Alpha');
+        $context = new TenantContext();
+        $context->set($tenant);
+
+        $middleware = new TenantContextRebindingMiddleware($this->makeRepo($tenant), $context);
+
+        $message = new class implements TenantAgnosticMessage {};
+        $envelope = new Envelope($message)->with(new ConsumedByWorkerStamp());
+
+        $seenInsideHandler = 'unset';
+        $middleware->handle($envelope, $this->makeStack(static function () use ($context, &$seenInsideHandler): void {
+            $seenInsideHandler = $context->get();
+        }));
+
+        self::assertNull(
+            $seenInsideHandler,
+            'a stale tenant would leave the Doctrine filter armed and scope a global sweep to one tenant',
+        );
+        self::assertNull($context->get());
     }
 
     #[Test]
