@@ -57,6 +57,7 @@ final readonly class ImportValidationService
         ObjectType $target,
         ?FileEncoding $encodingOverride = null,
         ?string $delimiterOverride = null,
+        ?int $maxRows = null,
     ): ValidationResult {
         $tenant = $this->tenantContext->get();
         if (!$tenant instanceof Tenant) {
@@ -70,7 +71,19 @@ final readonly class ImportValidationService
         $totalRows = 0;
         $skuSeenInFile = [];
 
+        $truncated = false;
+
         foreach ($this->rowReader->read($absolutePath, $encodingOverride, $delimiterOverride) as $rowNumber => $cells) {
+            // #2810 — a dry-run is a sanity check before committing, not a
+            // full pass: reading 51 800 rows took over 30 s and came back as
+            // a PHP fatal wrapped in HTTP 200. Mapping and format mistakes
+            // show up in the first rows; scanning the rest only delays the
+            // answer the operator is waiting for.
+            if (null !== $maxRows && $totalRows >= $maxRows) {
+                $truncated = true;
+                break;
+            }
+
             ++$totalRows;
             $rowErrors = $this->validateRow(
                 rowNumber: $rowNumber,
@@ -112,6 +125,7 @@ final readonly class ImportValidationService
             successCount: $successCount,
             errorCount: $errorCount,
             errors: $errors,
+            truncated: $truncated,
         );
     }
 

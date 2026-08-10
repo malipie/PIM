@@ -37,6 +37,18 @@ use Symfony\Component\Uid\Uuid;
  */
 final class ValidateDryRunController
 {
+    /**
+     * How many rows one dry-run inspects (#2810).
+     *
+     * The wizard step is interactive, so this is bounded by what an operator
+     * will wait for, not by file size. Scanning a 51 800-row export took over
+     * 30 s and returned a PHP fatal wrapped in HTTP 200 — the browser saw a
+     * success code carrying an HTML error page. Mapping and format mistakes
+     * surface in the first rows; the full pass belongs to the async run,
+     * which validates every row and reports real totals.
+     */
+    private const int DRY_RUN_MAX_ROWS = 1_000;
+
     private const int MAX_TOP_ERRORS = 10;
 
     public function __construct(
@@ -100,6 +112,7 @@ final class ValidateDryRunController
                 target: $objectType,
                 encodingOverride: $encoding,
                 delimiterOverride: $delimiter,
+                maxRows: self::DRY_RUN_MAX_ROWS,
             );
         } catch (InvalidImportFileException $exception) {
             throw new BadRequestHttpException($exception->getMessage(), $exception);
@@ -117,6 +130,7 @@ final class ValidateDryRunController
     {
         return [
             'total_rows' => $result->totalRows,
+            'truncated' => $result->truncated,
             'success_count' => $result->successCount,
             'error_count' => $result->errorCount,
             'top_errors' => array_map(

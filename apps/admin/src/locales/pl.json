@@ -3528,7 +3528,8 @@
         "invalid_value": "Nieprawidłowa wartość",
         "image_not_found": "Brak pliku zdjęcia",
         "category_not_found": "Brak kategorii (produkt zaimportowany bez przypisania)"
-      }
+      },
+      "truncated": "Sprawdzono pierwsze {{count}} wierszy pliku. Pełną walidację wykona właściwy import — te liczniki opisują próbkę, nie cały plik."
     },
     "confirm": {
       "summary": "Podsumowanie",

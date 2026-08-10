@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { useImportWizard, ValidationFinding } from '@/features/imports/hooks/useImportWizard';
-import { HttpError, jsonFetch } from '@/lib/http';
+import { HttpError, httpErrorDetail, jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
 interface StepValidationProps {
@@ -14,6 +14,8 @@ interface StepValidationProps {
 
 interface DryRunResponse {
   total_rows: number;
+  /** #2810 — dry-run skanuje ograniczoną liczbę wierszy; wtedy liczniki opisują próbkę. */
+  truncated?: boolean;
   success_count: number;
   error_count: number;
   top_errors: ApiError[];
@@ -98,7 +100,10 @@ export function StepValidationPlaceholder({ wizard }: StepValidationProps): Reac
             return;
           }
           if (err instanceof HttpError) {
-            setError(`HTTP ${err.status}`);
+            // #2810 — `HTTP 200` samo w sobie nic nie mówi (a właśnie tak
+            // wygląda fatal PHP przebrany za sukces). Detail z Problem
+            // Details niesie powód; status zostaje jako ostatnia deska.
+            setError(httpErrorDetail(err) ?? `HTTP ${err.status}`);
           } else {
             setError(err instanceof Error ? err.message : 'unknown');
           }
@@ -149,6 +154,19 @@ export function StepValidationPlaceholder({ wizard }: StepValidationProps): Reac
 
       {response !== null && (
         <>
+          {response.truncated === true && (
+            <p
+              role="status"
+              className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+            >
+              {t('imports.validation.truncated', {
+                count: response.total_rows,
+                defaultValue:
+                  'Sprawdzono pierwsze {{count}} wierszy pliku. Pełną walidację wykona właściwy import — te liczniki opisują próbkę, nie cały plik.',
+              })}
+            </p>
+          )}
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Kpi
               label={t('imports.validation.ok', {
