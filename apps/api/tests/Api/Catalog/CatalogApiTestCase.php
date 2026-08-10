@@ -7,7 +7,7 @@ namespace App\Tests\Api\Catalog;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Catalog\Application\BuiltInObjectTypeSeeder;
 use App\Catalog\Domain\ObjectKind;
-use App\DataFixtures\Identity\PrdPermissionFixtures;
+use App\Identity\Application\PrdPermissionSeeder;
 use App\Identity\Application\RbacSeeder;
 use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\User;
@@ -51,8 +51,7 @@ abstract class CatalogApiTestCase extends ApiTestCase
         // emits the legacy RbacMatrix 4-action × 19-resource set, so
         // these tests need the PRD permission catalogue + tenant_owner
         // role assigned to the test admin to clear EndpointGuardListener.
-        $prdPermissions = new PrdPermissionFixtures();
-        $prdPermissions->load($em);
+        self::getContainer()->get(PrdPermissionSeeder::class)->seed();
         $em->flush();
 
         $superAdmin = self::getContainer()->get(RoleRepositoryInterface::class)

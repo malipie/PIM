@@ -7,7 +7,7 @@ namespace App\Tests\Api\Channel;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Catalog\Application\BuiltInObjectTypeSeeder;
 use App\Channel\Domain\Entity\Locale;
-use App\DataFixtures\Identity\PrdPermissionFixtures;
+use App\Identity\Application\PrdPermissionSeeder;
 use App\Identity\Application\RbacSeeder;
 use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\User;
@@ -43,8 +43,7 @@ abstract class ChannelApiTestCase extends ApiTestCase
         $em = $this->em();
         self::getContainer()->get(RbacSeeder::class)->seed();
         // RBAC-P6 retrofit — same scaffolding as CatalogApiTestCase.
-        $prdPermissions = new PrdPermissionFixtures();
-        $prdPermissions->load($em);
+        self::getContainer()->get(PrdPermissionSeeder::class)->seed();
         $em->flush();
 
         $superAdmin = self::getContainer()->get(RoleRepositoryInterface::class)

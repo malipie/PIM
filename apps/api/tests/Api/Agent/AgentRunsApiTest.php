@@ -14,8 +14,8 @@ use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\ObjectKind;
-use App\DataFixtures\Identity\PrdPermissionFixtures;
 use App\Identity\Application\ByokKeyManager;
+use App\Identity\Application\PrdPermissionSeeder;
 use App\Identity\Application\RbacSeeder;
 use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\User;
@@ -56,8 +56,7 @@ final class AgentRunsApiTest extends ApiTestCase
 
         $em = $this->em();
         self::getContainer()->get(RbacSeeder::class)->seed();
-        $prdPermissions = new PrdPermissionFixtures();
-        $prdPermissions->load($em);
+        self::getContainer()->get(PrdPermissionSeeder::class)->seed();
         $em->flush();
 
         $superAdmin = self::getContainer()->get(RoleRepositoryInterface::class)
