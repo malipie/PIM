@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Messenger;
 
+use App\Shared\Application\TenantAgnosticMessage;
 use App\Shared\Application\TenantAwareMessage;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
@@ -40,8 +41,12 @@ use Symfony\Component\Uid\Uuid;
  *
  * Behaviour for messages without any tenant source:
  *   - **sync**: passes through (current MVP default — no-op).
- *   - **async**: throws `RuntimeException`. An unbound async message
- *     is a bug — every cross-process payload must declare its tenant.
+ *   - **async** marked {@see TenantAgnosticMessage}: passes through with
+ *     the context left empty — infrastructure work with no tenant to
+ *     declare (#2803).
+ *   - **async**, unmarked: throws `RuntimeException`. An unbound async
+ *     message is a bug — every cross-process payload must declare its
+ *     tenant, or declare that it has none.
  */
 final readonly class TenantContextRebindingMiddleware implements MiddlewareInterface
 {
@@ -62,12 +67,39 @@ final readonly class TenantContextRebindingMiddleware implements MiddlewareInter
             return $stack->next()->handle($envelope, $stack);
         }
 
+        $message = $envelope->getMessage();
+
+        // #2803 — infrastructure work that has no tenant to declare passes
+        // through with the context left empty. The marker keeps the decision
+        // on the message itself rather than in an allow-list here, so the
+        // next scheduler payload has to state its intent to get through.
+        if ($message instanceof TenantAgnosticMessage) {
+            $this->logger->debug('Async message declared tenant-agnostic; handling without tenant context', [
+                'message' => $message::class,
+            ]);
+
+            // Clearing is not a formality. A stale context left by the
+            // previous message on this worker boot would leave the Doctrine
+            // TenantFilter armed, and `pim:audit:cleanup` would then sweep
+            // exactly one tenant's rows while reporting a global run. The
+            // guard exists to stop stale context from leaking — skipping the
+            // rebind must not smuggle it back in.
+            $this->tenantContext->clear();
+
+            try {
+                return $stack->next()->handle($envelope, $stack);
+            } finally {
+                $this->tenantContext->clear();
+            }
+        }
+
         $tenantId = $this->resolveTenantId($envelope);
         if (null === $tenantId) {
             throw new RuntimeException(\sprintf(
-                'Async message %s carries no tenant context. Add a TenantStamp '.
-                'on dispatch or have the message implement TenantAwareMessage.',
-                $envelope->getMessage()::class,
+                'Async message %s carries no tenant context. Add a TenantStamp on '.
+                'dispatch, have the message implement TenantAwareMessage, or — only '.
+                'if the work is genuinely global — TenantAgnosticMessage.',
+                $message::class,
             ));
         }
 
