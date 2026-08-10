@@ -7,7 +7,7 @@ namespace App\Tests\Integration\Workflow;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\ObjectKind;
-use App\DataFixtures\Identity\PrdPermissionFixtures;
+use App\Identity\Application\PrdPermissionSeeder;
 use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
@@ -40,7 +40,7 @@ final class TransitionGuardActingUserTest extends KernelTestCase
     public function guardBlocksActingUserWithoutPermissionAndAllowsSystem(): void
     {
         $em = $this->em();
-        new PrdPermissionFixtures()->load($em);
+        self::getContainer()->get(PrdPermissionSeeder::class)->seed();
         $em->flush();
 
         $tenant = new Tenant('alpha', 'Alpha Tenant');

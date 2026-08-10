@@ -7,7 +7,7 @@ namespace App\Tests\Api\Agent;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Agent\Domain\Entity\ContentRecipe;
-use App\DataFixtures\Identity\PrdPermissionFixtures;
+use App\Identity\Application\PrdPermissionSeeder;
 use App\Identity\Application\RbacSeeder;
 use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\User;
@@ -49,8 +49,7 @@ final class AiContentSettingsApiTest extends ApiTestCase
 
         $em = $this->em();
         self::getContainer()->get(RbacSeeder::class)->seed();
-        $prdPermissions = new PrdPermissionFixtures();
-        $prdPermissions->load($em);
+        self::getContainer()->get(PrdPermissionSeeder::class)->seed();
         $em->flush();
 
         $tenant = new Tenant(self::TENANT_CODE, 'Demo Tenant');

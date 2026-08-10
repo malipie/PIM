@@ -26,7 +26,14 @@ final class OpenApiSpecApiTest extends CatalogApiTestCase
         \assert(\is_array($info));
 
         self::assertSame('PIM API', $info['title'] ?? null);
-        self::assertSame('0.1.0', $info['version'] ?? null);
+        // Read the expected version from the same container parameter
+        // api_platform.yaml feeds, instead of a literal: the release bump in
+        // #2789 (0.1.0 -> 1.8.7) left this assertion behind and turned the
+        // api-catalog shard red on main for three days.
+        self::assertSame(
+            self::getContainer()->getParameter('api_platform.version'),
+            $info['version'] ?? null,
+        );
     }
 
     #[Test]

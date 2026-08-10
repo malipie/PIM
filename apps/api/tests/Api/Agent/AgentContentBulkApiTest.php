@@ -8,8 +8,8 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentRun;
-use App\DataFixtures\Identity\PrdPermissionFixtures;
 use App\Identity\Application\ByokKeyManager;
+use App\Identity\Application\PrdPermissionSeeder;
 use App\Identity\Application\RbacSeeder;
 use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\User;
@@ -49,7 +49,7 @@ final class AgentContentBulkApiTest extends ApiTestCase
 
         $em = $this->em();
         self::getContainer()->get(RbacSeeder::class)->seed();
-        new PrdPermissionFixtures()->load($em);
+        self::getContainer()->get(PrdPermissionSeeder::class)->seed();
         $em->flush();
 
         $tenant = new Tenant(self::TENANT_CODE, 'Demo Tenant');
