@@ -55,6 +55,14 @@ final class ParsePreviewController
     #[RequiresPermission(module: 'imports', action: 'run')]
     public function __invoke(Request $request): JsonResponse
     {
+        // #2808 — defence for workbooks that declare no usable dimension: the
+        // parser then falls back to counting by iteration, and PHP's 30 s
+        // default turns a slow-but-legitimate file into a fatal error, which
+        // escapes as an HTML 500 instead of Problem Details. Bulk handlers
+        // lift the limit for the same reason; the one endpoint that accepts
+        // arbitrary user files had no such guard at all.
+        set_time_limit(120);
+
         $userId = $this->currentUser->userId();
         if (null === $userId) {
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');

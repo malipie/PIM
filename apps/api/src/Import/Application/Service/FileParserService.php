@@ -28,6 +28,14 @@ use const PATHINFO_EXTENSION;
 final class FileParserService
 {
     private const int SAMPLE_ROWS = 5;
+
+    /**
+     * Above this many rows the preview stops counting by iteration and trusts
+     * the sheet's declared dimension (#2808). Small files keep the exact
+     * count they always had — the fast path only kicks in where the old one
+     * was heading for a 30-second fatal.
+     */
+    private const int DIMENSION_COUNT_THRESHOLD = 5_000;
     private const int DETECT_PREFIX_BYTES = 16384;
     private const array XLSX_EXTENSIONS = ['xlsx'];
     private const array CSV_EXTENSIONS = ['csv'];
@@ -44,6 +52,7 @@ final class FileParserService
     public function __construct(
         private readonly EncodingDetector $encodingDetector,
         private readonly DelimiterDetector $delimiterDetector,
+        private readonly XlsxSheetDimensionReader $dimensions = new XlsxSheetDimensionReader(),
     ) {
     }
 
@@ -112,6 +121,15 @@ final class FileParserService
 
     private function parseXlsx(string $absolutePath): ParsedFile
     {
+        // #2808 — ask the sheet how many rows it has BEFORE opening a reader.
+        // Counting by iteration costs ~200 s on a 51 800-row export, which the
+        // 30 s request limit turns into a fatal error (HTML 500, not even a
+        // Problem Details body). When the file declares a large range we read
+        // headers + samples and stop; small files keep the exact count they
+        // always had, since iterating them is free.
+        $declaredRows = $this->dimensions->lastRowNumber($absolutePath);
+        $useDeclaredCount = null !== $declaredRows && $declaredRows > self::DIMENSION_COUNT_THRESHOLD;
+
         // IMP2-2.1 — stream the first sheet with openspout (no full-workbook
         // load). Header dedup mirrors ImportRowReader so the wizard maps against
         // the exact labels the run keys cells by.
@@ -152,6 +170,14 @@ final class FileParserService
                     ++$totalRows;
                     if (\count($sampleRows) < self::SAMPLE_ROWS) {
                         $sampleRows[] = $this->positionalSample($headers, $values);
+
+                        continue;
+                    }
+
+                    // Samples are complete; on the declared-count path there is
+                    // nothing left to learn from the remaining rows.
+                    if ($useDeclaredCount) {
+                        break 2;
                     }
                 }
             }
@@ -161,6 +187,11 @@ final class FileParserService
 
         if ([] === $headers || [] === array_filter($headers, static fn (string $h): bool => '' !== $h)) {
             throw InvalidImportFileException::noHeaderRow();
+        }
+
+        // The declared range counts the header row too.
+        if ($useDeclaredCount) {
+            $totalRows = max(0, $declaredRows - 1);
         }
 
         return new ParsedFile(
