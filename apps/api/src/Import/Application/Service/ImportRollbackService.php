@@ -39,6 +39,16 @@ use LogicException;
  */
 final readonly class ImportRollbackService
 {
+    /**
+     * Objects whose undo rows and current values are held in memory at once
+     * (#2814).
+     *
+     * Sized so the resident set stays comparable to one import chunk. The
+     * rollback is bounded by objects rather than by undo rows because both
+     * loads — undo rows and current values — key off the object.
+     */
+    private const int ROLLBACK_CHUNK_OBJECTS = 200;
+
     public function __construct(
         private EntityManagerInterface $em,
         private Connection $connection,
@@ -223,33 +233,41 @@ final readonly class ImportRollbackService
         $manualSkips = 0;
         $supersededSkips = 0;
         $superseded = $this->undoLog->supersededScopeKeys($session);
-        $index = $this->currentValueIndex($session);
-        foreach ($this->undoLog->findBySession($session) as $row) {
-            $code = $row->getAttributeCode();
-            if (null === $code) {
-                continue;
-            }
-            $key = $this->scopeKey(
-                $row->getObjectId()->toRfc4122(),
-                $code,
-                $row->getLocale(),
-                $row->getChannelId()?->toRfc4122(),
-            );
-            if (isset($superseded[$key])) {
-                ++$supersededSkips;
+        // #2814 — the preview walks the same volume as the rollback itself, so
+        // it is chunked identically. A dry-run that OOMs is no more useful than
+        // a rollback that does.
+        foreach (array_chunk($this->undoLog->affectedObjectIds($session), self::ROLLBACK_CHUNK_OBJECTS) as $chunkIds) {
+            $index = $this->currentValueIndex($chunkIds);
+            foreach ($this->undoLog->findBySessionAndObjectIds($session, $chunkIds) as $row) {
+                $code = $row->getAttributeCode();
+                if (null === $code) {
+                    continue;
+                }
+                $key = $this->scopeKey(
+                    $row->getObjectId()->toRfc4122(),
+                    $code,
+                    $row->getLocale(),
+                    $row->getChannelId()?->toRfc4122(),
+                );
+                if (isset($superseded[$key])) {
+                    ++$supersededSkips;
 
-                continue;
-            }
-            $value = $index[$key] ?? null;
-            if (null === $value) {
-                continue;
-            }
-            if (Provenance::Import !== $value->getProvenance()) {
-                ++$manualSkips;
+                    continue;
+                }
+                $value = $index[$key] ?? null;
+                if (null === $value) {
+                    continue;
+                }
+                if (Provenance::Import !== $value->getProvenance()) {
+                    ++$manualSkips;
 
-                continue;
+                    continue;
+                }
+                ImportUndoOperation::ValueOverwritten === $row->getOperation() ? ++$toRestore : ++$toRemove;
             }
-            ImportUndoOperation::ValueOverwritten === $row->getOperation() ? ++$toRestore : ++$toRemove;
+            // The preview only counts; detaching per chunk keeps the resident
+            // set flat without affecting the caller.
+            $this->em->clear();
         }
 
         return [
@@ -263,15 +281,21 @@ final readonly class ImportRollbackService
     }
 
     /**
-     * Current ObjectValues of the session's affected objects, keyed by scope.
+     * Current ObjectValues of the given objects, keyed by scope.
+     *
+     * Takes an explicit id list rather than the whole session (#2814): the
+     * session-wide variant loaded every value of every affected object into
+     * one index, which is what exhausted the worker.
+     *
+     * @param list<\Symfony\Component\Uid\Uuid> $objectIds
      *
      * @return array<string, \App\Catalog\Domain\Entity\ObjectValue>
      */
-    private function currentValueIndex(ImportSession $session): array
+    private function currentValueIndex(array $objectIds): array
     {
         $index = [];
         // findByObjectIds returns values grouped by object id (RFC4122 => list).
-        foreach ($this->objectValues->findByObjectIds($this->undoLog->affectedObjectIds($session)) as $values) {
+        foreach ($this->objectValues->findByObjectIds($objectIds) as $values) {
             foreach ($values as $value) {
                 $index[$this->scopeKey(
                     $value->getObject()->getId()->toRfc4122(),
@@ -296,7 +320,16 @@ final readonly class ImportRollbackService
      */
     private function replayUndoLog(ImportSession $session): array
     {
-        $undoRows = $this->undoLog->findBySession($session);
+        // #2814 — walk the session's objects in chunks. Loading every undo row
+        // and every current value up front cost 256 MiB in 1.65 s on a
+        // 51 800-row re-import (51 304 undo rows), so the rollback died before
+        // it could undo anything — the safety net failing in exactly the
+        // situation it exists for.
+        //
+        // Chunking stays inside the caller's transaction: clear() detaches the
+        // in-memory graph without committing, so a failure mid-way still rolls
+        // the whole rollback back. All-or-nothing is preserved; only the
+        // resident set shrinks.
         $superseded = $this->undoLog->supersededScopeKeys($session);
         $restored = 0;
         $removed = 0;
@@ -305,10 +338,54 @@ final readonly class ImportRollbackService
         /** @var array<string, true> $affected */
         $affected = [];
 
-        // One query for every current value of the affected objects, keyed by
-        // (objectId|attributeCode|locale|channel) so each undo row maps directly.
-        $index = $this->currentValueIndex($session);
+        foreach (array_chunk($this->undoLog->affectedObjectIds($session), self::ROLLBACK_CHUNK_OBJECTS) as $objectIds) {
+            $undoRows = $this->undoLog->findBySessionAndObjectIds($session, $objectIds);
+            // Current values of THIS chunk's objects, keyed by
+            // (objectId|attributeCode|locale|channel) so each undo row maps directly.
+            $index = $this->currentValueIndex($objectIds);
 
+            $this->replayChunk(
+                $undoRows,
+                $index,
+                $superseded,
+                $affected,
+                $restored,
+                $removed,
+                $skipped,
+                $skippedSuperseded,
+            );
+
+            $this->em->flush();
+            $this->em->clear();
+        }
+
+        return [
+            'restoredValues' => $restored,
+            'removedValues' => $removed,
+            'skippedManualEdits' => $skipped,
+            'skippedSuperseded' => $skippedSuperseded,
+            'affectedIds' => array_keys($affected),
+        ];
+    }
+
+    /**
+     * Replays one chunk's undo rows against the values loaded for it.
+     *
+     * @param list<\App\Import\Domain\Entity\ImportUndoLog>         $undoRows
+     * @param array<string, \App\Catalog\Domain\Entity\ObjectValue> $index
+     * @param array<string, true>                                   $superseded
+     * @param array<string, true>                                   $affected
+     */
+    private function replayChunk(
+        array $undoRows,
+        array $index,
+        array $superseded,
+        array &$affected,
+        int &$restored,
+        int &$removed,
+        int &$skipped,
+        int &$skippedSuperseded,
+    ): void {
         foreach ($undoRows as $row) {
             $code = $row->getAttributeCode();
             if (null === $code) {
@@ -360,16 +437,6 @@ final readonly class ImportRollbackService
                 ++$removed;
             }
         }
-
-        $this->em->flush();
-
-        return [
-            'restoredValues' => $restored,
-            'removedValues' => $removed,
-            'skippedManualEdits' => $skipped,
-            'skippedSuperseded' => $skippedSuperseded,
-            'affectedIds' => array_keys($affected),
-        ];
     }
 
     /**

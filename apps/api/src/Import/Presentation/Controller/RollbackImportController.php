@@ -46,6 +46,14 @@ final class RollbackImportController
     #[RequiresPermission(module: 'import_session', action: 'admin')]
     public function __invoke(string $id): JsonResponse
     {
+        // #2814 — a rollback undoes as much work as the import did: the run
+        // that motivated this fix had 121 348 values to restore, which is
+        // minutes, not the 30 s PHP allows an HTTP request by default. Bulk
+        // handlers lift the limit for the same reason (AbstractBulkHandler);
+        // without it the request dies mid-replay and — worse than failing —
+        // returns a fatal-error page carrying HTTP 200.
+        set_time_limit(0);
+
         $session = $this->loadOwned($id);
 
         try {
