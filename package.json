@@ -2,7 +2,7 @@
   "name": "pim",
   "version": "1.8.7",
   "private": true,
-  "description": "PIM — Product Information Management (single-tenant deployed, multi-tenant ready)",
+  "description": "PIM \u2014 Product Information Management (single-tenant deployed, multi-tenant ready)",
   "packageManager": "pnpm@10.33.2",
   "engines": {
     "node": ">=22",
@@ -52,7 +52,10 @@
       "fast-uri": ">=4.1.2",
       "qs": ">=6.15.2",
       "dompurify": ">=3.4.9",
-      "undici": ">=7.29.0 <8"
+      "undici": ">=7.29.0 <8",
+      "js-yaml": ">=4.3.1",
+      "nanoid@<3.3.17": ">=3.3.17",
+      "nanoid@5.1.11": ">=5.1.16 <6"
     },
     "auditConfig": {
       "ignoreGhsas": [
@@ -60,7 +63,8 @@
         "GHSA-vxpw-j846-p89q",
         "GHSA-hm92-r4w5-c3mj",
         "GHSA-3jxr-9vmj-r5cp",
-        "GHSA-52cp-r559-cp3m"
+        "GHSA-52cp-r559-cp3m",
+        "GHSA-fx2h-pf6j-xcff"
       ]
     }
   },
