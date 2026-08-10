@@ -170,12 +170,15 @@ final class CountingAttributeRepository implements AttributeRepositoryInterface
 }
 
 /**
- * @internal counts canViewAttribute calls so the batch path can assert each
- *           attribute id is resolved once, not once per item (#1620)
+ * @internal counts permission lookups so the batch path can assert each
+ *           attribute id is resolved once, not once per item (#1620), and
+ *           that the whole catalogue costs a single batch call (#2794)
  */
 final class CountingPermissionReader implements AttributePermissionReader
 {
     public int $canViewCalls = 0;
+
+    public int $canViewBatchCalls = 0;
 
     /** @var list<string> attribute ids (RFC4122) the principal may NOT view */
     private readonly array $denied;
@@ -193,6 +196,19 @@ final class CountingPermissionReader implements AttributePermissionReader
         ++$this->canViewCalls;
 
         return !\in_array($attributeId->toRfc4122(), $this->denied, true);
+    }
+
+    public function canViewAttributes(array $attributeIds): array
+    {
+        ++$this->canViewBatchCalls;
+
+        $decisions = [];
+        foreach ($attributeIds as $attributeId) {
+            ++$this->canViewCalls;
+            $decisions[$attributeId->toRfc4122()] = !\in_array($attributeId->toRfc4122(), $this->denied, true);
+        }
+
+        return $decisions;
     }
 
     public function canEditAttribute(Uuid $attributeId): bool

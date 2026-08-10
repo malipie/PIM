@@ -29,6 +29,22 @@ interface AttributePermissionReader
 {
     public function canViewAttribute(Uuid $attributeId): bool;
 
+    /**
+     * Batch counterpart of {@see canViewAttribute()} (#2794).
+     *
+     * Read overlays gate a whole page of items against the tenant's
+     * attribute catalogue, so asking one id at a time turned into a
+     * constant per-request query multiplier (GOLIVE #2234: 32 attributes
+     * × 4 SELECTs = 128 queries on every `GET /api/products`, regardless
+     * of `itemsPerPage`). Implementations must answer the whole set in a
+     * bounded number of round-trips.
+     *
+     * @param list<Uuid> $attributeIds
+     *
+     * @return array<string, bool> keyed by RFC4122 attribute id; every input id is present
+     */
+    public function canViewAttributes(array $attributeIds): array;
+
     public function canEditAttribute(Uuid $attributeId): bool;
 
     /**

@@ -39,6 +39,14 @@ use App\Shared\Domain\Tenant;
  * `?itemsPerPage=200`). The memo is a local variable scoped to a single
  * call, so nothing leaks between requests under FrankenPHP worker mode —
  * the service stays `readonly` and stateless.
+ *
+ * Perf (#2794): memoising was not enough — the FIRST resolve of each id
+ * still cost its own round-trips, so a 32-attribute catalogue meant a
+ * constant ~128 queries on every `GET /api/products` no matter how many
+ * items the page carried (GOLIVE #2234). The overlay now asks
+ * {@see AttributePermissionReader::canViewAttributes()} once per tenant
+ * with the whole catalogue, turning the page's permission cost into a
+ * fixed pair of set-based SELECTs.
  */
 final readonly class AttributeReadRestrictionOverlay
 {
@@ -100,6 +108,20 @@ final readonly class AttributeReadRestrictionOverlay
         $tenantId = $tenant->getId()->toRfc4122();
         $idByCode = $idByCodeByTenant[$tenantId] ??= $this->idByCode($tenant);
 
+        // #2794 — resolve the tenant's whole attribute catalogue in ONE
+        // call the first time we touch it. Asking per attribute cost two
+        // SELECTs per id even with the policy's own cache, which is what
+        // made the constant per-request query count of GOLIVE #2234.
+        $unresolved = [];
+        foreach ($idByCode as $attributeId) {
+            if (!\array_key_exists($attributeId->toRfc4122(), $canView)) {
+                $unresolved[] = $attributeId;
+            }
+        }
+        if ([] !== $unresolved) {
+            $canView += $this->permissions->canViewAttributes($unresolved);
+        }
+
         $filtered = [];
         foreach ($indexed as $code => $value) {
             $attributeId = $idByCode[$code] ?? null;
@@ -111,8 +133,7 @@ final readonly class AttributeReadRestrictionOverlay
                 continue;
             }
 
-            $key = $attributeId->toRfc4122();
-            $visible = $canView[$key] ??= $this->permissions->canViewAttribute($attributeId);
+            $visible = $canView[$attributeId->toRfc4122()] ?? false;
             if ($visible) {
                 $filtered[$code] = $value;
             }
