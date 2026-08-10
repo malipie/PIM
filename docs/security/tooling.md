@@ -28,6 +28,20 @@
 | **Gitleaks** | CI (`security-secrets.yml`) | Regex-based secrets-leak scan (AWS keys, Stripe tokens, private keys, JWT secrets) on every PR + push | n/a — auto-runs in CI |
 | **TruffleHog** | CI (`security-secrets.yml`) + Husky pre-commit (if binary installed locally) | High-entropy + verified-secret scan (catches structured tokens gitleaks would miss). **Defence in depth** alongside gitleaks. | `brew install trufflehog` then `trufflehog git file://. --since-commit=HEAD --only-verified` |
 
+### Wyjątki w `pnpm audit` (`pnpm.auditConfig.ignoreGhsas`)
+
+Bramka `audit.yml` puszcza `pnpm audit --audit-level=high`, więc każdy *high* zatrzymuje
+wszystkie PR-y. `package.json` trzyma listę świadomie zignorowanych advisory — ten
+rejestr wyjaśnia, dlaczego. **Każdy nowy wpis wymaga uzasadnienia tutaj**, inaczej
+lista po kilku miesiącach staje się workiem, do którego nikt nie zagląda.
+
+| GHSA | Pakiet | Dlaczego zignorowane | Kiedy zdjąć |
+|---|---|---|---|
+| `GHSA-fx2h-pf6j-xcff` | `vite` ≤6.4.2 (tranzytywnie przez `vitepress`) | Obejście `server.fs.deny` w **dev serverze Vite na Windows**. Ten vite wchodzi wyłącznie z `vitepress` (strona dokumentacji) i nigdy nie startuje jako dev server — `apps/docs` robi tylko `vitepress build` do statycznego HTML na linuksowym CI. `vitepress@1.6.4` (najnowszy stabilny) przypina vite 5; 2.x jest dopiero w alfie, więc nie ma ścieżki upgrade'u. | Gdy `vitepress` 2.x wyjdzie stabilnie — wtedy bump i usunięcie wpisu |
+
+Pozostałe wpisy pochodzą sprzed tego rejestru (#2745, #2699) i czekają na uzupełnienie
+uzasadnień przy najbliższym ticketcie maintenance.
+
 ### Deferred (with explicit follow-up tickets)
 
 | Tool | Reason for deferral | Where it lands |
