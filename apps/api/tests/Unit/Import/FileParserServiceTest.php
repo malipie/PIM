@@ -173,6 +173,65 @@ final class FileParserServiceTest extends TestCase
         return new FileParserService(new EncodingDetector(), new DelimiterDetector());
     }
 
+    /**
+     * #2808 — the regression that made this necessary: a 51 800-row export
+     * took 200 s to preview because the parser iterated every row to count
+     * them, and PHP's 30 s limit turned that into a fatal error (HTML 500,
+     * not Problem Details). Above the threshold the count now comes from the
+     * sheet's declared dimension.
+     */
+    #[Test]
+    public function largeSheetIsCountedFromDeclaredDimensionWithoutReadingEveryRow(): void
+    {
+        $rows = 6_000; // above DIMENSION_COUNT_THRESHOLD
+        $path = $this->writeXlsxWithRows($rows);
+
+        try {
+            $parsed = $this->parser()->parse($path);
+
+            self::assertSame(['sku', 'name'], $parsed->headers);
+            self::assertSame($rows, $parsed->totalRows, 'declared dimension must exclude the header row');
+            self::assertCount(5, $parsed->sampleRows, 'samples are still collected on the fast path');
+            self::assertSame('SKU-1', $parsed->sampleRows[0][0]);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    /**
+     * The fast path must not change what small files report — they were never
+     * the problem and their exact count costs nothing.
+     */
+    #[Test]
+    public function smallSheetKeepsTheExactIteratedCount(): void
+    {
+        $rows = 12; // below the threshold
+        $path = $this->writeXlsxWithRows($rows);
+
+        try {
+            $parsed = $this->parser()->parse($path);
+
+            self::assertSame($rows, $parsed->totalRows);
+            self::assertCount(5, $parsed->sampleRows);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    private function writeXlsxWithRows(int $dataRows): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'imp-test-').'.xlsx';
+        $writer = new XlsxWriter();
+        $writer->openToFile($path);
+        $writer->addRow(Row::fromValues(['sku', 'name']));
+        for ($i = 1; $i <= $dataRows; ++$i) {
+            $writer->addRow(Row::fromValues(['SKU-'.$i, 'Product '.$i]));
+        }
+        $writer->close();
+
+        return $path;
+    }
+
     private function writeGenuineXlsx(): string
     {
         $path = tempnam(sys_get_temp_dir(), 'imp-test-').'.xlsx';
