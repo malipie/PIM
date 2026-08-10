@@ -361,6 +361,10 @@ final class ImportRunMemoryBenchmarkCommand extends Command
      * Removes everything the benchmark created. Raw SQL on purpose: hydrating
      * tens of thousands of entities to delete them would blow the very budget
      * this command measures.
+     *
+     * tenant-safe: explicit tenant_id filter — the id list comes from a
+     * SELECT scoped to the benchmark's tenant and to its own `BENCH-IMP-`
+     * prefix, and both DELETEs are keyed by that list.
      */
     private function cleanUp(Tenant $tenant): int
     {
