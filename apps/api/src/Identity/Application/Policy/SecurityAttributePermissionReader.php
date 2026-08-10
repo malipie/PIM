@@ -36,6 +36,27 @@ final readonly class SecurityAttributePermissionReader implements AttributePermi
         return $this->policy->canViewAttribute($user, $attributeId);
     }
 
+    public function canViewAttributes(array $attributeIds): array
+    {
+        $user = $this->currentUser();
+        if (null === $user) {
+            // Anonymous → restricted, same default as the single-id path.
+            $denied = [];
+            foreach ($attributeIds as $attributeId) {
+                $denied[$attributeId->toRfc4122()] = false;
+            }
+
+            return $denied;
+        }
+
+        $decisions = [];
+        foreach ($this->policy->resolvePermissions($user, $attributeIds) as $key => $permission) {
+            $decisions[$key] = $permission->canView();
+        }
+
+        return $decisions;
+    }
+
     public function canEditAttribute(Uuid $attributeId): bool
     {
         $user = $this->currentUser();

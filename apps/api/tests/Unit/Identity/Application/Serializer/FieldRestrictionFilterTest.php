@@ -128,6 +128,7 @@ final class FieldRestrictionFilterTest extends TestCase
     {
         $policy = $this->createMock(AttributePermissionPolicy::class);
         $policy->expects(self::never())->method('resolvePermission');
+        $policy->method('resolvePermissions')->willReturn([]);
 
         $filter = new FieldRestrictionFilter($policy);
 
@@ -167,11 +168,17 @@ final class FieldRestrictionFilterTest extends TestCase
     private function policyMap(array $byAttribute): AttributePermissionPolicy
     {
         $policy = $this->createMock(AttributePermissionPolicy::class);
-        $policy->method('resolvePermission')
-            ->willReturnCallback(static function (User $_user, Uuid $attributeId) use ($byAttribute): AttributePermission {
-                $key = $attributeId->toRfc4122();
+        // #2794 — the filter resolves the whole field map in one call.
+        $policy->method('resolvePermissions')
+            ->willReturnCallback(static function (User $_user, array $attributeIds) use ($byAttribute): array {
+                $resolved = [];
+                /** @var Uuid $attributeId */
+                foreach ($attributeIds as $attributeId) {
+                    $key = $attributeId->toRfc4122();
+                    $resolved[$key] = $byAttribute[$key] ?? AttributePermission::Restricted;
+                }
 
-                return $byAttribute[$key] ?? AttributePermission::Restricted;
+                return $resolved;
             });
 
         return $policy;

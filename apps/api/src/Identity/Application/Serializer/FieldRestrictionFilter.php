@@ -54,10 +54,22 @@ final readonly class FieldRestrictionFilter
         array $valuesByAttributeId,
         array $integrationVisibleByAttribute = [],
     ): array {
+        // #2794 — one batch resolve for the whole field map. The previous
+        // shape called the policy once per attribute, and each of those
+        // calls issued four SELECTs, which made `GET /api/products` cost
+        // ~128 queries per request regardless of page size (GOLIVE #2234).
+        $attributeKeys = [];
+        $attributeIds = [];
+        foreach (array_keys($valuesByAttributeId) as $attributeIdString) {
+            $attributeId = Uuid::fromString($attributeIdString);
+            $attributeKeys[$attributeIdString] = $attributeId->toRfc4122();
+            $attributeIds[] = $attributeId;
+        }
+        $permissions = $this->policy->resolvePermissions($user, $attributeIds);
+
         $out = [];
         foreach ($valuesByAttributeId as $attributeIdString => $value) {
-            $attributeId = Uuid::fromString($attributeIdString);
-            $permission = $this->policy->resolvePermission($user, $attributeId);
+            $permission = $permissions[$attributeKeys[$attributeIdString]] ?? AttributePermission::Restricted;
 
             if (AttributePermission::Restricted === $permission) {
                 continue;

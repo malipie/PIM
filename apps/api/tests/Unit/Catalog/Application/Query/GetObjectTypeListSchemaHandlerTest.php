@@ -256,6 +256,16 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
                 return true;
             }
 
+            public function canViewAttributes(array $attributeIds): array
+            {
+                $decisions = [];
+                foreach ($attributeIds as $attributeId) {
+                    $decisions[$attributeId->toRfc4122()] = true;
+                }
+
+                return $decisions;
+            }
+
             public function canEditAttribute(Uuid $attributeId): bool
             {
                 return true;
@@ -282,6 +292,16 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
                 return $this->code !== $attributeId->toRfc4122();
             }
 
+            public function canViewAttributes(array $attributeIds): array
+            {
+                $decisions = [];
+                foreach ($attributeIds as $attributeId) {
+                    $decisions[$attributeId->toRfc4122()] = $this->canViewAttribute($attributeId);
+                }
+
+                return $decisions;
+            }
+
             public function canEditAttribute(Uuid $attributeId): bool
             {
                 return $this->code !== $attributeId->toRfc4122();
@@ -304,6 +324,16 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
             public function canViewAttribute(Uuid $attributeId): bool
             {
                 return true;
+            }
+
+            public function canViewAttributes(array $attributeIds): array
+            {
+                $decisions = [];
+                foreach ($attributeIds as $attributeId) {
+                    $decisions[$attributeId->toRfc4122()] = true;
+                }
+
+                return $decisions;
             }
 
             public function canEditAttribute(Uuid $attributeId): bool
