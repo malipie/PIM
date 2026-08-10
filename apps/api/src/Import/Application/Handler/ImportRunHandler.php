@@ -10,6 +10,7 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\ObjectKind;
 use App\Import\Application\Service\AttributeAutoCreator;
 use App\Import\Application\Service\ImportCategoryOps;
+use App\Import\Application\Service\ImportChunkSizer;
 use App\Import\Application\Service\ImportColumnGrammar;
 use App\Import\Application\Service\ImportObjectCreator;
 use App\Import\Application\Service\ImportProgressPublisher;
@@ -313,11 +314,15 @@ final class ImportRunHandler extends AbstractBatchHandler
             // and the value writer pay one query per chunk (resolveMany +
             // primeChunk) instead of one per row. flushAndClear() detaches
             // everything, so the re-merge block below replays the lookups.
+            $chunkRows = ImportChunkSizer::rowsPerChunk(\count($columnMapping), $this->batchSize);
+
             foreach ($this->rowReader->read($sourcePath) as $rowNumber => $cells) {
                 ++$totalRows;
                 $buffer[] = ['rowNumber' => $rowNumber, 'cells' => $cells];
 
-                if (!$this->shouldFlush(\count($buffer))) {
+                // #2813 — flush by working-set size, not by row count. See
+                // TARGET_VALUES_PER_CHUNK for why rows are the wrong unit here.
+                if (\count($buffer) < $chunkRows) {
                     continue;
                 }
 
