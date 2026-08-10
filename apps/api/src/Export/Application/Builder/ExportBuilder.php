@@ -116,6 +116,13 @@ final class ExportBuilder
             array_map(static fn (CatalogObject $o): Uuid => $o->getId(), $page),
         );
         $relationCodesByColumn = $this->prefetchRelationCodes($pageIds, $attributeMap);
+        // #2796 — resolve every column's view permission once per page.
+        // `cell()` asks per column PER ROW, so on the interactive path (where
+        // a domain user is present) a 60-column export used to warm the
+        // policy one attribute at a time. Pre-resolving turns that into a
+        // single batch; system-context runs skip it entirely, exactly as the
+        // per-cell guard below does.
+        $this->prefetchAttributeViewPermissions($attributeMap);
         $categoriesByObjectId = [];
         if ($this->needsCategoryColumn($columns)) {
             // XMLF-P3-03 — variants are not categorised independently: an
@@ -154,6 +161,34 @@ final class ExportBuilder
                 $categories,
             );
         }
+    }
+
+    /**
+     * #2796 — warm the per-attribute view decisions for the whole column set
+     * in one batch.
+     *
+     * {@see cell()} consults `canViewAttribute()` for every attribute column
+     * of every row. The policy memoises decisions per request, so the cost
+     * was never per row — but it WAS per distinct attribute, because each
+     * first-time lookup resolved a single id. A 60-column export therefore
+     * warmed the cache with 60 separate resolutions before settling.
+     *
+     * Skipped in system contexts (async export handler, sync runner): those
+     * carry no domain user, `cell()` short-circuits on
+     * `isAttributePermissionEnforced()` before it ever asks, and resolving
+     * here would only burn a query on an answer nobody reads.
+     *
+     * @param array<string, Attribute> $attributeMap
+     */
+    private function prefetchAttributeViewPermissions(array $attributeMap): void
+    {
+        if ([] === $attributeMap || !$this->attributePermissions->isAttributePermissionEnforced()) {
+            return;
+        }
+
+        $this->attributePermissions->canViewAttributes(
+            array_values(array_map(static fn (Attribute $a): Uuid => $a->getId(), $attributeMap)),
+        );
     }
 
     /**
