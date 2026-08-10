@@ -3510,7 +3510,8 @@
         "invalid_value": "Invalid value",
         "image_not_found": "Image file missing",
         "category_not_found": "Category not found (product imported without assignment)"
-      }
+      },
+      "truncated": "Checked the first {{count}} rows. The real import validates every row — these counters describe a sample, not the whole file."
     },
     "confirm": {
       "summary": "Summary",
