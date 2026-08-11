@@ -8,7 +8,6 @@ use App\Catalog\Application\AttributesIndexedRebuilder;
 use App\Catalog\Application\Reindex\BulkReindexQueueInterface;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
-use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Provenance;
 use App\Catalog\Domain\Repository\ObjectValueRepositoryInterface;
 use App\Import\Domain\Entity\ImportSession;
@@ -168,7 +167,12 @@ final readonly class ImportRollbackService
                 $lock->refresh();
                 $session = $this->persistProgress($sessionId, $totals, $resumeFrom, $objectsDone, $objectsTotal, 'values');
                 if ($session->isRollbackCancelRequested()) {
-                    return $this->stop($session, $totals, $objectsDone, $objectsTotal, 'cancelled', $affectedIds, $kind);
+                    // The work already committed still has to reach the index:
+                    // a partly undone catalogue with a stale index is the worst
+                    // of both.
+                    $this->reindexQueue->queueAll($affectedIds);
+
+                    return $this->stop($session, $totals, $objectsDone, $objectsTotal, 'cancelled');
                 }
             }
 
@@ -193,7 +197,10 @@ final readonly class ImportRollbackService
                 $lock->refresh();
                 $session = $this->persistProgress($sessionId, $totals, $resumeFrom, $objectsDone, $objectsTotal, 'created');
                 if ($session->isRollbackCancelRequested()) {
-                    return $this->stop($session, $totals, $objectsDone, $objectsTotal, 'cancelled', $affectedIds, $kind, $createdIds);
+                    $this->reindexQueue->queueAll($affectedIds);
+                    $this->reindexQueue->queueAllDeleted($createdIds, $kind);
+
+                    return $this->stop($session, $totals, $objectsDone, $objectsTotal, 'cancelled');
                 }
             }
 
@@ -333,8 +340,6 @@ final readonly class ImportRollbackService
      * that claims the catalogue is whole either way.
      *
      * @param array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int} $totals
-     * @param list<string>                                                                                                                             $affectedIds
-     * @param list<string>                                                                                                                             $createdIds
      *
      * @return array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int, objectsDone: int, objectsTotal: int, completed: bool, stoppedReason: ?string}
      */
@@ -344,20 +349,9 @@ final readonly class ImportRollbackService
         int $objectsDone,
         int $objectsTotal,
         string $reason,
-        array $affectedIds,
-        ObjectKind $kind,
-        array $createdIds = [],
     ): array {
         $session->recordRollbackStopped($objectsDone, $objectsTotal, $reason);
         $this->sessions->save($session);
-
-        // The work already committed still has to reach the index — the search
-        // documents of restored objects are stale otherwise, and a partial
-        // rollback with a stale index is the worst of both.
-        $this->reindexQueue->queueAll($affectedIds);
-        if ([] !== $createdIds) {
-            $this->reindexQueue->queueAllDeleted($createdIds, $kind);
-        }
         $this->progressPublisher->rollbackStopped($session, $objectsDone, $objectsTotal, $reason);
 
         return $this->outcome($totals, $objectsDone, $objectsTotal, false, $reason);
