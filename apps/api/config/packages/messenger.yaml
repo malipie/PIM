@@ -56,6 +56,9 @@ framework:
             # (Version20260704050000) — consistent with the env-driven DSNs.
             failed: 'doctrine://default?queue_name=failed&auto_setup=0'
 
+        # Two buses now (#2815), so the default must be named explicitly.
+        default_bus: messenger.bus.default
+
         buses:
             messenger.bus.default:
                 # Domain events emitted by AggregateRoot::recordThat() may have
@@ -86,6 +89,45 @@ framework:
                     - 'App\Search\Application\CatalogIndexDrainMiddleware'
                     - 'App\Shared\Infrastructure\Messenger\IdempotencyMiddleware'
                     - doctrine_transaction
+
+            # #2815 — bus for jobs that manage their own transaction boundaries.
+            #
+            # `doctrine_transaction` above wraps a WHOLE handler in one
+            # transaction. For a message that runs for seconds that is exactly
+            # right. For an import it is not: a 40k-row run held one transaction
+            # open for its entire duration, so nothing it wrote — not the
+            # `running` status, not started_at, not the row counters, not a
+            # single imported object — was visible to any other connection until
+            # the run ended. The sessions list, reading through its own
+            # connection, therefore showed "oczekuje · — wierszy · 0" for twenty
+            # minutes of real work, while the detail screen (reading Mercure,
+            # which never touches the database) showed the truth. That is the
+            # contradiction reported in #2815, and no amount of extra columns
+            # fixes it while the writes stay uncommitted.
+            #
+            # {@see \App\Import\Application\Handler\ImportRunHandler} was written
+            # for per-chunk commits and says so throughout: it flushes and
+            # clears every chunk to bound memory, records a resume checkpoint
+            # "so the chunk's rows AND the checkpoint commit in the SAME
+            # transaction", and degrades a failed run to `partial` to keep "the
+            # rows committed by earlier chunks". The blanket wrap silently
+            # turned each of those flushes into a savepoint of one long
+            # transaction, which also meant a crash discarded the entire run —
+            # the resume machinery had nothing left to resume from.
+            #
+            # Same middleware otherwise: tenant rebinding, the RLS GUC, the
+            # Meilisearch drain and idempotency all still apply. The
+            # idempotency marker is written after the handler returns either
+            # way, so a crashed run is still redelivered rather than swallowed.
+            messenger.bus.long_running:
+                default_middleware:
+                    enabled: true
+                    allow_no_handlers: true
+                middleware:
+                    - 'App\Shared\Infrastructure\Messenger\TenantContextRebindingMiddleware'
+                    - 'App\Shared\Infrastructure\Messenger\TenantRlsGucMiddleware'
+                    - 'App\Search\Application\CatalogIndexDrainMiddleware'
+                    - 'App\Shared\Infrastructure\Messenger\IdempotencyMiddleware'
 
         # Explicit routing per message class (audit MEDIUM-007).
         #

@@ -24,6 +24,9 @@ interface ImportSession {
   status: ImportStatus;
   file_name: string;
   total_rows: number | null;
+  // #2815 — durable row counter written per chunk; survives a page refresh
+  // and a Mercure stream nobody was watching.
+  processed_rows?: number;
   success_count: number;
   error_count: number;
   skipped_count: number;
@@ -121,7 +124,11 @@ export function ImportShowPage(): React.ReactElement {
     session.status === 'rolled_back';
 
   // Server is the source of truth; Mercure refines counters in realtime.
-  const processed = Math.max(progress.processedRows, session.success_count + session.error_count);
+  const processed = Math.max(
+    progress.processedRows,
+    session.processed_rows ?? 0,
+    session.success_count + session.error_count,
+  );
   const total = Math.max(progress.totalRows, session.total_rows ?? 0);
   const pct = total > 0 ? Math.round((processed / total) * 100) : 0;
 

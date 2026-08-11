@@ -46,6 +46,10 @@ final class GetImportSessionController
             'status' => $session->getStatus()->value,
             'file_name' => $session->getFileName(),
             'total_rows' => $session->getTotalRows(),
+            // #2815 — durable progress, so a page refresh mid-import does not
+            // fall back to whatever the Mercure stream happens to replay.
+            'processed_rows' => $session->getProcessedRows(),
+            'progress_updated_at' => $session->getProgressUpdatedAt()?->format(DateTimeInterface::RFC3339_EXTENDED),
             'success_count' => $session->getSuccessCount(),
             'error_count' => $session->getErrorCount(),
             'updated_count' => $session->getUpdatedCount(),

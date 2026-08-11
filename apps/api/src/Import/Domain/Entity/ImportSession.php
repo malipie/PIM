@@ -32,6 +32,13 @@ use Symfony\Component\Validator\Constraints as Assert;
  */
 class ImportSession extends AggregateRoot implements TenantScoped
 {
+    /**
+     * Cap on a persisted failure reason. The column is TEXT, but an exception
+     * message can carry a whole SQL statement or a serialized payload; the
+     * session row is a summary the UI renders, not a log sink.
+     */
+    private const int MAX_ERROR_MESSAGE_CHARS = 1000;
+
     private Uuid $id;
 
     private ?Tenant $tenant = null;
@@ -79,6 +86,25 @@ class ImportSession extends AggregateRoot implements TenantScoped
     private string $status = ImportSessionStatus::Pending->value;
 
     private ?int $totalRows = null;
+
+    /**
+     * #2815 — rows the worker has consumed so far, persisted per chunk.
+     *
+     * The outcome counters below split a row three ways (created / updated /
+     * skipped), so none of them answers "how far along is this?": a re-import
+     * that only updates leaves `success_count` at 0 for its whole run, and the
+     * sessions list read that as "nothing has happened" while the worker was at
+     * 100% CPU. This is the one number the progress bar needs, and it lives in
+     * the database so it survives a page refresh and a lost Mercure stream.
+     */
+    private int $processedRows = 0;
+
+    /**
+     * #2815 — when {@see $processedRows} last moved. Distinguishes a slow run
+     * from a hung one: with a timestamp that stopped advancing ten minutes ago
+     * the operator can act, where a static "oczekuje" left nothing but guessing.
+     */
+    private ?DateTimeImmutable $progressUpdatedAt = null;
 
     private int $successCount = 0;
 
@@ -294,6 +320,30 @@ class ImportSession extends AggregateRoot implements TenantScoped
     public function getSuccessCount(): int
     {
         return $this->successCount;
+    }
+
+    public function getProcessedRows(): int
+    {
+        return $this->processedRows;
+    }
+
+    public function getProgressUpdatedAt(): ?DateTimeImmutable
+    {
+        return $this->progressUpdatedAt;
+    }
+
+    /**
+     * #2815 — record how far the row phase has got. Called with each flushed
+     * chunk so the durable state moves with the run rather than only at its end.
+     * Monotonic: a redelivered or resumed chunk must never walk the counter back.
+     */
+    public function recordProgress(int $processedRows, ?DateTimeImmutable $at = null): void
+    {
+        if ($processedRows < $this->processedRows) {
+            return;
+        }
+        $this->processedRows = $processedRows;
+        $this->progressUpdatedAt = $at ?? new DateTimeImmutable();
     }
 
     public function getErrorCount(): int
@@ -546,6 +596,20 @@ class ImportSession extends AggregateRoot implements TenantScoped
         }
         $this->status = ImportSessionStatus::RolledBack->value;
         $this->rolledBackAt = new DateTimeImmutable();
+    }
+
+    /**
+     * #2815 — record why a run ended as it did WITHOUT forcing it to `failed`.
+     *
+     * A run aborted mid-way finalizes as `partial` (the rows earlier chunks
+     * committed are kept), and that path left `error_message` empty: the
+     * operator saw a half-imported catalogue with no stated reason, and the only
+     * account of the abort lived in the container log — out of reach for anyone
+     * without shell access to the server.
+     */
+    public function recordErrorMessage(string $message): void
+    {
+        $this->errorMessage = mb_substr($message, 0, self::MAX_ERROR_MESSAGE_CHARS);
     }
 
     public function isWithinRollbackWindow(?DateTimeImmutable $now = null): bool

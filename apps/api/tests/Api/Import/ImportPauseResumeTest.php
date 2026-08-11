@@ -324,6 +324,7 @@ final class ImportPauseResumeTest extends CatalogApiTestCase
             bulkContext: self::getContainer()->get(\App\Catalog\Application\BulkContext::class),
             rowCells: self::getContainer()->get(\App\Import\Application\Service\ImportRowCells::class),
             categoryOps: self::getContainer()->get(\App\Import\Application\Service\ImportCategoryOps::class),
+            rowCountEstimator: self::getContainer()->get(\App\Import\Application\Service\ImportRowCountEstimator::class),
             batchSize: $batchSize,
         );
     }

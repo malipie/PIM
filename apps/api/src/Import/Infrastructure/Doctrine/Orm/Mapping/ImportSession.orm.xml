@@ -114,6 +114,13 @@
         </field>
         <field name="rollbackReport" type="json" column="rollback_report" nullable="true"/>
 
+        <field name="processedRows" type="integer" column="processed_rows">
+            <options>
+                <option name="default">0</option>
+            </options>
+        </field>
+        <field name="progressUpdatedAt" type="datetime_immutable" column="progress_updated_at" nullable="true"/>
+
         <field name="startedAt" type="datetime_immutable" column="started_at" nullable="true"/>
         <field name="completedAt" type="datetime_immutable" column="completed_at" nullable="true"/>
         <field name="rollbackUntil" type="datetime_immutable" column="rollback_until" nullable="true"/>
