@@ -133,6 +133,14 @@ final class ListImportSessionsController
             'file_name' => $session->getFileName(),
             'file_size_bytes' => $session->getFileSizeBytes(),
             'total_rows' => $session->getTotalRows(),
+            // #2815 — the hub used to derive progress from success + error,
+            // which is 0 for a run that only updates rows: a working import
+            // read as "nothing has happened". These two are the durable
+            // progress the detail screen shows, so both screens agree even
+            // when the Mercure stream is not being watched.
+            'processed_rows' => $session->getProcessedRows(),
+            'progress_updated_at' => $session->getProgressUpdatedAt()?->format(DateTimeInterface::RFC3339_EXTENDED),
+            'error_message' => $session->getErrorMessage(),
             'success_count' => $session->getSuccessCount(),
             'error_count' => $session->getErrorCount(),
             'updated_count' => $session->getUpdatedCount(),

@@ -12,7 +12,7 @@ import {
   StagePipeline,
   StatusPill,
 } from '../primitives';
-import type { ImportSessionRow, ThroughputResponse } from './types';
+import { type ImportSessionRow, processedRowsOf, type ThroughputResponse } from './types';
 
 interface LiveSessionCardProps {
   session: ImportSessionRow;
@@ -33,7 +33,7 @@ function progressOf(session: ImportSessionRow): number {
   if (total === 0) {
     return 0;
   }
-  return Math.min(1, (session.success_count + session.error_count) / total);
+  return Math.min(1, processedRowsOf(session) / total);
 }
 
 function inferStage(session: ImportSessionRow): ImportStage {
@@ -45,8 +45,7 @@ function inferStage(session: ImportSessionRow): ImportStage {
   if (total === null || total === 0) {
     return 'parsing';
   }
-  const processed = session.success_count + session.error_count;
-  const ratio = processed / total;
+  const ratio = processedRowsOf(session) / total;
   if (ratio < 0.05) return 'parsing';
   if (ratio < 0.5) return 'validating';
   return 'writing';
@@ -140,7 +139,7 @@ export function LiveSessionCard({ session, throughput }: LiveSessionCardProps) {
             <div className="flex items-baseline justify-between mb-1.5">
               <div className="flex items-baseline gap-2">
                 <span className="font-display text-[20px] font-semibold tracking-tight num">
-                  {(session.success_count + session.error_count).toLocaleString('pl-PL')}
+                  {processedRowsOf(session).toLocaleString('pl-PL')}
                 </span>
                 <span className="text-[12px] text-zinc-500">
                   {t('imports.sessions.live.of_rows', {

@@ -15,6 +15,7 @@ use App\Import\Application\Service\ImportColumnGrammar;
 use App\Import\Application\Service\ImportObjectCreator;
 use App\Import\Application\Service\ImportProgressPublisher;
 use App\Import\Application\Service\ImportRowCells;
+use App\Import\Application\Service\ImportRowCountEstimator;
 use App\Import\Application\Service\ImportRowDecision;
 use App\Import\Application\Service\ImportRowReader;
 use App\Import\Application\Service\ImportUndoLogger;
@@ -73,6 +74,22 @@ use const PATHINFO_EXTENSION;
  * import; the long-lived `ImportSession` row is re-merged into the EM
  * after each clear so counters stay current without straggling
  * proxy state.
+ */
+/**
+ * #2815 — dispatched on `messenger.bus.long_running`, i.e. handled WITHOUT the
+ * blanket `doctrine_transaction` middleware, because this handler manages its
+ * own boundaries: it commits per chunk to bound memory and so that a resumed
+ * run picks up from a checkpoint that actually survived. Under the wrapping
+ * transaction none of its writes were visible until the run ended, and a crash
+ * discarded all of them — see the bus definition in
+ * config/packages/messenger.yaml.
+ *
+ * Deliberately NOT restricted to that bus with `#[AsMessageHandler(bus: ...)]`:
+ * the buses run with `allow_no_handlers`, so a dispatch that ever went to the
+ * default bus would be dropped in silence rather than failing loudly. Staying
+ * registered on both buses makes the worst case "runs with the old transaction
+ * semantics" instead of "does not run at all"; the bus is chosen at the two
+ * dispatch sites (config/services.yaml).
  */
 #[AsMessageHandler]
 final class ImportRunHandler extends AbstractBatchHandler
@@ -167,6 +184,7 @@ final class ImportRunHandler extends AbstractBatchHandler
         private readonly \App\Catalog\Application\BulkContext $bulkContext,
         private readonly ImportRowCells $rowCells,
         private readonly ImportCategoryOps $categoryOps,
+        private readonly ImportRowCountEstimator $rowCountEstimator,
         int $batchSize = 200,
     ) {
         parent::__construct($entityManager, $batchSize);
@@ -292,6 +310,11 @@ final class ImportRunHandler extends AbstractBatchHandler
                 $tenant,
             );
             $sourcePath = $this->stageSourceFile($session, $tenant);
+            // #2815 — publish the size of the job BEFORE working through it.
+            // total_rows was written only after the row loop, so throughout the
+            // run — the only time it is of any use — the sessions list showed
+            // "—" next to a job that had been going for twenty minutes.
+            $this->recordRowCountEstimate($session, $sourcePath);
 
             $skuSeenInFile = [];
             // IMP2-1.9 (item 2) — running file-wide set of identifier values
@@ -335,6 +358,11 @@ final class ImportRunHandler extends AbstractBatchHandler
                 // in the SAME transaction. A crash between commit and a separate
                 // checkpoint save would otherwise re-process committed rows.
                 $session->recordCheckpoint($chunkLastRow, 'rows');
+                // #2815 — the checkpoint exists for resume, not for reporting:
+                // it holds a file offset, is cleared on completion, and is not
+                // exposed. Progress rides the SAME flush so the durable state
+                // moves with the run instead of only at its end.
+                $session->recordProgress($processed);
                 $this->flushAndClear();
                 // After clear() every previously-loaded entity is detached —
                 // re-merge by reloading the session and tenant, replaying the
@@ -377,6 +405,7 @@ final class ImportRunHandler extends AbstractBatchHandler
                 $chunkLastRow = $buffer[array_key_last($buffer)]['rowNumber'];
                 $processed += $this->processChunk($session, $tenant, $buffer, $columnMapping, $attributesByCode, $skuSeenInFile, $identifierSeenInFile, $mediaJobs, $resumeFrom);
                 $session->recordCheckpoint($chunkLastRow, 'rows');
+                $session->recordProgress($processed);
                 $this->flushAndClear();
                 $session = $this->refreshSession($session);
                 $lock->refresh();
@@ -435,7 +464,9 @@ final class ImportRunHandler extends AbstractBatchHandler
                 return;
             }
 
+            // The exact count, replacing the estimate recorded before the loop.
             $session->setTotalRows($totalRows);
+            $session->recordProgress($processed);
             $this->persistSuppressedImportLogSummary($session);
             $this->sessions->save($session);
 
@@ -561,6 +592,30 @@ final class ImportRunHandler extends AbstractBatchHandler
             columnName: null,
             columnValue: null,
         ));
+    }
+
+    /**
+     * #2815 — record how many rows the run is about to work through, as soon as
+     * the file is on local disk and before the first one is read.
+     *
+     * Only fills a gap: a session that already carries a count (a resume, or a
+     * caller that knew the size up front) is left alone, and a file that gives
+     * no cheap answer leaves the column NULL rather than carrying a guess. The
+     * exact count overwrites this when the loop ends.
+     */
+    private function recordRowCountEstimate(ImportSession $session, string $sourcePath): void
+    {
+        if (null !== $session->getTotalRows()) {
+            return;
+        }
+
+        $estimate = $this->rowCountEstimator->estimate($sourcePath);
+        if (null === $estimate) {
+            return;
+        }
+
+        $session->setTotalRows($estimate);
+        $this->sessions->save($session);
     }
 
     /**
@@ -910,6 +965,15 @@ final class ImportRunHandler extends AbstractBatchHandler
             // discarding the whole run.
             $session->incrementError();
             $session->markCompleted();
+            // #2815 — say WHY. This path used to finalize a half-imported
+            // catalogue as `partial` with an empty error_message, so the only
+            // account of the abort was in the container log: the operator saw
+            // a truncated import and no stated reason for it.
+            $session->recordErrorMessage(\sprintf(
+                'Import przerwany po %d wierszach: %s',
+                $session->getProcessedRows(),
+                $exception->getMessage(),
+            ));
         }
         $em->flush();
 

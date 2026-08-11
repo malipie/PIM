@@ -450,6 +450,14 @@ services:
     App\Import\Presentation\Controller\StartImportController:
         arguments:
             $importsStorage: '@imports.storage'
+            # #2815 — ImportRunMessage is handled on the bus without the
+            # blanket transaction wrap, and the bus is chosen at DISPATCH
+            # (the envelope carries the bus name to the worker).
+            $bus: '@messenger.bus.long_running'
+
+    App\Import\Presentation\Controller\ImportSessionStateController:
+        arguments:
+            $bus: '@messenger.bus.long_running'
 
     # IMP2-2.2 — staged upload: stage once, reuse by id in dry-run/start.
     App\Import\Application\Service\StagedFileService:
