@@ -52,6 +52,31 @@ class DoctrineImportUndoLogRepository extends ServiceEntityRepository implements
     }
 
     /**
+     * @param list<Uuid> $objectIds
+     *
+     * @return list<ImportUndoLog>
+     */
+    public function findBySessionAndObjectIds(ImportSession $session, array $objectIds): array
+    {
+        if ([] === $objectIds) {
+            return [];
+        }
+
+        $qb = $this->createQueryBuilder('u')
+            ->where('u.importSession = :session')
+            ->andWhere('u.objectId IN (:objectIds)')
+            ->orderBy('u.createdAt', 'DESC')
+            ->addOrderBy('u.id', 'DESC')
+            ->setParameter('session', $session)
+            ->setParameter('objectIds', $objectIds);
+
+        /** @var list<ImportUndoLog> $result */
+        $result = $qb->getQuery()->getResult();
+
+        return $result;
+    }
+
+    /**
      * @return list<Uuid>
      */
     public function affectedObjectIds(ImportSession $session): array

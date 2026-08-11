@@ -23,6 +23,20 @@ interface ImportUndoLogRepositoryInterface
     public function findBySession(ImportSession $session): array;
 
     /**
+     * Undo rows of this session limited to the given objects (#2814).
+     *
+     * The unbounded {@see findBySession()} loads every row of the run at once —
+     * 51 304 of them for a 51 800-row re-import — which exhausted the worker's
+     * 256 MiB ceiling in 1.65 seconds. The rollback walks its objects in
+     * chunks instead and asks only for the rows it is about to replay.
+     *
+     * @param list<Uuid> $objectIds
+     *
+     * @return list<ImportUndoLog>
+     */
+    public function findBySessionAndObjectIds(ImportSession $session, array $objectIds): array;
+
+    /**
      * Distinct object ids touched by the session's undo rows (the pre-existing
      * objects whose attributes_indexed / completeness / search doc must be
      * rebuilt after a rollback replay).
