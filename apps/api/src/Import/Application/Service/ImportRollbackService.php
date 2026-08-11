@@ -21,6 +21,7 @@ use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * IMP2-2.4 — rollback v2. Truthful "Wycofaj import":
@@ -123,15 +124,7 @@ final readonly class ImportRollbackService
 
                 // --- 2. Rebuild attributes_indexed + completeness for restored objects ---
                 $affectedIds = $report['affectedIds'];
-                foreach ($affectedIds as $idRfc) {
-                    $object = $this->em->find(CatalogObject::class, $idRfc);
-                    if ($object instanceof CatalogObject) {
-                        $this->rebuilder->rebuild($object);
-                    }
-                }
-                if ([] !== $affectedIds) {
-                    $this->em->flush();
-                }
+                $this->rebuildAffected($affectedIds);
 
                 // --- 3. Delete the objects the import created (D11), capture for Meili ---
                 // tenant-safe: every raw DELETE/SELECT below is keyed by
@@ -281,13 +274,47 @@ final readonly class ImportRollbackService
     }
 
     /**
+     * Rebuilds `attributes_indexed` + completeness for every object the replay
+     * restored, in the same chunks the replay itself used (#2814).
+     *
+     * The replay was chunked first, but this step was not, and it is the one
+     * that decides whether the rollback finishes: it reloads every affected
+     * object AND every value of every affected object. On the session that
+     * motivated the ticket that is 13 895 objects and 51 304 values in one
+     * identity map — the exact load the chunked replay had just stopped
+     * building. Values are batch-loaded per chunk and handed to the rebuilder,
+     * so a chunk costs one query instead of one per object.
+     *
+     * @param list<string> $affectedIds RFC4122
+     */
+    private function rebuildAffected(array $affectedIds): void
+    {
+        foreach (array_chunk($affectedIds, self::ROLLBACK_CHUNK_OBJECTS) as $chunk) {
+            $valuesByObject = $this->objectValues->findByObjectIds(
+                array_map(static fn (string $id): Uuid => Uuid::fromString($id), $chunk),
+            );
+            foreach ($chunk as $idRfc) {
+                $object = $this->em->find(CatalogObject::class, $idRfc);
+                if ($object instanceof CatalogObject) {
+                    $this->rebuilder->rebuild($object, $valuesByObject[$idRfc] ?? []);
+                }
+            }
+            $this->em->flush();
+            // Same contract as the replay's chunk boundary: clear() detaches the
+            // graph without touching the open transaction, so the rollback stays
+            // all-or-nothing while the resident set tracks the chunk.
+            $this->em->clear();
+        }
+    }
+
+    /**
      * Current ObjectValues of the given objects, keyed by scope.
      *
      * Takes an explicit id list rather than the whole session (#2814): the
      * session-wide variant loaded every value of every affected object into
      * one index, which is what exhausted the worker.
      *
-     * @param list<\Symfony\Component\Uid\Uuid> $objectIds
+     * @param list<Uuid> $objectIds
      *
      * @return array<string, \App\Catalog\Domain\Entity\ObjectValue>
      */
