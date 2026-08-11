@@ -140,8 +140,14 @@ final readonly class ImportRollbackService
             // meaningful: "the first N objects are done" only means something if
             // N indexes the same sequence on every run.
             $objectIds = $this->undoLog->affectedObjectIds($session);
-            $objectsTotal = \count($objectIds);
             $resumeFrom = 'rollback' === $session->getCheckpointPhase() ? ($session->getCheckpointOffset() ?? 0) : 0;
+            // Progress counts BOTH phases. Counting only the undo-log objects
+            // reported "0 / 0" for a rollback whose whole job is deleting what
+            // the import created — a run that creates rows leaves no undo rows
+            // to replay — which is the same "nothing is happening" the operator
+            // was shown while an import worked (#2815).
+            $objectsTotal = \count($objectIds) + $this->createdObjectCount($session);
+            $objectsDone = $resumeFrom;
             $affectedIds = [];
 
             // --- 1-2. Replay the undo log and rebuild the caches, per chunk ---
@@ -157,11 +163,12 @@ final readonly class ImportRollbackService
                 $totals['skippedSuperseded'] += $chunkReport['skippedSuperseded'];
                 $affectedIds = [...$affectedIds, ...$chunkReport['affectedIds']];
                 $resumeFrom += \count($chunkIds);
+                $objectsDone += \count($chunkIds);
 
                 $lock->refresh();
-                $session = $this->persistProgress($sessionId, $totals, $resumeFrom, $objectsTotal, 'values');
+                $session = $this->persistProgress($sessionId, $totals, $resumeFrom, $objectsDone, $objectsTotal, 'values');
                 if ($session->isRollbackCancelRequested()) {
-                    return $this->stop($session, $totals, $resumeFrom, $objectsTotal, 'cancelled', $affectedIds, $kind);
+                    return $this->stop($session, $totals, $objectsDone, $objectsTotal, 'cancelled', $affectedIds, $kind);
                 }
             }
 
@@ -181,11 +188,12 @@ final readonly class ImportRollbackService
                 $totals['deletedObjects'] += $deleted['objects'];
                 $totals['deletedValues'] += $deleted['values'];
                 $createdIds = [...$createdIds, ...$batch];
+                $objectsDone += \count($batch);
 
                 $lock->refresh();
-                $session = $this->persistProgress($sessionId, $totals, $resumeFrom, $objectsTotal, 'created');
+                $session = $this->persistProgress($sessionId, $totals, $resumeFrom, $objectsDone, $objectsTotal, 'created');
                 if ($session->isRollbackCancelRequested()) {
-                    return $this->stop($session, $totals, $resumeFrom, $objectsTotal, 'cancelled', $affectedIds, $kind, $createdIds);
+                    return $this->stop($session, $totals, $objectsDone, $objectsTotal, 'cancelled', $affectedIds, $kind, $createdIds);
                 }
             }
 
@@ -196,7 +204,7 @@ final readonly class ImportRollbackService
             $final = $this->sessions->findById($sessionId);
             if ($final instanceof ImportSession) {
                 $final->markRolledBack($now);
-                $final->recordRollbackReport($this->reportPayload($totals, $objectsTotal, $objectsTotal, 'completed'));
+                $final->recordRollbackReport($this->reportPayload($totals, max($objectsDone, $objectsTotal), max($objectsDone, $objectsTotal), 'completed'));
                 $final->clearCheckpoint();
                 $this->sessions->save($final);
             }
@@ -209,7 +217,7 @@ final readonly class ImportRollbackService
                 $this->reindexQueue->queueAllDeleted($createdIds, $kind);
             }
 
-            return $this->outcome($totals, $objectsTotal, $objectsTotal, true, null);
+            return $this->outcome($totals, max($objectsDone, $objectsTotal), max($objectsDone, $objectsTotal), true, null);
         } finally {
             $lock->release();
         }
@@ -288,7 +296,7 @@ final readonly class ImportRollbackService
      *
      * @param array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int} $totals
      */
-    private function persistProgress(Uuid $sessionId, array $totals, int $objectsDone, int $objectsTotal, string $phase): ImportSession
+    private function persistProgress(Uuid $sessionId, array $totals, int $replayOffset, int $objectsDone, int $objectsTotal, string $phase): ImportSession
     {
         $this->em->clear();
         $session = $this->sessions->findById($sessionId);
@@ -308,7 +316,10 @@ final readonly class ImportRollbackService
             $this->reportPayload($totals, $objectsDone, $objectsTotal, $phase, $session->isRollbackCancelRequested()),
         );
         $session->recordRollbackProgress($objectsDone, $objectsTotal, $phase);
-        $session->recordCheckpoint($objectsDone, 'rollback');
+        // The checkpoint indexes the undo-log walk ONLY. Progress counts the
+        // deletions too, so feeding it here would make a resumed run skip
+        // objects it never replayed.
+        $session->recordCheckpoint($replayOffset, 'rollback');
         $this->sessions->save($session);
 
         $this->progressPublisher->rollbackProgress($session, $objectsDone, $objectsTotal, $phase);
@@ -650,6 +661,17 @@ final readonly class ImportRollbackService
         );
 
         return array_map(static fn (array $r): string => $r['id'], $rows);
+    }
+
+    /** #2818 — how many objects the import created and the rollback has still to delete. */
+    private function createdObjectCount(ImportSession $session): int
+    {
+        $count = $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM objects WHERE import_session_id = :sid',
+            ['sid' => $session->getId()->toRfc4122()],
+        );
+
+        return (int) (\is_scalar($count) ? $count : 0);
     }
 
     private function scopeKey(string $objectId, string $attributeCode, ?string $locale, ?string $channelId): string
