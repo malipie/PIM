@@ -46,6 +46,7 @@ export interface ImportProgressState {
     | 'partial'
     | 'failed'
     | 'cancelled'
+    | 'rolling_back'
     | 'rolled_back';
 }
 

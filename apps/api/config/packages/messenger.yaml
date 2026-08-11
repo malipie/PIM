@@ -188,6 +188,12 @@ framework:
             # on the same handler from the controller.
             App\Import\Domain\Message\ImportRunMessage: import
 
+            # #2818 — undoing an import is the same class of job as running one
+            # (same volume of work, sometimes more), so it shares the queue the
+            # worker drains. Dispatched on messenger.bus.long_running for the
+            # same reason the import is: it commits per chunk and checkpoints.
+            App\Import\Domain\Message\ImportRollbackMessage: import
+
             # APIC-P3-04 — inbound sync of a SyncBinding. Reuses the `import`
             # transport/worker (epic transport decision); TenantAwareMessage so
             # the rebinding + RLS-GUC middleware restore tenant context first.

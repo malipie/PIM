@@ -3364,6 +3364,7 @@
         "partial": "częściowy",
         "failed": "błąd",
         "cancelled": "anulowano",
+        "rolling_back": "wycofywanie",
         "rolled_back": "wycofano"
       }
     },
@@ -3391,6 +3392,7 @@
         "partial": "Częściowy",
         "failed": "Niepowodzenie",
         "cancelled": "Anulowany",
+        "rolling_back": "Wycofywanie",
         "rolled_back": "Wycofany"
       },
       "actions": {
@@ -4018,6 +4020,7 @@
       "rejected": "Odrzucony",
       "cancelled": "Anulowany",
       "error": "Błąd",
+      "rolling_back": "Wycofywanie",
       "rolled_back": "Cofnięty"
     },
     "inbox": {

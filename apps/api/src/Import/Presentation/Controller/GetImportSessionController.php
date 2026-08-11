@@ -66,6 +66,10 @@ final class GetImportSessionController
             'rollback_until' => $session->getRollbackUntil()?->format(DateTimeInterface::RFC3339_EXTENDED),
             'rolled_back_at' => $session->getRolledBackAt()?->format(DateTimeInterface::RFC3339_EXTENDED),
             'error_message' => $session->getErrorMessage(),
+            // #2818 — counts and progress of a queued rollback (null until one
+            // is asked for). The detail screen renders its progress from here,
+            // so a refresh mid-undo does not fall back to nothing.
+            'rollback_report' => $session->getRollbackReport(),
             // IMP2-2.10 (#1486) — the pre-import backup linked at start, or null.
             'backup' => self::serializeBackup($session->getBackupSnapshot()),
         ], Response::HTTP_OK);

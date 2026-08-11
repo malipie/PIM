@@ -25,130 +25,85 @@ use App\Tests\Api\Catalog\CatalogApiTestCase;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\Test;
-use RuntimeException;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Uid\Uuid;
 
 use const JSON_THROW_ON_ERROR;
 
 /**
- * #2818 — what an interrupted rollback must leave behind.
+ * #2818 — "Operator widzi postęp i może przerwać".
  *
- * The pre-#2818 contract was all-or-nothing: one transaction, so a crash undid
- * every mutation and the session stayed `success`. That guarantee cost the
- * operation itself — a full catalogue could not be undone at all, because the
- * work outlives any request and a transaction that long holds every touched row
- * for its whole duration (measured: over ten minutes for 13 895 objects, killed
- * by the connection closing). Undoing in chunks trades atomicity for actually
- * finishing, and the ticket names the price: part of the catalogue is restored
- * and part is not.
+ * A rollback of a full catalogue runs for minutes, so stopping it has to be
+ * possible without killing the worker. The request only sets a flag; the run
+ * reads it between chunks and stops after the one it is on, which is what keeps
+ * the stop point on a committed boundary rather than in the middle of a chunk.
  *
- * What must hold instead — and what this pins:
- *   - the intermediate state is VISIBLE. The session reads `rolling_back`,
- *     never `success` (which would invite a second run over a half-spent
- *     undo-log) and never `rolled_back` (which would claim work not done);
- *   - work already committed STAYS committed, so a resume is not a restart;
- *   - resuming finishes the job exactly once — no value restored twice, no
- *     object deleted twice.
+ * The cancelled state is deliberately NOT terminal. Some values are restored
+ * and some are not; `rolled_back` would claim otherwise and `success` would
+ * invite a second full replay of a half-spent undo-log. It stays
+ * `rolling_back`, carries `stopped_reason`, and resumes from its checkpoint.
  */
-final class ImportRollbackAtomicityApiTest extends CatalogApiTestCase
+final class ImportRollbackCancelApiTest extends CatalogApiTestCase
 {
     #[Test]
-    public function interruptedRollbackStaysVisiblyIncompleteAndResumesCleanly(): void
+    public function cancellingStopsTheRunOnAChunkBoundaryAndSaysSo(): void
     {
         $this->seedSkuName();
+        $this->import("sku;name\nCAN-1;Old1\nCAN-2;Old2\n");
+        $sessionId = $this->import("sku;name\nCAN-1;New1\nCAN-2;New2\nCAN-3;New3\n");
 
-        // Import #1 seeds ATM-1..2 with the "old" names.
-        $this->import("sku;name\nATM-1;Old1\nATM-2;Old2\n");
-        // Import #2 overwrites those names and creates ATM-3..4.
-        $sessionId = $this->import("sku;name\nATM-1;New1\nATM-2;New2\nATM-3;New3\nATM-4;New4\n");
-
-        self::assertSame('New1', $this->nameOf('ATM-1'), 'precondition: import #2 overwrote the name');
-        self::assertSame(4, $this->countObjects('ATM-%'), 'precondition: 4 objects exist (2 pre-existing + 2 created)');
+        self::assertSame(3, $this->countObjects('CAN-%'), 'precondition: CAN-3 was created by import #2');
 
         $session = $this->reloadSession($sessionId);
         $session->markRollbackStarted(new DateTimeImmutable());
         self::getContainer()->get(ImportSessionRepositoryInterface::class)->save($session);
 
-        // Interrupt the run at its first progress write — after the first chunk
-        // of the undo-log has been replayed and committed. This is the window
-        // that used to be impossible to observe: a worker killed by an OOM, a
-        // deploy or a FrankenPHP restart mid-rollback.
-        $service = $this->rollbackServiceWith(new ThrowOnProgressSaveRepository(
+        // The operator presses "Przerwij" while the run is between chunks. The
+        // decorator stands in for that timing: the flag lands on the session the
+        // run re-reads after its first committed chunk.
+        $service = $this->rollbackServiceWith(new CancelAfterFirstReadRepository(
             self::getContainer()->get(ImportSessionRepositoryInterface::class),
         ));
+        $outcome = $service->run($this->reloadSession($sessionId));
 
-        $threw = false;
-        try {
-            $service->run($this->reloadSession($sessionId));
-        } catch (RuntimeException $e) {
-            $threw = true;
-            self::assertSame('boom: worker died mid-rollback', $e->getMessage());
-        }
-        self::assertTrue($threw, 'precondition: the injected crash actually fired');
+        self::assertFalse($outcome['completed'], 'the run reports that it did not finish');
+        self::assertSame('cancelled', $outcome['stoppedReason']);
 
-        // ── The interrupted state is honest ─────────────────────────────────
         $this->em()->clear();
-        $afterCrash = $this->reloadSession($sessionId);
-        self::assertSame(
-            'rolling_back',
-            $afterCrash->getStatus()->value,
-            'an interrupted rollback must keep saying it is rolling back — not `success`, which would invite a '
-            .'second run over a half-spent undo-log, and not `rolled_back`, which would claim work it did not do',
-        );
-        self::assertFalse($afterCrash->getStatus()->isTerminal(), 'the session is not finished');
+        $afterCancel = $this->reloadSession($sessionId);
+        self::assertSame('rolling_back', $afterCancel->getStatus()->value, 'a cancelled rollback is not a finished one');
+        $report = $afterCancel->getRollbackReport() ?? [];
+        self::assertSame('stopped', $report['phase'] ?? null);
+        self::assertSame('cancelled', $report['stopped_reason'] ?? null);
 
-        // Work that committed before the interruption is still committed: the
-        // first chunk's values are restored. (Both objects fit one chunk here,
-        // so the whole replay landed before the progress write blew up.)
-        self::assertSame('Old1', $this->nameOf('ATM-1'), 'committed restore survives the crash');
+        // The values phase committed before the stop, so its work stands...
+        self::assertSame('Old1', $this->nameOf('CAN-1'), 'the committed part of the undo stands');
+        // ...and the part that had not run yet is untouched, not half-done.
+        self::assertSame(3, $this->countObjects('CAN-%'), 'the created object is still there — that phase never ran');
 
-        // ── Resuming finishes the job, exactly once ─────────────────────────
-        // A separate verb: POSTing /rollback again is refused precisely because
-        // the session is still `rolling_back`.
+        // Resuming picks the same job back up and finishes it.
         $client = $this->authenticatedClient();
-        $client->request('POST', \sprintf('/api/import-sessions/%s/rollback', $sessionId));
-        self::assertResponseStatusCodeSame(409, 'starting a second rollback over a stopped one must be refused');
-
         $client->request('POST', \sprintf('/api/import-sessions/%s/rollback/resume', $sessionId));
         self::assertResponseIsSuccessful();
         $body = $this->decode($client);
 
         self::assertSame('rolled_back', $body['status']);
-        self::assertSame(2, $body['deleted_objects'], 'ATM-3 + ATM-4 deleted once');
-        self::assertSame(4, $body['restored_values'], 'ATM-1/ATM-2 sku+name restored once across both runs');
-        self::assertSame(0, $body['skipped_manual_edits']);
-
-        $this->em()->clear();
-        self::assertSame('Old1', $this->nameOf('ATM-1'), 'the pre-import value is restored');
-        self::assertSame('Old2', $this->nameOf('ATM-2'));
-        self::assertSame(2, $this->countObjects('ATM-%'), 'the created objects are gone');
+        self::assertSame(1, $body['deleted_objects'], 'CAN-3 deleted by the resumed run');
+        self::assertSame(2, $this->countObjects('CAN-%'));
     }
 
     /**
-     * #2818 — a rollback in flight refuses a second one. Two runs replaying the
-     * same undo-log would race over the same rows.
+     * #2818 — cancelling something that is not rolling back is a conflict, not
+     * a silent no-op.
      */
     #[Test]
-    public function aSecondRollbackRequestIsRefusedWhileOneIsRunning(): void
+    public function cancellingASessionThatIsNotRollingBackIsRefused(): void
     {
         $this->seedSkuName();
-        $this->import("sku;name\nCNF-1;Old1\n");
-        $sessionId = $this->import("sku;name\nCNF-1;New1\n");
-
-        $session = $this->reloadSession($sessionId);
-        $session->markRollbackStarted(new DateTimeImmutable());
-        self::getContainer()->get(ImportSessionRepositoryInterface::class)->save($session);
+        $sessionId = $this->import("sku;name\nNOP-1;One\n");
 
         $client = $this->authenticatedClient();
-        $client->request('GET', \sprintf('/api/import-sessions/%s/rollback-preview', $sessionId));
-        self::assertResponseIsSuccessful();
-        self::assertFalse(
-            $this->decode($client)['rollbackable'],
-            'the preview must not offer a rollback of a session already rolling back',
-        );
-
-        $client->request('POST', \sprintf('/api/import-sessions/%s/rollback', $sessionId));
+        $client->request('POST', \sprintf('/api/import-sessions/%s/rollback/cancel', $sessionId));
         self::assertResponseStatusCodeSame(409);
     }
 
@@ -181,7 +136,7 @@ final class ImportRollbackAtomicityApiTest extends CatalogApiTestCase
 
     private function import(string $csv): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'pim-atm-').'.csv';
+        $path = tempnam(sys_get_temp_dir(), 'pim-can-').'.csv';
         file_put_contents($path, $csv);
 
         try {
@@ -193,7 +148,7 @@ final class ImportRollbackAtomicityApiTest extends CatalogApiTestCase
                         'mapping' => json_encode(['sku' => 'sku', 'name' => 'name'], JSON_THROW_ON_ERROR),
                         'mode' => 'UPSERT',
                     ],
-                    'files' => ['file' => new UploadedFile($path, 'atm.csv', 'text/csv', null, true)],
+                    'files' => ['file' => new UploadedFile($path, 'can.csv', 'text/csv', null, true)],
                 ],
             ]);
             self::assertResponseIsSuccessful();
@@ -265,12 +220,12 @@ final class ImportRollbackAtomicityApiTest extends CatalogApiTestCase
 }
 
 /**
- * Session-repository decorator that reads normally but dies on the first
- * progress write — the save that follows a committed chunk. Models a worker
- * killed mid-rollback (OOM, deploy, FrankenPHP restart) with some of the
- * catalogue already restored.
+ * Stands in for the operator pressing "Przerwij" while the first chunk is being
+ * replayed: every session the run re-reads between chunks carries the cancel
+ * request, exactly as it would once the endpoint had written it from the
+ * request process.
  */
-final class ThrowOnProgressSaveRepository implements ImportSessionRepositoryInterface
+final class CancelAfterFirstReadRepository implements ImportSessionRepositoryInterface
 {
     public function __construct(private readonly ImportSessionRepositoryInterface $inner)
     {
@@ -278,12 +233,17 @@ final class ThrowOnProgressSaveRepository implements ImportSessionRepositoryInte
 
     public function save(ImportSession $session): void
     {
-        throw new RuntimeException('boom: worker died mid-rollback');
+        $this->inner->save($session);
     }
 
     public function findById(Uuid $id): ?ImportSession
     {
-        return $this->inner->findById($id);
+        $session = $this->inner->findById($id);
+        if ($session instanceof ImportSession && $session->getStatus()->isRollingBack()) {
+            $session->requestRollbackCancel();
+        }
+
+        return $session;
     }
 
     /**

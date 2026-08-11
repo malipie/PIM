@@ -37,6 +37,8 @@ interface ImportSession {
   rollback_until: string | null;
   rolled_back_at: string | null;
   error_message: string | null;
+  // #2818 — counts + progress of a queued rollback; null until one is asked for.
+  rollback_report: Record<string, unknown> | null;
   // IMP2-2.10 (#1486) — pre-import pgBackRest snapshot linked at start, or null.
   backup: { id: string; status: string; started_at: string } | null;
 }
@@ -122,6 +124,10 @@ export function ImportShowPage(): React.ReactElement {
     session.status === 'failed' ||
     session.status === 'cancelled' ||
     session.status === 'rolled_back';
+
+  // #2818 — an undo in flight is not terminal, but the results card is where
+  // its progress belongs: same place the operator pressed the button.
+  const isRollingBack = session.status === 'rolling_back';
 
   // Server is the source of truth; Mercure refines counters in realtime.
   const processed = Math.max(
@@ -269,7 +275,7 @@ export function ImportShowPage(): React.ReactElement {
         </div>
       )}
 
-      {isTerminal && (
+      {(isTerminal || isRollingBack) && (
         <div className="space-y-4 rounded-2xl border border-zinc-100 bg-white p-6 shadow-sm">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Kpi
@@ -323,10 +329,12 @@ export function ImportShowPage(): React.ReactElement {
                 })}
               </Link>
             </Button>
-            {(session.status === 'success' || session.status === 'partial') && (
+            {(session.status === 'success' || session.status === 'partial' || isRollingBack) && (
               <RollbackButton
                 sessionId={sessionId}
                 rollbackUntil={session.rollback_until}
+                status={session.status}
+                report={session.rollback_report}
                 onRolledBack={() => query.refetch()}
               />
             )}

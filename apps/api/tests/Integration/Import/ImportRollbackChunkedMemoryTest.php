@@ -18,6 +18,7 @@ use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
 use App\Tests\Support\InMemoryMercureHub;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostLoadEventArgs;
 use Doctrine\ORM\Events;
@@ -117,8 +118,13 @@ final class ImportRollbackChunkedMemoryTest extends KernelTestCase
         $probe = new ObjectValueResidencyProbe($em);
         $em->getEventManager()->addEventListener([Events::postLoad], $probe);
 
+        // #2818 — the endpoint claims the session and the worker runs it; this
+        // test drives the run directly, so it makes the same claim first.
+        $session->markRollbackStarted(new DateTimeImmutable());
+        self::getContainer()->get(ImportSessionRepositoryInterface::class)->save($session);
+
         try {
-            $report = self::getContainer()->get(ImportRollbackService::class)->rollback($session);
+            $report = self::getContainer()->get(ImportRollbackService::class)->run($session);
         } finally {
             $em->getEventManager()->removeEventListener([Events::postLoad], $probe);
         }

@@ -45,6 +45,7 @@ export type ApiStatus =
   | 'partial'
   | 'failed'
   | 'cancelled'
+  | 'rolling_back'
   | 'rolled_back';
 
 const STATUS_TO_PILL: Record<ApiStatus, SessionStatus> = {
@@ -55,6 +56,8 @@ const STATUS_TO_PILL: Record<ApiStatus, SessionStatus> = {
   partial: 'warning',
   failed: 'error',
   cancelled: 'cancelled',
+  // #2818 — an undo in flight reads as running, because it is.
+  rolling_back: 'running',
   rolled_back: 'cancelled',
 };
 
@@ -89,7 +92,7 @@ export function filterMatches(filter: FilterValue, status: ApiStatus): boolean {
   if (filter === 'error') {
     return status === 'failed';
   }
-  return status === 'cancelled' || status === 'rolled_back';
+  return status === 'cancelled' || status === 'rolled_back' || status === 'rolling_back';
 }
 
 export const SOURCE_FALLBACK: SourceType = 'upload';

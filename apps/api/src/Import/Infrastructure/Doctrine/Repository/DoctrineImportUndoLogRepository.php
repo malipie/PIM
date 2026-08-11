@@ -83,7 +83,10 @@ class DoctrineImportUndoLogRepository extends ServiceEntityRepository implements
     {
         /** @var list<array{object_id: string}> $rows */
         $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
-            'SELECT DISTINCT object_id FROM import_undo_log WHERE import_session_id = :sid',
+            // #2818 — ORDER BY makes the sequence stable across runs, which is
+            // what lets a resumed rollback treat its checkpoint ("the first N
+            // objects are done") as meaning the same N it meant last time.
+            'SELECT DISTINCT object_id FROM import_undo_log WHERE import_session_id = :sid ORDER BY object_id',
             ['sid' => $session->getId()->toRfc4122()],
         );
 
