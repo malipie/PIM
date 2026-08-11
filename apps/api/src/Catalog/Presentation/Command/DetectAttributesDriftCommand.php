@@ -9,6 +9,7 @@ use App\Catalog\Application\BulkContext;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectValue;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\ObjectValueRepositoryInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
@@ -20,6 +21,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * AUD-039 / G-01 — detect (and optionally reconcile) drift between the
@@ -66,6 +68,7 @@ final class DetectAttributesDriftCommand extends Command
         private readonly BulkContext $bulkContext,
         private readonly TenantContext $tenantContext,
         private readonly TenantRepositoryInterface $tenants,
+        private readonly ObjectValueRepositoryInterface $objectValues,
     ) {
         parent::__construct();
     }
@@ -258,32 +261,48 @@ final class DetectAttributesDriftCommand extends Command
         $reconciled = 0;
         $samples = [];
 
-        /** @var iterable<int, CatalogObject> $iterable */
-        $iterable = $query->toIterable();
-        foreach ($iterable as $object) {
-            ++$scanned;
+        // #2231 — keyset pagination instead of toIterable(). Doctrine's
+        // toIterable() does not open a server-side cursor: libpq buffers the
+        // ENTIRE result set client-side before hydration starts, so a 50k
+        // catalogue paid tens of MB of driver buffer that EntityManager::clear()
+        // cannot reclaim. Walking by id keeps both the buffer and the identity
+        // map bounded by page size.
+        $cursor = null;
+        while (true) {
+            $page = $this->loadPage($kind, $cursor);
+            if ([] === $page) {
+                break;
+            }
+            $cursor = $page[array_key_last($page)]->getId()->toRfc4122();
 
-            $diff = $this->diffObject($object);
-            if ([] !== $diff['orphaned'] || [] !== $diff['missing'] || [] !== $diff['mismatched']) {
-                ++$drifted;
-                if (\count($samples) < $listLimit) {
-                    $samples[] = $this->formatDiff($object, $diff);
-                }
-                if ($reconcile) {
-                    // Reuse the canonical rebuilder — the SINGLE writer of the
-                    // cache (jsonb-schemas contract). Reads object_values, never
-                    // mutates them; only attributes_indexed + completeness change.
-                    $this->rebuilder->rebuild($object);
-                    ++$reconciled;
+            // One query for the page's values instead of one per object. The
+            // per-object lookup below used to issue ~13 queries per row, which
+            // is what turned a 50k reconcile into a multi-hour run.
+            $valuesByObject = $this->valuesForPage($page);
+
+            foreach ($page as $object) {
+                ++$scanned;
+
+                $diff = $this->diffObject($object, $valuesByObject[$object->getId()->toRfc4122()] ?? []);
+                if ([] !== $diff['orphaned'] || [] !== $diff['missing'] || [] !== $diff['mismatched']) {
+                    ++$drifted;
+                    if (\count($samples) < $listLimit) {
+                        $samples[] = $this->formatDiff($object, $diff);
+                    }
+                    if ($reconcile) {
+                        // Reuse the canonical rebuilder — the SINGLE writer of the
+                        // cache (jsonb-schemas contract). Reads object_values, never
+                        // mutates them; only attributes_indexed + completeness change.
+                        $this->rebuilder->rebuild($object);
+                        ++$reconciled;
+                    }
                 }
             }
 
-            if (0 === $scanned % self::FLUSH_EVERY) {
-                if ($reconcile) {
-                    $this->em->flush();
-                }
-                $this->em->clear();
+            if ($reconcile) {
+                $this->em->flush();
             }
+            $this->em->clear();
         }
 
         if ($reconcile) {
@@ -305,9 +324,55 @@ final class DetectAttributesDriftCommand extends Command
      *
      * @return array{orphaned: list<string>, missing: list<string>, mismatched: list<string>}
      */
-    private function diffObject(CatalogObject $object): array
+    /**
+     * One page of objects of the given kind, ordered by id (#2231).
+     *
+     * @return list<CatalogObject>
+     */
+    private function loadPage(ObjectKind $kind, ?string $afterId): array
     {
-        $canon = $this->canonicalGlobalReading($object);
+        $dql = 'SELECT o FROM '.CatalogObject::class.' o WHERE o.kind = :kind';
+        if (null !== $afterId) {
+            $dql .= ' AND o.id > :cursor';
+        }
+        $query = $this->em->createQuery($dql.' ORDER BY o.id ASC')
+            ->setParameter('kind', $kind->value)
+            ->setMaxResults(self::FLUSH_EVERY);
+        if (null !== $afterId) {
+            $query->setParameter('cursor', $afterId);
+        }
+
+        /** @var list<CatalogObject> $result */
+        $result = $query->getResult();
+
+        return $result;
+    }
+
+    /**
+     * Values of a whole page in one query, keyed by object id (#2231).
+     *
+     * @param list<CatalogObject> $page
+     *
+     * @return array<string, list<ObjectValue>>
+     */
+    private function valuesForPage(array $page): array
+    {
+        $ids = array_map(static fn (CatalogObject $o): Uuid => $o->getId(), $page);
+
+        /** @var array<string, list<ObjectValue>> $byObject */
+        $byObject = $this->objectValues->findByObjectIds($ids);
+
+        return $byObject;
+    }
+
+    /**
+     * @param list<ObjectValue> $values pre-loaded values of this object (#2231)
+     *
+     * @return array{orphaned: list<string>, missing: list<string>, mismatched: list<string>}
+     */
+    private function diffObject(CatalogObject $object, array $values): array
+    {
+        $canon = $this->canonicalGlobalReading($values);
         $cache = $object->getAttributesIndexed();
 
         // Both maps are keyed by Attribute.code (a non-numeric identifier such
@@ -375,13 +440,14 @@ final class DetectAttributesDriftCommand extends Command
      * The GLOBAL slice of object_values, keyed by attribute code — the exact
      * shape {@see AttributesIndexedRebuilder::rebuild()} writes into the cache.
      *
+     * @param list<ObjectValue> $values pre-loaded values (#2231 — the caller
+     *                                  batch-loads a page instead of issuing
+     *                                  one query per object)
+     *
      * @return array<string, mixed>
      */
-    private function canonicalGlobalReading(CatalogObject $object): array
+    private function canonicalGlobalReading(array $values): array
     {
-        /** @var list<ObjectValue> $values */
-        $values = $this->em->getRepository(ObjectValue::class)->findBy(['object' => $object]);
-
         $canon = [];
         foreach ($values as $value) {
             if (null !== $value->getLocale() || null !== $value->getChannelId()) {
