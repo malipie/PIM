@@ -8,16 +8,19 @@ use App\Catalog\Application\AttributesIndexedRebuilder;
 use App\Catalog\Application\Reindex\BulkReindexQueueInterface;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
+use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Provenance;
 use App\Catalog\Domain\Repository\ObjectValueRepositoryInterface;
 use App\Import\Domain\Entity\ImportSession;
 use App\Import\Domain\Enum\ImportUndoOperation;
 use App\Import\Domain\Repository\ImportSessionRepositoryInterface;
 use App\Import\Domain\Repository\ImportUndoLogRepositoryInterface;
+use App\Shared\Application\BulkOperationInProgressException;
 use App\Shared\Application\BulkOperationLock;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use DateTimeImmutable;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
@@ -60,147 +63,361 @@ final readonly class ImportRollbackService
         private BulkReindexQueueInterface $reindexQueue,
         private BulkOperationLock $bulkLock,
         private TenantContext $tenantContext,
+        private ImportProgressPublisher $progressPublisher,
     ) {
     }
 
     /**
-     * @return array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int}
+     * Runs (or resumes) the rollback of a session the caller has already moved
+     * to `rolling_back` — see {@see ImportSession::markRollbackStarted()}.
+     *
+     * #2818 — atomicity was traded for completion, deliberately. The pre-#2818
+     * rollback was ONE transaction, which made a failure leave nothing behind;
+     * it also meant a full catalogue could not be undone at all, because the
+     * work outlived every request budget (over ten minutes for 13 895 objects)
+     * and a transaction that long blocks rows for its whole duration. A safety
+     * net that cannot run is worth less than one that runs and says how far it
+     * got.
+     *
+     * What replaces atomicity is visibility plus resumability:
+     *   - each chunk commits on its own, so progress is durable;
+     *   - a checkpoint records how many objects are done, so a redelivered or
+     *     re-triggered run continues instead of starting over;
+     *   - the session stays `rolling_back` until the last step succeeds, so a
+     *     half-undone catalogue is never presented as either untouched or
+     *     fully undone.
+     *
+     * The replay is naturally idempotent, which is what makes resuming safe: a
+     * restored value carries its pre-import provenance again, so a second pass
+     * treats it as a manual edit and leaves it alone, and objects the import
+     * created are deleted by id.
+     *
+     * @return array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int, objectsDone: int, objectsTotal: int, completed: bool, stoppedReason: ?string}
      */
-    public function rollback(ImportSession $session): array
+    public function run(ImportSession $session): array
     {
-        // One "authorized-at" instant for both the entry guard and the final
-        // status flip: a window that lapses DURING the (sub-second) rollback work
-        // must not abort markRolledBack() after the data was already mutated.
+        // One "authorized-at" instant for the entry guard and the final status
+        // flip: a window that lapses DURING a long rollback must not strand a
+        // session whose data has already been undone.
         $now = new DateTimeImmutable();
-        // Fail fast BEFORE touching data if the window closed / status is not
-        // rollbackable — mirrors markRolledBack()'s guards without mutating yet.
-        if (!$session->getStatus()->isRollbackable() || !$session->isWithinRollbackWindow($now)) {
+        if (!$session->getStatus()->isRollingBack() && !$session->getStatus()->isRollbackable()) {
             throw new LogicException(\sprintf(
-                'Import session %s cannot be rolled back (status "%s" or window expired).',
+                'Import session %s cannot be rolled back (status "%s").',
                 $session->getId()->toRfc4122(),
                 $session->getStatus()->value,
             ));
         }
 
         $tenant = $session->getTenant();
-        if ($tenant instanceof Tenant) {
-            $this->tenantContext->set($tenant);
+        if (!$tenant instanceof Tenant) {
+            throw new LogicException('Import session has no tenant.');
         }
-        $lock = $this->bulkLock->acquire($tenant instanceof Tenant ? $tenant : throw new LogicException('Import session has no tenant.'));
+        $this->tenantContext->set($tenant);
+        $tenantId = $tenant->getId();
+
+        $targetObjectType = $session->getTargetObjectType();
+        if (!$targetObjectType instanceof ObjectType) {
+            // Structural imports (attributes / attribute groups) create
+            // configuration entities, not CatalogObjects, and are not rolled
+            // back through this catalog pipeline.
+            throw new LogicException('Structural import sessions cannot be rolled back through the catalog pipeline.');
+        }
+        $kind = $targetObjectType->getKind();
+        $sessionId = $session->getId();
+
+        $lock = $this->bulkLock->acquire($tenant);
         if (null === $lock) {
-            throw new LogicException('Another bulk operation is in progress for this tenant; retry shortly.');
+            // #2818 — PROD-05's own exception rather than a LogicException: the
+            // rollback runs in the worker now, and lock contention is a "try
+            // again shortly", not a refusal. The handler turns it into a
+            // recoverable retry; nothing has been undone yet either way.
+            throw new BulkOperationInProgressException($tenant);
         }
 
         try {
-            $targetObjectType = $session->getTargetObjectType();
-            if (!$targetObjectType instanceof ObjectType) {
-                // Structural imports (attributes / attribute groups) create
-                // configuration entities, not CatalogObjects, and are not
-                // rolled back through this catalog pipeline.
-                throw new LogicException('Structural import sessions cannot be rolled back through the catalog pipeline.');
-            }
-            $kind = $targetObjectType->getKind();
+            $totals = $this->totalsFromReport($session);
+            // Deterministic order (by object id) is what makes the checkpoint
+            // meaningful: "the first N objects are done" only means something if
+            // N indexes the same sequence on every run.
+            $objectIds = $this->undoLog->affectedObjectIds($session);
+            $objectsTotal = \count($objectIds);
+            $resumeFrom = 'rollback' === $session->getCheckpointPhase() ? ($session->getCheckpointOffset() ?? 0) : 0;
+            $affectedIds = [];
 
-            // AUD-040 (W2-5) — the four DB steps (replay overwrites, rebuild the
-            // restored caches, delete the created objects/values, flip the
-            // session status) run as ONE transaction. The v2 shape committed
-            // each step independently, so a worker crash (FrankenPHP restart,
-            // OOM, deploy) between any two left the catalog half-rolled-back:
-            // orphan objects, or data deleted while the session still read
-            // `success` → a second rollback replaying a spent undo-log. Wrapping
-            // them makes the rollback ALL-OR-NOTHING — a crash reverts every
-            // mutation AND leaves the status untouched, so the retry runs on an
-            // intact undo-log (no double-apply). The lock holds for the whole
-            // run, so concurrency never widens this to a long-lived lock.
-            //
-            // wrapInTransaction() and $this->connection share the one DBAL
-            // connection Symfony autowires, so the raw DELETEs below join the
-            // same transaction as the ORM flushes (same pattern as
-            // GenerateVariantsController / ObjectRelationService).
-            /** @var array{deletedObjects: int, deletedValues: int, createdIds: list<string>, affectedIds: list<string>, report: array{restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int, affectedIds: list<string>}} $outcome */
-            $outcome = $this->em->wrapInTransaction(function () use ($session, $now): array {
-                // --- 1. Replay the value undo-log on pre-existing objects ---
-                $report = $this->replayUndoLog($session);
+            // --- 1-2. Replay the undo log and rebuild the caches, per chunk ---
+            foreach (array_chunk(\array_slice($objectIds, $resumeFrom), self::ROLLBACK_CHUNK_OBJECTS) as $chunkIds) {
+                /** @var array{restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int, affectedIds: list<string>} $chunkReport */
+                $chunkReport = $this->em->wrapInTransaction(
+                    fn (): array => $this->replayChunkTransactionally($session, $chunkIds),
+                );
 
-                // --- 2. Rebuild attributes_indexed + completeness for restored objects ---
-                $affectedIds = $report['affectedIds'];
-                $this->rebuildAffected($affectedIds);
+                $totals['restoredValues'] += $chunkReport['restoredValues'];
+                $totals['removedValues'] += $chunkReport['removedValues'];
+                $totals['skippedManualEdits'] += $chunkReport['skippedManualEdits'];
+                $totals['skippedSuperseded'] += $chunkReport['skippedSuperseded'];
+                $affectedIds = [...$affectedIds, ...$chunkReport['affectedIds']];
+                $resumeFrom += \count($chunkIds);
 
-                // --- 3. Delete the objects the import created (D11), capture for Meili ---
-                // tenant-safe: every raw DELETE/SELECT below is keyed by
-                // import_session_id (a tenant-scoped session, loaded owner-scoped),
-                // and objects/object_values enforce RLS on app.current_tenant set
-                // via $tenantContext above — no cross-tenant reach.
-                $createdIds = $this->createdObjectIds($session);
-                $deletedValues = 0;
-                $deletedObjects = 0;
-                if ([] !== $createdIds) {
-                    $deletedValues = (int) $this->connection->executeStatement(
-                        'DELETE FROM object_values WHERE object_id IN (SELECT id FROM objects WHERE import_session_id = :sid)',
-                        ['sid' => $session->getId()->toRfc4122()],
-                    );
-                    $deletedObjects = (int) $this->connection->executeStatement(
-                        'DELETE FROM objects WHERE import_session_id = :sid',
-                        ['sid' => $session->getId()->toRfc4122()],
-                    );
+                $lock->refresh();
+                $session = $this->persistProgress($sessionId, $totals, $resumeFrom, $objectsTotal, 'values');
+                if ($session->isRollbackCancelRequested()) {
+                    return $this->stop($session, $totals, $resumeFrom, $objectsTotal, 'cancelled', $affectedIds, $kind);
                 }
-
-                // --- 4. Finalize: flip status + persist the report ---
-                // The raw DELETEs ran outside the ORM unit of work; clear +
-                // reload so the session mutation flushes against a clean
-                // Identity Map (clear() detaches in-memory entities only — it
-                // does not touch the open transaction). markRolledBack() is the
-                // LAST write to flush, so the status flip commits atomically
-                // with the deletes above.
-                $this->em->clear();
-                $reload = $this->sessions->findById($session->getId());
-                if ($reload instanceof ImportSession) {
-                    $reload->markRolledBack($now);
-                    $reload->recordRollbackReport([
-                        'deleted_objects' => $deletedObjects,
-                        'deleted_values' => $deletedValues,
-                        'restored_values' => $report['restoredValues'],
-                        'removed_values' => $report['removedValues'],
-                        'skipped_manual_edits' => $report['skippedManualEdits'],
-                        'skipped_superseded' => $report['skippedSuperseded'],
-                    ]);
-                    $this->sessions->save($reload);
-                }
-
-                return [
-                    'deletedObjects' => $deletedObjects,
-                    'deletedValues' => $deletedValues,
-                    'createdIds' => $createdIds,
-                    'affectedIds' => $affectedIds,
-                    'report' => $report,
-                ];
-            });
-
-            // --- 5. Meilisearch AFTER the DB transaction commits ---
-            // DB is the source of truth; the search index is a derived,
-            // idempotent projection (W1-7 ordering: external work runs only once
-            // the DB erasure is durable). Queueing inside the transaction would
-            // schedule ghost re-index/delete ops for a rollback that then rolled
-            // back. The queue is a request-scoped collector flushed in one
-            // batched call on kernel.terminate, so this stays a single Meili
-            // round-trip. The v1 ghost-documents fix (drop the created docs)
-            // rides along here, post-commit.
-            $this->reindexQueue->queueAll($outcome['affectedIds']);
-            if ([] !== $outcome['createdIds']) {
-                $this->reindexQueue->queueAllDeleted($outcome['createdIds'], $kind);
             }
 
-            return [
-                'deletedObjects' => $outcome['deletedObjects'],
-                'deletedValues' => $outcome['deletedValues'],
-                'restoredValues' => $outcome['report']['restoredValues'],
-                'removedValues' => $outcome['report']['removedValues'],
-                'skippedManualEdits' => $outcome['report']['skippedManualEdits'],
-                'skippedSuperseded' => $outcome['report']['skippedSuperseded'],
-            ];
+            // --- 3. Delete the objects the import created (D11) ---
+            // tenant-safe: every raw statement is keyed by import_session_id (a
+            // tenant-scoped session, loaded owner-scoped) or by ids read from
+            // it, and objects/object_values enforce RLS on the app.current_tenant
+            // set through $tenantContext above — no cross-tenant reach.
+            $createdIds = [];
+            while (true) {
+                $batch = $this->createdObjectIds($session, self::ROLLBACK_CHUNK_OBJECTS);
+                if ([] === $batch) {
+                    break;
+                }
+                /** @var array{objects: int, values: int} $deleted */
+                $deleted = $this->em->wrapInTransaction(fn (): array => $this->deleteCreatedBatch($batch));
+                $totals['deletedObjects'] += $deleted['objects'];
+                $totals['deletedValues'] += $deleted['values'];
+                $createdIds = [...$createdIds, ...$batch];
+
+                $lock->refresh();
+                $session = $this->persistProgress($sessionId, $totals, $resumeFrom, $objectsTotal, 'created');
+                if ($session->isRollbackCancelRequested()) {
+                    return $this->stop($session, $totals, $resumeFrom, $objectsTotal, 'cancelled', $affectedIds, $kind, $createdIds);
+                }
+            }
+
+            // --- 4. Finalize: the status flip is the LAST write, so a session
+            // only reads `rolled_back` once every step above has committed. ---
+            $this->em->clear();
+            $this->tenantContext->set($this->requireTenant($tenantId));
+            $final = $this->sessions->findById($sessionId);
+            if ($final instanceof ImportSession) {
+                $final->markRolledBack($now);
+                $final->recordRollbackReport($this->reportPayload($totals, $objectsTotal, $objectsTotal, 'completed'));
+                $final->clearCheckpoint();
+                $this->sessions->save($final);
+            }
+
+            // --- 5. Meilisearch AFTER the database work is durable ---
+            // The index is a derived, idempotent projection (W1-7 ordering:
+            // external work runs only once the erasure it reflects is committed).
+            $this->reindexQueue->queueAll($affectedIds);
+            if ([] !== $createdIds) {
+                $this->reindexQueue->queueAllDeleted($createdIds, $kind);
+            }
+
+            return $this->outcome($totals, $objectsTotal, $objectsTotal, true, null);
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * One chunk of the replay, inside the caller's transaction: restore/remove
+     * the chunk's values, then rebuild the caches of the objects it touched.
+     *
+     * @param list<Uuid> $chunkIds
+     *
+     * @return array{restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int, affectedIds: list<string>}
+     */
+    private function replayChunkTransactionally(ImportSession $session, array $chunkIds): array
+    {
+        $restored = 0;
+        $removed = 0;
+        $skipped = 0;
+        $skippedSuperseded = 0;
+        /** @var array<string, true> $affected */
+        $affected = [];
+
+        $this->replayChunk(
+            $this->undoLog->findBySessionAndObjectIds($session, $chunkIds),
+            $this->currentValueIndex($chunkIds),
+            $this->undoLog->supersededScopeKeys($session),
+            $affected,
+            $restored,
+            $removed,
+            $skipped,
+            $skippedSuperseded,
+        );
+        $this->em->flush();
+
+        $affectedIds = array_keys($affected);
+        $this->rebuildAffected($affectedIds);
+
+        return [
+            'restoredValues' => $restored,
+            'removedValues' => $removed,
+            'skippedManualEdits' => $skipped,
+            'skippedSuperseded' => $skippedSuperseded,
+            'affectedIds' => $affectedIds,
+        ];
+    }
+
+    /**
+     * Deletes one batch of import-created objects and their values.
+     *
+     * @param list<string> $ids RFC4122
+     *
+     * @return array{objects: int, values: int}
+     */
+    private function deleteCreatedBatch(array $ids): array
+    {
+        $values = (int) $this->connection->executeStatement(
+            'DELETE FROM object_values WHERE object_id IN (:ids)',
+            ['ids' => $ids],
+            ['ids' => ArrayParameterType::STRING],
+        );
+        $objects = (int) $this->connection->executeStatement(
+            'DELETE FROM objects WHERE id IN (:ids)',
+            ['ids' => $ids],
+            ['ids' => ArrayParameterType::STRING],
+        );
+
+        return ['objects' => $objects, 'values' => $values];
+    }
+
+    /**
+     * Commits the running totals + checkpoint and returns the reloaded session.
+     *
+     * Reloading is not incidental: the EntityManager was cleared by the chunk,
+     * and the returned session is what the caller reads the cancel flag from —
+     * a flag another process wrote while this chunk was running.
+     *
+     * @param array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int} $totals
+     */
+    private function persistProgress(Uuid $sessionId, array $totals, int $objectsDone, int $objectsTotal, string $phase): ImportSession
+    {
+        $this->em->clear();
+        $session = $this->sessions->findById($sessionId);
+        if (!$session instanceof ImportSession) {
+            throw new LogicException(\sprintf('Import session %s vanished mid-rollback.', $sessionId->toRfc4122()));
+        }
+        $tenant = $session->getTenant();
+        if ($tenant instanceof Tenant) {
+            $this->tenantContext->set($tenant);
+        }
+
+        // Carry the cancel flag across the write. The report is one JSONB
+        // column, so a progress write that rebuilt it from the run's own state
+        // would erase a cancellation the operator requested during this chunk —
+        // the button would look like it did nothing.
+        $session->recordRollbackReport(
+            $this->reportPayload($totals, $objectsDone, $objectsTotal, $phase, $session->isRollbackCancelRequested()),
+        );
+        $session->recordRollbackProgress($objectsDone, $objectsTotal, $phase);
+        $session->recordCheckpoint($objectsDone, 'rollback');
+        $this->sessions->save($session);
+
+        $this->progressPublisher->rollbackProgress($session, $objectsDone, $objectsTotal, $phase);
+
+        return $session;
+    }
+
+    /**
+     * Stops a rollback that will not finish this run, leaving the session in a
+     * state that says so — `rolling_back` with a checkpoint, never a status
+     * that claims the catalogue is whole either way.
+     *
+     * @param array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int} $totals
+     * @param list<string>                                                                                                                             $affectedIds
+     * @param list<string>                                                                                                                             $createdIds
+     *
+     * @return array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int, objectsDone: int, objectsTotal: int, completed: bool, stoppedReason: ?string}
+     */
+    private function stop(
+        ImportSession $session,
+        array $totals,
+        int $objectsDone,
+        int $objectsTotal,
+        string $reason,
+        array $affectedIds,
+        ObjectKind $kind,
+        array $createdIds = [],
+    ): array {
+        $session->recordRollbackStopped($objectsDone, $objectsTotal, $reason);
+        $this->sessions->save($session);
+
+        // The work already committed still has to reach the index — the search
+        // documents of restored objects are stale otherwise, and a partial
+        // rollback with a stale index is the worst of both.
+        $this->reindexQueue->queueAll($affectedIds);
+        if ([] !== $createdIds) {
+            $this->reindexQueue->queueAllDeleted($createdIds, $kind);
+        }
+        $this->progressPublisher->rollbackStopped($session, $objectsDone, $objectsTotal, $reason);
+
+        return $this->outcome($totals, $objectsDone, $objectsTotal, false, $reason);
+    }
+
+    /**
+     * Running totals carried across runs. A resumed rollback adds to what the
+     * previous attempt committed rather than reporting only its own share.
+     *
+     * @return array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int}
+     */
+    private function totalsFromReport(ImportSession $session): array
+    {
+        $report = $session->getRollbackReport() ?? [];
+        $read = static fn (string $key): int => \is_int($report[$key] ?? null) ? $report[$key] : 0;
+
+        return [
+            'deletedObjects' => $read('deleted_objects'),
+            'deletedValues' => $read('deleted_values'),
+            'restoredValues' => $read('restored_values'),
+            'removedValues' => $read('removed_values'),
+            'skippedManualEdits' => $read('skipped_manual_edits'),
+            'skippedSuperseded' => $read('skipped_superseded'),
+        ];
+    }
+
+    /**
+     * @param array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int} $totals
+     *
+     * @return array<string, mixed>
+     */
+    private function reportPayload(array $totals, int $objectsDone, int $objectsTotal, string $phase, bool $cancelRequested = false): array
+    {
+        return [
+            'deleted_objects' => $totals['deletedObjects'],
+            'deleted_values' => $totals['deletedValues'],
+            'restored_values' => $totals['restoredValues'],
+            'removed_values' => $totals['removedValues'],
+            'skipped_manual_edits' => $totals['skippedManualEdits'],
+            'skipped_superseded' => $totals['skippedSuperseded'],
+            'objects_done' => $objectsDone,
+            'objects_total' => $objectsTotal,
+            'phase' => $phase,
+            'cancel_requested' => $cancelRequested,
+        ];
+    }
+
+    /**
+     * @param array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int} $totals
+     *
+     * @return array{deletedObjects: int, deletedValues: int, restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int, objectsDone: int, objectsTotal: int, completed: bool, stoppedReason: ?string}
+     */
+    private function outcome(array $totals, int $objectsDone, int $objectsTotal, bool $completed, ?string $stoppedReason): array
+    {
+        return [
+            ...$totals,
+            'objectsDone' => $objectsDone,
+            'objectsTotal' => $objectsTotal,
+            'completed' => $completed,
+            'stoppedReason' => $stoppedReason,
+        ];
+    }
+
+    private function requireTenant(Uuid $tenantId): Tenant
+    {
+        $tenant = $this->em->find(Tenant::class, $tenantId->toRfc4122());
+        if (!$tenant instanceof Tenant) {
+            throw new LogicException(\sprintf('Tenant %s vanished mid-rollback.', $tenantId->toRfc4122()));
+        }
+
+        return $tenant;
     }
 
     /**
@@ -343,58 +560,10 @@ final readonly class ImportRollbackService
      *   - superseded guard (a LATER import session overwrote the same cell) —
      *     leave + report, never clobber the newer import.
      *
-     * @return array{restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int, affectedIds: list<string>}
+     * The chunk walk that drives this lives in {@see run()}: since #2818 each
+     * chunk is its own transaction, so the loop belongs where the checkpoint
+     * and the cancel check are.
      */
-    private function replayUndoLog(ImportSession $session): array
-    {
-        // #2814 — walk the session's objects in chunks. Loading every undo row
-        // and every current value up front cost 256 MiB in 1.65 s on a
-        // 51 800-row re-import (51 304 undo rows), so the rollback died before
-        // it could undo anything — the safety net failing in exactly the
-        // situation it exists for.
-        //
-        // Chunking stays inside the caller's transaction: clear() detaches the
-        // in-memory graph without committing, so a failure mid-way still rolls
-        // the whole rollback back. All-or-nothing is preserved; only the
-        // resident set shrinks.
-        $superseded = $this->undoLog->supersededScopeKeys($session);
-        $restored = 0;
-        $removed = 0;
-        $skipped = 0;
-        $skippedSuperseded = 0;
-        /** @var array<string, true> $affected */
-        $affected = [];
-
-        foreach (array_chunk($this->undoLog->affectedObjectIds($session), self::ROLLBACK_CHUNK_OBJECTS) as $objectIds) {
-            $undoRows = $this->undoLog->findBySessionAndObjectIds($session, $objectIds);
-            // Current values of THIS chunk's objects, keyed by
-            // (objectId|attributeCode|locale|channel) so each undo row maps directly.
-            $index = $this->currentValueIndex($objectIds);
-
-            $this->replayChunk(
-                $undoRows,
-                $index,
-                $superseded,
-                $affected,
-                $restored,
-                $removed,
-                $skipped,
-                $skippedSuperseded,
-            );
-
-            $this->em->flush();
-            $this->em->clear();
-        }
-
-        return [
-            'restoredValues' => $restored,
-            'removedValues' => $removed,
-            'skippedManualEdits' => $skipped,
-            'skippedSuperseded' => $skippedSuperseded,
-            'affectedIds' => array_keys($affected),
-        ];
-    }
-
     /**
      * Replays one chunk's undo rows against the values loaded for it.
      *
@@ -467,13 +636,16 @@ final readonly class ImportRollbackService
     }
 
     /**
-     * @return list<string> RFC4122 ids of objects the import created
+     * @return list<string> RFC4122 ids of objects the import created, capped at $limit
      */
-    private function createdObjectIds(ImportSession $session): array
+    private function createdObjectIds(ImportSession $session, int $limit): array
     {
+        // #2818 — one batch at a time, ordered, so deletion is chunked like the
+        // replay and a resumed run simply asks again: whatever is still there
+        // is whatever is still to delete.
         /** @var list<array{id: string}> $rows */
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT id FROM objects WHERE import_session_id = :sid',
+            \sprintf('SELECT id FROM objects WHERE import_session_id = :sid ORDER BY id LIMIT %d', max(1, $limit)),
             ['sid' => $session->getId()->toRfc4122()],
         );
 

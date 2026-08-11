@@ -3347,6 +3347,7 @@
         "partial": "partial",
         "failed": "error",
         "cancelled": "cancelled",
+        "rolling_back": "rolling back",
         "rolled_back": "rolled back"
       }
     },
@@ -3374,6 +3375,7 @@
         "partial": "Partial",
         "failed": "Failed",
         "cancelled": "Cancelled",
+        "rolling_back": "Rolling back",
         "rolled_back": "Rolled back"
       },
       "actions": {
@@ -3994,6 +3996,7 @@
       "rejected": "Rejected",
       "cancelled": "Cancelled",
       "error": "Error",
+      "rolling_back": "Rolling back",
       "rolled_back": "Rolled back"
     },
     "inbox": {

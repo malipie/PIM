@@ -10,6 +10,9 @@ export type ImportStatus =
   | 'partial'
   | 'failed'
   | 'cancelled'
+  // #2818 — the rollback runs in the worker, so "undoing" is a state the
+  // operator sees for minutes, not an instant between two page loads.
+  | 'rolling_back'
   | 'rolled_back';
 
 interface StatusBadgeProps {
@@ -25,6 +28,7 @@ const STATUS_STYLES: Record<ImportStatus, string> = {
   partial: 'bg-amber-100 text-amber-900',
   failed: 'bg-red-100 text-red-900',
   cancelled: 'bg-muted text-muted-foreground',
+  rolling_back: 'bg-purple-100 text-purple-900',
   rolled_back: 'bg-purple-100 text-purple-900',
 };
 
@@ -36,6 +40,7 @@ const STATUS_GLYPHS: Record<ImportStatus, string> = {
   partial: '⚠️',
   failed: '❌',
   cancelled: '🛑',
+  rolling_back: '🔄',
   rolled_back: '↶',
 };
 
