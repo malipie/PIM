@@ -17,6 +17,7 @@ use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
+use Symfony\Bundle\FrameworkBundle\Test\MailerAssertionsTrait;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
@@ -57,6 +58,7 @@ use const JSON_THROW_ON_ERROR;
 final class TokenLifecycleApiTest extends ApiTestCase
 {
     use Factories;
+    use MailerAssertionsTrait;
     use ResetDatabase;
 
     protected static ?bool $alwaysBootKernel = true;
@@ -303,6 +305,42 @@ final class TokenLifecycleApiTest extends ApiTestCase
         $body = $client->getResponse()?->toArray(throw: false) ?? [];
         self::assertArrayNotHasKey('token', $body);
         self::assertArrayNotHasKey('token_dev_only', $body);
+    }
+
+    // ===================================================================
+    //  Recovery e-mail links (#2827)
+    // ===================================================================
+    //
+    // Both flows above drive the API directly, which is exactly why the
+    // shipped e-mails could address routes that never existed and CI stayed
+    // green: the invitee clicked the button, Caddy handed the non-/api path
+    // to the SPA, the catch-all route redirected to /dashboard and — with no
+    // session — on to /login. The recipient saw a bare login screen and the
+    // single-use token was burnt for nothing. These two tests pin the link
+    // shape to the SPA routes that serve it (App.tsx).
+
+    #[Test]
+    public function invitationEmailPointsAtTheAcceptInvitationSpaRoute(): void
+    {
+        $token = $this->createInvitationToken('link-check@example.com', 'viewer');
+
+        $message = self::getMailerMessage();
+        self::assertNotNull($message, 'Creating an invitation must send an e-mail.');
+        self::assertEmailAddressContains($message, 'To', 'link-check@example.com');
+        self::assertEmailHtmlBodyContains($message, '/accept-invitation?token='.$token);
+        self::assertEmailHtmlBodyNotContains($message, '/invitations/'.$token.'/accept');
+    }
+
+    #[Test]
+    public function passwordResetEmailPointsAtThePasswordResetSpaRoute(): void
+    {
+        $token = $this->requestPasswordResetToken(self::ADMIN_EMAIL);
+
+        $message = self::getMailerMessage();
+        self::assertNotNull($message, 'Requesting a reset for a known address must send an e-mail.');
+        self::assertEmailAddressContains($message, 'To', self::ADMIN_EMAIL);
+        self::assertEmailHtmlBodyContains($message, '/password-reset?token='.$token);
+        self::assertEmailHtmlBodyNotContains($message, '/password-reset/'.$token);
     }
 
     // ===================================================================

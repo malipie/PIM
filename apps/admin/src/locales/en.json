@@ -69,6 +69,7 @@
     "submitting": "Signing in...",
     "invalid_credentials": "Invalid email or password.",
     "login_failed": "Sign-in failed. Please try again.",
+    "forgot_password": "Forgot your password?",
     "mfa_title": "Two-factor verification",
     "mfa_subtitle": "Enter the code from your authenticator app or a backup code.",
     "mfa_code": "Verification code",
@@ -3670,6 +3671,33 @@
       "guidance": "Use the ownership transfer flow (Settings → Tenant) instead of assigning Owner twice.",
       "close": "Close"
     }
+  },
+  "forgot_password": {
+    "title": "Reset your password",
+    "body": "Enter the e-mail address linked to your account. We will send a link for setting a new password.",
+    "field_email": "E-mail",
+    "submit": "Send link",
+    "submitting": "Sending...",
+    "sent_title": "Check your inbox",
+    "sent_body": "If an account exists for that address, we have sent it a link for setting a new password. The link is valid for a limited time.",
+    "error_throttled": "Too many attempts. Wait a moment and try again.",
+    "go_login": "Back to sign in"
+  },
+  "password_reset": {
+    "title": "Set a new password",
+    "body": "Enter a new password for your account. Sign in with it once saved.",
+    "field_new": "New password",
+    "field_confirm": "Repeat password",
+    "submit": "Save password",
+    "submitting": "Saving...",
+    "error_too_short": "The password must be at least {{min}} characters long.",
+    "error_mismatch": "The passwords do not match.",
+    "error_generic": "Could not set the password. Please try again.",
+    "invalid_title": "This link is no longer valid",
+    "invalid_body": "This password-reset link has expired, was already used, or is malformed. Please request a new one.",
+    "request_new": "Request a new link",
+    "toast_success": "Password changed. Sign in with your new password.",
+    "go_login": "Back to sign in"
   },
   "accept_invitation": {
     "verifying": "Verifying invitation...",
