@@ -49,6 +49,14 @@ W miejsce atomowości wchodzi:
 
 Bezpieczeństwo wznawiania stoi na **idempotencji replaya**: przywrócona wartość niesie znowu swoją sprzed-importową proweniencję, więc druga próba traktuje ją jak edycję ręczną i zostawia w spokoju; obiekty utworzone przez import kasowane są po id, więc powtórka nie ma co kasować.
 
+## Wdrożenie: wiadomości już zakolejkowane niosą starą szynę
+
+Envelope zapisuje `BusNameStamp` **w momencie nadania**, a worker po nim routuje. Wiadomość, która stała w kolejce przed wdrożeniem, pobiegnie więc po staremu — w jednej transakcji — mimo że kod jest już nowy.
+
+Zaobserwowane na dev 2026-08-12: trzy zaległe `ImportRunMessage` z `bus=messenger.bus.default` (nadane dzień wcześniej) po restarcie workera ruszyły ze starą semantyką. Objawy były dokładnie takie, jakie ten ADR usuwa: sesja czytała `pending` mimo trwającej pracy, transakcja trzymała blokadę wiersza sesji, przez co `POST /cancel` wisiał i padł na 30-sekundowym limicie wykonania, a worker skończył OOM-killem (`Exited 137`). Odblokowanie: zatrzymanie workera (transakcja się cofa), anulowanie sesji, ponowny start.
+
+**Przed wdrożeniem na produkcję**: opróżnij kolejkę `import` albo policz się z tym, że ostatnie zadania pobiegną jeszcze po staremu. `SELECT id, substring(body from 'busName[^"]*') FROM messenger_messages WHERE queue_name='import'` pokazuje, która wiadomość którą szynę niesie.
+
 ## Konsekwencje
 
 - Przerwany import zostawia zacommitowane wcześniejsze porcje. To jest zamierzone (`partial`, checkpointy, undo-log z `ON CONFLICT DO NOTHING`), ale każde **nowe** zadanie na tej szynie musi tę semantykę potwierdzić świadomie, a nie odziedziczyć.
