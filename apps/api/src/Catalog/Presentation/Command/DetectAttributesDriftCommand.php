@@ -49,9 +49,12 @@ use Symfony\Component\Uid\Uuid;
  * Postgres GUC (RLS), exactly like {@see \App\Shared\Infrastructure\Messenger\TenantRlsGucMiddleware}
  * does for workers. Omit `--tenant` to sweep every tenant (cron-friendly).
  *
- * Memory shape mirrors {@see RecalculateCompletenessCommand}: Doctrine
- * `toIterable()` + `EntityManager::clear()` every {@see self::FLUSH_EVERY}
- * rows so a 50k-SKU scan keeps the FrankenPHP worker peak bounded.
+ * Memory shape (#2231): keyset pagination + `EntityManager::clear()` every
+ * {@see self::FLUSH_EVERY} objects, with each page's values batch-loaded in one
+ * query. The earlier `toIterable()` walk opened no server-side cursor, so libpq
+ * buffered the whole result set client-side — memory `clear()` cannot reclaim —
+ * and the per-object value lookup turned a 50k reconcile into ~1.7M queries. It
+ * ran for 110 minutes without finishing, at 213 MiB against a 256 MiB ceiling.
  */
 #[AsCommand(
     name: 'pim:catalog:detect-attributes-drift',
@@ -251,11 +254,6 @@ final class DetectAttributesDriftCommand extends Command
      */
     private function scanKind(ObjectKind $kind, bool $reconcile, int $listLimit): array
     {
-        $query = $this->em->createQuery(
-            'SELECT o FROM '.CatalogObject::class.' o WHERE o.kind = :kind',
-        );
-        $query->setParameter('kind', $kind->value);
-
         $scanned = 0;
         $drifted = 0;
         $reconciled = 0;
@@ -283,7 +281,8 @@ final class DetectAttributesDriftCommand extends Command
             foreach ($page as $object) {
                 ++$scanned;
 
-                $diff = $this->diffObject($object, $valuesByObject[$object->getId()->toRfc4122()] ?? []);
+                $values = $valuesByObject[$object->getId()->toRfc4122()] ?? [];
+                $diff = $this->diffObject($object, $values);
                 if ([] !== $diff['orphaned'] || [] !== $diff['missing'] || [] !== $diff['mismatched']) {
                     ++$drifted;
                     if (\count($samples) < $listLimit) {
@@ -293,7 +292,12 @@ final class DetectAttributesDriftCommand extends Command
                         // Reuse the canonical rebuilder — the SINGLE writer of the
                         // cache (jsonb-schemas contract). Reads object_values, never
                         // mutates them; only attributes_indexed + completeness change.
-                        $this->rebuilder->rebuild($object);
+                        //
+                        // #2231 — hand it the page's values. Left to fetch its own
+                        // it re-read them per drifted object, which is the per-row
+                        // round trip this ticket removed from the scan re-appearing
+                        // in the repair.
+                        $this->rebuilder->rebuild($object, $values);
                         ++$reconciled;
                     }
                 }
@@ -318,12 +322,6 @@ final class DetectAttributesDriftCommand extends Command
         ];
     }
 
-    /**
-     * Compare the cache against the canonical GLOBAL reading the rebuilder
-     * would produce (locale=null + channel=null rows), keyed by attribute code.
-     *
-     * @return array{orphaned: list<string>, missing: list<string>, mismatched: list<string>}
-     */
     /**
      * One page of objects of the given kind, ordered by id (#2231).
      *
