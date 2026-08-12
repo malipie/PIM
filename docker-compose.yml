@@ -111,6 +111,21 @@ services:
   caddy:
     image: caddy:2-alpine
     <<: [*default_restart, *resource_limits_edge]
+    # #2791 — run tini as PID 1 so orphaned children get reaped.
+    #
+    # The healthcheck below runs BusyBox `wget` over HTTPS, and BusyBox forks a
+    # helper (`ssl_client`) to do the TLS handshake. When wget exits, that
+    # helper is reparented to PID 1 — which is `caddy`, a web server with no
+    # reason to reap anyone else's children. Every ten seconds left one more
+    # zombie behind: 8 640 a day, ~12 KB of kernel slab each, all charged to
+    # this container's 128 MiB.
+    #
+    # Measured on the dev edge before the fix: 10 489 zombies, 121 of 128 MiB.
+    # On prod: 119 MiB and `unhealthy` for 45 hours, because once the PID space
+    # filled (~9 200) nothing could fork any more — so the healthcheck itself
+    # could not run, and neither could `docker exec`. The container kept serving
+    # traffic the whole time, which is why it went unnoticed for days.
+    init: true
     depends_on:
       api:
         condition: service_healthy

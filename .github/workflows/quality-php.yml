@@ -98,6 +98,14 @@ jobs:
         working-directory: .
         run: bash scripts/lint-api-max-lines.sh
 
+      # #2791 — a healthcheck that forks over TLS leaves a zombie per run when
+      # PID 1 does not reap. The edge accumulated 10 489 of them (121/128 MiB)
+      # and ran out of PIDs, which killed the healthcheck itself — so the
+      # container reported `unhealthy` for 45 hours while serving traffic fine.
+      - name: Healthcheck reaper guard
+        working-directory: .
+        run: bash scripts/lint-healthcheck-reaper.sh
+
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:
