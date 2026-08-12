@@ -6,6 +6,7 @@ namespace App\Import\Domain\Entity;
 
 use App\Backup\Domain\Entity\Backup;
 use App\Catalog\Domain\Entity\ObjectType;
+use App\Import\Domain\Entity\Concerns\RollbackRunState;
 use App\Import\Domain\Enum\ImportImageSource;
 use App\Import\Domain\Enum\ImportMode;
 use App\Import\Domain\Enum\ImportSessionStatus;
@@ -32,6 +33,10 @@ use Symfony\Component\Validator\Constraints as Assert;
  */
 class ImportSession extends AggregateRoot implements TenantScoped
 {
+    // #2818 — the lifecycle of a rollback RUN (queued → working → stopped →
+    // resumed), which grew its own states once undoing moved to the worker.
+    use RollbackRunState;
+
     /**
      * Cap on a persisted failure reason. The column is TEXT, but an exception
      * message can carry a whole SQL statement or a serialized payload; the
@@ -581,7 +586,10 @@ class ImportSession extends AggregateRoot implements TenantScoped
     public function markRolledBack(?DateTimeImmutable $now = null): void
     {
         $now ??= new DateTimeImmutable();
-        if (!$this->getStatus()->isRollbackable()) {
+        // #2818 — reachable from `rolling_back` too: the worker that has just
+        // finished undoing the catalogue flips the status from the state the
+        // request put the session in when it queued the job.
+        if (!$this->getStatus()->isRollbackable() && !$this->getStatus()->isRollingBack()) {
             throw new LogicException(\sprintf(
                 'Import session %s cannot be rolled back from status "%s".',
                 $this->id->toRfc4122(),

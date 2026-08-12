@@ -23,6 +23,16 @@ enum ImportSessionStatus: string
     case Partial = 'partial';
     case Failed = 'failed';
     case Cancelled = 'cancelled';
+
+    /**
+     * #2818 — the rollback is running in the worker. Not terminal and not
+     * rollbackable: the operator must see that undoing is under way (it can
+     * take minutes on a full catalogue) instead of a button that looks
+     * unpressed, and a second request must be refused rather than replay an
+     * undo-log another run is already replaying.
+     */
+    case RollingBack = 'rolling_back';
+
     case RolledBack = 'rolled_back';
 
     public function isTerminal(): bool
@@ -36,5 +46,11 @@ enum ImportSessionStatus: string
     public function isRollbackable(): bool
     {
         return self::Success === $this || self::Partial === $this;
+    }
+
+    /** #2818 — a rollback is under way (queued or working). */
+    public function isRollingBack(): bool
+    {
+        return self::RollingBack === $this;
     }
 }

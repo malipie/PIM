@@ -17068,6 +17068,84 @@
                 "x-cortex-permission": "import_session.admin"
             }
         },
+        "/api/import-sessions/{id}/rollback/cancel": {
+            "post": {
+                "operationId": "api_import_sessions_id_rollback_cancel_post",
+                "tags": [
+                    "import-sessions"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api import sessions id rollback cancel",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "import_session.admin"
+            }
+        },
+        "/api/import-sessions/{id}/rollback/resume": {
+            "post": {
+                "operationId": "api_import_sessions_id_rollback_resume_post",
+                "tags": [
+                    "import-sessions"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api import sessions id rollback resume",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "import_session.admin"
+            }
+        },
         "/api/import-sources/{id}/test-connection": {
             "post": {
                 "operationId": "api_import_sources_id_test_connection_post",

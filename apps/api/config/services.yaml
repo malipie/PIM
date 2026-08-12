@@ -459,6 +459,11 @@ services:
         arguments:
             $bus: '@messenger.bus.long_running'
 
+    # #2818 — the rollback is queued, not run in the request.
+    App\Import\Presentation\Controller\RollbackImportController:
+        arguments:
+            $bus: '@messenger.bus.long_running'
+
     # IMP2-2.2 — staged upload: stage once, reuse by id in dry-run/start.
     App\Import\Application\Service\StagedFileService:
         arguments:

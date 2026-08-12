@@ -62,6 +62,36 @@ final class ImportProgressPublisher
         ]);
     }
 
+    /**
+     * #2818 — the rollback runs in the worker now, so it publishes progress the
+     * way the import does. Same detail topic: the session screen shows one
+     * timeline whether the session is being written or being undone.
+     */
+    public function rollbackProgress(ImportSession $session, int $objectsDone, int $objectsTotal, string $phase): void
+    {
+        $this->publish($session, 'rollback_progress', [
+            'objects_done' => $objectsDone,
+            'objects_total' => $objectsTotal,
+            'phase' => $phase,
+            'status' => $session->getStatus()->value,
+        ]);
+    }
+
+    /**
+     * #2818 — a rollback that stopped short (cancelled or interrupted). Its own
+     * event type rather than `completed`: the catalogue is partly undone, and
+     * the UI must not report that as a finished rollback.
+     */
+    public function rollbackStopped(ImportSession $session, int $objectsDone, int $objectsTotal, string $reason): void
+    {
+        $this->publish($session, 'rollback_stopped', [
+            'objects_done' => $objectsDone,
+            'objects_total' => $objectsTotal,
+            'reason' => $reason,
+            'status' => $session->getStatus()->value,
+        ]);
+    }
+
     public function completed(ImportSession $session): void
     {
         $this->publish($session, 'completed', [
