@@ -69,6 +69,7 @@
     "submitting": "Logowanie...",
     "invalid_credentials": "Nieprawidłowy e-mail lub hasło.",
     "login_failed": "Nie udało się zalogować. Spróbuj ponownie.",
+    "forgot_password": "Nie pamiętam hasła",
     "mfa_title": "Weryfikacja dwuetapowa",
     "mfa_subtitle": "Wpisz kod z aplikacji uwierzytelniającej lub kod zapasowy.",
     "mfa_code": "Kod weryfikacyjny",
@@ -3688,6 +3689,33 @@
       "guidance": "Skorzystaj z transferu właścicielstwa (Settings → Tenant) zamiast przypisywać Owner po raz drugi.",
       "close": "Zamknij"
     }
+  },
+  "forgot_password": {
+    "title": "Reset hasła",
+    "body": "Podaj adres e-mail powiązany z kontem. Wyślemy na niego link do ustawienia nowego hasła.",
+    "field_email": "E-mail",
+    "submit": "Wyślij link",
+    "submitting": "Wysyłanie...",
+    "sent_title": "Sprawdź skrzynkę",
+    "sent_body": "Jeśli konto o tym adresie istnieje, wysłaliśmy na nie link do ustawienia nowego hasła. Link jest ważny przez ograniczony czas.",
+    "error_throttled": "Zbyt wiele prób. Odczekaj chwilę i spróbuj ponownie.",
+    "go_login": "Wróć do logowania"
+  },
+  "password_reset": {
+    "title": "Ustaw nowe hasło",
+    "body": "Wpisz nowe hasło do swojego konta. Po zapisaniu zaloguj się przy jego użyciu.",
+    "field_new": "Nowe hasło",
+    "field_confirm": "Powtórz hasło",
+    "submit": "Zapisz hasło",
+    "submitting": "Zapisywanie...",
+    "error_too_short": "Hasło musi mieć co najmniej {{min}} znaków.",
+    "error_mismatch": "Hasła nie są takie same.",
+    "error_generic": "Nie udało się ustawić hasła. Spróbuj ponownie.",
+    "invalid_title": "Link jest nieaktualny",
+    "invalid_body": "Ten link do resetu hasła wygasł, został już użyty albo jest niepoprawny. Poproś o nowy.",
+    "request_new": "Poproś o nowy link",
+    "toast_success": "Hasło zostało zmienione. Zaloguj się nowym hasłem.",
+    "go_login": "Wróć do logowania"
   },
   "accept_invitation": {
     "verifying": "Sprawdzam zaproszenie...",

@@ -92,7 +92,11 @@ final class PasswordResetService
                 ->htmlTemplate('email/password-reset.html.twig')
                 ->context([
                     'recipient_email' => $email,
-                    'confirm_url' => \sprintf('%s/password-reset/%s', $this->appBaseUrl, $plaintext),
+                    // #2827 — `?token=` query, matching the SPA route added in
+                    // the same ticket. The old `/password-reset/{token}` path
+                    // segment had no route on either side, so the link dropped
+                    // the recipient on the login screen.
+                    'confirm_url' => \sprintf('%s/password-reset?token=%s', $this->appBaseUrl, $plaintext),
                 ]);
             $this->mailer->send($message);
         } catch (TransportExceptionInterface $e) {

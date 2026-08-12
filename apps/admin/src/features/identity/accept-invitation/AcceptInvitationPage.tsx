@@ -159,7 +159,10 @@ export function AcceptInvitationPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
-      <div className="w-full max-w-md">
+      {/* #2827 — landmark added along with the first automated a11y pass over
+          this page: until the mail linked here correctly, no spec ever
+          rendered it, and axe flags content outside any landmark. */}
+      <main className="w-full max-w-md">
         {state.kind === 'pending' && <PendingCard />}
         {state.kind === 'invalid' && <InvalidCard reason={state.reason} />}
         {(state.kind === 'expired' || state.kind === 'revoked' || state.kind === 'accepted') && (
@@ -178,7 +181,7 @@ export function AcceptInvitationPage() {
             submitting={submitting}
           />
         )}
-      </div>
+      </main>
     </div>
   );
 }

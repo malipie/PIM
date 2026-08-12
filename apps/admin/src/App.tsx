@@ -15,6 +15,8 @@ import { FirstLoginChangePasswordPage } from '@/features/auth/FirstLoginChangePa
 import { DashboardPage } from '@/features/dashboard/page';
 import { AcceptInvitationPage } from '@/features/identity/accept-invitation/AcceptInvitationPage';
 import { LoginPage } from '@/features/identity/auth/login';
+import { ForgotPasswordPage } from '@/features/identity/forgot-password/ForgotPasswordPage';
+import { PasswordResetPage } from '@/features/identity/password-reset/PasswordResetPage';
 import { AppLayout } from '@/layout/AppLayout';
 import { SettingsLayout } from '@/layout/SettingsLayout';
 import { authProvider } from '@/lib/auth-provider';
@@ -476,6 +478,13 @@ function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+                {/* #2827 — both recovery mails link here. These must stay
+                    OUTSIDE <AuthedRoute>: the whole point is that the caller
+                    has no session, and the catch-all route below would send
+                    them to /dashboard and on to /login, which is exactly the
+                    dead-link symptom this ticket fixes. */}
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/password-reset" element={<PasswordResetPage />} />
                 {/* Manual user creation (#867) — force-password-change gate.
                   Sits inside <AuthedRoute> (JWT required to call
                   /api/me/change-password) but outside <AppLayout> so the

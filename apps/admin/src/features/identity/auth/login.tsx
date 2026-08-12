@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -182,6 +182,16 @@ export function LoginPage() {
               <Button type="submit" className="w-full" disabled={isPending}>
                 {isPending ? t('auth.submitting') : t('auth.submit')}
               </Button>
+              {/* #2827 — without this link the reset flow is reachable only
+                  from a mail nobody can request. */}
+              <p className="text-center text-sm">
+                <Link
+                  to="/forgot-password"
+                  className="text-muted-foreground underline underline-offset-4"
+                >
+                  {t('auth.forgot_password')}
+                </Link>
+              </p>
             </form>
           )}
         </CardContent>

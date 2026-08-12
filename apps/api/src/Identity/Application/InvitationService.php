@@ -118,7 +118,14 @@ final class InvitationService
                     'tenant_name' => $tenant->getName(),
                     'invited_by_email' => $invitedBy->getEmail(),
                     'role_name' => $role->getName(),
-                    'accept_url' => \sprintf('%s/invitations/%s/accept', $this->appBaseUrl, $plaintext),
+                    // #2827 — the link MUST address the admin SPA route that
+                    // actually exists (`/accept-invitation?token=…`, App.tsx).
+                    // The previous `/invitations/{token}/accept` looked like the
+                    // API path but nothing served it: Caddy hands every non-/api
+                    // path to the SPA, whose catch-all route redirects to
+                    // /dashboard and — with no session — on to /login. The
+                    // invitee saw a login screen and the token was lost.
+                    'accept_url' => \sprintf('%s/accept-invitation?token=%s', $this->appBaseUrl, $plaintext),
                     'expires_at' => $expiresAt,
                 ]);
             $this->mailer->send($email);
