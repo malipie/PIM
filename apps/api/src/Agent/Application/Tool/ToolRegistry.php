@@ -6,6 +6,7 @@ namespace App\Agent\Application\Tool;
 
 use App\Agent\Domain\Exception\ToolAccessDeniedException;
 use App\Identity\Contracts\Policy\AgentAutonomyResolverInterface;
+use App\Identity\Contracts\Policy\PermissionAliases;
 use App\Identity\Contracts\Policy\PermissionCheckerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\Uid\Uuid;
@@ -56,7 +57,7 @@ final readonly class ToolRegistry
         return array_values(array_filter(
             $this->tools,
             fn (AgentToolInterface $tool): bool => ('read_only' !== $level || ToolKind::Read === $tool->kind())
-                && $this->permissions->userHasPermission($userId, $tool->requiredPermission()),
+                && $this->holdsPermissionFor($userId, $tool),
         ));
     }
 
@@ -136,11 +137,29 @@ final readonly class ToolRegistry
             throw ToolAccessDeniedException::unknownTool($toolName);
         }
 
-        if (!$this->permissions->userHasPermission($context->userId, $tool->requiredPermission())) {
+        if (!$this->holdsPermissionFor($context->userId, $tool)) {
             throw ToolAccessDeniedException::forTool($toolName);
         }
 
         return $tool->execute($arguments, $context);
+    }
+
+    /**
+     * #2838 — tools declare their requirement in legacy codes
+     * (`object.write`), while PRD-seeded roles hold business codes
+     * (`products.edit`). Judging on the literal code alone left a Catalog
+     * Manager with an empty tool surface despite holding
+     * `agent.bulk_actions` and full rights to the data itself.
+     */
+    private function holdsPermissionFor(Uuid $userId, AgentToolInterface $tool): bool
+    {
+        foreach (PermissionAliases::acceptedFor($tool->requiredPermission()) as $code) {
+            if ($this->permissions->userHasPermission($userId, $code)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function find(string $toolName): ?AgentToolInterface

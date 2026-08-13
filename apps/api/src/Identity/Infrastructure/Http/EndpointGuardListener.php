@@ -150,7 +150,17 @@ final class EndpointGuardListener implements EventSubscriberInterface
             $requirement = $attribute->newInstance();
             $permissionCode = $requirement->permissionCode();
 
-            if (!$permissions->has($permissionCode)) {
+            // #2838 — `anyOf` lets one requirement accept alternative
+            // grants; without it the only way to express "either of these"
+            // would be two attributes, which the loop above ANDs.
+            $satisfied = false;
+            foreach ($requirement->acceptedCodes() as $accepted) {
+                if ($permissions->has($accepted)) {
+                    $satisfied = true;
+                    break;
+                }
+            }
+            if (!$satisfied) {
                 throw new PermissionDeniedException($permissionCode);
             }
 

@@ -29,7 +29,7 @@ use App\Identity\Infrastructure\Security\AbstractPrdVoter;
 final class CategoryVoter extends AbstractPrdVoter
 {
     /**
-     * @return array<string, string>
+     * @return array<string, string|list<string>>
      */
     protected function permissionMap(): array
     {
@@ -37,6 +37,15 @@ final class CategoryVoter extends AbstractPrdVoter
             'view' => 'categories.view',
             'add_edit' => 'categories.add_edit',
             'delete' => 'categories.delete',
+
+            // #2838 — API Platform asks in uppercase; without these the
+            // legacy voter was the only one voting and it demands
+            // `category.read`, which no PRD role holds.
+            'READ' => 'categories.view',
+            'CREATE' => 'categories.add_edit',
+            'UPDATE' => 'categories.add_edit',
+            'WRITE' => 'categories.add_edit',
+            'DELETE' => 'categories.delete',
         ];
     }
 

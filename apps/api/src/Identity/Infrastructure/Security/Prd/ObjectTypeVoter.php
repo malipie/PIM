@@ -37,15 +37,43 @@ use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 final class ObjectTypeVoter extends AbstractPrdVoter
 {
     /**
-     * @return array<string, string>
+     * #2838 — reading a type definition is implied by reading the data it
+     * describes. Rendering a product list needs the product ObjectType;
+     * requiring `modeling.view` for that would hand the Catalog Manager
+     * the entire Modeling section (MENU_PERMISSIONS.modeling keys on
+     * exactly this code), which the PRD §3.2 matrix denies it. Writes stay
+     * on `modeling.*` — this widens reading, not modelling.
+     */
+    private const array METADATA_READERS = [
+        'modeling.view',
+        'products.view',
+        'categories.view',
+        'multimedia.view',
+    ];
+
+    /**
+     * @return array<string, string|list<string>>
      */
     protected function permissionMap(): array
     {
         return [
-            'view' => 'modeling.view',
+            'view' => self::METADATA_READERS,
             'add' => 'modeling.object_types.add',
             'edit' => 'modeling.object_types.add',
             'delete' => 'modeling.delete_custom',
+
+            // #2838 — API Platform asks in uppercase (`is_granted('READ',
+            // ObjectType::class)`), this voter only spoke lowercase, so the
+            // legacy voter was the only one voting and it demands
+            // `object_type.read` — a code no PRD role holds. The product
+            // list therefore 403'd on its own type definition and the UI
+            // reported it as "run the catalog seeder". Same shape as the
+            // fix in ProductVoter (#2416).
+            'READ' => self::METADATA_READERS,
+            'CREATE' => 'modeling.object_types.add',
+            'UPDATE' => 'modeling.object_types.add',
+            'WRITE' => 'modeling.object_types.add',
+            'DELETE' => 'modeling.delete_custom',
         ];
     }
 
@@ -60,7 +88,8 @@ final class ObjectTypeVoter extends AbstractPrdVoter
             return false;
         }
 
-        if ('delete' !== $attribute) {
+        // #2838 — the uppercase alias must inherit the same guard.
+        if ('delete' !== $attribute && 'DELETE' !== $attribute) {
             return true;
         }
 

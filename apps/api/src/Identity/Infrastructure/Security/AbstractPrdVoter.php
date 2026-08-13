@@ -45,7 +45,16 @@ abstract class AbstractPrdVoter extends Voter
     }
 
     /**
-     * @return array<string, string> Voter attribute → permission code
+     * Voter attribute → permission code, or a list of codes any one of
+     * which grants it.
+     *
+     * #2838 — the list form exists because reading schema metadata is
+     * implied by reading the data it describes: a Catalog Manager must be
+     * able to fetch the product ObjectType to render the product list,
+     * without holding `modeling.view` (which would also open the whole
+     * Modeling section in the sidebar).
+     *
+     * @return array<string, string|list<string>>
      */
     abstract protected function permissionMap(): array;
 
@@ -88,13 +97,20 @@ abstract class AbstractPrdVoter extends Voter
             return false;
         }
 
-        $code = $this->permissionMap()[$attribute] ?? null;
-        if (null === $code) {
+        $mapped = $this->permissionMap()[$attribute] ?? null;
+        if (null === $mapped) {
             return false;
         }
 
         $permissions = $this->resolver->resolve($user);
-        if (!$permissions->has($code)) {
+        $granted = false;
+        foreach ((array) $mapped as $code) {
+            if ($permissions->has($code)) {
+                $granted = true;
+                break;
+            }
+        }
+        if (!$granted) {
             return false;
         }
 

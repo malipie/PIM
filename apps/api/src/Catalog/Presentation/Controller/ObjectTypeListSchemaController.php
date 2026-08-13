@@ -51,7 +51,18 @@ final class ObjectTypeListSchemaController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'object_type', action: 'read')]
+    // #2838 — the list schema is what the product/category/asset lists need
+    // to know which columns to draw. Requiring `object_type.read` (or
+    // `modeling.view`) alone made a Catalog Manager's own product list 403
+    // on its type definition, which the UI reported as "run the catalog
+    // seeder". Reading schema metadata follows reading the data.
+    #[RequiresPermission(module: 'object_type', action: 'read', anyOf: [
+        'object_type.read',
+        'modeling.view',
+        'products.view',
+        'categories.view',
+        'multimedia.view',
+    ])]
     public function __invoke(string $id, Request $request): JsonResponse
     {
         // GRID-P3-01 (#2392) — `?full=1` returns the complete attribute

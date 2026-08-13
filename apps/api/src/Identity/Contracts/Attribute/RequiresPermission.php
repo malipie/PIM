@@ -26,15 +26,37 @@ use Attribute;
 #[Attribute(Attribute::TARGET_METHOD)]
 final class RequiresPermission
 {
+    /**
+     * @param list<string> $anyOf #2838 — alternative codes, any one of which
+     *                            satisfies the requirement. Multiple
+     *                            `#[RequiresPermission]` attributes on one
+     *                            method are ANDed by the guard, so alternatives
+     *                            have to be expressed here. Used where a read is
+     *                            implied by several different grants — e.g. list
+     *                            schema metadata, which a Modeler reaches through
+     *                            `modeling.view` and a Catalog Manager through
+     *                            `products.view`.
+     */
     public function __construct(
         public readonly string $module,
         public readonly string $action,
         public readonly ?string $subject = null,
+        public readonly array $anyOf = [],
     ) {
     }
 
     public function permissionCode(): string
     {
         return $this->module.'.'.$this->action;
+    }
+
+    /**
+     * Every code that satisfies this requirement, the primary one first.
+     *
+     * @return list<string>
+     */
+    public function acceptedCodes(): array
+    {
+        return [] === $this->anyOf ? [$this->permissionCode()] : $this->anyOf;
     }
 }

@@ -13,7 +13,6 @@ use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\Role;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Rbac\RbacMatrix;
-use App\Identity\Domain\Repository\PermissionRepositoryInterface;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Identity\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\TenantContext;
@@ -65,11 +64,11 @@ final class AgentCapabilitiesApiTest extends ApiTestCase
         self::getContainer()->get(SeedTenantPrdRolesService::class)->seed($tenant);
         $tenantOwner = $roles->findByCode('tenant_owner', $tenant);
         $marketing = $roles->findByCode('marketing', $tenant);
-        $legacyCatalogManager = $roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenant);
-        $legacyViewer = $roles->findByCode(RbacMatrix::ROLE_VIEWER, $tenant);
+        $catalogManager = $roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenant);
+        $viewer = $roles->findByCode(RbacMatrix::ROLE_VIEWER, $tenant);
         \assert(
             null !== $tenantOwner && null !== $marketing
-            && null !== $legacyCatalogManager && null !== $legacyViewer,
+            && null !== $catalogManager && null !== $viewer,
         );
 
         $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
@@ -84,30 +83,16 @@ final class AgentCapabilitiesApiTest extends ApiTestCase
 
         // Full surface: every tool's permission resolves.
         $make(self::ADMIN_EMAIL, $superAdmin, $tenantOwner);
-        // Catalog-only: object.read/write plus agent.bulk_actions (via PRD
+        // Catalog-only: the data grants plus agent.bulk_actions (via PRD
         // marketing), but NO modeling.attributes.add_edit and NO
-        // integration.admin — so the schema and feed chips must be filtered
+        // integration.admin — the schema and feed chips must stay filtered
         // out while the three catalog chips survive.
-        //
-        // #2837/#2838 — the object.* codes come from a purpose-built role
-        // here rather than from `catalog_manager`. The PRD template grants
-        // `products.*` / `categories.*`, and the agent tools still declare
-        // their requirement in legacy codes, so a real Catalog Manager gets
-        // NO chips at all. That mismatch is #2838's subject; this test is
-        // about per-user filtering, so it states its own preconditions
-        // instead of riding on whichever codes a template happens to carry.
-        $catalogTools = new Role('agent_catalog_tools', 'Agent catalog tools', $tenant);
-        $em->persist($catalogTools);
-        foreach (['object.read', 'object.write'] as $code) {
-            $permission = self::getContainer()->get(PermissionRepositoryInterface::class)->findByCode($code);
-            \assert(null !== $permission);
-            $catalogTools->grantPermission($permission);
-        }
-        $em->flush();
-
-        $make(self::RESTRICTED_EMAIL, $catalogTools, $marketing);
+        // #2838 — a REAL PRD Catalog Manager. Its codes are products.* /
+        // categories.*, while the tools declare object.read / object.write;
+        // before the alias map this user saw an empty tool surface.
+        $make(self::RESTRICTED_EMAIL, $catalogManager, $marketing);
         // Read-only legacy role without agent.bulk_actions.
-        $make(self::VIEWER_EMAIL, $legacyViewer);
+        $make(self::VIEWER_EMAIL, $viewer);
         $em->flush();
 
         self::getContainer()->get(TenantContext::class)->set($tenant);
@@ -210,9 +195,9 @@ final class AgentCapabilitiesApiTest extends ApiTestCase
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $tenant = $em->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
         \assert($tenant instanceof Tenant);
-        // The roles this user actually holds — see setUp: a purpose-built
-        // tools role plus PRD marketing.
-        foreach ([$roles->findByCode('agent_catalog_tools', $tenant), $roles->findByCode('marketing', $tenant)] as $role) {
+        // The roles this user actually holds — see setUp: the PRD Catalog
+        // Manager plus PRD marketing.
+        foreach ([$roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenant), $roles->findByCode('marketing', $tenant)] as $role) {
             \assert($role instanceof Role);
             $role->setAgentAutonomy('off');
         }

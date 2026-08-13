@@ -36,7 +36,7 @@ use App\Identity\Infrastructure\Security\AbstractPrdVoter;
 final class AssetVoter extends AbstractPrdVoter
 {
     /**
-     * @return array<string, string>
+     * @return array<string, string|list<string>>
      */
     protected function permissionMap(): array
     {
@@ -45,6 +45,13 @@ final class AssetVoter extends AbstractPrdVoter
             'add_edit_own' => 'multimedia.add_edit_own',
             'add_edit_any' => 'multimedia.add_edit_any',
             'delete' => 'multimedia.delete',
+
+            // #2838 — uppercase aliases for the API Platform operations.
+            'READ' => 'multimedia.view',
+            'CREATE' => ['multimedia.add_edit_own', 'multimedia.add_edit_any'],
+            'UPDATE' => ['multimedia.add_edit_own', 'multimedia.add_edit_any'],
+            'WRITE' => ['multimedia.add_edit_own', 'multimedia.add_edit_any'],
+            'DELETE' => 'multimedia.delete',
         ];
     }
 
