@@ -211,8 +211,10 @@ final class DashboardSummaryApiTest extends CatalogApiTestCase
         $body = $response->toArray();
 
         self::assertSame([], $body['channels'], 'channel rows must not reach a caller without channel.read');
-        // The rest of the payload is unaffected — the role does hold products.view.
-        self::assertSame(1, $body['products']['total']);
+        // The rest of the payload is unaffected — the role does hold
+        // products.view. Asserted whole (not `$body['products']['total']`)
+        // because the nested offset is `mixed` under PHPStan max.
+        self::assertSame(['total' => 1, 'delta30d' => 1], $body['products']);
 
         // Control: the admin (channel.read included) still gets the rows.
         $adminBody = $this->authenticatedClient()->request('GET', '/api/dashboard/summary')->toArray();
