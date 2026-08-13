@@ -55,6 +55,18 @@ pnpm --filter @pim/admin build
 
 If any of these fail, fix before writing your first PR — the CI rejects the same matrix.
 
+Faster feedback while you work: `pnpm ci:local` runs only the suites your change can break — see [docs/development/local-test-gate.md](docs/development/local-test-gate.md).
+
+### Mail (#2829)
+
+Everything the app sends in dev goes to **Mailpit**: <https://mail.pim.localhost>. Worth a two-minute smoke before you touch anything that mails — invitations, password resets, workflow notifications:
+
+1. Log in as `admin@demo.localhost` / `changeme`.
+2. Settings → Users → invite any address (it does not have to exist).
+3. Open Mailpit — the message is there, and **the link in it is clickable**.
+
+Step 3 is the point. Dead links in invitation and reset mails reached production once (#2827) precisely because nobody could open the mail locally: `apps/api/.env` ships `MAILER_DSN=null://null`, so every message was dropped in silence and a "sent" API response proved nothing.
+
 ## Day 3 — first PR
 
 Pick something contained: add a new `AttributeOption` to an existing `Attribute`, or extend `BuiltInObjectTypeSeeder`. Workflow:

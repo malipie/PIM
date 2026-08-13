@@ -116,3 +116,21 @@ pim.localhost, localhost {
         }
     }
 }
+
+# #2829 — Mailpit UI. Docblocks across the mail senders (InvitationService,
+# PasswordResetService) point here, and until now the host did not exist:
+# mailpit only `expose`s its ports, so nothing outside the compose network
+# could reach it.
+#
+# A separate host rather than a path under pim.localhost on purpose — the
+# single-origin rule (architecture §3.10a) exists so the ADMIN and the API
+# share one origin and need no CORS. Mailpit is neither; it is a dev tool
+# that happens to run alongside, and mounting it under /mail would put a
+# third-party UI inside the app's origin, sharing its cookies.
+#
+# Dev only. This file is not used in production (docker-compose.prod.yml
+# mounts docker/caddy/Caddyfile.prod), and no Mailpit runs there.
+mail.pim.localhost {
+    tls internal
+    reverse_proxy mailpit:8025
+}
