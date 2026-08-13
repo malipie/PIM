@@ -340,8 +340,42 @@ jobs:
           openssl genpkey -algorithm RSA -out config/jwt/private.pem -aes256 -pass pass:ci -pkeyopt rsa_keygen_bits:4096
           openssl pkey -in config/jwt/private.pem -passin pass:ci -pubout -out config/jwt/public.pem
 
+      # #2843 — ParaTest gives each worker its own database via TEST_TOKEN
+      # (already wired into doctrine.yaml), but nothing creates them: Foundry
+      # expects the database to exist and three of four workers die on
+      # connect otherwise. Cheap to create, harmless when unused.
+      - name: Create per-worker test databases (ParaTest)
+        if: matrix.suite == 'api-catalog'
+        env:
+          PGPASSWORD: ChangeMeInDev
+        run: |
+          for i in 1 2 3 4; do
+            psql -h localhost -U pim -d postgres -c "CREATE DATABASE pim_test$i OWNER pim;"
+          done
+
+      # #2843 — ParaTest for the long pole. Measured on this repo: the
+      # api-catalog leg spent 3478s (~58 min) executing tests while the whole
+      # surrounding job — checkout, composer, PHP setup — took ~30s, so the
+      # only thing worth attacking is the run itself. Workers get their own
+      # database (TEST_TOKEN, already wired in doctrine.yaml) and their own
+      # rate-limiter pool directory (see framework.yaml when@test).
+      #
+      # `--passthru-php` is required: `-d` on the parent process does NOT
+      # reach the workers, and they inherit the image's execution limit.
+      #
+      # Suites other than api-catalog stay sequential for now — they finish
+      # in 12-15 min and are not the bottleneck; widening this is a follow-up
+      # once the catalog leg proves stable in parallel.
       - name: Run PHPUnit (${{ matrix.suite }})
-        run: php bin/phpunit --testsuite ${{ matrix.suite }}
+        run: |
+          if [ "${{ matrix.suite }}" = "api-catalog" ]; then
+            vendor/bin/paratest \
+              --processes 4 \
+              --testsuite ${{ matrix.suite }} \
+              --passthru-php="-d max_execution_time=0"
+          else
+            php bin/phpunit --testsuite ${{ matrix.suite }}
+          fi
 
   phpunit-benchmark:
     # AUD-083 — the heavy 5k/50k import + export memory benchmark, split out of
