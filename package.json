@@ -23,6 +23,7 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "lint:php": "docker compose exec -T api composer lint",
+    "ci:local": "./scripts/pre-push-gate.sh",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "prepare": "husky"
