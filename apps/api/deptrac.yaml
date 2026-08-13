@@ -692,6 +692,12 @@ parameters:
             - App\Catalog\Domain\ObjectKind
         App\Identity\Infrastructure\Security\Prd\AssetVoter:
             - App\Asset\Domain\Entity\Asset
+        # #2845 — assets exist twice: the stored binary (Asset, above) and
+        # its catalogue entry (CatalogObject kind=asset, here). Same
+        # "voter references its resource" reasoning.
+        App\Identity\Infrastructure\Security\Prd\AssetObjectVoter:
+            - App\Catalog\Domain\Entity\CatalogObject
+            - App\Catalog\Domain\ObjectKind
         # RBAC-P3-004 (#667) — modeling-row voters under Prd\. Each Voter
         # legitimately references the resource class it protects.
         App\Identity\Infrastructure\Security\Prd\ObjectTypeVoter:

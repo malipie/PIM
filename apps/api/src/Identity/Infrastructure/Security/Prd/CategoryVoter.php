@@ -38,16 +38,38 @@ final class CategoryVoter extends AbstractPrdVoter
             'add_edit' => 'categories.add_edit',
             'delete' => 'categories.delete',
 
-            // #2838 — NO uppercase aliases here, deliberately. This voter
-            // answers for `CatalogObject`, and `/categories`, `/assets` and
-            // the poly-kind `/objects` all ask the identical question
-            // (`is_granted('READ', CatalogObject::class)`): on a collection
-            // the kind is unknowable, so an alias here would open the
-            // generic /api/objects list to anyone holding categories.view.
-            // ProductVoter avoids this with kind-specific attributes
-            // (READ_PRODUCT / CREATE_PRODUCT, #2416); giving categories and
-            // assets the same treatment is tracked separately.
+            // #2845 — kind-specific attributes for the two operations that
+            // carry no instance. `/categories` and the poly-kind `/objects`
+            // both hand the voter the bare CatalogObject class string, so a
+            // plain `READ` / `CREATE` alias here would open the generic list
+            // to anyone holding categories.view — the escalation
+            // ProductCreatePermissionApiTest guards, and the reason #2838
+            // left these out. Products solved it the same way in #2416.
+            'READ_CATEGORY' => 'categories.view',
+            'CREATE_CATEGORY' => 'categories.add_edit',
+
+            // Instance-carrying operations are safe on the shared attribute:
+            // acceptsSubject() below checks the kind, and supports() keeps
+            // this voter out of the class-string decisions above.
+            'READ' => 'categories.view',
+            'UPDATE' => 'categories.add_edit',
+            'DELETE' => 'categories.delete',
         ];
+    }
+
+    /**
+     * Class-string subjects are shared by every kind's collection / POST, so
+     * the kind cannot be checked. Those decisions belong to the explicit
+     * READ_CATEGORY / CREATE_CATEGORY attributes; abstain here and let the
+     * legacy CatalogObjectVoter answer for pre-PRD principals.
+     */
+    protected function supports(string $attribute, mixed $subject): bool
+    {
+        if (\is_string($subject) && \in_array($attribute, ['READ', 'CREATE', 'UPDATE', 'DELETE'], true)) {
+            return false;
+        }
+
+        return parent::supports($attribute, $subject);
     }
 
     protected function subjectClass(): string

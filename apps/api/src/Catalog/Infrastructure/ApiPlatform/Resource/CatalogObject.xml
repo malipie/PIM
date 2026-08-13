@@ -219,7 +219,7 @@
                        name="categories_get_collection"
                        paginationType="cursor"
                        provider="App\Catalog\Infrastructure\ApiPlatform\State\CatalogObjectCollectionLocaleOverlayProvider"
-                       security="is_granted('READ', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
+                       security="is_granted('READ_CATEGORY', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
                 <extraProperties>
                     <values>
                         <value name="kind">category</value>
@@ -271,7 +271,7 @@
                        name="categories_post"
                        input="App\Catalog\Infrastructure\ApiPlatform\Resource\CatalogObjectInput"
                        processor="App\Catalog\Infrastructure\ApiPlatform\State\CatalogObjectProcessor"
-                       security="is_granted('CREATE', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
+                       security="is_granted('CREATE_CATEGORY', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
                 <extraProperties>
                     <values>
                         <value name="kind">category</value>
@@ -328,7 +328,7 @@
                        name="assets_get_collection"
                        paginationType="cursor"
                        provider="App\Catalog\Infrastructure\ApiPlatform\State\CatalogObjectCollectionLocaleOverlayProvider"
-                       security="is_granted('READ', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
+                       security="is_granted('READ_ASSET', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
                 <extraProperties>
                     <values>
                         <value name="kind">asset</value>

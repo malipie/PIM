@@ -45,24 +45,6 @@ final class SchemaMetadataReadAccessTest extends CatalogApiTestCase
         self::assertResponseIsSuccessful($path.' must be readable by a catalog role');
     }
 
-    /**
-     * #2838 — `/api/categories` stays refused, and that is not an oversight.
-     * It asks the identical question as the poly-kind `/api/objects`
-     * (`is_granted('READ', CatalogObject::class)`), so anything that opened
-     * one would open the other — `ProductCreatePermissionApiTest` pins
-     * exactly that leak. Categories and assets need kind-specific attributes
-     * first, the way products got them in #2416; tracked separately.
-     */
-    #[Test]
-    public function categoriesStayBehindTheGenericGateForNow(): void
-    {
-        $this->givenCatalogManager();
-
-        $this->authenticatedClient(self::CATALOG_EMAIL)->request('GET', '/api/categories');
-
-        self::assertResponseStatusCodeSame(403);
-    }
-
     #[Test]
     public function catalogRoleReadsTheListSchemaOfTheProductType(): void
     {

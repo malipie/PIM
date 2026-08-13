@@ -42,6 +42,13 @@ final class CatalogObjectVoter extends AbstractRbacVoter
             // object.read principals keep browsing the unscoped collection
             // through this alias.
             'READ_OBJECT_COLLECTION' => 'read',
+            // #2845 — same story for the category / asset sugar paths: they
+            // moved to kind-specific attributes so the PRD voters can answer
+            // without opening the other kinds' lists. Legacy principals hold
+            // object.read / object.write and reach all of them through here.
+            'READ_CATEGORY' => 'read',
+            'CREATE_CATEGORY' => 'write',
+            'READ_ASSET' => 'read',
             'UPDATE' => 'write',
             'WRITE' => 'write',
             'DELETE' => 'delete',
