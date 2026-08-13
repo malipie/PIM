@@ -7,6 +7,7 @@ namespace App\Tests\Api\Identity;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Identity\Application\RbacSeeder;
+use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\Role;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Rbac\RbacMatrix;
@@ -55,13 +56,21 @@ final class RolesListControllerTest extends ApiTestCase
 
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
-        $catalogManager = $roles->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER);
-        \assert(null !== $superAdmin && null !== $catalogManager);
+        \assert(null !== $superAdmin);
 
         $tenantA = new Tenant(self::TENANT_A_CODE, 'Demo Tenant');
         $tenantB = new Tenant(self::TENANT_B_CODE, 'Other Tenant');
         $em->persist($tenantA);
         $em->persist($tenantB);
+        $em->flush();
+
+        // #2837 — tenant roles come from the per-tenant PRD templates, so
+        // they exist only after the tenant does.
+        $prdRoles = self::getContainer()->get(SeedTenantPrdRolesService::class);
+        $prdRoles->seed($tenantA);
+        $prdRoles->seed($tenantB);
+        $catalogManager = $roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenantA);
+        \assert(null !== $catalogManager);
 
         // Custom role on tenant A — must appear in the listing alongside
         // the 4 system templates.
@@ -97,10 +106,12 @@ final class RolesListControllerTest extends ApiTestCase
         self::assertResponseStatusCodeSame(200);
         $body = $this->decodeResponse($client);
 
-        // 4 seeded system roles + custom_a (tenant A's own custom role) = 5.
-        // custom_b lives on tenant B and must NOT appear.
-        self::assertSame(5, $body['totalItems'] ?? null);
-
+        // #2837 — the tenant now carries the 9 PRD role templates instead
+        // of a mix of global and per-tenant copies; plus the global
+        // super_admin and tenant A's own custom_a. custom_b lives on tenant
+        // B and must NOT appear. Asserting on the codes below rather than
+        // pinning a count keeps this from breaking every time the PRD
+        // template list grows.
         $codes = $this->extractField($body, 'code');
         self::assertContains(RbacMatrix::ROLE_SUPER_ADMIN, $codes);
         self::assertContains(RbacMatrix::ROLE_CATALOG_MANAGER, $codes);

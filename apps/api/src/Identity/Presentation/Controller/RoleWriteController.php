@@ -9,6 +9,7 @@ use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Domain\Entity\Permission;
 use App\Identity\Domain\Entity\Role;
 use App\Identity\Domain\Entity\User;
+use App\Identity\Domain\Rbac\PrdRoleTemplates;
 use App\Identity\Domain\Repository\PermissionRepositoryInterface;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Identity\Domain\Repository\UserRepositoryInterface;
@@ -126,7 +127,9 @@ final readonly class RoleWriteController
             return $payload;
         }
 
-        $isCustom = !$role->isGlobal();
+        // #2837 — PRD template roles are built-in even though they live on
+        // a tenant; renaming them would desynchronise them from the seeder.
+        $isCustom = !$role->isGlobal() && !PrdRoleTemplates::isTemplateCode($role->getCode());
 
         if (\array_key_exists('name', $payload)) {
             if (!$isCustom) {
@@ -197,7 +200,10 @@ final readonly class RoleWriteController
             return $role;
         }
 
-        if ($role->isGlobal()) {
+        // #2837 — protection covers the PRD templates too. Guarding on
+        // globality alone left `tenant_owner`, `catalog_manager` and the
+        // rest deletable from the panel the moment nobody held them.
+        if ($role->isGlobal() || PrdRoleTemplates::isTemplateCode($role->getCode())) {
             return $this->problem(
                 Response::HTTP_FORBIDDEN,
                 'Forbidden',

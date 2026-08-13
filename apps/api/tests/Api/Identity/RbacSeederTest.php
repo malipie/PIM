@@ -6,6 +6,7 @@ namespace App\Tests\Api\Identity;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Identity\Application\RbacSeeder;
+use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\Permission;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Rbac\RbacMatrix;
@@ -30,23 +31,31 @@ final class RbacSeederTest extends ApiTestCase
     protected static ?bool $alwaysBootKernel = true;
 
     #[Test]
-    public function seedsAllFourBuiltInRolesWithMatrixPermissions(): void
+    public function seedsOnlyThePlatformRoles(): void
     {
         $this->seeder()->seed();
 
         $roles = $this->roleRepository();
 
         $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
-        $catalogManager = $roles->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER);
-        $integrationManager = $roles->findGlobalByCode(RbacMatrix::ROLE_INTEGRATION_MANAGER);
-        $viewer = $roles->findGlobalByCode(RbacMatrix::ROLE_VIEWER);
         $platformOperator = $roles->findGlobalByCode(RbacMatrix::ROLE_PLATFORM_OPERATOR);
 
         self::assertNotNull($superAdmin, 'super_admin must exist after seeding.');
-        self::assertNotNull($catalogManager);
-        self::assertNotNull($integrationManager);
-        self::assertNotNull($viewer);
         self::assertNotNull($platformOperator, 'platform_operator must exist after seeding.');
+
+        // #2837 — tenant-facing roles belong to the per-tenant PRD
+        // templates. Seeding them globally as well produced two rows per
+        // code, identical in the panel and different in what they granted.
+        foreach ([
+            RbacMatrix::ROLE_CATALOG_MANAGER,
+            RbacMatrix::ROLE_INTEGRATION_MANAGER,
+            RbacMatrix::ROLE_VIEWER,
+        ] as $tenantRoleCode) {
+            self::assertNull(
+                $roles->findGlobalByCode($tenantRoleCode),
+                \sprintf('%s is a tenant role — it must not be seeded globally.', $tenantRoleCode),
+            );
+        }
 
         // AUD-003 (#1575): super_admin gets every legacy (resource, action)
         // pair but NONE of the cross-tenant `platform.*` codes — those are
@@ -67,23 +76,6 @@ final class RbacSeederTest extends ApiTestCase
             'platform.tenants.list',
             'platform.tenants.manage',
         ], $platformCodes);
-
-        // Viewer is read-only: no write/delete/admin pairs in its set.
-        foreach ($viewer->getPermissions() as $permission) {
-            self::assertSame(RbacMatrix::ACTION_READ, $permission->getAction(), 'Viewer must only have read permissions.');
-        }
-
-        // Catalog manager must NOT have channel.write — that's integration territory.
-        $catalogPermissions = array_map(static fn (Permission $p): string => $p->getCode(), $catalogManager->getPermissions()->toArray());
-        self::assertNotContains('channel.write', $catalogPermissions);
-        self::assertContains('object.write', $catalogPermissions);
-        self::assertContains('attribute.write', $catalogPermissions);
-
-        // Integration manager has read on object but not write.
-        $integrationPermissions = array_map(static fn (Permission $p): string => $p->getCode(), $integrationManager->getPermissions()->toArray());
-        self::assertContains('object.read', $integrationPermissions);
-        self::assertNotContains('object.write', $integrationPermissions);
-        self::assertContains('channel.write', $integrationPermissions);
     }
 
     #[Test]
@@ -113,7 +105,9 @@ final class RbacSeederTest extends ApiTestCase
         $em->persist($tenant);
         $em->flush();
 
-        $catalogManager = $this->roleRepository()->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER);
+        // #2837 — a tenant role, seeded per tenant from the PRD templates.
+        self::getContainer()->get(SeedTenantPrdRolesService::class)->seed($tenant);
+        $catalogManager = $this->roleRepository()->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenant);
         self::assertNotNull($catalogManager);
 
         $user = new User($tenant, 'kasia@alpha.test', '', ['ROLE_LEGACY']);
@@ -128,7 +122,7 @@ final class RbacSeederTest extends ApiTestCase
         $resolved = $reloaded->getRoles();
 
         // ROLE_USER is implicit, ROLE_LEGACY comes from the JSON column,
-        // ROLE_CATALOG_MANAGER comes from the M2M edge.
+        // ROLE_CATALOG_MANAGER comes from the role assignment (ADR-0034).
         self::assertContains('ROLE_USER', $resolved);
         self::assertContains('ROLE_LEGACY', $resolved);
         self::assertContains('ROLE_CATALOG_MANAGER', $resolved);

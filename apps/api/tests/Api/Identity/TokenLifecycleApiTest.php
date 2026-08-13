@@ -85,18 +85,19 @@ final class TokenLifecycleApiTest extends ApiTestCase
 
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
-        $catalogManager = $roles->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER);
-        \assert(null !== $superAdmin && null !== $catalogManager);
+        \assert(null !== $superAdmin);
 
         $tenant = new Tenant(self::TENANT_CODE, 'Demo Tenant');
         $em->persist($tenant);
         $em->flush();
 
-        // Per-tenant roles (viewer, tenant_owner, ...) — InvitationService
-        // resolves role_code per tenant, so a global-only seed would 400.
+        // Per-tenant roles (viewer, tenant_owner, catalog_manager, ...) —
+        // InvitationService resolves role_code per tenant, and since #2837
+        // catalog_manager is a tenant role too.
         self::getContainer()->get(SeedTenantPrdRolesService::class)->seed($tenant);
         $tenantOwner = $roles->findByCode('tenant_owner', $tenant);
-        \assert(null !== $tenantOwner);
+        $catalogManager = $roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenant);
+        \assert(null !== $tenantOwner && null !== $catalogManager);
 
         $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
         $stub = new User($tenant, self::ADMIN_EMAIL, '');

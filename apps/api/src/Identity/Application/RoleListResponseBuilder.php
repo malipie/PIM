@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Identity\Application;
 
 use App\Identity\Domain\Entity\Role;
+use App\Identity\Domain\Rbac\PrdRoleTemplates;
 use DateTimeInterface;
 
 /**
@@ -38,14 +39,18 @@ final class RoleListResponseBuilder
         $out = [];
         foreach ($rows as $row) {
             $role = $row['role'];
-            $type = $role->isGlobal() ? self::TYPE_SYSTEM : self::TYPE_CUSTOM;
+            // #2837 — a role is built-in when it is global (platform scope)
+            // OR comes from the PRD templates. Judging by globality alone
+            // labelled every template role as user-made.
+            $isBuiltIn = $role->isGlobal() || PrdRoleTemplates::isTemplateCode($role->getCode());
+            $type = $isBuiltIn ? self::TYPE_SYSTEM : self::TYPE_CUSTOM;
             $out[] = [
                 'id' => $role->getId()->toRfc4122(),
                 'code' => $role->getCode(),
                 'name' => $role->getName(),
                 'type' => $type,
                 'user_count' => $row['user_count'],
-                'is_built_in' => $role->isGlobal(),
+                'is_built_in' => $isBuiltIn,
                 'created_at' => $role->getCreatedAt()->format(DateTimeInterface::ATOM),
                 'permissions_count' => $role->getPermissions()->count(),
             ];

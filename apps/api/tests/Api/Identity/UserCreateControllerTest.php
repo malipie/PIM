@@ -54,8 +54,7 @@ final class UserCreateControllerTest extends ApiTestCase
 
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
-        $catalogManager = $roles->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER);
-        \assert(null !== $superAdmin && null !== $catalogManager);
+        \assert(null !== $superAdmin);
 
         $tenant = new Tenant(self::TENANT_CODE, 'Demo Tenant');
         $em->persist($tenant);
@@ -63,7 +62,9 @@ final class UserCreateControllerTest extends ApiTestCase
 
         self::getContainer()->get(SeedTenantPrdRolesService::class)->seed($tenant);
         $tenantOwner = $roles->findByCode('tenant_owner', $tenant);
-        \assert(null !== $tenantOwner);
+        // #2837 — catalog_manager is a tenant role, seeded with the rest.
+        $catalogManager = $roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenant);
+        \assert(null !== $tenantOwner && null !== $catalogManager);
 
         $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
 

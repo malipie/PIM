@@ -64,8 +64,7 @@ final class UserDeactivationControllerTest extends ApiTestCase
 
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
-        $catalogManager = $roles->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER);
-        \assert(null !== $superAdmin && null !== $catalogManager);
+        \assert(null !== $superAdmin);
 
         $tenantA = new Tenant(self::TENANT_A_CODE, 'Demo Tenant');
         $tenantB = new Tenant(self::TENANT_B_CODE, 'Other Tenant');
@@ -81,7 +80,9 @@ final class UserDeactivationControllerTest extends ApiTestCase
 
         $tenantOwnerA = $roles->findByCode('tenant_owner', $tenantA);
         $tenantOwnerB = $roles->findByCode('tenant_owner', $tenantB);
-        \assert(null !== $tenantOwnerA && null !== $tenantOwnerB);
+        // #2837 — catalog_manager is a tenant role now.
+        $catalogManager = $roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenantA);
+        \assert(null !== $tenantOwnerA && null !== $tenantOwnerB && null !== $catalogManager);
 
         $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
 

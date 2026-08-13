@@ -15,7 +15,15 @@ use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
 
 /**
- * Idempotent seeder for the four built-in global roles.
+ * Idempotent seeder for the built-in PLATFORM roles + the legacy
+ * permission catalogue.
+ *
+ * #2837 — "global roles" now means exactly `super_admin` and
+ * `platform_operator`. Tenant-facing roles come from
+ * {@see SeedTenantPrdRolesService}; while both
+ * seeders emitted `catalog_manager` / `integration_manager` / `viewer`,
+ * every tenant ended up with two rows per code — same name in the panel,
+ * different grants underneath.
  *
  * Re-running the seeder is supported: existing rows are matched by code or
  * (resource, action) and updated rather than duplicated. The unique indexes

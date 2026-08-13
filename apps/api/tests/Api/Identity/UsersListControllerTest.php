@@ -7,6 +7,7 @@ namespace App\Tests\Api\Identity;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Identity\Application\RbacSeeder;
+use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Rbac\RbacMatrix;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
@@ -57,15 +58,23 @@ final class UsersListControllerTest extends ApiTestCase
 
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
-        $viewer = $roles->findGlobalByCode(RbacMatrix::ROLE_VIEWER);
-        $catalogManager = $roles->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER);
-        \assert(null !== $superAdmin && null !== $viewer && null !== $catalogManager);
-        $this->catalogManagerRoleId = $catalogManager->getId()->toRfc4122();
+        \assert(null !== $superAdmin);
 
         $tenantA = new Tenant(self::TENANT_A_CODE, 'Demo Tenant');
         $tenantB = new Tenant(self::TENANT_B_CODE, 'Other Tenant');
         $em->persist($tenantA);
         $em->persist($tenantB);
+        $em->flush();
+
+        // #2837 — tenant roles come from the per-tenant PRD templates, so
+        // they exist only after the tenant does.
+        $prdRoles = self::getContainer()->get(SeedTenantPrdRolesService::class);
+        $prdRoles->seed($tenantA);
+        $prdRoles->seed($tenantB);
+        $viewer = $roles->findByCode(RbacMatrix::ROLE_VIEWER, $tenantA);
+        $catalogManager = $roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenantA);
+        \assert(null !== $viewer && null !== $catalogManager);
+        $this->catalogManagerRoleId = $catalogManager->getId()->toRfc4122();
 
         $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
 
