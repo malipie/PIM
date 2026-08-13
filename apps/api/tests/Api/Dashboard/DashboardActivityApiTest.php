@@ -9,7 +9,6 @@ use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Identity\Domain\Entity\AuditLog;
 use App\Identity\Domain\Entity\User;
-use App\Identity\Domain\Entity\UserRole;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
@@ -165,7 +164,8 @@ final class DashboardActivityApiTest extends CatalogApiTestCase
         );
         $this->em()->persist($user);
         $this->em()->flush();
-        $this->em()->persist(new UserRole(userId: $user->getId(), roleId: $role->getId()));
+        $user->addRole($role);
+        $this->em()->persist($user);
         $this->em()->flush();
         $this->em()->clear();
 
