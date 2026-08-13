@@ -93,13 +93,8 @@ class DoctrineRoleRepository extends ServiceEntityRepository implements RoleRepo
     }
 
     /**
-     * Single batched COUNT(*) against `user_roles` (legacy Sprint-0 M2M).
-     * The newer `user_role_assignments` junction (RBAC-P1-008) is consulted
-     * by the PermissionResolver hot path but is not yet the source of truth
-     * for membership counts — once #644 delta-migrations consolidate, this
-     * method picks up the union of both tables. Today the M2M is what the
-     * fixture admin and seeded users actually live on, so it returns
-     * realistic counts for the demo tenant.
+     * Single batched COUNT(*) over `user_role_assignments`, the sole record
+     * of who holds which role since ADR-0034 (#2832 expand, #2836 contract).
      *
      * @param list<Role> $roles
      *

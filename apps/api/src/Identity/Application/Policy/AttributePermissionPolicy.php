@@ -36,15 +36,15 @@ use Symfony\Contracts\Service\ResetInterface;
  *   3. **Role default** — `roles.default_attribute_permission` falls
  *      back to one of the three values (defaults to `edit` per schema).
  *
- * **Multi-role merging:** the user can carry multiple roles (both via
- * `user_role_assignments` and the legacy `user_roles` M2M). The policy
+ * **Multi-role merging:** the user can carry multiple roles (all of them in
+ * `user_role_assignments` since ADR-0034). The policy
  * resolves per role and returns `max(rank)` — most-permissive role
  * wins. This matches PermissionResolver's union semantics for broad
  * permissions.
  *
  * **Tenant scope:** roles are tenant-scoped through `roles.tenant_id`;
- * `user_roles` / `user_role_assignments` carry the link from a
- * tenant-scoped user to a tenant-scoped role. No additional tenant
+ * `user_role_assignments` carries the link from a tenant-scoped user to a
+ * tenant-scoped role. No additional tenant
  * compare is needed here — the role IDs we collect are already inside
  * the caller's tenant.
  *
