@@ -199,8 +199,9 @@ final class UserDeactivationControllerTest extends ApiTestCase
         // Drop the tenant_owner role from secondary so admin@demo is
         // the only remaining tenant_owner — this is the precondition
         // the guard checks.
+        // ADR-0034 (#2832) — grants live in user_role_assignments now.
         $this->em()->getConnection()->executeStatement(
-            'DELETE FROM user_roles WHERE user_id = :u AND role_id = (
+            'DELETE FROM user_role_assignments WHERE user_id = :u AND role_id = (
                 SELECT id FROM roles WHERE code = :code AND tenant_id = :t
             )',
             [

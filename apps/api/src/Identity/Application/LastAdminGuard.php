@@ -18,10 +18,10 @@ use Doctrine\DBAL\Connection;
  * `tenant_owner` and `admin`. `super_admin` lives on the global tier
  * and does not count toward tenant-local admin headcount.
  *
- * The guard talks to Doctrine DBAL directly because the M2M graph
- * (`user_roles`) plus the `roles` table lookup is a single small
- * SQL statement and avoiding the ORM keeps the hot path lean — this
- * runs on every deactivate / change_role attempt.
+ * The guard talks to Doctrine DBAL directly because the assignment
+ * table plus the `roles` lookup is a single small SQL statement and
+ * avoiding the ORM keeps the hot path lean — this runs on every
+ * deactivate / change_role attempt.
  */
 final readonly class LastAdminGuard
 {
@@ -104,10 +104,14 @@ final readonly class LastAdminGuard
      */
     private function countOtherAdminsInTenant(User $subject): int
     {
+        // ADR-0034 (#2832) — reads the assignment table, the single record of
+        // who holds what. While this still counted the Sprint-0 junction, a
+        // tenant whose only remaining owner arrived through an invitation
+        // (which never wrote there) would have counted as headless.
         $sql = <<<'SQL'
             SELECT COUNT(DISTINCT u.id)
             FROM users u
-            INNER JOIN user_roles ur ON ur.user_id = u.id
+            INNER JOIN user_role_assignments ur ON ur.user_id = u.id
             INNER JOIN roles r ON r.id = ur.role_id
             WHERE u.tenant_id = :tenant_id
               AND u.id != :subject_id
