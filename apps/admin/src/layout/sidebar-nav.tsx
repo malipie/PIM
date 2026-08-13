@@ -23,7 +23,13 @@ import { NavLink, useLocation } from 'react-router';
 
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { hasFeature, hasPermission, isMenuRefVisible, useIdentity } from '@/lib/identity';
+import {
+  hasAnyPermission,
+  hasFeature,
+  hasPermission,
+  isMenuRefVisible,
+  useIdentity,
+} from '@/lib/identity';
 import { type EffectiveMenuItem, useEffectiveMenu } from '@/lib/use-effective-menu';
 import { cn } from '@/lib/utils';
 
@@ -149,6 +155,14 @@ interface IntegrationChild {
   live?: boolean;
   /** A sibling owns this deeper prefix — do not highlight this item there. */
   excludePrefix?: string;
+  /**
+   * #2830 — codes that make this child visible ("any of"). Children used
+   * to render unconditionally, so a role without
+   * `settings.integrations.manage` still saw the API/XML configurator and
+   * only found out on the first request. Undefined = visible to everyone,
+   * matching the sub-item convention in SETTINGS_NAV_GROUPS.
+   */
+  permission?: readonly string[];
 }
 
 const INTEGRATION_CHILDREN: IntegrationChild[] = [
@@ -158,8 +172,14 @@ const INTEGRATION_CHILDREN: IntegrationChild[] = [
     route: '/integrations/imports/sessions',
     countKey: 'child:imports',
     live: true,
+    permission: ['imports.view_own', 'imports.view_all'],
   },
-  { key: 'exports', labelKey: 'nav.exports', route: '/integrations/exports/sessions' },
+  {
+    key: 'exports',
+    labelKey: 'nav.exports',
+    route: '/integrations/exports/sessions',
+    permission: ['exports.view_own', 'exports.view_all'],
+  },
   {
     key: 'api_configurator',
     labelKey: 'nav.api_configurator',
@@ -167,11 +187,13 @@ const INTEGRATION_CHILDREN: IntegrationChild[] = [
     // XMLF-FUP-01 — the feeds area is its own menu entry below; without this
     // exclusion both items would light up on /api-configurator/feeds/*.
     excludePrefix: '/integrations/api-configurator/feeds',
+    permission: ['settings.integrations.manage'],
   },
   {
     key: 'xml_configurator',
     labelKey: 'nav.xml_configurator',
     route: '/integrations/api-configurator/feeds',
+    permission: ['settings.integrations.manage'],
   },
 ];
 
@@ -244,9 +266,19 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
     return item.ref;
   };
 
+  // #2830 — children carry their own codes; a role that can reach none of
+  // them must not see the "Integracje" parent either, otherwise the group
+  // expands into nothing.
+  const visibleIntegrationChildren = INTEGRATION_CHILDREN.filter(
+    (child) => child.permission === undefined || hasAnyPermission(identity, child.permission),
+  );
+
   const renderIntegrationsParent = (item: EffectiveMenuItem) => {
     const Icon = ICON_MAP[item.icon] ?? Plug2;
     const labelText = renderLabel(item);
+    if (visibleIntegrationChildren.length === 0) {
+      return null;
+    }
     return (
       <div key={item.id}>
         <button
@@ -278,7 +310,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
         </button>
         {integrationsOpen && (
           <div id="nav-integrations-children" className="mt-0.5 flex flex-col gap-0.5">
-            {INTEGRATION_CHILDREN.map((child) => (
+            {visibleIntegrationChildren.map((child) => (
               <NavLink
                 key={child.key}
                 to={child.route}
@@ -500,16 +532,22 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
         </div>
         <div className="flex flex-col gap-0.5">{items.map(renderLeaf)}</div>
 
-        <NavLink
-          to="/modeling/object-types/new"
-          onClick={onNavigate}
-          className="mt-3 flex w-full items-center gap-3 rounded-xl border border-dashed border-zinc-200 px-3 py-2 text-[13px] text-zinc-500 transition hover:border-orange-300 hover:bg-orange-50/60 hover:text-orange-700"
-        >
-          <Plus className="size-4 text-zinc-500" aria-hidden />
-          <span className="flex-1 text-left">
-            {t('nav.add_custom_module', { defaultValue: 'Dodaj własny moduł' })}
-          </span>
-        </NavLink>
+        {/* #2830 — this link used to render for everyone and walked the
+            caller into the four-step object-type wizard, which then failed
+            with HTTP 403 on save. It creates a type, so it needs the
+            create code, not merely modeling.view. */}
+        {hasPermission(identity, 'modeling.object_types.add') && (
+          <NavLink
+            to="/modeling/object-types/new"
+            onClick={onNavigate}
+            className="mt-3 flex w-full items-center gap-3 rounded-xl border border-dashed border-zinc-200 px-3 py-2 text-[13px] text-zinc-500 transition hover:border-orange-300 hover:bg-orange-50/60 hover:text-orange-700"
+          >
+            <Plus className="size-4 text-zinc-500" aria-hidden />
+            <span className="flex-1 text-left">
+              {t('nav.add_custom_module', { defaultValue: 'Dodaj własny moduł' })}
+            </span>
+          </NavLink>
+        )}
       </nav>
 
       <div className="mt-3">
