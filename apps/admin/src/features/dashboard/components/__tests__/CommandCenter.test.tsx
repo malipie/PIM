@@ -51,6 +51,21 @@ vi.mock('../../use-dashboard-activity', async (importOriginal) => {
 const alertsState: { alerts: DashboardAlertsDto | null } = { alerts: null };
 const ackMock = vi.fn();
 
+/**
+ * #2831 — the cards now ask what the caller may see. `useCanI` runs a
+ * React Query under the hood, which this harness has no provider for, so
+ * it is stubbed from a per-test permission set.
+ */
+const grantedPermissions = new Set<string>();
+
+vi.mock('@/lib/identity', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/identity')>();
+  return {
+    ...actual,
+    useCanI: (code: string) => grantedPermissions.has(code),
+  };
+});
+
 vi.mock('../../use-dashboard-alerts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../use-dashboard-alerts')>();
   return {
@@ -93,6 +108,11 @@ beforeEach(() => {
   activityState.topEdited = null;
   alertsState.alerts = null;
   ackMock.mockClear();
+  // Default to a fully entitled caller so the existing cases keep pinning
+  // rendering rather than gating; the gating cases narrow this per test.
+  grantedPermissions.clear();
+  grantedPermissions.add('channel.read');
+  grantedPermissions.add('audit.view_cross_user');
 });
 
 describe('KpiBand', () => {
@@ -189,6 +209,23 @@ describe('CatalogHealthCard', () => {
       'href',
       expect.stringContaining('filter[completeness_pct][op]=lt'),
     );
+  });
+
+  it('drops the per-channel section for a role without channel.read (#2831)', () => {
+    grantedPermissions.delete('channel.read');
+    state.summary = LIVE_SUMMARY;
+
+    renderWithRouter(<CatalogHealthCard />);
+
+    // Not the "no channels configured" empty state — the section is gone,
+    // because "you may not see this" and "there is nothing here" are
+    // different statements.
+    expect(screen.queryByText('Kompletność wg kanału')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Brak kanałów z danymi kompletności/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Google Shopping')).not.toBeInTheDocument();
+
+    // The rest of the card still renders — the role does hold products.view.
+    expect(screen.getByText('120')).toBeInTheDocument();
   });
 });
 

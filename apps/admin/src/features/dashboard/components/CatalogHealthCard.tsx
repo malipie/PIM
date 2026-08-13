@@ -2,6 +2,8 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
+import { useCanI } from '@/lib/identity';
+
 import { type DashboardSummaryDto, formatInt, useDashboardSummary } from '../use-dashboard-summary';
 
 interface BucketVm {
@@ -203,6 +205,7 @@ export function CatalogHealthCard() {
   const { t } = useTranslation();
   const headingId = useId();
   const { summary } = useDashboardSummary();
+  const canReadChannels = useCanI('channel.read');
   const vm = buildVm(summary);
   const total = vm.buckets.reduce((sum, bucket) => sum + bucket.count, 0);
 
@@ -277,60 +280,67 @@ export function CatalogHealthCard() {
         </div>
       </div>
 
-      <div className="mt-6 border-t border-line pt-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-2">
-            {t('dashboard.health.channels_header', { defaultValue: 'Kompletność wg kanału' })}
-          </h3>
-          <span className="text-[12px] text-ink-2">
-            {t('dashboard.health.channels_sort', { defaultValue: 'sort: najgorszy pierwszy' })}
-          </span>
-        </div>
-        {vm.channels.length === 0 ? (
-          <p className="mt-4 text-[13px] text-ink-2">
-            {t('dashboard.health.channels_empty', {
-              defaultValue:
-                'Brak kanałów z danymi kompletności — skonfiguruj wymagania kanałowe w modelowaniu.',
-            })}
-          </p>
-        ) : (
-          <ul className="mt-4 space-y-3.5">
-            {vm.channels.map((channel) => (
-              <li key={channel.code}>
-                <Link
-                  to={filterHref(
-                    'filter[completeness_pct][op]=lt&filter[completeness_pct][value]=80',
-                  )}
-                  className="flex items-center gap-4 rounded hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
-                  aria-label={t('dashboard.health.channel_link_aria', {
-                    defaultValue: 'Pokaż produkty poniżej progu publikacji (kanał {{channel}})',
-                    channel: channel.name,
-                  })}
-                >
-                  <span className="w-32 shrink-0 truncate text-[13.5px] text-ink sm:w-36">
-                    {channel.name}
-                  </span>
-                  <span
-                    className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-2"
-                    aria-hidden
+      {/* #2831 — the per-channel breakdown is channel data; a role without
+          channel.read gets the card without this section rather than an
+          empty-state that implies "no channels configured". The API omits
+          the rows for the same caller, so this is presentation, not the
+          enforcement point. */}
+      {canReadChannels ? (
+        <div className="mt-6 border-t border-line pt-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-2">
+              {t('dashboard.health.channels_header', { defaultValue: 'Kompletność wg kanału' })}
+            </h3>
+            <span className="text-[12px] text-ink-2">
+              {t('dashboard.health.channels_sort', { defaultValue: 'sort: najgorszy pierwszy' })}
+            </span>
+          </div>
+          {vm.channels.length === 0 ? (
+            <p className="mt-4 text-[13px] text-ink-2">
+              {t('dashboard.health.channels_empty', {
+                defaultValue:
+                  'Brak kanałów z danymi kompletności — skonfiguruj wymagania kanałowe w modelowaniu.',
+              })}
+            </p>
+          ) : (
+            <ul className="mt-4 space-y-3.5">
+              {vm.channels.map((channel) => (
+                <li key={channel.code}>
+                  <Link
+                    to={filterHref(
+                      'filter[completeness_pct][op]=lt&filter[completeness_pct][value]=80',
+                    )}
+                    className="flex items-center gap-4 rounded hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink"
+                    aria-label={t('dashboard.health.channel_link_aria', {
+                      defaultValue: 'Pokaż produkty poniżej progu publikacji (kanał {{channel}})',
+                      channel: channel.name,
+                    })}
                   >
+                    <span className="w-32 shrink-0 truncate text-[13.5px] text-ink sm:w-36">
+                      {channel.name}
+                    </span>
                     <span
-                      className="block h-full rounded-full"
-                      style={{ width: `${channel.percent}%`, backgroundColor: channel.color }}
-                    />
-                  </span>
-                  <span className="num w-10 shrink-0 text-right text-[13.5px] font-semibold text-ink">
-                    {channel.percent}%
-                  </span>
-                  <span className="num w-14 shrink-0 text-right text-[12.5px] text-ink-2">
-                    {channel.count}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                      className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-2"
+                      aria-hidden
+                    >
+                      <span
+                        className="block h-full rounded-full"
+                        style={{ width: `${channel.percent}%`, backgroundColor: channel.color }}
+                      />
+                    </span>
+                    <span className="num w-10 shrink-0 text-right text-[13.5px] font-semibold text-ink">
+                      {channel.percent}%
+                    </span>
+                    <span className="num w-14 shrink-0 text-right text-[12.5px] text-ink-2">
+                      {channel.count}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -14931,7 +14931,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "products.view"
+                "x-cortex-permission": "audit.view_cross_user"
             }
         },
         "/api/exports/columns": {

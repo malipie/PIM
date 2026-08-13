@@ -9,6 +9,8 @@ use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Channel\Domain\Entity\Channel;
 use App\Identity\Domain\Entity\User;
+use App\Identity\Domain\Entity\UserRole;
+use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Tests\Api\Catalog\CatalogApiTestCase;
@@ -183,6 +185,66 @@ final class DashboardSummaryApiTest extends CatalogApiTestCase
         \assert($tenant instanceof Tenant);
 
         return $tenant;
+    }
+
+    /**
+     * #2831 — `products.view` opens the dashboard, but the per-channel
+     * breakdown is channel data. A Catalog Manager holds the former and not
+     * the latter, and used to receive the channel rows anyway.
+     */
+    #[Test]
+    public function channelBreakdownIsOmittedForCallersWithoutChannelRead(): void
+    {
+        $tenant = $this->demoTenant();
+        $this->seedProducts($tenant, [
+            ['sku' => 'P-100', 'pct' => 100, 'per_channel' => ['shopify' => 100]],
+        ]);
+        $this->em()->persist(new Channel('shopify', 'Shopify'));
+        $this->em()->flush();
+
+        $this->createUserWithRole('catalog@demo.localhost', 'catalog_manager', $tenant);
+
+        $response = $this->authenticatedClient('catalog@demo.localhost')
+            ->request('GET', '/api/dashboard/summary');
+
+        self::assertResponseIsSuccessful();
+        $body = $response->toArray();
+
+        self::assertSame([], $body['channels'], 'channel rows must not reach a caller without channel.read');
+        // The rest of the payload is unaffected — the role does hold
+        // products.view. Asserted whole (not `$body['products']['total']`)
+        // because the nested offset is `mixed` under PHPStan max.
+        self::assertSame(['total' => 1, 'delta30d' => 1], $body['products']);
+
+        // Control: the admin (channel.read included) still gets the rows.
+        $adminBody = $this->authenticatedClient()->request('GET', '/api/dashboard/summary')->toArray();
+        self::assertSame(
+            [['code' => 'shopify', 'name' => 'Shopify', 'avgPct' => 100, 'readyCount' => 1]],
+            $adminBody['channels'],
+        );
+    }
+
+    /**
+     * Creates a user carrying exactly one PRD role, via the RBAC assignment
+     * table the invitation flow uses.
+     */
+    private function createUserWithRole(string $email, string $roleCode, Tenant $tenant): void
+    {
+        $role = self::getContainer()->get(RoleRepositoryInterface::class)->findByCode($roleCode, $tenant);
+        \assert(null !== $role);
+
+        $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
+        $stub = new User($tenant, $email, '', ['ROLE_USER']);
+        $user = new User($tenant, $email, $hasher->hashPassword($stub, 'changeme'), ['ROLE_USER']);
+        $this->em()->persist($user);
+        $this->em()->flush();
+
+        $this->em()->persist(new UserRole(
+            userId: $user->getId(),
+            roleId: $role->getId(),
+        ));
+        $this->em()->flush();
+        $this->em()->clear();
     }
 
     /**

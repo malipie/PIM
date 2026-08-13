@@ -1,3 +1,5 @@
+import { useCanI } from '@/lib/identity';
+
 import { ActionCenter } from './components/ActionCenter';
 import { AgentCommandHero } from './components/AgentCommandHero';
 import { CatalogHealthCard } from './components/CatalogHealthCard';
@@ -20,6 +22,14 @@ import { TeamActivityCard } from './components/TeamActivityCard';
  * banners — it must look exactly like the approved design.
  */
 export function DashboardPage() {
+  // #2831 — "Tempo pracy zespołu" attributes edits to named people, which
+  // is cross-user audit data. A role whose audit reach is `audit.view_own`
+  // (Catalog Manager, for one) must not see it; the endpoint behind it
+  // refuses the same caller, so leaving the card in would render an error
+  // tile. Without it the health card takes the full width instead of
+  // leaving a hole in the grid.
+  const canSeeTeamActivity = useCanI('audit.view_cross_user');
+
   // Padding comes from the AppLayout <main> wrapper — same as every other
   // page; the extra px-* of dashboard v2 made the margins wider than
   // sibling views (operator correction, 2026-07-03).
@@ -28,9 +38,13 @@ export function DashboardPage() {
       <DashboardGreeting />
       <AgentCommandHero />
       <KpiBand />
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div
+        className={
+          canSeeTeamActivity ? 'grid grid-cols-1 gap-6 xl:grid-cols-2' : 'grid grid-cols-1 gap-6'
+        }
+      >
         <CatalogHealthCard />
-        <TeamActivityCard />
+        {canSeeTeamActivity ? <TeamActivityCard /> : null}
       </div>
       <MyTasksCard />
       <ActionCenter />

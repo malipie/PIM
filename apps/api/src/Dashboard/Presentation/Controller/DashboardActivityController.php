@@ -48,7 +48,10 @@ final class DashboardActivityController
         name: 'pim_dashboard_top_edited',
         methods: ['GET'],
     )]
-    #[RequiresPermission(module: 'products', action: 'view')]
+    // #2831 — this endpoint names WHO edited what, so `products.view` is the
+    // wrong gate: a Catalog Manager holds it while its audit reach is
+    // `audit.view_own`. Cross-user attribution needs the cross-user code.
+    #[RequiresPermission(module: 'audit', action: 'view_cross_user')]
     public function topEdited(Request $request): JsonResponse
     {
         $this->assertAuthenticated();

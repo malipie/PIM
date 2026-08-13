@@ -7,6 +7,7 @@ namespace App\Dashboard\Presentation\Controller;
 use App\Dashboard\Application\Query\DashboardSummaryQuery;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Contracts\Auth\CurrentUserProvider;
+use App\Identity\Contracts\Policy\PermissionCheckerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
@@ -22,6 +23,7 @@ final class DashboardSummaryController
     public function __construct(
         private readonly DashboardSummaryQuery $query,
         private readonly CurrentUserProvider $currentUser,
+        private readonly PermissionCheckerInterface $permissions,
     ) {
     }
 
@@ -38,6 +40,13 @@ final class DashboardSummaryController
             throw new UnauthorizedHttpException('JWT', 'Authenticated user required.');
         }
 
-        return new JsonResponse($this->query->summary($userId), Response::HTTP_OK);
+        // #2831 — `products.view` opens the dashboard, but the per-channel
+        // breakdown is channel data and needs its own code. Deciding here
+        // rather than in the UI matters twice: the payload stops carrying
+        // rows the caller may not read, and the query skips the per-channel
+        // aggregate entirely instead of computing it to be thrown away.
+        $includeChannels = $this->permissions->userHasPermission($userId, 'channel.read');
+
+        return new JsonResponse($this->query->summary($userId, $includeChannels), Response::HTTP_OK);
     }
 }
