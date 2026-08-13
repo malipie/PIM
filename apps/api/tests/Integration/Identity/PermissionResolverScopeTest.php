@@ -13,33 +13,25 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * AUD-029 / W3-5.1 (#1611) — the legacy `user_roles` M2M must not neutralise
- * the per-locale/channel scope carried by `user_role_assignments`.
+ * ADR-0034 (#2832) — scope resolution over the consolidated assignment table.
  *
- * Brownfield reality: {@see \App\Identity\Application\UserCreateService} writes
- * every (user, role) pair to BOTH tables — `user_roles` (Symfony Security graph)
- * and `user_role_assignments` (scope columns). The legacy row projects a literal
- * `'[]'` scope which {@see \App\Identity\Application\PermissionResolver::mergeScope}
- * reads as "no restriction" and short-circuits the union to `[]`, silently
- * widening a locale-scoped role to all locales.
- *
- * RED  (pre-fix): a user with role R via `user_role_assignments` (locale=['pl'])
- *      AND a legacy `user_roles` row for the SAME R resolves to localeScope=[]
- *      (most-permissive) — the `'[]'` from the legacy branch wins the union.
- * GREEN (post-fix): the legacy branch is excluded when an assignment covers the
- *      same (user, role); localeScope stays ['pl'].
- *
- * Regression guard: a legacy-ONLY role (no matching assignment — the fixture
- * super_admin / tenant_owner attached via addRole only) keeps localeScope=[]
- * so genuinely unrestricted roles retain full access.
+ * History this replaces: grants used to live in two tables, and the Sprint-0
+ * `user_roles` M2M had no scope columns, so it projected a literal `'[]'`
+ * into the resolver's union. {@see \App\Identity\Application\PermissionResolver::mergeScope}
+ * reads an empty array as "no restriction", so a role granted for one locale
+ * was silently widened to all of them by its own duplicate row — AUD-029
+ * (#1611), patched back then by excluding duplicates from the union. With one
+ * table the failure mode cannot recur, and what remains worth pinning is the
+ * behaviour itself: a scoped assignment stays scoped, an unscoped one stays
+ * open.
  *
  * Uses the real container Connection + PermissionResolver against the test DB
- * (schema built from ORM metadata), seeds raw rows, and cleans up in a finally.
+ * (schema built from ORM metadata), seeds raw rows, cleans up in a finally.
  */
-final class PermissionResolverLegacyScopeTest extends KernelTestCase
+final class PermissionResolverScopeTest extends KernelTestCase
 {
     #[Test]
-    public function legacyUserRolesDoesNotWidenScopedAssignment(): void
+    public function scopedAssignmentStaysRestrictedToItsLocale(): void
     {
         self::bootKernel();
         $connection = $this->connection();
@@ -53,35 +45,24 @@ final class PermissionResolverLegacyScopeTest extends KernelTestCase
         $code = 'products.view.scoped.'.$suffix;
 
         try {
-            $this->seedTenant($connection, $tenantId, 'aud029-a-'.$suffix);
+            $this->seedTenant($connection, $tenantId, 'adr34-a-'.$suffix);
             $this->seedRole($connection, $roleId, $tenantId, 'scoped-role-'.$suffix);
             $this->seedPermission($connection, $permissionId, $code);
             $this->linkRolePermission($connection, $roleId, $permissionId);
-            $this->seedUser($connection, $userId, $tenantId, 'aud029-'.$suffix.'@demo.localhost');
+            $this->seedUser($connection, $userId, $tenantId, 'adr34-'.$suffix.'@demo.localhost');
 
-            // Scoped assignment: role restricted to the `pl` locale.
+            // Role restricted to the `pl` locale.
             $this->seedAssignment($connection, $assignmentId, $userId, $roleId, '["pl"]');
-            // Legacy duplicate of the SAME role (UserCreateService writes both).
-            $this->seedLegacyUserRole($connection, $userId, $roleId);
 
             $resolved = $this->resolver()->resolve($this->loadUser($userId));
 
             self::assertContains($code, $resolved->getCodes());
-            // The crux: the legacy `'[]'` row must NOT have widened the scope.
-            self::assertSame(
-                ['pl'],
-                $resolved->getLocaleScope(),
-                'A scoped (locale=pl) assignment must stay restricted; the legacy '
-                .'user_roles `[]` row must not widen it to most-permissive (all locales).',
-            );
-            self::assertTrue(
-                $resolved->appliesToLocale('pl'),
-                'The pl locale is in scope.',
-            );
+            self::assertSame(['pl'], $resolved->getLocaleScope());
+            self::assertTrue($resolved->appliesToLocale('pl'));
             self::assertFalse(
                 $resolved->appliesToLocale('en'),
-                'A non-pl locale must be out of scope; a true here means the legacy '
-                .'row re-opened the full locale set.',
+                'A non-pl locale must stay out of scope; a true here means something '
+                .'re-opened the full locale set.',
             );
         } finally {
             $this->cleanup($connection, $userId, $roleId, $permissionId, $tenantId);
@@ -89,7 +70,7 @@ final class PermissionResolverLegacyScopeTest extends KernelTestCase
     }
 
     #[Test]
-    public function legacyOnlyRoleKeepsMostPermissiveScope(): void
+    public function unscopedAssignmentAppliesEverywhere(): void
     {
         self::bootKernel();
         $connection = $this->connection();
@@ -99,28 +80,23 @@ final class PermissionResolverLegacyScopeTest extends KernelTestCase
         $roleId = Uuid::v7()->toRfc4122();
         $permissionId = Uuid::v7()->toRfc4122();
         $userId = Uuid::v7()->toRfc4122();
-        $code = 'platform.tenants.manage.legacy.'.$suffix;
+        $assignmentId = Uuid::v7()->toRfc4122();
+        $code = 'platform.tenants.manage.open.'.$suffix;
 
         try {
-            $this->seedTenant($connection, $tenantId, 'aud029-b-'.$suffix);
-            $this->seedRole($connection, $roleId, $tenantId, 'legacy-only-role-'.$suffix);
+            $this->seedTenant($connection, $tenantId, 'adr34-b-'.$suffix);
+            $this->seedRole($connection, $roleId, $tenantId, 'open-role-'.$suffix);
             $this->seedPermission($connection, $permissionId, $code);
             $this->linkRolePermission($connection, $roleId, $permissionId);
-            $this->seedUser($connection, $userId, $tenantId, 'aud029b-'.$suffix.'@demo.localhost');
+            $this->seedUser($connection, $userId, $tenantId, 'adr34b-'.$suffix.'@demo.localhost');
 
-            // No user_role_assignments row — this models the fixture super_admin /
-            // tenant_owner attached via addRole() only.
-            $this->seedLegacyUserRole($connection, $userId, $roleId);
+            // Empty scope — how tenant_owner / super_admin are granted.
+            $this->seedAssignment($connection, $assignmentId, $userId, $roleId, '[]');
 
             $resolved = $this->resolver()->resolve($this->loadUser($userId));
 
             self::assertContains($code, $resolved->getCodes());
-            self::assertSame(
-                [],
-                $resolved->getLocaleScope(),
-                'A legacy-only role (no scoped assignment) must keep the most-permissive '
-                .'empty scope so super_admin / tenant_owner retain full access.',
-            );
+            self::assertSame([], $resolved->getLocaleScope());
             self::assertTrue($resolved->appliesToLocale('en'), 'An unrestricted role applies to any locale.');
             self::assertTrue($resolved->appliesToChannel('shopify'), 'An unrestricted role applies to any channel.');
         } finally {
@@ -184,14 +160,6 @@ final class PermissionResolverLegacyScopeTest extends KernelTestCase
         );
     }
 
-    private function seedLegacyUserRole(Connection $connection, string $userId, string $roleId): void
-    {
-        $connection->executeStatement(
-            'INSERT INTO user_roles (user_id, role_id) VALUES (:user, :role)',
-            ['user' => $userId, 'role' => $roleId],
-        );
-    }
-
     private function cleanup(
         Connection $connection,
         string $userId,
@@ -201,7 +169,6 @@ final class PermissionResolverLegacyScopeTest extends KernelTestCase
     ): void {
         // FK order: junctions first, then owned rows, then the tenant.
         $connection->executeStatement('DELETE FROM user_role_assignments WHERE user_id = :id', ['id' => $userId]);
-        $connection->executeStatement('DELETE FROM user_roles WHERE user_id = :id', ['id' => $userId]);
         $connection->executeStatement('DELETE FROM role_permissions WHERE role_id = :id', ['id' => $roleId]);
         $connection->executeStatement('DELETE FROM users WHERE id = :id', ['id' => $userId]);
         $connection->executeStatement('DELETE FROM permissions WHERE id = :id', ['id' => $permissionId]);

@@ -14,7 +14,6 @@ use App\Identity\Domain\Repository\InvitationRepositoryInterface;
 use App\Identity\Domain\Repository\PasswordResetTokenRepositoryInterface;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Identity\Domain\Repository\UserRepositoryInterface;
-use App\Identity\Domain\Repository\UserRoleRepositoryInterface;
 use App\Identity\Presentation\Controller\InvitationActionsController;
 use App\Identity\Presentation\Controller\InvitationController;
 use App\Identity\Presentation\Controller\PasswordResetController;
@@ -242,7 +241,6 @@ final class DevTokenExposureTest extends TestCase
             em: $this->createStub(EntityManagerInterface::class),
             invitations: $invitations,
             users: $this->createStub(UserRepositoryInterface::class),
-            userRoles: $this->createStub(UserRoleRepositoryInterface::class),
             roles: $roles,
             tokenHasher: new MagicLinkTokenHasher(),
             passwordHasher: $this->createStub(UserPasswordHasherInterface::class),

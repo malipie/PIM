@@ -79,9 +79,11 @@ class DoctrineUserRepository extends ServiceEntityRepository implements UserRepo
 
     public function countAssignedToRole(Uuid $roleId): int
     {
+        // ADR-0034 — role grants hang off the assignment entity now.
         $qb = $this->createQueryBuilder('u')
             ->select('COUNT(DISTINCT u.id)')
-            ->innerJoin('u.assignedRoles', 'r')
+            ->innerJoin('u.roleAssignments', 'ura')
+            ->innerJoin('ura.role', 'r')
             ->where('r.id = :roleId')
             ->setParameter('roleId', $roleId);
 
@@ -111,13 +113,14 @@ class DoctrineUserRepository extends ServiceEntityRepository implements UserRepo
         }
 
         if (null !== $roleIds && [] !== $roleIds) {
-            // Intersection with the assigned-roles M2M graph via EXISTS —
-            // a plain INNER JOIN + DISTINCT trips Postgres' "no equality
-            // operator for type json" error because Doctrine projects the
-            // legacy User.roles json column on the select clause.
+            // Intersection with the role assignments via EXISTS — a plain
+            // INNER JOIN + DISTINCT trips Postgres' "no equality operator for
+            // type json" error because Doctrine projects the legacy
+            // User.roles json column on the select clause.
             $sub = $this->createQueryBuilder('u_sub')
                 ->select('u_sub.id')
-                ->innerJoin('u_sub.assignedRoles', 'r')
+                ->innerJoin('u_sub.roleAssignments', 'ura_sub')
+                ->innerJoin('ura_sub.role', 'r')
                 ->where('u_sub.id = u.id')
                 ->andWhere('r.id IN (:roleIds)');
             $qb->andWhere($qb->expr()->exists($sub->getDQL()))

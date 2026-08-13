@@ -21,8 +21,15 @@
             <generator strategy="NONE"/>
         </id>
 
-        <field name="userId" type="uuid" column="user_id"/>
-        <field name="roleId" type="uuid" column="role_id"/>
+        <!-- ADR-0034 (#2832) — associations, not bare UUIDs: `User` owns its
+             assignments (cascade persist via User::addRole()) and a role code
+             is one hop away instead of a second query. -->
+        <many-to-one field="user" target-entity="App\Identity\Domain\Entity\User" inversed-by="roleAssignments">
+            <join-column name="user_id" referenced-column-name="id" nullable="false" on-delete="CASCADE"/>
+        </many-to-one>
+        <many-to-one field="role" target-entity="App\Identity\Domain\Entity\Role">
+            <join-column name="role_id" referenced-column-name="id" nullable="false" on-delete="CASCADE"/>
+        </many-to-one>
         <field name="localeScope" type="json" column="locale_scope">
             <options>
                 <option name="default">[]</option>

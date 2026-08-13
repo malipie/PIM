@@ -22,19 +22,23 @@ use Symfony\Component\Uid\Uuid;
  *  - non-empty array means the role is restricted to listed values; permission
  *    checks intersect this set with the resource scope before granting.
  *
- * Brownfield note: existing `User.assignedRoles` M2M (table `user_roles`)
- * stays operational. This entity targets a new table `user_role_assignments`
- * to avoid colliding with the existing junction during Phase 1. A future
- * delta migration (Phase 1 ticket #644 — `delta migrations`) consolidates
- * the two paths once Phase 3 voters consume scope directly.
+ * ADR-0034 (#2832) — this table is now the ONLY record of who holds which
+ * role. The Sprint-0 `user_roles` M2M is gone from the model: it had no
+ * scope columns, so a role granted for one locale was silently widened by
+ * its own duplicate row there (AUD-029), and a user created through an
+ * invitation showed up as "no roles" anywhere that read the old junction.
+ *
+ * The user and role are associations rather than bare UUIDs so `User` can
+ * own its assignments (cascade persist through `User::addRole()`) and read
+ * a role code without a second query.
  */
 class UserRole
 {
     private Uuid $id;
 
-    private Uuid $userId;
+    private User $user;
 
-    private Uuid $roleId;
+    private Role $role;
 
     /**
      * Locale scope (`['pl', 'en']`). Empty array means "all locales".
@@ -66,8 +70,8 @@ class UserRole
      * @param list<string> $attributeGroupScope
      */
     public function __construct(
-        Uuid $userId,
-        Uuid $roleId,
+        User $user,
+        Role $role,
         array $localeScope = [],
         array $channelScope = [],
         array $attributeGroupScope = [],
@@ -75,8 +79,8 @@ class UserRole
         ?DateTimeImmutable $assignedAt = null,
     ) {
         $this->id = $id ?? Uuid::v7();
-        $this->userId = $userId;
-        $this->roleId = $roleId;
+        $this->user = $user;
+        $this->role = $role;
         $this->localeScope = $localeScope;
         $this->channelScope = $channelScope;
         $this->attributeGroupScope = $attributeGroupScope;
@@ -88,14 +92,24 @@ class UserRole
         return $this->id;
     }
 
+    public function getUser(): User
+    {
+        return $this->user;
+    }
+
+    public function getRole(): Role
+    {
+        return $this->role;
+    }
+
     public function getUserId(): Uuid
     {
-        return $this->userId;
+        return $this->user->getId();
     }
 
     public function getRoleId(): Uuid
     {
-        return $this->roleId;
+        return $this->role->getId();
     }
 
     /**

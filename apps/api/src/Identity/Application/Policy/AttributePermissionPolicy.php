@@ -241,19 +241,16 @@ class AttributePermissionPolicy implements ResetInterface
     }
 
     /**
-     * @return list<string> role UUIDs (RFC4122 strings) accessible to the
-     *                      user via either `user_role_assignments` or the
-     *                      legacy `user_roles` M2M, deduplicated
+     * @return list<string> role UUIDs (RFC4122 strings) held by the user
+     *
+     * ADR-0034 (#2832) — one table; this used to UNION in the Sprint-0
+     * `user_roles` M2M as well
      */
     private function collectRoleIds(Uuid $userId): array
     {
         $sql = <<<'SQL'
             SELECT DISTINCT role_id::text AS role_id
               FROM user_role_assignments
-             WHERE user_id = :user_id
-            UNION
-            SELECT DISTINCT role_id::text AS role_id
-              FROM user_roles
              WHERE user_id = :user_id
             SQL;
 

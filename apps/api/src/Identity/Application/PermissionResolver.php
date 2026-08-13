@@ -27,9 +27,9 @@ use Symfony\Contracts\Cache\TagAwareCacheInterface;
  *     the role's permissions change (touches every user in that role).
  *   - `tenant:{tenant_id}` — broad nuclear option for tenant-wide ops.
  *
- * Query optimisation: single SELECT joins users → user_roles → roles →
- * role_permissions → permissions, ordered by permission_id for stable
- * ordering. No N+1.
+ * Query optimisation: single SELECT joins users → user_role_assignments →
+ * roles → role_permissions → permissions, ordered by permission_id for
+ * stable ordering. No N+1.
  *
  * Phase 3 #671 (3-state attribute permissions) consumes this Set to
  * compute the per-attribute view/edit decision; the set itself does NOT
@@ -102,49 +102,26 @@ final class PermissionResolver implements PermissionResolverInterface
     private function loadFromDatabase(string $tenantId, string $userId): PermissionSet
     {
         // Single JOIN — users → user_role_assignments → roles → role_permissions → permissions.
-        // user_role_assignments is the new junction with scope columns (RBAC-P1-008);
-        // legacy `user_roles` M2M (Sprint-0 path) stays operational and is consulted
-        // by the secondary query below until #644 delta migrations consolidate.
-        // PostgreSQL `json` columns have no equality operator, so DISTINCT
-        // on the raw json column errors out (`could not identify an
-        // equality operator for type json`). Cast to text — dedup happens
-        // on string form, which is fine because mergeScope() re-decodes
-        // the JSON below before producing the final list.
         //
-        // AUD-029 (#1611): the legacy `user_roles` branch projects a literal
-        // `'[]'` scope. That `'[]'` is NOT an intentional "no restriction"
-        // grant — `user_roles` has no scope columns at all — yet mergeScope()
-        // reads any empty array as most-permissive and short-circuits the
-        // union to `[]`. UserCreateService writes EVERY (user, role) pair to
-        // BOTH tables (addRole + UserRole entity), so a user given a
-        // locale-scoped role saw that restriction silently widened to "all
-        // locales" by its own legacy duplicate row. Fix (INTERIM — full
-        // consolidation is #644): exclude a legacy `user_roles` row from the
-        // union whenever a `user_role_assignments` row already covers the same
-        // (user, role); the scoped assignment then owns the scope projection.
-        // A legacy-ONLY role (no matching assignment — e.g. the fixture
-        // super_admin / tenant_owner attached via addRole only) still
-        // contributes its broad `'[]'`, so genuinely unrestricted roles keep
-        // full access. Permission CODES still come from both tables, so a
-        // legacy-only role's grants are never dropped — only its redundant
-        // scope row is.
+        // ADR-0034 (#2832): `user_role_assignments` is the only record of who
+        // holds which role, so this query has one source. It used to UNION in
+        // the Sprint-0 `user_roles` M2M, which has no scope columns and
+        // therefore projected a literal `'[]'` — and mergeScope() reads an
+        // empty array as "no restriction". A role granted for one locale had
+        // that restriction silently widened by its own duplicate row
+        // (AUD-029 / #1611, patched then by excluding duplicates, resolved
+        // now by there being only one table).
+        //
+        // PostgreSQL `json` columns have no equality operator, so DISTINCT on
+        // the raw json column errors out (`could not identify an equality
+        // operator for type json`). Cast to text — dedup happens on string
+        // form, which is fine because mergeScope() re-decodes the JSON below.
         $sql = <<<'SQL'
                 SELECT DISTINCT p.code, ura.locale_scope::text AS locale_scope, ura.channel_scope::text AS channel_scope, ura.attribute_group_scope::text AS attribute_group_scope
                 FROM user_role_assignments ura
                 INNER JOIN role_permissions rp ON rp.role_id = ura.role_id
                 INNER JOIN permissions p ON p.id = rp.permission_id
                 WHERE ura.user_id = :user_id
-                UNION
-                SELECT DISTINCT p.code, '[]' AS locale_scope, '[]' AS channel_scope, '[]' AS attribute_group_scope
-                FROM user_roles ur
-                INNER JOIN role_permissions rp ON rp.role_id = ur.role_id
-                INNER JOIN permissions p ON p.id = rp.permission_id
-                WHERE ur.user_id = :user_id
-                  AND NOT EXISTS (
-                      SELECT 1 FROM user_role_assignments ura2
-                      WHERE ura2.user_id = ur.user_id
-                        AND ura2.role_id = ur.role_id
-                  )
             SQL;
 
         /** @var list<array{code: string, locale_scope: string, channel_scope: string, attribute_group_scope: string}> $rows */

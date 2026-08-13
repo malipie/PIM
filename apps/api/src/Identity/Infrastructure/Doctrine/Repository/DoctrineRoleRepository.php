@@ -113,7 +113,9 @@ class DoctrineRoleRepository extends ServiceEntityRepository implements RoleRepo
         $rows = $this->getEntityManager()->createQueryBuilder()
             ->select('r.id AS role_id', 'COUNT(u.id) AS cnt')
             ->from(User::class, 'u')
-            ->innerJoin('u.assignedRoles', 'r')
+            // ADR-0034 — counts go through the assignment entity.
+            ->innerJoin('u.roleAssignments', 'ura')
+            ->innerJoin('ura.role', 'r')
             ->where('u.tenant = :tenant')
             ->andWhere('r.id IN (:roleIds)')
             ->groupBy('r.id')

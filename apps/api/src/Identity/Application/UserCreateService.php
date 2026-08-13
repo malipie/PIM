@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Identity\Application;
 
 use App\Identity\Domain\Entity\User;
-use App\Identity\Domain\Entity\UserRole;
 use App\Identity\Domain\Exception\DuplicateUserEmailException;
 use App\Identity\Domain\Exception\RoleNotFoundException;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Identity\Domain\Repository\UserRepositoryInterface;
-use App\Identity\Domain\Repository\UserRoleRepositoryInterface;
 use App\Shared\Domain\Tenant;
 use Psr\Log\LoggerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
@@ -32,7 +30,7 @@ use Symfony\Component\Uid\Uuid;
  *   2. Reject if a user with the email already exists (409).
  *   3. Hash the admin-supplied password via UserPasswordHasherInterface.
  *   4. Create User (STATUS_ACTIVE, optional passwordChangeRequired flag).
- *   5. Assign role via UserRole junction.
+ *   5. Assign the role (ADR-0034 — `user_role_assignments`).
  *   6. Optionally send a welcome email (silent on transport failure —
  *      admin can still hand over credentials out-of-band).
  *
@@ -44,7 +42,6 @@ final class UserCreateService
 {
     public function __construct(
         private readonly UserRepositoryInterface $users,
-        private readonly UserRoleRepositoryInterface $userRoles,
         private readonly RoleRepositoryInterface $roles,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly MailerInterface $mailer,
@@ -100,23 +97,13 @@ final class UserCreateService
             passwordChangeRequired: $forcePasswordChange,
         );
 
-        // Two role-storage tables are kept in sync:
-        //   - `user_roles` (M2M backing the `assignedRoles` collection) drives
-        //     Symfony Security `getRoles()` and the `UserListResponseBuilder`
-        //     projection (`$user->getAssignedRoles()`).
-        //   - `user_role_assignments` (UserRole entity) carries the per-
-        //     assignment scope columns (locale_scope, channel_scope) needed
-        //     by Phase 3 voters and the PermissionResolver.
-        // Both must be populated on create — otherwise the list view shows
-        // the user with empty roles OR the scope guards miss the assignment.
+        // ADR-0034 (#2832) — one write, one table. This used to populate the
+        // legacy M2M and the assignment table separately, and the duplicate
+        // row without scope columns silently widened locale-restricted grants
+        // (AUD-029). `addRole()` now creates the assignment; cascade persist
+        // saves it with the user.
         $user->addRole($role);
         $this->users->save($user);
-
-        $userRole = new UserRole(
-            userId: $user->getId(),
-            roleId: $role->getId(),
-        );
-        $this->userRoles->save($userRole);
 
         if ($sendWelcomeEmail) {
             $this->sendWelcomeEmail(

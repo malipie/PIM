@@ -6,11 +6,9 @@ namespace App\Identity\Application;
 
 use App\Identity\Domain\Entity\Invitation;
 use App\Identity\Domain\Entity\User;
-use App\Identity\Domain\Entity\UserRole;
 use App\Identity\Domain\Repository\InvitationRepositoryInterface;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Identity\Domain\Repository\UserRepositoryInterface;
-use App\Identity\Domain\Repository\UserRoleRepositoryInterface;
 use App\Shared\Domain\Tenant;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -37,7 +35,7 @@ use const DATE_ATOM;
  *             email send via Symfony Mailer is a follow-up ticket (mailer
  *             infra not yet configured in repo).
  *   accept(): hash incoming token → query by token_hash (unique index) →
- *             verify Invitation::isPending() → create User + UserRole
+ *             verify Invitation::isPending() → create User + role
  *             assignment → mark Invitation::accept().
  *   revoke(): sets revokedAt via Invitation::revoke().
  *
@@ -57,7 +55,6 @@ final class InvitationService
         private readonly EntityManagerInterface $em,
         private readonly InvitationRepositoryInterface $invitations,
         private readonly UserRepositoryInterface $users,
-        private readonly UserRoleRepositoryInterface $userRoles,
         private readonly RoleRepositoryInterface $roles,
         private readonly MagicLinkTokenHasher $tokenHasher,
         private readonly UserPasswordHasherInterface $passwordHasher,
@@ -191,12 +188,14 @@ final class InvitationService
         );
         $this->users->save($user);
 
-        // Assign role via UserRole junction (no scope restrictions by default).
-        $userRole = new UserRole(
-            userId: $user->getId(),
-            roleId: $invitation->getRoleId(),
-        );
-        $this->userRoles->save($userRole);
+        // Assign the invited role, unrestricted by default (ADR-0034 — the
+        // assignment table is the only record of who holds what).
+        $invitedRole = $this->roles->findById($invitation->getRoleId());
+        if (null === $invitedRole) {
+            throw new RuntimeException('Role attached to the invitation no longer exists.');
+        }
+        $user->addRole($invitedRole);
+        $this->users->save($user);
 
         return $user;
     }

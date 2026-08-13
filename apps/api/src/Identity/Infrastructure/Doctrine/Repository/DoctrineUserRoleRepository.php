@@ -30,7 +30,9 @@ class DoctrineUserRoleRepository extends ServiceEntityRepository implements User
      */
     public function findByUser(Uuid $userId): array
     {
-        return $this->findBy(['userId' => $userId->toRfc4122()]);
+        // ADR-0034 — `user`/`role` are associations now; Doctrine accepts the
+        // identifier as the criteria value, so callers keep passing UUIDs.
+        return $this->findBy(['user' => $userId->toRfc4122()]);
     }
 
     /**
@@ -38,14 +40,14 @@ class DoctrineUserRoleRepository extends ServiceEntityRepository implements User
      */
     public function findByRole(Uuid $roleId): array
     {
-        return $this->findBy(['roleId' => $roleId->toRfc4122()]);
+        return $this->findBy(['role' => $roleId->toRfc4122()]);
     }
 
     public function findByUserAndRole(Uuid $userId, Uuid $roleId): ?UserRole
     {
         return $this->findOneBy([
-            'userId' => $userId->toRfc4122(),
-            'roleId' => $roleId->toRfc4122(),
+            'user' => $userId->toRfc4122(),
+            'role' => $roleId->toRfc4122(),
         ]);
     }
 

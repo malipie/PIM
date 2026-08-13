@@ -43,19 +43,23 @@ class User extends AggregateRoot implements UserInterface, PasswordAuthenticated
     private string $password;
 
     /**
-     * Legacy Sprint-0 channel for Symfony Security roles. Survives alongside
-     * the M2M `$assignedRoles` relation until #27 (RBAC seeder) migrates the
-     * fixture admin onto the proper role graph; #25 then merges both sources
-     * inside getRoles() before this column is dropped.
+     * Legacy Sprint-0 channel for Symfony Security roles, merged into
+     * getRoles() alongside the assignments. ADR-0034 schedules this column
+     * for removal in the contract step, once the consolidated assignments
+     * are confirmed in production.
      *
      * @var list<string>
      */
     private array $roles;
 
     /**
-     * @var Collection<int, Role>
+     * ADR-0034 (#2832) — role assignments carrying their scope. Replaces the
+     * Sprint-0 `user_roles` M2M, which had no scope columns and therefore
+     * widened locale/channel-restricted grants (AUD-029).
+     *
+     * @var Collection<int, UserRole>
      */
-    private Collection $assignedRoles;
+    private Collection $roleAssignments;
 
     private string $status;
 
@@ -115,7 +119,7 @@ class User extends AggregateRoot implements UserInterface, PasswordAuthenticated
         $this->email = $email;
         $this->password = $passwordHash;
         $this->roles = $roles;
-        $this->assignedRoles = new ArrayCollection();
+        $this->roleAssignments = new ArrayCollection();
         $this->status = self::STATUS_ACTIVE;
         $this->lastLoginAt = null;
         $this->totpSecret = null;
@@ -169,13 +173,14 @@ class User extends AggregateRoot implements UserInterface, PasswordAuthenticated
     {
         $roles = $this->roles;
 
-        // Merge in roles assigned via the M2M graph (#27). Each Role is
-        // exposed to Symfony Security as `ROLE_<UPPERCASE_CODE>`, so the
-        // RBAC matrix from RbacMatrix and the `roles JSON` legacy column
-        // share one resolved list. Sprint-0 fixtures still rely on the JSON
-        // column; the legacy path stays until every fixture writes M2M.
-        foreach ($this->assignedRoles as $role) {
-            $roles[] = 'ROLE_'.strtoupper($role->getCode());
+        // ADR-0034 (#2832) — role strings come from the assignment table,
+        // the single record of who holds what. Note these are NOT an
+        // authorization path: nothing in the app calls
+        // `isGranted('ROLE_*')`; permissions are decided by codes through
+        // the voters. They exist because Symfony Security expects a user to
+        // report roles, and they keep the JWT readable during debugging.
+        foreach ($this->roleAssignments as $assignment) {
+            $roles[] = 'ROLE_'.strtoupper($assignment->getRole()->getCode());
         }
 
         // Symfony convention — every authenticated user must have ROLE_USER
@@ -237,23 +242,62 @@ class User extends AggregateRoot implements UserInterface, PasswordAuthenticated
     }
 
     /**
+     * ADR-0034 (#2832) — the assignments themselves, scope included. Callers
+     * that only need the roles use {@see getAssignedRoles()}.
+     *
+     * @return Collection<int, UserRole>
+     */
+    public function getRoleAssignments(): Collection
+    {
+        return $this->roleAssignments;
+    }
+
+    /**
      * @return Collection<int, Role>
      */
     public function getAssignedRoles(): Collection
     {
-        return $this->assignedRoles;
+        return new ArrayCollection(
+            $this->roleAssignments->map(static fn (UserRole $assignment): Role => $assignment->getRole())
+                ->getValues(),
+        );
     }
 
+    /**
+     * Grants the role with no scope restrictions.
+     *
+     * ADR-0034: this writes to `user_role_assignments` — the single record of
+     * who holds what. Callers (tenant bootstrap, fixtures, break-glass, the
+     * users panel, tests) are unchanged; only the destination is.
+     */
     public function addRole(Role $role): void
     {
-        if (!$this->assignedRoles->contains($role)) {
-            $this->assignedRoles->add($role);
+        if ($this->hasAssignedRole($role)) {
+            return;
         }
+
+        $this->roleAssignments->add(new UserRole($this, $role));
     }
 
     public function removeRole(Role $role): void
     {
-        $this->assignedRoles->removeElement($role);
+        foreach ($this->roleAssignments as $assignment) {
+            if ($assignment->getRole()->getId()->equals($role->getId())) {
+                // orphanRemoval on the mapping turns this into a DELETE.
+                $this->roleAssignments->removeElement($assignment);
+            }
+        }
+    }
+
+    private function hasAssignedRole(Role $role): bool
+    {
+        foreach ($this->roleAssignments as $assignment) {
+            if ($assignment->getRole()->getId()->equals($role->getId())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function getTotpSecret(): ?string

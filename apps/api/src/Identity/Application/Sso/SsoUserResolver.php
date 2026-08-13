@@ -6,10 +6,8 @@ namespace App\Identity\Application\Sso;
 
 use App\Identity\Domain\Entity\Role;
 use App\Identity\Domain\Entity\User;
-use App\Identity\Domain\Entity\UserRole;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Identity\Domain\Repository\UserRepositoryInterface;
-use App\Identity\Domain\Repository\UserRoleRepositoryInterface;
 use App\Shared\Domain\Tenant;
 use Symfony\Component\Uid\Uuid;
 
@@ -39,7 +37,6 @@ final class SsoUserResolver
 {
     public function __construct(
         private readonly UserRepositoryInterface $users,
-        private readonly UserRoleRepositoryInterface $userRoles,
         private readonly RoleRepositoryInterface $roles,
     ) {
     }
@@ -75,11 +72,9 @@ final class SsoUserResolver
         // elevates via Phase 5 settings UI.
         $viewerRole = $this->roles->findByCode('viewer', $tenant);
         if (null !== $viewerRole) {
-            $userRole = new UserRole(
-                userId: $user->getId(),
-                roleId: $viewerRole->getId(),
-            );
-            $this->userRoles->save($userRole);
+            // ADR-0034 — one write path; cascade persist stores the assignment.
+            $user->addRole($viewerRole);
+            $this->users->save($user);
         }
 
         return $user;
