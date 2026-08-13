@@ -2090,6 +2090,9 @@
     },
     "list": {
       "action_failed": "The operation failed."
+    },
+    "errors": {
+      "forbidden": "You do not have permission to view this section. Contact your administrator."
     }
   },
   "api_configurator": {

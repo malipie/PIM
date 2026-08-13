@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
-
 import { UniversalListPage } from '@/components/objects/universal-list-page';
 import { useListSchema } from '@/hooks/use-list-schema';
+import { HttpError } from '@/lib/http';
 import { useDefaultObjectType } from './use-default-object-type';
 
 /**
@@ -37,12 +37,21 @@ export function ProductsUniversalListPage() {
   }
 
   if (lookupError !== null || objectTypeId === null) {
+    // #2839 — a 403 used to render as "run the catalog seeder", pointing
+    // the diagnosis at missing data when the real cause was a missing
+    // permission. That cost real time on #2838.
+    const forbidden = lookupError instanceof HttpError && lookupError.status === 403;
+
     return (
       <div className="rounded border border-destructive bg-destructive/5 p-6 text-sm text-destructive">
-        {t('products.errors.built_in_missing', {
-          defaultValue:
-            'Built-in product ObjectType not found in this tenant — run the catalog seeder.',
-        })}
+        {forbidden
+          ? t('products.errors.forbidden', {
+              defaultValue: 'Nie masz uprawnień do tej sekcji. Skontaktuj się z administratorem.',
+            })
+          : t('products.errors.built_in_missing', {
+              defaultValue:
+                'Built-in product ObjectType not found in this tenant — run the catalog seeder.',
+            })}
       </div>
     );
   }

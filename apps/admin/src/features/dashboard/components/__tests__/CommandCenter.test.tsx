@@ -63,6 +63,9 @@ vi.mock('@/lib/identity', async (importOriginal) => {
   return {
     ...actual,
     useCanI: (code: string) => grantedPermissions.has(code),
+    // #2839 — KpiBand asks whether the tile's target is reachable; the real
+    // `canAccessPath` runs against this stub identity.
+    useIdentity: () => ({ identity: { permissions: grantedPermissions }, isLoading: false }),
   };
 });
 
@@ -113,6 +116,9 @@ beforeEach(() => {
   grantedPermissions.clear();
   grantedPermissions.add('channel.read');
   grantedPermissions.add('audit.view_cross_user');
+  // #2839 — the tiles link to /products, so a "fully entitled caller" has
+  // to include the code that makes that target reachable.
+  grantedPermissions.add('products.view');
 });
 
 describe('KpiBand', () => {
@@ -122,6 +128,27 @@ describe('KpiBand', () => {
     expect(screen.queryByText('12 847')).not.toBeInTheDocument();
     expect(screen.getAllByText('brak trendu')).toHaveLength(3);
     expect(screen.getByText('24h · brak trendu')).toBeInTheDocument();
+  });
+
+  it('drops the link when the role cannot reach the target (#2839)', () => {
+    // A catalog-less role: the count is still legitimately its own (the
+    // backend computed it under this role), but /products would 403.
+    grantedPermissions.delete('products.view');
+    state.summary = LIVE_SUMMARY;
+
+    renderWithRouter(<KpiBand />);
+
+    expect(screen.getByText('194')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Produkty/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the link for a role that may open the target', () => {
+    grantedPermissions.add('products.view');
+    state.summary = LIVE_SUMMARY;
+
+    renderWithRouter(<KpiBand />);
+
+    expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
   });
 
   it('renders live values with real product delta and honest nulls elsewhere', () => {
