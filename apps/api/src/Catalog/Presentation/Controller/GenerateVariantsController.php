@@ -110,9 +110,20 @@ final class GenerateVariantsController
     public function __invoke(string $master_id, Request $request): JsonResponse
     {
         // Generation can stamp dozens of ObjectValue rows per combination;
-        // 30s default would cut moderate runs (e.g. 3 axes × 4 values × 20
-        // attributes) mid-flush. Bulk import handlers raise the same limit.
-        set_time_limit(120);
+        // the 30s default would cut moderate runs (e.g. 3 axes × 4 values ×
+        // 20 attributes) mid-flush.
+        //
+        // #2843 — this used to raise the ceiling to 120s, which is the same
+        // guess as 30 only further out: the number holds until the machine
+        // is busy. It surfaced when the catalog suite started running four
+        // processes in parallel and the identical generation blew past 120s,
+        // killing the whole worker with a fatal error instead of failing one
+        // request. On a loaded instance — an import running, a 50k catalog —
+        // the same thing would happen in production, and a fatal error is
+        // the least useful way for it to happen. Bulk handlers next door
+        // (AbstractBulkHandler, PendingBatchCommitter, BulkRollbackHandler)
+        // all pass 0 for exactly this reason; this is a bulk operation too.
+        set_time_limit(0);
 
         $tenant = $this->tenantContext->get();
         if (null === $tenant) {

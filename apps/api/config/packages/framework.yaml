@@ -159,6 +159,18 @@ framework:
 
 when@test:
     framework:
+        # #2843 — rate-limiter buckets live in the filesystem `cache.app`
+        # pool. One directory shared by several PHPUnit processes means one
+        # shared bucket: tests reset the counter for 127.0.0.1, so a parallel
+        # run would have them clearing each other's state at random. Giving
+        # each ParaTest worker its own pool directory (TEST_TOKEN, the same
+        # variable that already separates their databases) isolates them.
+        #
+        # NOT an in-memory pool: ApiTestCase reboots the kernel between
+        # requests, and an array pool dies with it — the counter would reset
+        # mid-test and the 429 assertions would never fire.
+        cache:
+            directory: '%kernel.cache_dir%/pools%env(default::TEST_TOKEN)%'
         test: true
         session:
             storage_factory_id: session.storage.factory.mock_file
