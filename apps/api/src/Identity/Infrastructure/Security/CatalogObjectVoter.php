@@ -36,6 +36,12 @@ final class CatalogObjectVoter extends AbstractRbacVoter
             // this alias (affirmative strategy: either voter grants).
             'CREATE_PRODUCT' => 'write',
             'READ_PRODUCT' => 'read',
+            // #2848 — the poly-kind /api/objects collection moved off the
+            // shared 'READ' attribute so Prd\ObjectCollectionVoter can grant
+            // per-kind when the query is scoped by ?objectType=. Legacy
+            // object.read principals keep browsing the unscoped collection
+            // through this alias.
+            'READ_OBJECT_COLLECTION' => 'read',
             'UPDATE' => 'write',
             'WRITE' => 'write',
             'DELETE' => 'delete',

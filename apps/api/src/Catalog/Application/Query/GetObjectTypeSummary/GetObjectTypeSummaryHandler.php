@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Catalog\Application\Query\GetObjectTypeSummary;
 
 use App\Catalog\Contracts\Query\ObjectTypeSummary;
+use App\Catalog\Contracts\Query\ObjectTypeSummaryPort;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use LogicException;
+use Symfony\Component\Uid\Uuid;
 
-final readonly class GetObjectTypeSummaryHandler
+final readonly class GetObjectTypeSummaryHandler implements ObjectTypeSummaryPort
 {
     public function __construct(
         private ObjectTypeRepositoryInterface $repository,
@@ -17,7 +19,12 @@ final readonly class GetObjectTypeSummaryHandler
 
     public function __invoke(GetObjectTypeSummaryQuery $query): ?ObjectTypeSummary
     {
-        $objectType = $this->repository->findById($query->objectTypeId);
+        return $this->byId($query->objectTypeId);
+    }
+
+    public function byId(Uuid $objectTypeId): ?ObjectTypeSummary
+    {
+        $objectType = $this->repository->findById($objectTypeId);
         if (null === $objectType) {
             return null;
         }
