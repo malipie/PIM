@@ -2104,6 +2104,9 @@
     },
     "list": {
       "action_failed": "Operacja nie powiodła się."
+    },
+    "errors": {
+      "forbidden": "Nie masz uprawnień do tej sekcji. Skontaktuj się z administratorem."
     }
   },
   "api_configurator": {

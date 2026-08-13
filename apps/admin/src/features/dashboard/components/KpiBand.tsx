@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
+import { canAccessPath, useIdentity } from '@/lib/identity';
+
 import { formatDelta, formatInt, useDashboardSummary } from '../use-dashboard-summary';
 
 export type KpiKey = 'products' | 'publish_ready' | 'avg_completeness' | 'open_alerts';
@@ -129,6 +131,17 @@ export function KpiBand() {
   );
 }
 
+/**
+ * #2839 — a tile links only where the caller may actually go. The counts
+ * themselves are fine to show: the backend computed them under this
+ * role's own permissions. What must not happen is handing out a link into
+ * a section that answers 403 — the reported case was a Catalog Manager
+ * clicking "Produkty" and landing on an error page.
+ *
+ * The check reads the same prefix map as the section guard
+ * (`route-permissions.ts`), so "hidden in the sidebar" and "not clickable
+ * here" can never drift apart.
+ */
 function TileLink({
   href,
   className,
@@ -138,6 +151,14 @@ function TileLink({
   className: string;
   children: ReactNode;
 }) {
+  const { identity } = useIdentity();
+  const path = href.split('?')[0] ?? href;
+  const reachable = href.startsWith('#') || canAccessPath(identity, path);
+
+  if (!reachable) {
+    return <div className={className}>{children}</div>;
+  }
+
   if (href.startsWith('#')) {
     return (
       <a href={href} className={className}>
