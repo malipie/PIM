@@ -65,7 +65,13 @@ test('a role without modeling rights is neither offered nor let into it', async 
   // What the role DOES hold stays reachable — the gate must not blank the
   // app. Navigate in-app (a second full reload races the silent refresh and
   // can bounce the session to /login, which would mask the real assertion).
-  await page.getByRole('link', { name: /^(Multimedia)$/ }).click();
+  // Prefix, not an exact match: the item carries a count badge fed by
+  // GET /api/assets, and the badge is inside the link, so the accessible
+  // name reads "Multimedia 10". Anchoring both ends passed only while the
+  // role was refused that endpoint and the count stayed undefined — #2845
+  // gave catalog roles their multimedia read, and this assertion was
+  // measuring the 403, not the navigation.
+  await page.getByRole('link', { name: /^Multimedia\b/ }).click();
   await expect(page).toHaveURL(/\/assets$/);
 
   // Deep link into the wizard: the 403 screen, not the form. This is the
