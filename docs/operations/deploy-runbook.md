@@ -2,6 +2,9 @@
 
 > Pierwszy pełny runbook prod (go-live #2138, przygotowanie 2026-08).
 > Zakres: od czystego hosta do działającej instancji z danymi demo i smoke-testem.
+> **Wdrażasz kolejną zmianę na coś, co już działa? To nie ten plik** — patrz
+> [`docs/deploy/playbook.md`](../deploy/playbook.md) (kolejność „dane przed kodem", migracje z nowego
+> obrazu, `cache:clear` w obu kontenerach, pułapki z realnych wdrożeń).
 > Powiązane: `.env.prod.example` (wszystkie zmienne), `docs/runbook/restore.md` (PITR),
 > `docs/runbook/disaster-recovery.md`, `docs/operations/secrets-runbook.md`.
 
