@@ -198,22 +198,4 @@ final class RbacMatrix
             self::PERMISSION_PLATFORM_BREAK_GLASS,
         ];
     }
-
-    /**
-     * @param list<string> $resources
-     * @param list<string> $actions
-     *
-     * @return list<string>
-     */
-    private static function permissionsFor(array $resources, array $actions): array
-    {
-        $codes = [];
-        foreach ($resources as $resource) {
-            foreach ($actions as $action) {
-                $codes[] = \sprintf('%s.%s', $resource, $action);
-            }
-        }
-
-        return $codes;
-    }
 }
