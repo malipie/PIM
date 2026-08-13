@@ -66,17 +66,6 @@ final class ProductCreatePermissionApiTest extends CatalogApiTestCase
         ]);
         self::assertResponseStatusCodeSame(403);
 
-        // ...nor onto the categories sugar path.
-        $client->request('POST', '/api/categories', [
-            'headers' => ['content-type' => 'application/ld+json', 'authorization' => 'Bearer '.$marketingJwt],
-            'body' => json_encode([
-                'code' => 'MKT-CREATE-CAT-1',
-                'objectTypeId' => $this->objectTypeIdFor(ObjectKind::Category),
-                'attributes' => [],
-            ], JSON_THROW_ON_ERROR),
-        ]);
-        self::assertResponseStatusCodeSame(403);
-
         // products.view grants the products reads (READ_PRODUCT alias) —
         // the item GET is what the product-detail page stands on.
         $client->request('GET', '/api/products/'.$productId, [
@@ -100,13 +89,53 @@ final class ProductCreatePermissionApiTest extends CatalogApiTestCase
             'headers' => ['authorization' => 'Bearer '.$marketingJwt],
         ]);
         self::assertResponseStatusCodeSame(200);
+    }
 
-        // ...but a non-product instance stays behind the legacy gate.
+    /**
+     * #2845 — the kind boundary, checked with a role that genuinely lacks the
+     * other kinds' permissions.
+     *
+     * This used to be asserted with `marketing`, which was wrong in a way
+     * worth recording: the PRD §3.2 matrix grants marketing `categories.view`
+     * and `categories.add_edit`, so refusing it categories was never the
+     * invariant — it was the symptom of categories having no kind-specific
+     * attribute to be granted through. Once #2845 gave them one, marketing
+     * legitimately reads and creates categories, and pinning 403 there would
+     * have pinned the bug.
+     *
+     * `approver` is the honest control: `products.view` and nothing on
+     * categories or multimedia.
+     */
+    #[Test]
+    public function aRoleWithoutTheKindsPermissionCannotReachIt(): void
+    {
+        $approverJwt = $this->seedUserWithRole('approver-2845@demo.localhost', 'approver');
+        $client = static::createClient();
+        $productOt = $this->objectTypeIdFor(ObjectKind::Product);
+
+        $client->request('POST', '/api/categories', [
+            'headers' => ['content-type' => 'application/ld+json', 'authorization' => 'Bearer '.$approverJwt],
+            'body' => json_encode([
+                'code' => 'APR-CREATE-CAT-1',
+                'objectTypeId' => $this->objectTypeIdFor(ObjectKind::Category),
+                'categoryTargetObjectTypeId' => $productOt,
+                'attributes' => [],
+            ], JSON_THROW_ON_ERROR),
+        ]);
+        self::assertResponseStatusCodeSame(403, 'creating categories needs categories.add_edit');
+
+        $client->request('GET', '/api/categories', [
+            'headers' => ['authorization' => 'Bearer '.$approverJwt],
+        ]);
+        self::assertResponseStatusCodeSame(403, 'listing categories needs categories.view');
+
+        // A category instance through the poly-kind item GET: the kind is
+        // known here, so the voter must refuse it just the same.
         $adminJwt = $this->jwtFor(self::ADMIN_EMAIL);
         $category = $client->request('POST', '/api/categories', [
             'headers' => ['content-type' => 'application/ld+json', 'authorization' => 'Bearer '.$adminJwt],
             'body' => json_encode([
-                'code' => 'MKT-READ-CAT-1',
+                'code' => 'APR-READ-CAT-1',
                 'objectTypeId' => $this->objectTypeIdFor(ObjectKind::Category),
                 'categoryTargetObjectTypeId' => $productOt,
                 'attributes' => [],
@@ -117,7 +146,7 @@ final class ProductCreatePermissionApiTest extends CatalogApiTestCase
         \assert(\is_string($categoryId));
 
         $client->request('GET', '/api/objects/'.$categoryId, [
-            'headers' => ['authorization' => 'Bearer '.$marketingJwt],
+            'headers' => ['authorization' => 'Bearer '.$approverJwt],
         ]);
         self::assertResponseStatusCodeSame(403);
     }
@@ -132,18 +161,22 @@ final class ProductCreatePermissionApiTest extends CatalogApiTestCase
 
     private function seedMarketingUser(): string
     {
+        return $this->seedUserWithRole(self::MARKETING_EMAIL, 'marketing');
+    }
+
+    private function seedUserWithRole(string $email, string $roleCode): string
+    {
         $em = $this->em();
         $tenant = $em->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
         \assert($tenant instanceof Tenant);
 
-        $marketing = self::getContainer()->get(RoleRepositoryInterface::class)
-            ->findByCode('marketing', $tenant);
-        \assert(null !== $marketing, 'marketing role must be seeded per tenant');
+        $role = self::getContainer()->get(RoleRepositoryInterface::class)->findByCode($roleCode, $tenant);
+        \assert(null !== $role, $roleCode.' role must be seeded per tenant');
 
         $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
-        $stub = new User($tenant, self::MARKETING_EMAIL, '', ['ROLE_USER']);
-        $user = new User($tenant, self::MARKETING_EMAIL, $hasher->hashPassword($stub, 'changeme'), ['ROLE_USER']);
-        $user->addRole($marketing);
+        $stub = new User($tenant, $email, '', ['ROLE_USER']);
+        $user = new User($tenant, $email, $hasher->hashPassword($stub, 'changeme'), ['ROLE_USER']);
+        $user->addRole($role);
         $em->persist($user);
         $em->flush();
 
