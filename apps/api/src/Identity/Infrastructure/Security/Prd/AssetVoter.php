@@ -46,12 +46,15 @@ final class AssetVoter extends AbstractPrdVoter
             'add_edit_any' => 'multimedia.add_edit_any',
             'delete' => 'multimedia.delete',
 
-            // #2838 — uppercase aliases for the API Platform operations.
-            'READ' => 'multimedia.view',
-            'CREATE' => ['multimedia.add_edit_own', 'multimedia.add_edit_any'],
-            'UPDATE' => ['multimedia.add_edit_own', 'multimedia.add_edit_any'],
-            'WRITE' => ['multimedia.add_edit_own', 'multimedia.add_edit_any'],
-            'DELETE' => 'multimedia.delete',
+            // #2838 — NO uppercase aliases here, deliberately. This voter
+            // answers for `CatalogObject`, and `/categories`, `/assets` and
+            // the poly-kind `/objects` all ask the identical question
+            // (`is_granted('READ', CatalogObject::class)`): on a collection
+            // the kind is unknowable, so an alias here would open the
+            // generic /api/objects list to anyone holding categories.view.
+            // ProductVoter avoids this with kind-specific attributes
+            // (READ_PRODUCT / CREATE_PRODUCT, #2416); giving categories and
+            // assets the same treatment is tracked separately.
         ];
     }
 

@@ -38,14 +38,15 @@ final class CategoryVoter extends AbstractPrdVoter
             'add_edit' => 'categories.add_edit',
             'delete' => 'categories.delete',
 
-            // #2838 — API Platform asks in uppercase; without these the
-            // legacy voter was the only one voting and it demands
-            // `category.read`, which no PRD role holds.
-            'READ' => 'categories.view',
-            'CREATE' => 'categories.add_edit',
-            'UPDATE' => 'categories.add_edit',
-            'WRITE' => 'categories.add_edit',
-            'DELETE' => 'categories.delete',
+            // #2838 — NO uppercase aliases here, deliberately. This voter
+            // answers for `CatalogObject`, and `/categories`, `/assets` and
+            // the poly-kind `/objects` all ask the identical question
+            // (`is_granted('READ', CatalogObject::class)`): on a collection
+            // the kind is unknowable, so an alias here would open the
+            // generic /api/objects list to anyone holding categories.view.
+            // ProductVoter avoids this with kind-specific attributes
+            // (READ_PRODUCT / CREATE_PRODUCT, #2416); giving categories and
+            // assets the same treatment is tracked separately.
         ];
     }
 
