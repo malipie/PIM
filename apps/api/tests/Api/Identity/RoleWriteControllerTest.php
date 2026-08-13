@@ -7,6 +7,7 @@ namespace App\Tests\Api\Identity;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Identity\Application\RbacSeeder;
+use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\Role;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Rbac\RbacMatrix;
@@ -68,13 +69,21 @@ final class RoleWriteControllerTest extends ApiTestCase
 
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
-        $catalogManager = $roles->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER);
-        \assert(null !== $superAdmin && null !== $catalogManager);
+        \assert(null !== $superAdmin);
 
         $tenantA = new Tenant(self::TENANT_A_CODE, 'Demo Tenant');
         $tenantB = new Tenant(self::TENANT_B_CODE, 'Other Tenant');
         $em->persist($tenantA);
         $em->persist($tenantB);
+        $em->flush();
+
+        // #2837 — tenant roles come from the per-tenant PRD templates, so
+        // they exist only after the tenant does.
+        $prdRoles = self::getContainer()->get(SeedTenantPrdRolesService::class);
+        $prdRoles->seed($tenantA);
+        $prdRoles->seed($tenantB);
+        $catalogManager = $roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenantA);
+        \assert(null !== $catalogManager);
 
         // Custom role on tenant A — mutable by tenant A admin.
         $customA = new Role('custom_a', 'Custom Role A', $tenantA);
@@ -229,7 +238,7 @@ final class RoleWriteControllerTest extends ApiTestCase
     public function adminCannotDeleteBuiltInRole(): void
     {
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
-        $builtIn = $roles->findGlobalByCode(RbacMatrix::ROLE_VIEWER);
+        $builtIn = $roles->findByCode(RbacMatrix::ROLE_VIEWER, $this->tenantA());
         \assert(null !== $builtIn);
 
         $client = $this->clientFor(self::ADMIN_A_EMAIL);
@@ -237,6 +246,44 @@ final class RoleWriteControllerTest extends ApiTestCase
 
         // Built-in roles are protected even from a full admin.
         self::assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * #2837 — protection used to key on `tenant_id IS NULL`, which held
+     * only while tenant roles were also seeded globally. With the
+     * duplicates gone, every PRD template role would have been deletable
+     * (and renameable) from the panel the moment nobody held it —
+     * `tenant_owner` included.
+     */
+    #[Test]
+    public function prdTemplateRolesAreProtectedFromDeletionAndRename(): void
+    {
+        $roles = self::getContainer()->get(RoleRepositoryInterface::class);
+        $client = $this->clientFor(self::ADMIN_A_EMAIL);
+
+        foreach (['tenant_owner', 'catalog_manager', 'approver'] as $code) {
+            $role = $roles->findByCode($code, $this->tenantA());
+            \assert(null !== $role);
+            $id = $role->getId()->toRfc4122();
+
+            $client->request('DELETE', '/api/roles/'.$id);
+            self::assertResponseStatusCodeSame(403, $code.' must not be deletable');
+
+            $client->request('PATCH', '/api/roles/'.$id, [
+                'json' => ['name' => 'Renamed '.$code],
+            ]);
+            self::assertResponseStatusCodeSame(400, $code.' must not be renameable');
+        }
+    }
+
+    /** A genuinely user-made role stays fully editable. */
+    #[Test]
+    public function customRoleRemainsDeletable(): void
+    {
+        $client = $this->clientFor(self::ADMIN_A_EMAIL);
+        $client->request('DELETE', '/api/roles/'.$this->customAId);
+
+        self::assertResponseStatusCodeSame(204);
     }
 
     private function tenantA(): Tenant

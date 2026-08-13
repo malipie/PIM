@@ -6,6 +6,7 @@ namespace App\Tests\Api\Identity;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Identity\Application\RbacSeeder;
+use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Rbac\RbacMatrix;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
@@ -55,11 +56,16 @@ final class EndpointGuardSmokeTest extends ApiTestCase
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
         \assert(null !== $superAdmin);
-        $viewer = $roles->findGlobalByCode(RbacMatrix::ROLE_VIEWER);
-        \assert(null !== $viewer);
 
         $tenant = new Tenant(self::TENANT_CODE, 'Demo Tenant');
         $em->persist($tenant);
+        $em->flush();
+
+        // #2837 — viewer is a tenant role now, so it exists only after the
+        // tenant does and only once the PRD templates are seeded into it.
+        self::getContainer()->get(SeedTenantPrdRolesService::class)->seed($tenant);
+        $viewer = $roles->findByCode(RbacMatrix::ROLE_VIEWER, $tenant);
+        \assert(null !== $viewer);
 
         $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
 

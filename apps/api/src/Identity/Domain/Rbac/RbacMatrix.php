@@ -21,6 +21,17 @@ namespace App\Identity\Domain\Rbac;
 final class RbacMatrix
 {
     public const string ROLE_SUPER_ADMIN = 'super_admin';
+
+    /**
+     * #2837 — these three are TENANT roles, provisioned per tenant by
+     * {@see \App\Identity\Application\SeedTenantPrdRolesService} from the
+     * PRD §3.2 templates. The constants stay as the canonical spelling of
+     * their codes, but {@see roles()} no longer defines them: seeding them
+     * globally as well produced two rows per code — identical in the panel,
+     * different in what they granted (`viewer` held 11 permissions on one
+     * side and 17 on the other), so the access a user got depended on which
+     * row the panel happened to pick.
+     */
     public const string ROLE_CATALOG_MANAGER = 'catalog_manager';
     public const string ROLE_INTEGRATION_MANAGER = 'integration_manager';
     public const string ROLE_VIEWER = 'viewer';
@@ -126,6 +137,15 @@ final class RbacMatrix
     }
 
     /**
+     * The GLOBAL (tenant_id NULL) roles — platform scope only.
+     *
+     * #2837 — tenant-facing roles (catalog_manager, integration_manager,
+     * viewer, …) are NOT here: they belong to the per-tenant PRD templates
+     * and seeding them from both places created duplicate codes with
+     * diverging permission sets. What stays global is what genuinely has
+     * no tenant: `super_admin` (held by a tenant Owner, but the row itself
+     * is shared) and `platform_operator` (cross-tenant `platform.*`).
+     *
      * @return list<RoleDefinition>
      */
     public static function roles(): array
@@ -135,53 +155,6 @@ final class RbacMatrix
                 code: self::ROLE_SUPER_ADMIN,
                 name: 'Super Admin',
                 permissionCodes: self::allPermissionCodes(),
-            ),
-            new RoleDefinition(
-                code: self::ROLE_CATALOG_MANAGER,
-                name: 'Catalog Manager',
-                permissionCodes: [
-                    ...self::permissionsFor(
-                        resources: ['object', 'object_type', 'attribute', 'attribute_group', 'category', 'asset'],
-                        actions: [self::ACTION_READ, self::ACTION_WRITE, self::ACTION_DELETE],
-                    ),
-                    // IMP-01/02 — Catalog Manager is the primary persona for
-                    // self-service imports (Kasia, spec §2). Backup write is
-                    // intentionally OUT — a cluster-wide pgBackRest snapshot
-                    // is admin-territory (spec §7.8). Read on backup keeps
-                    // the wizard's status polling working.
-                    ...self::permissionsFor(
-                        resources: ['import_session', 'import_profile', 'import_source', 'import_schedule'],
-                        actions: [self::ACTION_READ, self::ACTION_WRITE, self::ACTION_DELETE],
-                    ),
-                    ...self::permissionsFor(
-                        resources: ['backup'],
-                        actions: [self::ACTION_READ],
-                    ),
-                ],
-            ),
-            new RoleDefinition(
-                code: self::ROLE_INTEGRATION_MANAGER,
-                name: 'Integration Manager',
-                permissionCodes: [
-                    ...self::permissionsFor(
-                        resources: ['channel', 'integration', 'api_profile'],
-                        actions: [self::ACTION_READ, self::ACTION_WRITE, self::ACTION_DELETE],
-                    ),
-                    // Read-only on catalog so an integrator can wire mappings
-                    // without being able to mutate product data.
-                    ...self::permissionsFor(
-                        resources: ['object', 'object_type', 'attribute', 'category', 'asset'],
-                        actions: [self::ACTION_READ],
-                    ),
-                ],
-            ),
-            new RoleDefinition(
-                code: self::ROLE_VIEWER,
-                name: 'Viewer',
-                permissionCodes: self::permissionsFor(
-                    resources: self::RESOURCES,
-                    actions: [self::ACTION_READ],
-                ),
             ),
             // AUD-003 (#1575) — platform operator: the ONLY role with the
             // cross-tenant `platform.*` grants. Never assigned to a tenant

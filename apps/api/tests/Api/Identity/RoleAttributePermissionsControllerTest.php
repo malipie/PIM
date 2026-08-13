@@ -10,6 +10,7 @@ use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
 use App\Identity\Application\RbacSeeder;
+use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Domain\Entity\Role;
 use App\Identity\Domain\Entity\RoleAttributePermission;
 use App\Identity\Domain\Entity\User;
@@ -77,13 +78,21 @@ final class RoleAttributePermissionsControllerTest extends ApiTestCase
 
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
-        $catalogManager = $roles->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER);
-        \assert(null !== $superAdmin && null !== $catalogManager);
+        \assert(null !== $superAdmin);
 
         $tenantA = new Tenant(self::TENANT_A_CODE, 'Demo Tenant');
         $tenantB = new Tenant(self::TENANT_B_CODE, 'Other Tenant');
         $em->persist($tenantA);
         $em->persist($tenantB);
+        $em->flush();
+
+        // #2837 — tenant roles come from the per-tenant PRD templates, so
+        // they exist only after the tenant does.
+        $prdRoles = self::getContainer()->get(SeedTenantPrdRolesService::class);
+        $prdRoles->seed($tenantA);
+        $prdRoles->seed($tenantB);
+        $catalogManager = $roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenantA);
+        \assert(null !== $catalogManager);
 
         $customA = new Role('custom_a', 'Custom Role A', $tenantA);
         $em->persist($customA);

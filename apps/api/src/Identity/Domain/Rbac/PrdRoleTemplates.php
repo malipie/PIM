@@ -39,6 +39,22 @@ final class PrdRoleTemplates
     }
 
     /**
+     * Whether the code belongs to the PRD template set, i.e. the role is
+     * built-in even though it lives on a tenant.
+     *
+     * #2837 — "built-in" used to mean `tenant_id IS NULL`, which was true
+     * only while tenant-facing roles were ALSO seeded globally. Those
+     * duplicates are gone, so a check on globality alone would classify
+     * every template role as a user-made one — and the write controller
+     * guards deletion on exactly that check, which would have made
+     * `tenant_owner` deletable from the panel.
+     */
+    public static function isTemplateCode(string $code): bool
+    {
+        return \array_key_exists($code, self::tenantRoleNames());
+    }
+
+    /**
      * Platform-level (`super_admin`) name.
      */
     public static function superAdminRoleName(): string

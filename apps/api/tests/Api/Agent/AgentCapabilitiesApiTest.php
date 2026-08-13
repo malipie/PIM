@@ -53,18 +53,23 @@ final class AgentCapabilitiesApiTest extends ApiTestCase
 
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
-        $legacyCatalogManager = $roles->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER);
-        $legacyViewer = $roles->findGlobalByCode(RbacMatrix::ROLE_VIEWER);
-        \assert(null !== $superAdmin && null !== $legacyCatalogManager && null !== $legacyViewer);
+        \assert(null !== $superAdmin);
 
         $tenant = new Tenant(self::TENANT_CODE, 'Demo Tenant');
         $em->persist($tenant);
         $em->flush();
 
+        // #2837 — catalog_manager and viewer are tenant roles now, seeded
+        // per tenant alongside tenant_owner and marketing.
         self::getContainer()->get(SeedTenantPrdRolesService::class)->seed($tenant);
         $tenantOwner = $roles->findByCode('tenant_owner', $tenant);
         $marketing = $roles->findByCode('marketing', $tenant);
-        \assert(null !== $tenantOwner && null !== $marketing);
+        $legacyCatalogManager = $roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenant);
+        $legacyViewer = $roles->findByCode(RbacMatrix::ROLE_VIEWER, $tenant);
+        \assert(
+            null !== $tenantOwner && null !== $marketing
+            && null !== $legacyCatalogManager && null !== $legacyViewer,
+        );
 
         $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
         $make = static function (string $email, Role ...$assigned) use ($em, $hasher, $tenant): void {
@@ -186,7 +191,7 @@ final class AgentCapabilitiesApiTest extends ApiTestCase
         $roles = self::getContainer()->get(RoleRepositoryInterface::class);
         $tenant = $em->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
         \assert($tenant instanceof Tenant);
-        foreach ([$roles->findGlobalByCode(RbacMatrix::ROLE_CATALOG_MANAGER), $roles->findByCode('marketing', $tenant)] as $role) {
+        foreach ([$roles->findByCode(RbacMatrix::ROLE_CATALOG_MANAGER, $tenant), $roles->findByCode('marketing', $tenant)] as $role) {
             \assert($role instanceof Role);
             $role->setAgentAutonomy('off');
         }
