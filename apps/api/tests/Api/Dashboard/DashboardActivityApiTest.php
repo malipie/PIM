@@ -8,11 +8,15 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Identity\Domain\Entity\AuditLog;
+use App\Identity\Domain\Entity\User;
+use App\Identity\Domain\Entity\UserRole;
+use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Tests\Api\Catalog\CatalogApiTestCase;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Uid\Uuid;
 
 use const JSON_THROW_ON_ERROR;
@@ -134,6 +138,44 @@ final class DashboardActivityApiTest extends CatalogApiTestCase
     {
         static::createClient()->request('GET', '/api/dashboard/activity');
         self::assertResponseStatusCodeSame(401);
+    }
+
+    /**
+     * #2831 — /top-edited attributes edits to named people. It used to sit
+     * behind `products.view`, which a Catalog Manager holds while its audit
+     * reach is only `audit.view_own`, so the role could read who else had
+     * been editing. The aggregate series stays open to the same role: it
+     * counts catalog changes without naming anyone.
+     */
+    #[Test]
+    public function topEditedIsRefusedWithoutCrossUserAuditReach(): void
+    {
+        $tenant = $this->demoTenant();
+        $role = self::getContainer()->get(RoleRepositoryInterface::class)
+            ->findByCode('catalog_manager', $tenant);
+        \assert(null !== $role);
+
+        $hasher = self::getContainer()->get(UserPasswordHasherInterface::class);
+        $stub = new User($tenant, 'catalog@demo.localhost', '', ['ROLE_USER']);
+        $user = new User(
+            $tenant,
+            'catalog@demo.localhost',
+            $hasher->hashPassword($stub, 'changeme'),
+            ['ROLE_USER'],
+        );
+        $this->em()->persist($user);
+        $this->em()->flush();
+        $this->em()->persist(new UserRole(userId: $user->getId(), roleId: $role->getId()));
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $client = $this->authenticatedClient('catalog@demo.localhost');
+
+        $client->request('GET', '/api/dashboard/top-edited');
+        self::assertResponseStatusCodeSame(403);
+
+        $client->request('GET', '/api/dashboard/activity');
+        self::assertResponseIsSuccessful();
     }
 
     #[Test]

@@ -43,8 +43,13 @@ final readonly class DashboardSummaryQuery
     /**
      * The raw aggregates for the current tenant — shared by the summary
      * response and the daily snapshot command.
+     *
+     * @param bool $withChannels #2831 — false skips the per-channel
+     *                           completeness probe for callers without
+     *                           `channel.read`; the snapshot command and
+     *                           channel-entitled callers keep it
      */
-    public function aggregates(): DashboardAggregates
+    public function aggregates(bool $withChannels = true): DashboardAggregates
     {
         $tenant = $this->currentTenant();
 
@@ -80,17 +85,17 @@ final readonly class DashboardSummaryQuery
             publishReadyCount: $buckets[self::READY_THRESHOLD],
             avgCompletenessPct: (int) round(\is_numeric($avgRaw) ? (float) $avgRaw : 0.0),
             cumulativeBuckets: $buckets,
-            channels: $this->channelCompleteness->perChannel(self::READY_THRESHOLD),
+            channels: $withChannels ? $this->channelCompleteness->perChannel(self::READY_THRESHOLD) : [],
         );
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function summary(Uuid $userId): array
+    public function summary(Uuid $userId, bool $withChannels = true): array
     {
         $tenant = $this->currentTenant();
-        $aggregates = $this->aggregates();
+        $aggregates = $this->aggregates($withChannels);
         $horizons = $this->snapshotHorizons($tenant);
 
         $ready30 = $horizons[30]['publish_ready_count'] ?? null;
