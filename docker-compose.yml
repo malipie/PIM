@@ -189,6 +189,19 @@ services:
       # Version20260704050000; pim_app has no DDL rights, so runtime auto-setup
       # on a fresh install could only fail. Keep every doctrine DSN setup-free.
       MESSENGER_IMPORT_TRANSPORT_DSN: doctrine://default?auto_setup=0
+      # #2829 — dev mail goes to Mailpit (UI: https://mail.pim.localhost).
+      # apps/api/.env ships MAILER_DSN=null://null, which drops every message
+      # silently: invitations and password resets "send" and land nowhere, so
+      # the one smoke test that matters — open the mail, click the link —
+      # cannot be run. That is how the dead recovery links in #2827 survived
+      # to production. Prod overrides this with a real relay and refuses to
+      # start without one (docker-compose.prod.yml).
+      #
+      # Set MAILER_DSN in the root .env to point somewhere else — a compose
+      # variable wins over apps/api/.env* because Symfony's Dotenv does not
+      # overwrite real environment variables.
+      MAILER_DSN: ${MAILER_DSN:-smtp://mailpit:1025}
+      MAILER_FROM: ${MAILER_FROM:-noreply@pim.localhost}
       MERCURE_URL: http://mercure/.well-known/mercure
       MERCURE_PUBLIC_URL: ${MERCURE_PUBLIC_URL:-https://pim.localhost/.well-known/mercure}
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-!ChangeMercureKeyAtLeast256BitsLong!}
@@ -288,6 +301,19 @@ services:
       # container from the shared var/cache/dev, corrupting live requests
       # (HTTP 200 + HTML fatal). Own tree = each role clears only itself.
       APP_CACHE_DIR: /app/var/cache-worker
+      # #2829 — dev mail goes to Mailpit (UI: https://mail.pim.localhost).
+      # apps/api/.env ships MAILER_DSN=null://null, which drops every message
+      # silently: invitations and password resets "send" and land nowhere, so
+      # the one smoke test that matters — open the mail, click the link —
+      # cannot be run. That is how the dead recovery links in #2827 survived
+      # to production. Prod overrides this with a real relay and refuses to
+      # start without one (docker-compose.prod.yml).
+      #
+      # Set MAILER_DSN in the root .env to point somewhere else — a compose
+      # variable wins over apps/api/.env* because Symfony's Dotenv does not
+      # overwrite real environment variables.
+      MAILER_DSN: ${MAILER_DSN:-smtp://mailpit:1025}
+      MAILER_FROM: ${MAILER_FROM:-noreply@pim.localhost}
       APP_SECRET: ${APP_SECRET:-ChangeMeBeforeDeploy}
       # AUD-002 (W1-1) — same NON-owner, NOBYPASSRLS runtime role as the api.
       # The worker sets app.current_tenant at session scope via
