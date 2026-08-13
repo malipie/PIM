@@ -14,9 +14,9 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * WFL-P4-01 (#2428) — Doctrine adapter. "Mine" resolves the caller's
- * role codes with raw DBAL over BOTH coexisting assignment paths
- * (legacy `user_roles` + RBAC `user_role_assignments`, consolidation
- * #644) — referencing Identity entities in DQL would leak
+ * role codes with raw DBAL over `user_role_assignments` (the sole
+ * assignment path since ADR-0034) — referencing Identity entities in
+ * DQL would leak
  * Identity_Internals into this BC (deptrac).
  */
 final readonly class DoctrineWorkflowTaskRepository implements WorkflowTaskRepositoryInterface

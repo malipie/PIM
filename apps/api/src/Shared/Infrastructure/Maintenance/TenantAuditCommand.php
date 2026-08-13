@@ -53,8 +53,8 @@ final class TenantAuditCommand extends Command
      *   - `tenants`: the tenant entity itself; not scoped.
      *   - `permissions`: catalog of (resource, action) pairs, intentionally
      *     global (#27 / RbacMatrix).
-     *   - `role_permissions`, `user_roles`: M2M junctions; tenant scope
-     *     follows the parent rows.
+     *   - `role_permissions`: M2M junction; tenant scope follows the
+     *     parent rows.
      *   - `messenger_messages`: Symfony Messenger queue, infra.
      *   - `doctrine_migration_versions`: Doctrine bookkeeping.
      *
@@ -64,7 +64,6 @@ final class TenantAuditCommand extends Command
         'tenants',
         'permissions',
         'role_permissions',
-        'user_roles',
         'messenger_messages',
         'doctrine_migration_versions',
         // ObjectType ↔ Attribute junction (#32). Tenant scope inherited via
@@ -108,8 +107,8 @@ final class TenantAuditCommand extends Command
         'super_admins',
         // RBAC-P1-008 (#647) — per-user role assignment with scope
         // (locale/channel/attribute_groups). Junction; tenant scope
-        // inherited via user_id FK to users(tenant_id). Coexists with
-        // legacy `user_roles` M2M until #644 delta migrations consolidate.
+        // inherited via user_id FK to users(tenant_id). Sole record of who
+        // holds what since ADR-0034 (#2832 expand, #2836 contract).
         'user_role_assignments',
         // RBAC-P5-007 (#697) — per-attribute 3-state permission override
         // on a role. Junction; tenant scope inherited via role_id FK to

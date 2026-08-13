@@ -127,9 +127,10 @@ final readonly class UserUpdateController
             );
         }
 
-        // Replace the assigned-role set. Doctrine's M2M unit-of-work emits one
-        // DELETE for stripped rows and one INSERT per added row when we save,
-        // so we do not bypass listeners by touching `user_roles` directly.
+        // Replace the assigned-role set through the entity so Doctrine's
+        // unit-of-work emits the DELETE / INSERT on `user_role_assignments`
+        // itself — writing that junction with raw SQL would skip the
+        // listeners (ADR-0034 keeps addRole()/removeRole() the only path).
         $currentRoles = [];
         foreach ($target->getAssignedRoles() as $role) {
             $currentRoles[$role->getId()->toRfc4122()] = $role;
