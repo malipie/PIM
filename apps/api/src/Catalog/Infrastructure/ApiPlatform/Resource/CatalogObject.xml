@@ -376,13 +376,21 @@
 
                  Read-only by design — writes still go through the per-kind
                  sugar paths (`POST /api/{products,categories}`) where
-                 CatalogObjectProcessor enforces the discriminator. -->
+                 CatalogObjectProcessor enforces the discriminator.
+
+                 #2848 — READ_OBJECT_COLLECTION, not the shared 'READ'. This
+                 is also the endpoint the universal list view browses
+                 (`?objectType=<uuid>`, ObjectTypeFilter), so it has to serve
+                 PRD roles that may read one kind without handing them every
+                 other kind. Prd\ObjectCollectionVoter grants per-kind when
+                 the query is scoped; the unscoped union still needs the
+                 broad legacy object.read via CatalogObjectVoter. -->
             <operation class="ApiPlatform\Metadata\GetCollection"
                        uriTemplate="/objects{._format}"
                        name="objects_get_collection"
                        paginationType="cursor"
                        provider="App\Catalog\Infrastructure\ApiPlatform\State\CatalogObjectCollectionLocaleOverlayProvider"
-                       security="is_granted('READ', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
+                       security="is_granted('READ_OBJECT_COLLECTION', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
                 <paginationViaCursor>
                     <paginationField field="id" direction="DESC"/>
                 </paginationViaCursor>
