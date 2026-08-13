@@ -24,10 +24,11 @@ final readonly class RoleAgentAutonomyResolver implements AgentAutonomyResolverI
 
     public function autonomyForUser(Uuid $userId): string
     {
-        // tenant-safe: user_roles rows are reachable only through the
-        // caller's user id; RLS is the backstop.
+        // tenant-safe: assignment rows are reachable only through the
+        // caller's user id; RLS is the backstop. ADR-0034 (#2832) — reads
+        // the assignment table, so a role granted by invitation counts too.
         $levels = $this->connection->fetchFirstColumn(
-            'SELECT r.agent_autonomy FROM roles r JOIN user_roles ur ON ur.role_id = r.id WHERE ur.user_id = :user',
+            'SELECT r.agent_autonomy FROM roles r JOIN user_role_assignments ur ON ur.role_id = r.id WHERE ur.user_id = :user',
             ['user' => $userId->toRfc4122()],
         );
 

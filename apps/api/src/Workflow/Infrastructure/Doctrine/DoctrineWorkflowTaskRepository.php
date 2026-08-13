@@ -116,9 +116,6 @@ final readonly class DoctrineWorkflowTaskRepository implements WorkflowTaskRepos
     {
         $sql = <<<'SQL'
             SELECT DISTINCT r.code FROM roles r
-            JOIN user_roles ur ON ur.role_id = r.id AND ur.user_id = :user
-            UNION
-            SELECT DISTINCT r.code FROM roles r
             JOIN user_role_assignments ura ON ura.role_id = r.id AND ura.user_id = :user
             SQL;
 
