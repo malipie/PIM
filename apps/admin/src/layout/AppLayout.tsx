@@ -1,7 +1,6 @@
 import { Menu } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Outlet } from 'react-router';
 import { GlobalCmdK } from '@/components/agent/global-cmd-k';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -13,6 +12,7 @@ import { AGENT_ENABLED } from '@/lib/features';
 import { AppFooter } from './app-footer';
 import { NotificationsInboxProvider } from './notifications-context';
 import { PageActionsProvider } from './page-actions-context';
+import { SectionPermissionGuard } from './SectionPermissionGuard';
 import { SidebarNav } from './sidebar-nav';
 import { TopbarV2 } from './topbar-v2';
 
@@ -65,7 +65,10 @@ export function AppLayout() {
               </header>
 
               <main className="flex-1 overflow-auto p-4 md:p-6">
-                <Outlet />
+                {/* #2830 — every routed page passes the section gate, so a
+                    URL the caller cannot use shows 403 instead of a form
+                    that only fails on submit. */}
+                <SectionPermissionGuard />
               </main>
 
               <AppFooter />

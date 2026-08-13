@@ -21,6 +21,11 @@ export {
   type RestrictedFieldEnvelope,
   type RestrictedFieldValue,
 } from './restricted-field';
+export {
+  canAccessPath,
+  ROUTE_PERMISSIONS,
+  requiredPermissionsForPath,
+} from './route-permissions';
 export { useHttpErrorToast } from './use-http-error-toast';
 export {
   IDENTITY_QUERY_KEY,
