@@ -65,8 +65,10 @@ final class SuperAdminContext implements ResetInterface
 
     private ?Uuid $activeSuperAdminId = null;
 
-    public function __construct(private readonly EntityManagerInterface $entityManager)
-    {
+    public function __construct(
+        private readonly EntityManagerInterface $entityManager,
+        private readonly RlsBypass $rls,
+    ) {
     }
 
     public function isActive(): bool
@@ -119,12 +121,28 @@ final class SuperAdminContext implements ResetInterface
 
         $this->activeSuperAdminId = $superAdminId;
 
+        // #2876 — the Doctrine filter is only the first isolation layer.
+        // Postgres FORCE RLS is the second, and it reads `app.current_tenant`,
+        // which the request listener pinned to the CALLER's tenant. Writing
+        // another tenant's rows — which is the entire point of cross-tenant
+        // mode — violates the policy, so provisioning a tenant died with
+        // SQLSTATE 42501 after the tenant row was already inserted: created,
+        // no owner invitation, an error on screen.
+        //
+        // It only ever worked where `app.current_tenant` happened to be
+        // empty. `enableSuperAdminBypass()` was written for exactly this in
+        // #677 and had no callers.
+        $this->rls->enableSuperAdminBypass();
+
         return $previouslyEnabled;
     }
 
     public function restoreTenantScope(bool $reEnableFilter): void
     {
         $this->activeSuperAdminId = null;
+        // Hand the privilege back immediately; `kernel.terminate` resets it
+        // too, but the rest of THIS request must not keep it.
+        $this->rls->disableSuperAdminBypass();
 
         if ($reEnableFilter) {
             $filters = $this->entityManager->getFilters();

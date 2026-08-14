@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Infrastructure\Doctrine;
 
+use App\Identity\Application\SuperAdmin\RlsBypass;
 use App\Shared\Application\TenantContext;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -56,7 +57,7 @@ use Symfony\Component\HttpKernel\KernelEvents;
  * pre-context-safe policy that allows reads while the GUC is empty — see
  * the W1-1 migration.
  */
-final class RlsContextListener
+final class RlsContextListener implements RlsBypass
 {
     public function __construct(
         private readonly Connection $connection,
@@ -125,5 +126,18 @@ final class RlsContextListener
     {
         // tenant-safe: infrastructure (Super Admin bypass — audited via Phase 3 #676 listener with cross_tenant_access=true)
         $this->connection->executeStatement("SELECT set_config('app.is_super_admin', 'true', false)");
+    }
+
+    /**
+     * #2876 — the other half of the bypass, so a caller can hand the
+     * privilege back the moment it is done instead of waiting for
+     * `kernel.terminate`. Without it, a cross-tenant block that finishes
+     * early would leave the rest of the request able to write any tenant's
+     * rows.
+     */
+    public function disableSuperAdminBypass(): void
+    {
+        // tenant-safe: infrastructure (drops the bypass; the request returns to plain tenant isolation)
+        $this->connection->executeStatement("SELECT set_config('app.is_super_admin', 'false', false)");
     }
 }

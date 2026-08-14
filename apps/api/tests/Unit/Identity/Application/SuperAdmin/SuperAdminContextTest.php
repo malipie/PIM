@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Identity\Application\SuperAdmin;
 
+use App\Identity\Application\SuperAdmin\RlsBypass;
 use App\Identity\Application\SuperAdmin\SuperAdminContext;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query\FilterCollection;
@@ -21,7 +22,10 @@ final class SuperAdminContextTest extends TestCase
     #[Test]
     public function startsInactive(): void
     {
-        $context = new SuperAdminContext($this->createStub(EntityManagerInterface::class));
+        $context = new SuperAdminContext(
+            $this->createStub(EntityManagerInterface::class),
+            $this->createStub(RlsBypass::class),
+        );
 
         self::assertFalse($context->isActive());
         self::assertNull($context->activeSuperAdminId());
@@ -42,7 +46,7 @@ final class SuperAdminContextTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
-        $context = new SuperAdminContext($em);
+        $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
         $previous = $context->useCrossTenantMode(Uuid::v7());
 
         self::assertTrue($previous);
@@ -62,7 +66,7 @@ final class SuperAdminContextTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
-        $context = new SuperAdminContext($em);
+        $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
         $previous = $context->useCrossTenantMode(Uuid::v7());
 
         self::assertFalse($previous);
@@ -80,7 +84,7 @@ final class SuperAdminContextTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
-        $context = new SuperAdminContext($em);
+        $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
         $previous = $context->useCrossTenantMode(Uuid::v7());
         $context->restoreTenantScope($previous);
 
@@ -97,7 +101,7 @@ final class SuperAdminContextTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
-        $context = new SuperAdminContext($em);
+        $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
         $context->restoreTenantScope($context->useCrossTenantMode(Uuid::v7()));
 
         self::assertFalse($context->isActive());
@@ -114,7 +118,7 @@ final class SuperAdminContextTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
-        $context = new SuperAdminContext($em);
+        $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
         $result = $context->runCrossTenant(Uuid::v7(), static fn (): string => 'done');
 
         self::assertSame('done', $result);
@@ -132,7 +136,7 @@ final class SuperAdminContextTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
-        $context = new SuperAdminContext($em);
+        $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
 
         try {
             $context->runCrossTenant(Uuid::v7(), static function (): never {
@@ -143,5 +147,52 @@ final class SuperAdminContextTest extends TestCase
         }
 
         self::assertFalse($context->isActive());
+    }
+
+    /**
+     * #2876 — the Doctrine filter is only half of tenant isolation. Postgres
+     * FORCE RLS is the other half, and it does not care about PHP: it reads
+     * `app.is_super_admin`. Provisioning a tenant writes the NEW tenant's
+     * rows while the request has the CALLER's tenant pinned, so without this
+     * the insert died with SQLSTATE 42501 — after the tenant row was already
+     * committed. Created, no owner invitation, an error on screen.
+     */
+    #[Test]
+    public function crossTenantModeLiftsTheRlsPolicyToo(): void
+    {
+        $filters = $this->createMock(FilterCollection::class);
+        $filters->method('isEnabled')->willReturn(true);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getFilters')->willReturn($filters);
+
+        $rls = $this->createMock(RlsBypass::class);
+        $rls->expects(self::once())->method('enableSuperAdminBypass');
+        $rls->expects(self::once())->method('disableSuperAdminBypass');
+
+        new SuperAdminContext($em, $rls)->runCrossTenant(Uuid::v7(), static fn (): bool => true);
+    }
+
+    /**
+     * Handing the privilege back is not optional. If the callback throws and
+     * the bypass stays on, the rest of the request can write any tenant's
+     * rows — a wider hole than the bug it was lifted for.
+     */
+    #[Test]
+    public function theRlsBypassIsReleasedEvenWhenTheCallbackThrows(): void
+    {
+        $filters = $this->createMock(FilterCollection::class);
+        $filters->method('isEnabled')->willReturn(true);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getFilters')->willReturn($filters);
+
+        $rls = $this->createMock(RlsBypass::class);
+        $rls->expects(self::once())->method('disableSuperAdminBypass');
+
+        $context = new SuperAdminContext($em, $rls);
+
+        $this->expectException(RuntimeException::class);
+        $context->runCrossTenant(Uuid::v7(), static function (): void {
+            throw new RuntimeException('boom');
+        });
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Identity\Application\SuperAdmin;
 
+use App\Identity\Application\SuperAdmin\RlsBypass;
 use App\Identity\Application\SuperAdmin\SuperAdminContext;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query\FilterCollection;
@@ -30,7 +31,7 @@ final class RescueAdminContextRoundtripTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
-        $context = new SuperAdminContext($em);
+        $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
         $superAdminId = Uuid::v7();
 
         $insideActive = null;
