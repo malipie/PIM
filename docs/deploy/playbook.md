@@ -166,14 +166,19 @@ Przed i po, z tymi samymi zapytaniami — porównanie liczb jest szybsze i pewni
 -- czy ktoś stracił przypisanie
 SELECT count(*) FROM user_role_assignments;
 
--- czy rola nie zgubiła uprawnień
-SELECT r.code, count(rp.permission_id)
-FROM roles r LEFT JOIN role_permissions rp ON rp.role_id = r.id
-GROUP BY r.code ORDER BY 1;
+-- czy rola nie zgubiła uprawnień — ZAWSZE per (tenant, rola)
+SELECT coalesce(t.code, 'GLOBAL') AS tenant, r.code, count(rp.permission_id)
+FROM roles r
+LEFT JOIN tenants t ON t.id = r.tenant_id
+LEFT JOIN role_permissions rp ON rp.role_id = r.id
+GROUP BY 1, 2 ORDER BY 1, 2;
 
--- czy migracja porządkująca nie zostawiła duplikatów
-SELECT code, count(*) FROM roles GROUP BY code HAVING count(*) > 1;
+-- czy naprawdę są duplikaty grantów (a nie po prostu drugi tenant)
+SELECT count(*) AS wierszy, count(DISTINCT (role_id, permission_id)) AS unikalnych
+FROM role_permissions;
 ```
+
+**Agreguj per (tenant, rola), nigdy per sam kod roli.** Każdy tenant ma własny komplet ról PRD, więc `GROUP BY r.code` podwaja wszystkie liczby, gdy tylko powstanie drugi tenant — i wygląda to dokładnie jak zduplikowane role, czyli klasa błędu, którą naprawiały #2832 / #2840. **Zdarzyło się** (2026-08-14): `catalog_manager` pokazał 62 zamiast 31, `tenant_owner` 114 zamiast 57, a wdrożenie z nieodwracalną migracją omal nie zostało przerwane. Rozstrzygające były trzy fakty: `role_permissions` miało tyle samo wierszy co unikalnych par (jest tam unikalny PK, więc duplikaty są niemożliwe), `super_admin` nie drgnął (jest globalny), a `tenants` zawierał drugi wpis z wczorajszą datą.
 
 ## Wycofanie
 
