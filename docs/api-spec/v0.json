@@ -11633,7 +11633,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.read"
+                "x-cortex-permission": "user.read | api_tokens.own.crud"
             },
             "post": {
                 "operationId": "api_api_tokens_post",
@@ -11657,7 +11657,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.read"
+                "x-cortex-permission": "user.read | api_tokens.own.crud"
             }
         },
         "/api/api-tokens/{id}": {
@@ -11696,7 +11696,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.read"
+                "x-cortex-permission": "user.read | api_tokens.own.crud"
             }
         },
         "/api/api_profiles/{id}/rotate_webhook_secret": {
@@ -17208,7 +17208,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.users.manage"
             }
         },
         "/api/invitations/{id}/resend": {
@@ -17247,7 +17247,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.users.manage"
             }
         },
         "/api/invitations/{id}/revoke": {
@@ -17286,7 +17286,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.users.manage"
             }
         },
         "/api/invitations/{token}/accept": {
@@ -17518,7 +17518,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.read"
+                "x-cortex-permission": false
             }
         },
         "/api/mercure/authorization": {
@@ -18234,7 +18234,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object_type.read"
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/object_types/{id}/usage": {
@@ -19440,7 +19440,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.roles.manage"
             }
         },
         "/api/products/bulk-actions/preview": {
@@ -20581,7 +20581,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.roles.manage"
             },
             "post": {
                 "operationId": "api_roles_post",
@@ -20605,7 +20605,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.roles.manage"
             }
         },
         "/api/roles/{id}": {
@@ -20644,7 +20644,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.roles.manage"
             },
             "delete": {
                 "operationId": "api_roles_id_delete",
@@ -20681,7 +20681,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.roles.manage"
             },
             "patch": {
                 "operationId": "api_roles_id_patch",
@@ -20718,7 +20718,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.roles.manage"
             }
         },
         "/api/roles/{id}/attribute-permissions": {
@@ -20757,7 +20757,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.roles.manage"
             },
             "put": {
                 "operationId": "api_roles_id_attribute_permissions_put",
@@ -20794,7 +20794,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.roles.manage"
             }
         },
         "/api/saved-views": {
@@ -21274,7 +21274,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.tenant.manage"
             },
             "post": {
                 "operationId": "api_sso_providers_post",
@@ -21298,7 +21298,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.tenant.manage"
             }
         },
         "/api/sso/providers/{id}": {
@@ -21337,7 +21337,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.tenant.manage"
             },
             "patch": {
                 "operationId": "api_sso_providers_id_patch",
@@ -21374,7 +21374,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.tenant.manage"
             }
         },
         "/api/structural-import-sessions": {
@@ -21543,7 +21543,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.tenant.manage"
             },
             "patch": {
                 "operationId": "api_tenant_patch",
@@ -21567,7 +21567,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.tenant.manage"
             }
         },
         "/api/tenant-locales": {
@@ -21860,7 +21860,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.users.manage"
             },
             "post": {
                 "operationId": "api_users_post",
@@ -21884,7 +21884,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.users.manage"
             }
         },
         "/api/users/me/filter-favorites": {
@@ -21910,7 +21910,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.read"
+                "x-cortex-permission": false
             },
             "put": {
                 "operationId": "api_users_me_filter_favorites_put",
@@ -21934,7 +21934,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.write"
+                "x-cortex-permission": false
             },
             "patch": {
                 "operationId": "api_users_me_filter_favorites_patch",
@@ -21958,7 +21958,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.write"
+                "x-cortex-permission": false
             }
         },
         "/api/users/{id}": {
@@ -21997,7 +21997,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.users.manage"
             }
         },
         "/api/users/{id}/deactivate": {
@@ -22036,7 +22036,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.users.manage"
             }
         },
         "/api/users/{id}/password": {
@@ -22075,7 +22075,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.users.manage"
             }
         },
         "/api/users/{id}/reactivate": {
@@ -22114,7 +22114,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "user.admin"
+                "x-cortex-permission": "user.admin | settings.users.manage"
             }
         },
         "/api/workflow/definitions": {

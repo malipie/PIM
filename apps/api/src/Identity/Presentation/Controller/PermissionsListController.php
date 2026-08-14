@@ -56,7 +56,7 @@ final readonly class PermissionsListController
     }
 
     #[Route(path: '/api/permissions', methods: ['GET'], name: 'api_permissions_list')]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.roles.manage'])]
     public function __invoke(): JsonResponse
     {
         $principal = $this->security->getUser();

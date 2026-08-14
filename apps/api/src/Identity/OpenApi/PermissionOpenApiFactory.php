@@ -227,7 +227,14 @@ final readonly class PermissionOpenApiFactory implements OpenApiFactoryInterface
             /** @var RequiresPermission $instance */
             $instance = $attr->newInstance();
 
-            return $instance->permissionCode();
+            // #2874 — an endpoint that accepts either permission catalogue
+            // must say so. Publishing only the primary code told integrators
+            // that `user.admin` was the way in, while a PRD role holding
+            // `settings.users.manage` gets through just as well; the spec is
+            // a product surface, not a comment.
+            $accepted = $instance->acceptedCodes();
+
+            return \count($accepted) > 1 ? implode(' | ', $accepted) : $instance->permissionCode();
         }
 
         foreach ($rm->getAttributes(NoPermissionRequired::class) as $_) {

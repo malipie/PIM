@@ -35,7 +35,7 @@ final readonly class RoleDetailController
     }
 
     #[Route(path: '/api/roles/{id}', methods: ['GET'], name: 'api_roles_detail', requirements: ['id' => '[0-9a-f-]{36}'])]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.roles.manage'])]
     public function __invoke(string $id): JsonResponse
     {
         $caller = $this->security->getUser();

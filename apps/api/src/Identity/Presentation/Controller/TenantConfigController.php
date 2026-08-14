@@ -47,7 +47,7 @@ final readonly class TenantConfigController
     }
 
     #[Route(path: '/api/tenant', methods: ['GET'], name: 'api_tenant_get')]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.tenant.manage'])]
     public function get(): JsonResponse
     {
         $user = $this->security->getUser();
@@ -59,7 +59,7 @@ final readonly class TenantConfigController
     }
 
     #[Route(path: '/api/tenant', methods: ['PATCH'], name: 'api_tenant_patch')]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.tenant.manage'])]
     public function patch(Request $request): JsonResponse
     {
         $user = $this->security->getUser();

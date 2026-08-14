@@ -51,7 +51,7 @@ final readonly class RoleWriteController
     }
 
     #[Route(path: '/api/roles', methods: ['POST'], name: 'api_roles_create')]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.roles.manage'])]
     public function create(Request $request): JsonResponse
     {
         $caller = $this->security->getUser();
@@ -109,7 +109,7 @@ final readonly class RoleWriteController
     }
 
     #[Route(path: '/api/roles/{id}', methods: ['PATCH'], name: 'api_roles_update', requirements: ['id' => '[0-9a-f-]{36}'])]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.roles.manage'])]
     public function update(string $id, Request $request): JsonResponse
     {
         $caller = $this->security->getUser();
@@ -187,7 +187,7 @@ final readonly class RoleWriteController
     }
 
     #[Route(path: '/api/roles/{id}', methods: ['DELETE'], name: 'api_roles_delete', requirements: ['id' => '[0-9a-f-]{36}'])]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.roles.manage'])]
     public function delete(string $id): JsonResponse
     {
         $caller = $this->security->getUser();

@@ -138,7 +138,7 @@ export function AssetDrawer({ asset, onClose, onDeleted }: AssetDrawerProps) {
               </a>
             ) : null}
             <GatedButton
-              permission="asset.delete"
+              anyOf={['asset.delete', 'multimedia.delete']}
               variant="outline"
               size="icon"
               className="h-9 w-9 rounded-xl text-zinc-500 hover:bg-rose-50 hover:text-rose-600"

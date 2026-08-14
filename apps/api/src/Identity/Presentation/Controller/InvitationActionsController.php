@@ -50,7 +50,7 @@ final readonly class InvitationActionsController
         name: 'api_invitations_revoke',
         requirements: ['id' => '[0-9a-f-]{36}'],
     )]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.users.manage'])]
     public function revoke(string $id): JsonResponse
     {
         $caller = $this->callerOrUnauthorized();
@@ -91,7 +91,7 @@ final readonly class InvitationActionsController
         name: 'api_invitations_resend',
         requirements: ['id' => '[0-9a-f-]{36}'],
     )]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.users.manage'])]
     public function resend(string $id): JsonResponse
     {
         $caller = $this->callerOrUnauthorized();

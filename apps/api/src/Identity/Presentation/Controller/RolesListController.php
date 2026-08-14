@@ -40,7 +40,7 @@ final readonly class RolesListController
      * of the same Settings → Users management surface. Phase 6 retrofit
      * (#720+) migrates onto PRD §3.2 `settings.roles.manage`.
      */
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.roles.manage'])]
     public function __invoke(): JsonResponse
     {
         $principal = $this->security->getUser();

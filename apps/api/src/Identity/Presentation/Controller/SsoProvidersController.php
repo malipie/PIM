@@ -63,7 +63,7 @@ final readonly class SsoProvidersController
     }
 
     #[Route(path: '/api/sso/providers', methods: ['GET'], name: 'api_sso_providers_list')]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.tenant.manage'])]
     public function list(): JsonResponse
     {
         $caller = $this->security->getUser();
@@ -86,7 +86,7 @@ final readonly class SsoProvidersController
     }
 
     #[Route(path: '/api/sso/providers', methods: ['POST'], name: 'api_sso_providers_create')]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.tenant.manage'])]
     public function create(Request $request): JsonResponse
     {
         $caller = $this->security->getUser();
@@ -149,7 +149,7 @@ final readonly class SsoProvidersController
     }
 
     #[Route(path: '/api/sso/providers/{id}', methods: ['PATCH'], name: 'api_sso_providers_update', requirements: ['id' => '[0-9a-f-]{36}'])]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.tenant.manage'])]
     public function update(string $id, Request $request): JsonResponse
     {
         $caller = $this->security->getUser();
@@ -213,7 +213,7 @@ final readonly class SsoProvidersController
     }
 
     #[Route(path: '/api/sso/providers/{id}', methods: ['DELETE'], name: 'api_sso_providers_delete', requirements: ['id' => '[0-9a-f-]{36}'])]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.tenant.manage'])]
     public function delete(string $id): JsonResponse
     {
         $caller = $this->security->getUser();

@@ -49,7 +49,7 @@ final readonly class ApiTokensListController
     }
 
     #[Route(path: '/api/api-tokens', methods: ['GET'], name: 'api_api_tokens_list')]
-    #[RequiresPermission(module: 'user', action: 'read')]
+    #[RequiresPermission(module: 'user', action: 'read', anyOf: ['user.read', 'api_tokens.own.crud'])]
     public function __invoke(Request $request): JsonResponse
     {
         $caller = $this->security->getUser();

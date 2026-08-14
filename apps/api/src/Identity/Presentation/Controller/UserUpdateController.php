@@ -57,7 +57,7 @@ final readonly class UserUpdateController
     }
 
     #[Route(path: '/api/users/{id}', methods: ['PATCH'], name: 'api_users_update', requirements: ['id' => '[0-9a-f-]{36}'])]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.users.manage'])]
     public function __invoke(string $id, Request $request): JsonResponse
     {
         $caller = $this->security->getUser();

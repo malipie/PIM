@@ -50,7 +50,7 @@ final readonly class RevokeApiTokenController
     }
 
     #[Route(path: '/api/api-tokens/{id}', methods: ['DELETE'], name: 'api_api_tokens_revoke', requirements: ['id' => '[0-9a-f-]{36}'])]
-    #[RequiresPermission(module: 'user', action: 'read')]
+    #[RequiresPermission(module: 'user', action: 'read', anyOf: ['user.read', 'api_tokens.own.crud'])]
     public function __invoke(string $id): JsonResponse
     {
         $caller = $this->security->getUser();
