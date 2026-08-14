@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Presentation\Controller;
 
+use App\Catalog\Contracts\Service\TenantCatalogBootstrap;
 use App\Identity\Application\InvitationService;
 use App\Identity\Application\SeedTenantPrdRolesService;
 use App\Identity\Application\SuperAdmin\PlatformOperatorGuard;
@@ -72,6 +73,7 @@ final readonly class SuperAdminTenantWriteController
         private TenantRepositoryInterface $tenants,
         private SuperAdminTenantResponseBuilder $builder,
         private SeedTenantPrdRolesService $seedRoles,
+        private TenantCatalogBootstrap $bootstrapCatalog,
         private InvitationService $invitations,
     ) {
     }
@@ -135,6 +137,14 @@ final readonly class SuperAdminTenantWriteController
                 // PRD §3.2 role catalogue scoped to its id. Idempotent
                 // so a re-run from cortex:tenant:seed-roles is safe.
                 $this->seedRoles->seed($tenant);
+
+                // #2875 — built-in ObjectTypes, system + relation attributes
+                // and the default sidebar. Before this the chain ran only in
+                // AppFixtures, so a tenant created here came up with no
+                // Product type and its owner was told to "run the catalog
+                // seeder". Runs BEFORE the invitation on purpose: the owner
+                // should land in a tenant that is already usable.
+                $this->bootstrapCatalog->bootstrap($tenant);
 
                 // Provision the default Owner via the existing
                 // invitation flow — the email lands in Mailpit (dev) or
