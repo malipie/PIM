@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace App\DataFixtures;
 
-use App\Catalog\Application\BuiltInObjectTypeSeeder;
-use App\Catalog\Application\BuiltInProductRelationAttributesSeeder;
 use App\Catalog\Application\BuiltInSmartFilterPresetsSeeder;
-use App\Catalog\Application\BuiltInSystemAttributesSeeder;
-use App\Catalog\Application\DefaultMenuSeeder;
 use App\Catalog\Application\DemoCatalogSeeder;
+use App\Catalog\Contracts\Service\TenantCatalogBootstrap;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
@@ -76,12 +73,9 @@ class AppFixtures extends Fixture implements DependentFixtureInterface
         private readonly RoleRepositoryInterface $roleRepository,
         private readonly PermissionRepositoryInterface $permissionRepository,
         private readonly SeedTenantPrdRolesService $tenantPrdRolesSeeder,
-        private readonly BuiltInObjectTypeSeeder $builtInSeeder,
-        private readonly BuiltInSystemAttributesSeeder $systemAttributesSeeder,
-        private readonly BuiltInProductRelationAttributesSeeder $productRelationAttributesSeeder,
+        private readonly TenantCatalogBootstrap $tenantCatalogBootstrap,
         private readonly ObjectTypeRepositoryInterface $objectTypeRepository,
         private readonly DemoCatalogSeeder $demoCatalogSeeder,
-        private readonly DefaultMenuSeeder $defaultMenuSeeder,
         private readonly BuiltInSmartFilterPresetsSeeder $smartFilterPresetsSeeder,
     ) {
     }
@@ -141,21 +135,15 @@ class AppFixtures extends Fixture implements DependentFixtureInterface
         // catalog rows. The seeder is idempotent — `pim:db:reset` re-runs
         // are safe.
         foreach ($tenants as $tenant) {
-            $this->builtInSeeder->seed($tenant);
-            // System audit attributes are seeded as platform-owned Attribute
-            // rows only. Visibility is explicit modeling configuration;
-            // no AttributeGroup is auto-created or auto-attached.
-            $this->systemAttributesSeeder->seed($tenant);
-            // ADR-014 / MOD-02 (#894): seed the 5 built-in `relation`
-            // attributes on Product ObjectType + the "Powiązania" group
-            // that hosts them. Replaces BuiltInAssociationTypeSeeder.
-            $this->productRelationAttributesSeeder->seed($tenant);
-            // UX-02 — the "Multimedia" AttributeGroup is no longer seeded.
-            // Multimedia is now a capability flag (`ObjectType.hasMultimedia`)
-            // driving a hardcoded conditional tab, not a group of attributes.
-            // VIEW-08 (#427): seed the default sidebar layout (8 items
-            // matching the legacy hard-coded sidebar minus Services).
-            $this->defaultMenuSeeder->seed($tenant);
+            // #2875 — ObjectTypes, system + relation attributes and the
+            // default sidebar, in the order they depend on each other.
+            // Shared with SuperAdminTenantWriteController so a tenant created
+            // through the admin UI comes up identical to a fixtures one; the
+            // two used to drift, and the UI-created side had no ObjectTypes.
+            // UX-02 — the "Multimedia" AttributeGroup is deliberately NOT
+            // seeded: multimedia is a capability flag on ObjectType driving a
+            // conditional tab, not a group of attributes.
+            $this->tenantCatalogBootstrap->bootstrap($tenant);
             // RBAC-P1-007 (#646) — seed the 9 PRD-PIM-rbac §3.2 tenant-level
             // role templates (tenant_owner / admin / catalog_manager / …).
             // Without this, the demo admin lands without `settings.*.manage`
