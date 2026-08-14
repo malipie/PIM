@@ -10,6 +10,7 @@ use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Catalog\Domain\SystemMenuItemRegistry;
 use App\Catalog\Domain\Value\MenuItemRecord;
+use App\Identity\Contracts\Attribute\NoPermissionRequired;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Shared\Application\TenantContext;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -142,7 +143,13 @@ final class MenuConfigurationController
         priority: 200,
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'user', action: 'read')]
+    // #2874 — the caller's OWN effective menu, the same shape as /api/me:
+    // the authenticated user is the implicit subject, so there is nothing
+    // to authorise beyond being logged in. It used to ask for the legacy
+    // `user.read`, which no PRD role holds — so every member of a tenant
+    // created through the admin UI got a 403 here and the sidebar silently
+    // fell back to the default menu.
+    #[NoPermissionRequired(reason: 'Returns the caller\'s own effective menu; authentication is the whole gate.')]
     public function effective(Request $request): JsonResponse
     {
         $tenant = $this->tenantContext->get();

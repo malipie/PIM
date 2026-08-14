@@ -66,7 +66,7 @@ final readonly class RoleAttributePermissionsController
         name: 'api_roles_attribute_permissions_get',
         requirements: ['id' => '[0-9a-f-]{36}'],
     )]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.roles.manage'])]
     public function get(string $id): JsonResponse
     {
         $caller = $this->security->getUser();
@@ -91,7 +91,7 @@ final readonly class RoleAttributePermissionsController
         name: 'api_roles_attribute_permissions_replace',
         requirements: ['id' => '[0-9a-f-]{36}'],
     )]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.roles.manage'])]
     public function replace(string $id, Request $request): JsonResponse
     {
         $caller = $this->security->getUser();

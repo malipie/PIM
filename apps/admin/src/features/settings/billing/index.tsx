@@ -8,16 +8,21 @@ import { useIdentity } from '@/lib/identity';
 /**
  * RBAC-P5-016 (#706) — placeholder for Settings → Billing.
  *
- * Owner-only via {@link PermissionGate} (`user.admin` until #720
- * retrofit migrates onto the PRD §3.2 `settings.billing.manage`
- * permission code). The actual billing integration ships in Faza 1
+ * Owner-only via {@link PermissionGate}. Accepts either catalogue:
+ * legacy `user.admin` (bootstrap principals) or the PRD §3.2
+ * `settings.billing.manage` (#2874) — a tenant owner created through the
+ * admin UI holds only the latter, and used to be told "only the tenant
+ * Owner can see Subscription" while being exactly that. The actual billing integration ships in Faza 1
  * — this page only surfaces the current plan tier read from
  * `/api/auth/me` (extended in this PR) and a mailto link so the
  * Owner has a route to contact support today.
  */
 export function BillingSettingsPage() {
   return (
-    <PermissionGate code="user.admin" fallback={<ForbiddenFallback />}>
+    <PermissionGate
+      anyOf={['user.admin', 'settings.billing.manage']}
+      fallback={<ForbiddenFallback />}
+    >
       <BillingPlaceholder />
     </PermissionGate>
   );

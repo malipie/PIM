@@ -74,7 +74,7 @@ export function AssetBulkActionsBar({
         </span>
         <span className="h-5 w-px bg-white/20" aria-hidden />
         <GatedButton
-          permission="asset.delete"
+          anyOf={['asset.delete', 'multimedia.delete']}
           variant="ghost"
           size="sm"
           onClick={() => setConfirmOpen(true)}

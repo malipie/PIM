@@ -52,7 +52,7 @@ final class InvitationController extends AbstractController
     // `user.admin` is the code the sibling user-management endpoints use
     // (UserCreateController, InvitationActionsController::revoke/resend).
     #[Route(path: '/api/invitations', methods: ['POST'], name: 'api_invitations_create')]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.users.manage'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function create(Request $request): JsonResponse
     {

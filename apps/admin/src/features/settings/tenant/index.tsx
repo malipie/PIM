@@ -35,7 +35,10 @@ interface TenantConfig {
  */
 export function TenantSettingsPage() {
   return (
-    <PermissionGate code="user.admin" fallback={<ForbiddenFallback />}>
+    <PermissionGate
+      anyOf={['user.admin', 'settings.tenant.manage']}
+      fallback={<ForbiddenFallback />}
+    >
       <TenantConfigForm />
     </PermissionGate>
   );

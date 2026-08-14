@@ -61,7 +61,7 @@ final readonly class UserSetPasswordController
     }
 
     #[Route(path: '/api/users/{id}/password', methods: ['POST'], name: 'api_users_set_password', requirements: ['id' => '[0-9a-f-]{36}'])]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.users.manage'])]
     public function __invoke(string $id, Request $request): Response
     {
         $caller = $this->security->getUser();

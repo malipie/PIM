@@ -63,7 +63,7 @@ final readonly class UsersListController
      * has `user.read` (read-only-on-everything pattern) so a narrower gate is
      * needed than the read flag.
      */
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.users.manage'])]
     public function __invoke(Request $request): JsonResponse
     {
         $principal = $this->security->getUser();

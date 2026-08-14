@@ -54,7 +54,7 @@ final readonly class UserDeactivationController
     }
 
     #[Route(path: '/api/users/{id}/deactivate', methods: ['POST'], name: 'api_users_deactivate', requirements: ['id' => '[0-9a-f-]{36}'])]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.users.manage'])]
     public function deactivate(string $id): JsonResponse
     {
         $caller = $this->callerOrUnauthorized();
@@ -95,7 +95,7 @@ final readonly class UserDeactivationController
     }
 
     #[Route(path: '/api/users/{id}/reactivate', methods: ['POST'], name: 'api_users_reactivate', requirements: ['id' => '[0-9a-f-]{36}'])]
-    #[RequiresPermission(module: 'user', action: 'admin')]
+    #[RequiresPermission(module: 'user', action: 'admin', anyOf: ['user.admin', 'settings.users.manage'])]
     public function reactivate(string $id): JsonResponse
     {
         $caller = $this->callerOrUnauthorized();

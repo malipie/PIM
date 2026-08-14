@@ -238,7 +238,7 @@ export function UsersListView() {
           {t('settings.users.showing_count', { shown: users.length, total })}
         </div>
         <GatedButton
-          permission="user.write"
+          anyOf={['user.write', 'settings.users.manage']}
           variant="outline"
           size="sm"
           className="h-9 gap-1.5 rounded-xl border-zinc-200 px-3.5 text-[12.5px] font-medium text-zinc-700 hover:bg-zinc-100"
@@ -248,7 +248,7 @@ export function UsersListView() {
           {t('settings.users.add_manually.cta')}
         </GatedButton>
         <GatedButton
-          permission="user.write"
+          anyOf={['user.write', 'settings.users.manage']}
           size="sm"
           className="h-9 gap-1.5 rounded-xl bg-zinc-900 px-3.5 text-[12.5px] font-medium text-white hover:bg-zinc-800"
           onClick={() => setInviteOpen(true)}
