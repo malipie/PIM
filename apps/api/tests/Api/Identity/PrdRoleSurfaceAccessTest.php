@@ -77,6 +77,46 @@ final class PrdRoleSurfaceAccessTest extends CatalogApiTestCase
         yield 'attribute groups (schema)' => ['GET', '/api/attribute_groups/'.self::UNKNOWN_ID.'/attributes', 'modeling.view'];
         yield 'object form schema' => ['GET', '/api/objects/'.self::UNKNOWN_ID.'/form-schema', 'modeling.view'];
         yield 'category search' => ['GET', '/api/search/categories', 'categories.view'];
+
+        // #2881 — the API Platform half of the same sweep. These gate
+        // through `security="is_granted(...)"` on the resource rather than
+        // #[RequiresPermission], which is exactly why the first inventory
+        // walked past them: eleven resources answered only to legacy codes
+        // and returned 403 to every panel-created role, whatever it held.
+        yield 'channels (resource)' => ['GET', '/api/channels', 'publications.view'];
+        yield 'import profiles (resource)' => ['GET', '/api/import-profiles', 'imports.view_own'];
+        yield 'import schedules (resource)' => ['GET', '/api/import-schedules', 'imports.view_own'];
+        yield 'import sources (resource)' => ['GET', '/api/import-sources', 'imports.view_own'];
+        yield 'connections (resource)' => ['GET', '/api/connections', 'settings.integrations.manage'];
+        yield 'remote endpoints (resource)' => ['GET', '/api/remote_endpoints', 'settings.integrations.manage'];
+        yield 'field mappings (resource)' => ['GET', '/api/field_mappings', 'settings.integrations.manage'];
+        yield 'sync bindings (resource)' => ['GET', '/api/sync_bindings', 'settings.integrations.manage'];
+        yield 'sync runs (resource)' => ['GET', '/api/sync_runs', 'settings.integrations.manage'];
+        yield 'webhook deliveries (resource)' => ['GET', '/api/webhook_deliveries', 'settings.integrations.manage'];
+        yield 'api keys (resource)' => ['GET', '/api/api_keys', 'settings.integrations.manage'];
+        yield 'api profiles (resource)' => ['GET', '/api/api_profiles', 'settings.integrations.manage'];
+    }
+
+    /**
+     * Reading a surface is not permission to change it. `publications.view`
+     * opens the channel list; creating a channel needs the publish grant,
+     * and without that separation the table above would have quietly turned
+     * every viewer into an editor of eleven resources.
+     */
+    #[Test]
+    public function readingAResourceDoesNotGrantWritingIt(): void
+    {
+        $this->givenUserWithPermissions('channels-reader@demo.localhost', 'control_channels_read', ['publications.view']);
+
+        $client = $this->authenticatedClient('channels-reader@demo.localhost');
+        $client->request('GET', '/api/channels');
+        self::assertResponseIsSuccessful();
+
+        $client->request('POST', '/api/channels', [
+            'headers' => ['content-type' => 'application/ld+json'],
+            'body' => json_encode(['code' => 'shall-not-pass', 'name' => 'Nope'], JSON_THROW_ON_ERROR),
+        ]);
+        self::assertResponseStatusCodeSame(403, 'creating a channel needs publications.publish_unpublish');
     }
 
     /**
