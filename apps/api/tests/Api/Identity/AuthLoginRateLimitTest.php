@@ -21,10 +21,20 @@ use const JSON_THROW_ON_ERROR;
 /**
  * Coverage for #48 (0.4.8) — auth_login rate limiter.
  *
- * Six POST requests inside one window must yield five normal responses
- * (200 / 401) plus a 429 with `Retry-After`. The limiter ticks on
- * every login attempt regardless of credentials — even successful
- * logins consume the budget so a stolen credential cannot re-arm it.
+ * Five FAILED attempts inside one window exhaust the budget; the next
+ * request from that IP gets a 429 with `Retry-After`.
+ *
+ * #2881 — this file used to assert the opposite of its second test:
+ * that a successful login also consumed the budget. That was the
+ * behaviour, and the behaviour was wrong. Five correct passwords in a
+ * row locked the caller out for fifteen minutes, which is what an
+ * administrator moving between accounts does, and what verifying a
+ * deployment does. Brute force is made of failures; the limiter now
+ * counts those.
+ *
+ * The half of the old rationale worth keeping is pinned below: a
+ * success does not RESET the budget either, so guessing a password
+ * mid-run does not re-arm the limiter for the attacker.
  */
 final class AuthLoginRateLimitTest extends ApiTestCase
 {
@@ -98,14 +108,17 @@ final class AuthLoginRateLimitTest extends ApiTestCase
         );
     }
 
+    /**
+     * The operator's case, in the shape production logged it: several
+     * correct logins in a row from one address, which used to end in a
+     * 429 and now must not.
+     */
     #[Test]
-    public function successfulLoginAlsoConsumesTheBudget(): void
+    public function successfulLoginsDoNotConsumeTheBudget(): void
     {
         $client = static::createClient();
 
-        // Three successful logins (200) + three more wrong (401) =
-        // six attempts; the seventh should be 429.
-        for ($i = 0; $i < 3; ++$i) {
+        for ($i = 1; $i <= 8; ++$i) {
             $client->request('POST', '/api/auth/login', [
                 'headers' => ['content-type' => 'application/json'],
                 'body' => json_encode(
@@ -113,21 +126,52 @@ final class AuthLoginRateLimitTest extends ApiTestCase
                     JSON_THROW_ON_ERROR,
                 ),
             ]);
-            self::assertResponseStatusCodeSame(200, 'Successful attempt #'.($i + 1));
+            self::assertResponseStatusCodeSame(200, 'Successful login #'.$i.' must not be throttled.');
         }
+    }
 
-        for ($i = 0; $i < 2; ++$i) {
+    /**
+     * The half of the original rationale that survives: a correct
+     * password does not forgive the failures already recorded. Without
+     * this, an attacker who lands one guess mid-run re-arms the limiter
+     * and keeps going.
+     */
+    #[Test]
+    public function aSuccessDoesNotForgiveEarlierFailures(): void
+    {
+        $client = static::createClient();
+
+        for ($i = 1; $i <= 4; ++$i) {
             $client->request('POST', '/api/auth/login', [
                 'headers' => ['content-type' => 'application/json'],
                 'body' => json_encode(
-                    ['email' => self::ADMIN_EMAIL, 'password' => 'wrong'],
+                    ['email' => self::ADMIN_EMAIL, 'password' => 'wrong-'.$i],
                     JSON_THROW_ON_ERROR,
                 ),
             ]);
             self::assertResponseStatusCodeSame(401);
         }
 
-        // Sixth attempt — limiter triggers regardless of credentials.
+        $client->request('POST', '/api/auth/login', [
+            'headers' => ['content-type' => 'application/json'],
+            'body' => json_encode(
+                ['email' => self::ADMIN_EMAIL, 'password' => self::ADMIN_PASSWORD],
+                JSON_THROW_ON_ERROR,
+            ),
+        ]);
+        self::assertResponseStatusCodeSame(200, 'the budget still has one failure left');
+
+        // Fifth failure exhausts it; the one after that is refused
+        // before Lexik sees it, correct password or not.
+        $client->request('POST', '/api/auth/login', [
+            'headers' => ['content-type' => 'application/json'],
+            'body' => json_encode(
+                ['email' => self::ADMIN_EMAIL, 'password' => 'wrong-5'],
+                JSON_THROW_ON_ERROR,
+            ),
+        ]);
+        self::assertResponseStatusCodeSame(401);
+
         $client->request('POST', '/api/auth/login', [
             'headers' => ['content-type' => 'application/json'],
             'body' => json_encode(

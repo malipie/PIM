@@ -12,11 +12,27 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 /**
  * Rate limiter on `/api/auth/login` (#48 / 0.4.8).
  *
- * Five attempts per IP per 15-minute fixed window; the 6th request
- * gets a 429 with a `Retry-After` header. Both successful and failed
- * logins consume the budget — a stolen credential should not let the
- * attacker re-arm the limiter just because the password happens to
- * match.
+ * Five **failed** attempts per IP per 15-minute fixed window; the next
+ * request from that IP gets a 429 with a `Retry-After` header.
+ *
+ * #2881 — until now every attempt consumed the budget, successes
+ * included. That is not anti-bruteforce, it is a cap on logging in: an
+ * administrator moving between three of their own accounts from one
+ * address locked themselves out for a quarter of an hour, and so did
+ * anyone verifying a deployment from the same office IP. Production logs
+ * showed the shape plainly — five 200s, then a 429. Brute force is made
+ * of *failures*, so failures are what this counts;
+ * {@see AuthLoginFailureRateLimitListener} does the consuming.
+ *
+ * A success does not consume the budget, and it does not clear it
+ * either: failures already recorded keep counting down their window, so
+ * landing one guess mid-run does not re-arm the limiter for an attacker.
+ * Only `pim:security:unblock-ip` (#97) and the window expiring reset it.
+ *
+ * This listener therefore only *peeks*. `consume(0)` reports the bucket
+ * without saving it, but its accepted flag is not usable for a
+ * zero-token request — Symfony hardcodes `true` on that branch — so the
+ * decision reads the remaining tokens instead.
  *
  * IP fingerprinting is the only signal available on a pre-auth POST
  * (no JWT yet, no session). It's a coarse signal — corporate NATs
@@ -55,12 +71,12 @@ final readonly class AuthLoginRateLimitListener
         }
 
         $limiter = $this->authLoginLimiter->create($request->getClientIp() ?? 'unknown');
-        $consumed = $limiter->consume();
-        if ($consumed->isAccepted()) {
+        $peeked = $limiter->consume(0);
+        if ($peeked->getRemainingTokens() > 0) {
             return;
         }
 
-        $retryAfter = $consumed->getRetryAfter();
+        $retryAfter = $peeked->getRetryAfter();
         $secondsUntilReset = max(1, $retryAfter->getTimestamp() - time());
 
         throw new TooManyRequestsHttpException(
