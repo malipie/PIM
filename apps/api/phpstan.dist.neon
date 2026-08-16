@@ -6,11 +6,14 @@
 #   - phpstan-doctrine (entity manager, query builder typing)
 #   - phpstan-strict-rules (boolean coercion, defensive comparisons)
 #
-# Custom rules — three ship today:
+# Custom rules — four ship today:
 #   - RequiresPermissionAnnotationRule (RBAC-P1-010 #649) — every #[Route]
 #     method must declare #[RequiresPermission] or #[NoPermissionRequired].
 #   - HardcodedRoleCheckRule (RBAC-P1-010 #649) — forbids $user->hasRole(),
 #     isAdmin(), in_array(..., getRoles()) outside Identity/Infrastructure/Security/.
+#   - LegacyPermissionCodeRule (#2881) — an endpoint gated by a legacy
+#     `{resource}.{action}` code alone is closed to every role a tenant can
+#     create through the panel; it must offer the PRD equivalent via anyOf.
 #   - FlushWithoutClearInLoopRule (AUD-011, W1-8) — a Messenger handler that
 #     flush()es inside a batch loop without clear() OOMs the FrankenPHP worker
 #     (architektura §3.10); exempts AbstractBatchHandler subclasses.
@@ -35,10 +38,12 @@ parameters:
         # Skeleton bootstrap shipped by symfony/test-pack — touching it forces
         # us to fight Symfony's own conventions. Re-included once we extend it.
         - tests/bootstrap.php
-        # AUD-011 (W1-8) — deliberately-malformed fixtures for
-        # FlushWithoutClearInLoopRuleTest (flush-in-loop-without-clear handlers).
-        # RuleTestCase analyses them explicitly with the rule in isolation; the
-        # main analysis must NOT flag them as production findings.
+        # Deliberately-wrong fixtures for the custom-rule tests — flush-in-loop
+        # handlers (AUD-011, W1-8) and endpoints on legacy-only permission
+        # codes (#2881). RuleTestCase analyses them explicitly with the rule in
+        # isolation; the main analysis must NOT flag them as production
+        # findings, which for #2881 would also be self-defeating: the rule
+        # would report its own proof that it works.
         - tests/Architecture/PHPStan/Fixtures/*
 
     # Symfony container introspection — needs the dev cache built before PHPStan runs.

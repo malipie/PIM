@@ -114,6 +114,21 @@ final class RbacMatrix
     ];
 
     /**
+     * The resources of the legacy grid, as a list.
+     *
+     * #2881 — exposed so `LegacyPermissionCodeRule` can tell a legacy
+     * code from a PRD one at analysis time. Keeping the rule's own copy
+     * of this list would mean a new legacy resource silently escaping
+     * the gate, which is the exact failure mode the gate exists to stop.
+     *
+     * @return list<string>
+     */
+    public static function legacyResources(): array
+    {
+        return self::RESOURCES;
+    }
+
+    /**
      * @return list<PermissionDefinition>
      */
     public static function permissions(): array

@@ -87,6 +87,33 @@ public function update(Product $product) { /* ... */ }
 - `src/Identity/Application/RbacSeeder` — seeder reads role catalogue when materialising templates
 - `tests/`, `DataFixtures/` — fixtures and assertions legitimately introspect roles
 
+### `LegacyPermissionCodeRule` (#2881)
+
+**Co blokuje:** `#[RequiresPermission]` nazywający zasób z siatki legacy (`RbacMatrix::legacyResources()`) **bez** ani jednego kodu PRD w `anyOf`.
+
+**Dlaczego:** uprawnienia żyją w PIM w dwóch równoległych katalogach — legacy `{zasób}.{akcja}` (`object.write`, `channel.read`) i PRD §3.2 `{moduł}.{akcja}` (`products.add`, `publications.view`). **Role tworzone przez panel niosą wyłącznie kody PRD.** Endpoint pytający o sam kod legacy jest więc zamknięty dla każdej roli, którą tenant potrafi u siebie utworzyć: użytkownik ma uprawnienie, panel pokazuje, że je ma, a serwer odmawia.
+
+Ten defekt naprawiano **pięć razy, ekran po ekranie** (#2841, #2849, #2852, #2877, #2880), bo nic nie powstrzymywało kolejnego feature'u przed wprowadzeniem go od nowa. Ta reguła jest tym powstrzymaniem.
+
+```php
+// ✗ zamknięte dla każdej roli z panelu
+#[RequiresPermission(module: 'channel', action: 'read')]
+
+// ✓
+#[RequiresPermission(module: 'channel', action: 'read', anyOf: [
+    'channel.read',          // podmioty sprzed PRD i klucze API
+    'publications.view',     // role z panelu
+])]
+```
+
+**Czego reguła NIE sprawdza:** czy wybrany kod PRD jest *właściwy*. To decyzja o tym, kto ma docierać do danej powierzchni, i żadna analiza statyczna jej nie podejmie. Reguła gwarantuje tylko, że decyzja w ogóle zapadła. Tabela mapowań: #2881.
+
+**Kolizja nazw, którą reguła pomija świadomie:** `object.view` / `.add` / `.edit` / `.delete` / `.export` to werby ULV-04a (#985) zaseedowane jako kody PRD, mimo że `object` jest też zasobem legacy — `object.delete` to dosłownie jeden wiersz obsługujący oba katalogi. Kod, który sam jest w katalogu PRD, nie jest zgłaszany.
+
+**Brak wyjątków na baseline.** Po #2881 na samym kodzie legacy nie stoi żaden endpoint produkcyjny, więc reguła wchodzi na czysto — nie ma czego grandfather'ować i nie ma daty przeglądu do pilnowania.
+
+**Kiedy zniknie:** gdy zniknie katalog legacy (migracja ról istniejących instalacji, osobny ticket). Do tego czasu to jest jedyna rzecz, która trzyma oba katalogi razem.
+
 ## Deferred rules (follow-up tickets)
 
 ### Rule 2 — `FlushWithoutClearRule` (DEFERRED)
