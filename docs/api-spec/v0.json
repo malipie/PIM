@@ -13297,7 +13297,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/catalogs": {
@@ -13347,7 +13347,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/catalogs/bulk-generate": {
@@ -13373,7 +13373,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/catalogs/preview": {
@@ -13526,7 +13526,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             },
             "patch": {
                 "operationId": "api_catalogs_id_patch",
@@ -13563,7 +13563,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/catalogs/{id}/generate": {
@@ -13602,7 +13602,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/catalogs/{id}/preview": {
@@ -13719,7 +13719,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             },
             "delete": {
                 "operationId": "api_catalogs_id_token_delete",
@@ -13756,7 +13756,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             }
         },
         "/api/categories/{id}/attribute_groups": {
@@ -15033,7 +15033,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/exports/profiles/{id}": {
@@ -15109,7 +15109,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             },
             "patch": {
                 "operationId": "api_exports_profiles_id_patch",
@@ -15146,7 +15146,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/exports/profiles/{id}/run": {
@@ -15287,7 +15287,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin | exports.run"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/exports/sessions/{id}/cancel": {

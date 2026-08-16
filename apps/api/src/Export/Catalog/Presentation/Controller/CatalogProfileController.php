@@ -58,11 +58,17 @@ final class CatalogProfileController
 
     #[Route(path: '/api/catalogs', name: 'pim_catalogs_create', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    // #2881 — PDF catalogs are the exports surface (`/catalogs-pdf` is gated
-    // by exports.view_* in ROUTE_PERMISSIONS), so writes follow `exports.run`.
+    // #2881 — the writes follow the SAME code this controller's reads use
+    // (`exports.view_all`), not `exports.run`. A first pass mapped them to
+    // exports.run and CI caught the incoherence: `marketing` holds
+    // exports.run but only exports.view_own, so it could create a PDF
+    // catalog it could not then open. A write reachable by someone who
+    // cannot read the surface is a worse gate than the legacy one it
+    // replaced. Minting the public pull token is a secret and follows
+    // `settings.integrations.manage` instead — see CatalogTokenController.
     #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
         'integration.admin',
-        'exports.run',
+        'exports.view_all',
     ])]
     public function create(Request $request): JsonResponse
     {
@@ -109,7 +115,7 @@ final class CatalogProfileController
     #[IsGranted('ROLE_USER')]
     #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
         'integration.admin',
-        'exports.run',
+        'exports.view_all',
     ])]
     public function patch(string $id, Request $request): JsonResponse
     {
@@ -159,7 +165,7 @@ final class CatalogProfileController
     #[IsGranted('ROLE_USER')]
     #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
         'integration.admin',
-        'exports.run',
+        'exports.view_all',
     ])]
     public function delete(string $id): Response
     {

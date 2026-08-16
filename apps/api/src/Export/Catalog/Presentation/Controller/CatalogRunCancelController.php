@@ -48,7 +48,7 @@ final class CatalogRunCancelController
     #[IsGranted('ROLE_USER')]
     #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
         'integration.admin',
-        'exports.run',
+        'exports.view_all',
     ])]
     public function cancel(string $id): JsonResponse
     {

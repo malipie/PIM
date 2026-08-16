@@ -68,7 +68,10 @@ final class PrdRoleSurfaceAccessTest extends CatalogApiTestCase
         yield 'import sources' => ['POST', '/api/import-sources/'.self::UNKNOWN_ID.'/test-connection', 'imports.run'];
         yield 'api profiles (configurator)' => ['GET', '/api/profiles/builder_options', 'settings.integrations.manage'];
         yield 'feeds (configurator)' => ['GET', '/api/feeds', 'settings.integrations.manage'];
-        yield 'pdf catalogs (exports)' => ['POST', '/api/catalogs/bulk-generate', 'exports.run'];
+        // Not `exports.run`: the catalog reads ask for `exports.view_all`, so
+        // the writes do too — a write reachable by someone who cannot read the
+        // surface is not a gate, it is a hole with a different name.
+        yield 'pdf catalogs (exports)' => ['POST', '/api/catalogs/bulk-generate', 'exports.view_all'];
         yield 'backups (tenant admin)' => ['GET', '/api/backups/'.self::UNKNOWN_ID, 'settings.tenant.manage'];
         yield 'attribute options (schema)' => ['GET', '/api/attributes/some-code/options', 'modeling.view'];
         yield 'attribute groups (schema)' => ['GET', '/api/attribute_groups/'.self::UNKNOWN_ID.'/attributes', 'modeling.view'];
