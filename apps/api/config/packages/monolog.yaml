@@ -43,7 +43,17 @@ when@prod:
                 action_level: error
                 buffer_size: 50
                 handler: nested
-                excluded_http_codes: [404, 405]
+                # #2881 — 401 and 403 join 404/405 as codes that do NOT
+                # open an incident. A permission denial is the RBAC layer
+                # working, not failing: with the two catalogues in play a
+                # healthy tenant produces them all day, and each one used
+                # to flush the whole 50-record buffer — DEBUG security
+                # chatter, the exception, the stack trace — so a normal
+                # afternoon read like an outage. The denial itself is not
+                # lost: Symfony logs it at ERROR, which the `warnings`
+                # handler below emits unconditionally, so one denial is
+                # one line instead of fifty.
+                excluded_http_codes: [401, 403, 404, 405]
                 channels: ["!event", "!deprecation"]
             nested:
                 type: stream

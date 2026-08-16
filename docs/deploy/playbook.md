@@ -98,7 +98,14 @@ for p in /login /forgot-password /dashboard; do
   printf "%-18s %s\n" "$p" "$(curl -s -o /dev/null -w '%{http_code}' https://app.harmonpim.pl$p)"
 done
 curl -s -o /dev/null -w '%{http_code}\n' https://app.harmonpim.pl/api/products   # 401 bez tokenu
-ssh $HOST "cd /opt/pim && $DC logs api --since 5m | grep -icE 'critical|emergency|fatal|uncaught'"   # 0
+# Uwaga (#2881): odmowa uprawnień loguje się jako `Uncaught PHP Exception
+# AccessDeniedHttpException`, więc goły grep po `uncaught` liczył ją jako błąd
+# krytyczny. To normalna praca RBAC — odfiltrowana, żeby ten wynik znowu
+# odróżniał awarię od odmowy.
+ssh $HOST "cd /opt/pim && $DC logs api --since 5m | grep -iE 'critical|emergency|fatal|uncaught' | grep -vic 'AccessDenied'"   # 0
+# Same odmowy — informacyjnie, nie jako bramka. Rosnąca liczba po wdrożeniu
+# uprawnień znaczy, że komuś zabrano dostęp; zero znaczy, że nikt nie próbował.
+ssh $HOST "cd /opt/pim && $DC logs api --since 5m | grep -ic 'AccessDenied'"
 ssh $HOST "cd /opt/pim && $DC ps --format '{{.Service}} {{.Status}}'"                                 # healthy
 ```
 
