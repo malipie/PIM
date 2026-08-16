@@ -54,7 +54,13 @@ final class AttributeOptionsController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'attribute', action: 'read')]
+    #[RequiresPermission(module: 'attribute', action: 'read', anyOf: [
+        'attribute.read',
+        'modeling.view',
+        'products.view',
+        'categories.view',
+        'multimedia.view',
+    ])]
     public function list(string $code): JsonResponse
     {
         $attribute = $this->loadAttributeByCode($code);
@@ -83,7 +89,13 @@ final class AttributeOptionsController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'attribute', action: 'read')]
+    #[RequiresPermission(module: 'attribute', action: 'read', anyOf: [
+        'attribute.read',
+        'modeling.view',
+        'products.view',
+        'categories.view',
+        'multimedia.view',
+    ])]
     public function usage(string $code, string $optionCode): JsonResponse
     {
         $attribute = $this->loadAttributeByCode($code);
@@ -232,7 +244,10 @@ final class AttributeOptionsController
         methods: ['DELETE'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'attribute', action: 'delete')]
+    #[RequiresPermission(module: 'attribute', action: 'delete', anyOf: [
+        'attribute.delete',
+        'modeling.delete_custom',
+    ])]
     public function delete(string $code, string $optionCode): JsonResponse
     {
         $attribute = $this->loadAttributeByCode($code);

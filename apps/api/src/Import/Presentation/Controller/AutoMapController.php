@@ -40,7 +40,10 @@ final class AutoMapController
         name: 'imports_auto_map',
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'write')]
+    #[RequiresPermission(module: 'import_session', action: 'write', anyOf: [
+        'import_session.write',
+        'imports.run',
+    ])]
     public function __invoke(Request $request): JsonResponse
     {
         $payload = json_decode($request->getContent(), true);

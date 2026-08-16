@@ -56,7 +56,10 @@ final class CatalogBulkGenerateController
 
     #[Route(path: '/api/catalogs/bulk-generate', name: 'pim_catalogs_bulk_generate', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.run',
+    ])]
     public function bulkGenerate(Request $request): JsonResponse
     {
         $tenant = $this->resolveTenant();

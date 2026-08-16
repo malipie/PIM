@@ -48,7 +48,10 @@ final class FeedRunHistoryController
 
     #[Route(path: '/api/feeds/{id}/runs', name: 'pim_feeds_runs_list', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function list(string $id, Request $request): JsonResponse
     {
         $this->assertTenantUser();
@@ -71,7 +74,10 @@ final class FeedRunHistoryController
 
     #[Route(path: '/api/feeds/{id}/runs/{runId}', name: 'pim_feeds_run_detail', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}', 'runId' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function detail(string $id, string $runId): JsonResponse
     {
         $this->assertTenantUser();
@@ -83,7 +89,10 @@ final class FeedRunHistoryController
 
     #[Route(path: '/api/feeds/{id}/runs/{runId}/logs', name: 'pim_feeds_run_logs', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}', 'runId' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function logs(string $id, string $runId, Request $request): JsonResponse
     {
         $this->assertTenantUser();
@@ -114,7 +123,10 @@ final class FeedRunHistoryController
 
     #[Route(path: '/api/feeds/{id}/health', name: 'pim_feeds_health', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function health(string $id): JsonResponse
     {
         $this->assertTenantUser();

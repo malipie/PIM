@@ -38,7 +38,13 @@ final class TestImportSourceConnectionController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_source', action: 'read')]
+    // #2881 — `imports.run`, not the view codes: this reaches out to the
+    // remote source, so it belongs to whoever may run an import, not to
+    // whoever may read past sessions.
+    #[RequiresPermission(module: 'import_source', action: 'read', anyOf: [
+        'import_source.read',
+        'imports.run',
+    ])]
     public function __invoke(string $id): JsonResponse
     {
         $userId = $this->currentUser->userId();

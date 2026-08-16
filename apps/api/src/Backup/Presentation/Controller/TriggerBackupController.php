@@ -51,7 +51,16 @@ final class TriggerBackupController
         name: 'backups_trigger',
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'backup', action: 'write')]
+    // #2881 — `settings.tenant.manage`, not only `platform.tenants.manage`
+    // as the ticket first suggested. The pre-import backup checkbox in the
+    // wizard is a tenant-admin action; the platform code belongs to the
+    // operator panel and no tenant Owner holds it, which would have left
+    // that checkbox dead for every panel-provisioned tenant.
+    #[RequiresPermission(module: 'backup', action: 'write', anyOf: [
+        'backup.write',
+        'settings.tenant.manage',
+        'platform.tenants.manage',
+    ])]
     public function __invoke(Request $request): JsonResponse
     {
         $userId = $this->currentUser->userId();

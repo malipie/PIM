@@ -46,7 +46,10 @@ final class TestWebhookController
         methods: ['POST'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'api_profile', action: 'admin')]
+    #[RequiresPermission(module: 'api_profile', action: 'admin', anyOf: [
+        'api_profile.admin',
+        'settings.integrations.manage',
+    ])]
     public function test(string $id): JsonResponse
     {
         $profile = $this->profiles->findById(Uuid::fromString($id));
@@ -86,7 +89,10 @@ final class TestWebhookController
         methods: ['POST'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'api_profile', action: 'admin')]
+    #[RequiresPermission(module: 'api_profile', action: 'admin', anyOf: [
+        'api_profile.admin',
+        'settings.integrations.manage',
+    ])]
     public function rotate(string $id): JsonResponse
     {
         $profile = $this->profiles->findById(Uuid::fromString($id));

@@ -51,7 +51,10 @@ final class FeedMappingController
 
     #[Route(path: '/api/feeds/{id}/mapping', name: 'pim_feeds_mapping_get', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function get(string $id): JsonResponse
     {
         $tenant = $this->resolveTenant();
@@ -62,7 +65,10 @@ final class FeedMappingController
 
     #[Route(path: '/api/feeds/{id}/mapping', name: 'pim_feeds_mapping_put', methods: ['PUT'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function put(string $id, Request $request): JsonResponse
     {
         $tenant = $this->resolveTenant();

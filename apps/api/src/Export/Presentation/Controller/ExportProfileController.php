@@ -84,7 +84,13 @@ final class ExportProfileController
         methods: ['POST'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    // #2881 — the reads on this controller already ask for exports.view_all;
+    // the writes asked for legacy integration.admin. Whoever may run an
+    // export may configure one, so they follow `exports.run`.
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.run',
+    ])]
     public function create(Request $request): JsonResponse
     {
         [$tenant, $userId] = $this->resolveTenantAndUser();
@@ -136,7 +142,10 @@ final class ExportProfileController
         methods: ['PATCH'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.run',
+    ])]
     public function patch(string $id, Request $request): JsonResponse
     {
         $profile = $this->loadOwnedOrFail($id);
@@ -192,7 +201,10 @@ final class ExportProfileController
         methods: ['DELETE'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.run',
+    ])]
     public function delete(string $id): Response
     {
         $profile = $this->loadOwnedOrFail($id);

@@ -67,7 +67,13 @@ final class CategoryAttributeGroupController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'attribute_group', action: 'read')]
+    #[RequiresPermission(module: 'attribute_group', action: 'read', anyOf: [
+        'attribute_group.read',
+        'modeling.view',
+        'products.view',
+        'categories.view',
+        'multimedia.view',
+    ])]
     public function list(string $id, Request $request): JsonResponse
     {
         $category = $this->fetchCategory($id);

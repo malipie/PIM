@@ -55,7 +55,10 @@ final class RollbackImportController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'admin')]
+    #[RequiresPermission(module: 'import_session', action: 'admin', anyOf: [
+        'import_session.admin',
+        'imports.run',
+    ])]
     public function __invoke(string $id): JsonResponse
     {
         $session = $this->loadOwned($id);
@@ -104,7 +107,10 @@ final class RollbackImportController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'admin')]
+    #[RequiresPermission(module: 'import_session', action: 'admin', anyOf: [
+        'import_session.admin',
+        'imports.run',
+    ])]
     public function cancel(string $id): JsonResponse
     {
         $session = $this->loadOwned($id);
@@ -134,7 +140,10 @@ final class RollbackImportController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'admin')]
+    #[RequiresPermission(module: 'import_session', action: 'admin', anyOf: [
+        'import_session.admin',
+        'imports.run',
+    ])]
     public function resume(string $id): JsonResponse
     {
         $session = $this->loadOwned($id);
@@ -173,7 +182,10 @@ final class RollbackImportController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['GET'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'admin')]
+    #[RequiresPermission(module: 'import_session', action: 'admin', anyOf: [
+        'import_session.admin',
+        'imports.run',
+    ])]
     public function preview(string $id): JsonResponse
     {
         $session = $this->loadOwned($id);

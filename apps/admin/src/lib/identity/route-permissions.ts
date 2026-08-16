@@ -40,7 +40,9 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, readonly string[
   ['/integrations/imports', ['imports.view_own', 'imports.view_all']],
   ['/integrations/exports', ['exports.view_own', 'exports.view_all']],
   ['/integrations/api-configurator', ['settings.integrations.manage']],
-  ['/api-profiles', ['api_profile.read', 'settings.integrations.manage']],
+  // #2881 — settings.integrations.manage first; `api_profile.read` is the
+  // legacy code kept for pre-PRD principals, not the one panel roles hold.
+  ['/api-profiles', ['settings.integrations.manage', 'api_profile.read']],
 
   ['/publications', ['publications.view']],
   ['/workflow', ['workflow.view']],

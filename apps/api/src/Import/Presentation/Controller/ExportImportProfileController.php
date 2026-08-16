@@ -42,7 +42,11 @@ final class ExportImportProfileController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['GET'],
     )]
-    #[RequiresPermission(module: 'import_profile', action: 'read')]
+    #[RequiresPermission(module: 'import_profile', action: 'read', anyOf: [
+        'import_profile.read',
+        'imports.view_own',
+        'imports.view_all',
+    ])]
     public function __invoke(string $id): JsonResponse
     {
         $userId = $this->currentUser->userId();

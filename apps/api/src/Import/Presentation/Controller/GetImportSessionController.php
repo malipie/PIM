@@ -36,7 +36,11 @@ final class GetImportSessionController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['GET'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'read')]
+    #[RequiresPermission(module: 'import_session', action: 'read', anyOf: [
+        'import_session.read',
+        'imports.view_own',
+        'imports.view_all',
+    ])]
     public function __invoke(string $id): JsonResponse
     {
         $session = $this->loadSession($id);

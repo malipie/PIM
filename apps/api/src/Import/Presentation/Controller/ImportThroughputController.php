@@ -36,7 +36,11 @@ final class ImportThroughputController
         name: 'imports_throughput',
         methods: ['GET'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'read')]
+    #[RequiresPermission(module: 'import_session', action: 'read', anyOf: [
+        'import_session.read',
+        'imports.view_own',
+        'imports.view_all',
+    ])]
     public function __invoke(Request $request): JsonResponse
     {
         $userId = $this->currentUser->userId();

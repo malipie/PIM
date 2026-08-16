@@ -56,7 +56,10 @@ final class CatalogRegenerateController
 
     #[Route(path: '/api/catalogs/{id}/generate', name: 'pim_catalogs_generate', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.run',
+    ])]
     public function generate(string $id): JsonResponse
     {
         $tenant = $this->resolveTenant();

@@ -58,7 +58,12 @@ final class CatalogProfileController
 
     #[Route(path: '/api/catalogs', name: 'pim_catalogs_create', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    // #2881 — PDF catalogs are the exports surface (`/catalogs-pdf` is gated
+    // by exports.view_* in ROUTE_PERMISSIONS), so writes follow `exports.run`.
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.run',
+    ])]
     public function create(Request $request): JsonResponse
     {
         [$tenant] = $this->resolveTenant();
@@ -102,7 +107,10 @@ final class CatalogProfileController
 
     #[Route(path: '/api/catalogs/{id}', name: 'pim_catalogs_patch', methods: ['PATCH'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.run',
+    ])]
     public function patch(string $id, Request $request): JsonResponse
     {
         $catalog = $this->loadOrFail($id);
@@ -149,7 +157,10 @@ final class CatalogProfileController
 
     #[Route(path: '/api/catalogs/{id}', name: 'pim_catalogs_delete', methods: ['DELETE'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.run',
+    ])]
     public function delete(string $id): Response
     {
         $this->catalogs->remove($this->loadOrFail($id));

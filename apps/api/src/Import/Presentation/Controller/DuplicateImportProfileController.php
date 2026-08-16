@@ -40,7 +40,10 @@ final class DuplicateImportProfileController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_profile', action: 'write')]
+    #[RequiresPermission(module: 'import_profile', action: 'write', anyOf: [
+        'import_profile.write',
+        'imports.run',
+    ])]
     public function __invoke(string $id): JsonResponse
     {
         $userId = $this->currentUser->userId();

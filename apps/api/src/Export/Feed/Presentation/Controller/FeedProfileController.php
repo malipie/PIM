@@ -50,7 +50,14 @@ final class FeedProfileController
 
     #[Route(path: '/api/feeds', name: 'pim_feeds_list', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    // #2881 — the feeds screen lives under /integrations/api-configurator
+    // (ROUTE_PERMISSIONS), so its reads answer to the same code its writes
+    // do. Leaving the list on exports.view_all alone would have handed an
+    // Integration Manager the ability to create a feed and no way to see it.
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function list(): JsonResponse
     {
         [$tenant] = $this->resolveTenant();
@@ -62,7 +69,14 @@ final class FeedProfileController
 
     #[Route(path: '/api/feeds', name: 'pim_feeds_create', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    // #2881 — feeds live under /integrations/api-configurator in the admin
+    // (ROUTE_PERMISSIONS), so they follow `settings.integrations.manage`.
+    // Catalogs and export profiles are the exports surface and follow
+    // `exports.run` instead — the legacy `integration.admin` covered both.
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function create(Request $request): JsonResponse
     {
         [$tenant] = $this->resolveTenant();
@@ -101,7 +115,10 @@ final class FeedProfileController
 
     #[Route(path: '/api/feeds/{id}', name: 'pim_feeds_get', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function get(string $id): JsonResponse
     {
         return new JsonResponse($this->serialize($this->loadOrFail($id)));
@@ -109,7 +126,10 @@ final class FeedProfileController
 
     #[Route(path: '/api/feeds/{id}', name: 'pim_feeds_patch', methods: ['PATCH'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function patch(string $id, Request $request): JsonResponse
     {
         $feed = $this->loadOrFail($id);
@@ -189,7 +209,10 @@ final class FeedProfileController
 
     #[Route(path: '/api/feeds/{id}', name: 'pim_feeds_delete', methods: ['DELETE'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function delete(string $id): Response
     {
         $this->feeds->remove($this->loadOrFail($id));
@@ -199,7 +222,10 @@ final class FeedProfileController
 
     #[Route(path: '/api/feeds/{id}/pause', name: 'pim_feeds_pause', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function pause(string $id): JsonResponse
     {
         $feed = $this->loadOrFail($id);
@@ -211,7 +237,10 @@ final class FeedProfileController
 
     #[Route(path: '/api/feeds/{id}/resume', name: 'pim_feeds_resume', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function resume(string $id): JsonResponse
     {
         $feed = $this->loadOrFail($id);

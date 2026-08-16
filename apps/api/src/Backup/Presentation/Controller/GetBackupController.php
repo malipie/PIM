@@ -37,7 +37,13 @@ final class GetBackupController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['GET'],
     )]
-    #[RequiresPermission(module: 'backup', action: 'read')]
+    // #2881 — see TriggerBackupController: backups are a tenant-admin
+    // surface, so `settings.tenant.manage` answers alongside the platform code.
+    #[RequiresPermission(module: 'backup', action: 'read', anyOf: [
+        'backup.read',
+        'settings.tenant.manage',
+        'platform.tenants.manage',
+    ])]
     public function __invoke(string $id): JsonResponse
     {
         try {

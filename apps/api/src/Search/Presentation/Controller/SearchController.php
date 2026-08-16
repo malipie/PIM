@@ -65,7 +65,10 @@ final class SearchController
 
     #[Route('/api/search/categories', name: 'pim_search_categories', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'category', action: 'read')]
+    #[RequiresPermission(module: 'category', action: 'read', anyOf: [
+        'category.read',
+        'categories.view',
+    ])]
     public function categories(Request $request): JsonResponse
     {
         return $this->run($request, ObjectKind::Category);
@@ -73,7 +76,10 @@ final class SearchController
 
     #[Route('/api/search/assets', name: 'pim_search_assets', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'asset', action: 'read')]
+    #[RequiresPermission(module: 'asset', action: 'read', anyOf: [
+        'asset.read',
+        'multimedia.view',
+    ])]
     public function assets(Request $request): JsonResponse
     {
         return $this->run($request, ObjectKind::Asset);

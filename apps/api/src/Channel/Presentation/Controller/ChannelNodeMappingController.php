@@ -66,7 +66,10 @@ final class ChannelNodeMappingController
 
     #[Route('/api/channels/{channelId}/node-mappings', name: 'pim_channel_node_mappings_list', methods: ['GET'], format: 'json')]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'read')]
+    #[RequiresPermission(module: 'channel', action: 'read', anyOf: [
+        'channel.read',
+        'publications.view',
+    ])]
     public function list(string $channelId): JsonResponse
     {
         $channel = $this->requireChannel($channelId);
@@ -88,7 +91,10 @@ final class ChannelNodeMappingController
      */
     #[Route('/api/channels/{channelId}/node-placement-counts', name: 'pim_channel_node_placement_counts', methods: ['GET'], format: 'json')]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'read')]
+    #[RequiresPermission(module: 'channel', action: 'read', anyOf: [
+        'channel.read',
+        'publications.view',
+    ])]
     public function placementCounts(string $channelId): JsonResponse
     {
         $channel = $this->requireChannel($channelId);
@@ -108,7 +114,10 @@ final class ChannelNodeMappingController
      */
     #[Route('/api/channels/{channelId}/node-mappings', name: 'pim_channel_node_mappings_clear', methods: ['DELETE'], format: 'json')]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'write')]
+    #[RequiresPermission(module: 'channel', action: 'write', anyOf: [
+        'channel.write',
+        'publications.publish_unpublish',
+    ])]
     public function clearAll(string $channelId): JsonResponse
     {
         $channel = $this->requireChannel($channelId);
@@ -129,7 +138,10 @@ final class ChannelNodeMappingController
 
     #[Route('/api/channels/{channelId}/node-mappings/{masterCategoryId}', name: 'pim_channel_node_mappings_put', methods: ['PUT'], format: 'json')]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'write')]
+    #[RequiresPermission(module: 'channel', action: 'write', anyOf: [
+        'channel.write',
+        'publications.publish_unpublish',
+    ])]
     public function put(string $channelId, string $masterCategoryId, Request $request): JsonResponse
     {
         $channel = $this->requireChannel($channelId);
@@ -159,7 +171,10 @@ final class ChannelNodeMappingController
 
     #[Route('/api/channels/{channelId}/node-mappings/{masterCategoryId}', name: 'pim_channel_node_mappings_delete', methods: ['DELETE'], format: 'json')]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'write')]
+    #[RequiresPermission(module: 'channel', action: 'write', anyOf: [
+        'channel.write',
+        'publications.publish_unpublish',
+    ])]
     public function delete(string $channelId, string $masterCategoryId): Response
     {
         $channel = $this->requireChannel($channelId);

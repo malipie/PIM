@@ -44,7 +44,13 @@ final class AttributeRelationPreviewFieldsController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'attribute', action: 'read')]
+    #[RequiresPermission(module: 'attribute', action: 'read', anyOf: [
+        'attribute.read',
+        'modeling.view',
+        'products.view',
+        'categories.view',
+        'multimedia.view',
+    ])]
     public function __invoke(string $id): JsonResponse
     {
         $attribute = $this->attributes->findById(Uuid::fromString($id));

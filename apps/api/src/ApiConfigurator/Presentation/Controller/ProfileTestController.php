@@ -59,7 +59,10 @@ final class ProfileTestController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'api_profile', action: 'read')]
+    #[RequiresPermission(module: 'api_profile', action: 'read', anyOf: [
+        'api_profile.read',
+        'settings.integrations.manage',
+    ])]
     public function test(string $code): JsonResponse
     {
         $profile = $this->loadProfile($code);
@@ -75,7 +78,10 @@ final class ProfileTestController
 
     #[Route('/api/profiles/preview', name: 'pim_api_profiles_preview', methods: ['POST'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'api_profile', action: 'read')]
+    #[RequiresPermission(module: 'api_profile', action: 'read', anyOf: [
+        'api_profile.read',
+        'settings.integrations.manage',
+    ])]
     public function preview(Request $request): JsonResponse
     {
         $content = $request->getContent();
@@ -108,7 +114,10 @@ final class ProfileTestController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'api_profile', action: 'read')]
+    #[RequiresPermission(module: 'api_profile', action: 'read', anyOf: [
+        'api_profile.read',
+        'settings.integrations.manage',
+    ])]
     public function openapi(string $code): JsonResponse
     {
         $profile = $this->loadProfile($code);

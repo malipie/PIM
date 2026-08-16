@@ -34,7 +34,10 @@ final readonly class AssetFoldersController
     }
 
     #[Route(path: '/api/asset-folders', name: 'pim_asset_folders', methods: ['GET'], format: 'json')]
-    #[RequiresPermission(module: 'asset', action: 'read')]
+    #[RequiresPermission(module: 'asset', action: 'read', anyOf: [
+        'asset.read',
+        'multimedia.view',
+    ])]
     public function __invoke(): JsonResponse
     {
         $tenant = $this->tenantContext->get();

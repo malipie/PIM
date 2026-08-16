@@ -64,7 +64,17 @@ final class BulkObjectsController
 
     #[Route('/api/objects/bulk', name: 'pim_objects_bulk', methods: ['POST'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'object', action: 'delete')]
+    // #2881 — the per-kind delete codes are safe alternatives HERE and
+    // nowhere else: the loop below re-checks `is_granted('DELETE', $object)`
+    // per object, so holding products.delete opens the endpoint but not a
+    // single category row. Pinned by BulkDeleteKindBoundaryTest — without
+    // that re-check this would be the coarse-bulk-gate escalation.
+    #[RequiresPermission(module: 'object', action: 'delete', anyOf: [
+        'object.delete',
+        'products.delete',
+        'categories.delete',
+        'multimedia.delete',
+    ])]
     public function __invoke(Request $request): JsonResponse
     {
         $tenant = $this->tenantContext->get();

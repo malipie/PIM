@@ -46,7 +46,10 @@ final class ImportSessionStateController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'write')]
+    #[RequiresPermission(module: 'import_session', action: 'write', anyOf: [
+        'import_session.write',
+        'imports.run',
+    ])]
     public function pause(string $id): JsonResponse
     {
         $session = $this->loadOwned($id);
@@ -66,7 +69,10 @@ final class ImportSessionStateController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'write')]
+    #[RequiresPermission(module: 'import_session', action: 'write', anyOf: [
+        'import_session.write',
+        'imports.run',
+    ])]
     public function resume(string $id): JsonResponse
     {
         $session = $this->loadOwned($id);
@@ -100,7 +106,10 @@ final class ImportSessionStateController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'write')]
+    #[RequiresPermission(module: 'import_session', action: 'write', anyOf: [
+        'import_session.write',
+        'imports.run',
+    ])]
     public function cancel(string $id): JsonResponse
     {
         $session = $this->loadOwned($id);
