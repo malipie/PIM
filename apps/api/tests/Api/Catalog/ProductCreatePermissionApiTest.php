@@ -54,13 +54,37 @@ final class ProductCreatePermissionApiTest extends CatalogApiTestCase
         $productId = $created->toArray()['id'];
         \assert(\is_string($productId));
 
-        // Escalation guard: products.add must NOT leak onto the generic
-        // /api/objects POST (still gated by legacy object.write)...
+        // #2881 — this used to assert 403, on the reasoning that the
+        // poly-kind POST stays on legacy object.write. That pinned a gap
+        // rather than a rule: the request names the product ObjectType, so
+        // it creates a product, and the matrix grants marketing
+        // `products.add`. Keeping the denial would have frozen the bug
+        // that made the panel's create button unusable for every PRD role
+        // — the endpoint the product form actually posts to is this one,
+        // not the sugar path above.
+        //
+        // The boundary the original assertion was reaching for is real and
+        // moved, not dropped: an unscoped payload still needs the broad
+        // grant (below), a role without the create code is still refused,
+        // and the kind is still checked — all pinned in
+        // ObjectWriteAccessTest.
         $client->request('POST', '/api/objects', [
             'headers' => ['content-type' => 'application/ld+json', 'authorization' => 'Bearer '.$marketingJwt],
             'body' => json_encode([
                 'code' => 'MKT-CREATE-2',
                 'objectTypeId' => $productOt,
+                'attributes' => [],
+            ], JSON_THROW_ON_ERROR),
+        ]);
+        self::assertResponseStatusCodeSame(201, 'the poly-kind POST creates a product, which marketing may add');
+
+        // ...but only because the payload named a kind it may create. With
+        // no ObjectType to resolve, the request is "create something" and
+        // still needs legacy object.write.
+        $client->request('POST', '/api/objects', [
+            'headers' => ['content-type' => 'application/ld+json', 'authorization' => 'Bearer '.$marketingJwt],
+            'body' => json_encode([
+                'code' => 'MKT-CREATE-3',
                 'attributes' => [],
             ], JSON_THROW_ON_ERROR),
         ]);

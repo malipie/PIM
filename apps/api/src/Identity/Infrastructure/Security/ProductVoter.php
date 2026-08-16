@@ -73,6 +73,15 @@ final class ProductVoter extends AbstractPrdVoter
             // out of class-string 'READ' (collection) decisions where
             // the kind is unknowable.
             'READ' => 'products.view',
+            // #2881 — the DELETE counterpart of the two aliases above.
+            // Categories and multimedia got theirs in #2852; products were
+            // missed, and the gap stayed invisible because `object.delete`
+            // happens to collide between the legacy grid (object × delete)
+            // and the ULV-04a verb set, so the three roles carrying that
+            // verb deleted products through the legacy voter by accident.
+            // A custom role built in the panel with products.delete and
+            // nothing else could not.
+            'DELETE' => 'products.delete',
             'delete' => 'products.delete',
             'bulk_operations' => 'products.bulk_operations',
             'approve_pending_changes' => 'products.approve_pending_changes',
@@ -81,13 +90,14 @@ final class ProductVoter extends AbstractPrdVoter
 
     protected function supports(string $attribute, mixed $subject): bool
     {
-        // Class-string 'READ' is the shared collection gate for every
-        // kind's list — without an instance there is no kind to check,
-        // so granting products.view here would leak onto /api/objects
-        // and the other kinds' collections. Abstain and leave those to
-        // the legacy CatalogObjectVoter; collections that should follow
-        // products.view ask for READ_PRODUCT explicitly.
-        if ('READ' === $attribute && \is_string($subject)) {
+        // The shared uppercase attributes are every kind's gate — without
+        // an instance there is no kind to check, so granting products.*
+        // here would leak onto /api/objects and the other kinds'
+        // surfaces. Abstain and leave those to the legacy
+        // CatalogObjectVoter; surfaces that should follow the product
+        // codes ask for READ_PRODUCT / CREATE_PRODUCT / CREATE_OBJECT
+        // explicitly.
+        if (\is_string($subject) && \in_array($attribute, ['READ', 'UPDATE', 'DELETE'], true)) {
             return false;
         }
 
