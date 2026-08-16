@@ -442,13 +442,25 @@
                  uses its kind as the discriminator. Built-in kinds should
                  still prefer the sugar-path POSTs (/api/products etc.) where
                  the discriminator is locked at the operation level, but the
-                 poly-kind POST accepts them too for consistency. -->
+                 poly-kind POST accepts them too for consistency.
+
+                 #2881 — CREATE_OBJECT, not the shared 'CREATE'. In practice
+                 this is not the niche path the paragraph above describes:
+                 the product detail form creates through here, and multimedia
+                 has no create sugar path at all. On the plain 'CREATE'
+                 attribute only legacy object.write answered, which no PRD
+                 role holds — a panel-created tenant could not save an object
+                 at all. Prd\ObjectCreateVoter reads the kind from the
+                 payload's objectTypeId (the same field the processor uses
+                 for the discriminator) and grants per kind; a payload
+                 naming no readable type still needs the broad legacy grant
+                 via CatalogObjectVoter. -->
             <operation class="ApiPlatform\Metadata\Post"
                        uriTemplate="/objects{._format}"
                        name="objects_post"
                        input="App\Catalog\Infrastructure\ApiPlatform\Resource\CatalogObjectInput"
                        processor="App\Catalog\Infrastructure\ApiPlatform\State\CatalogObjectProcessor"
-                       security="is_granted('CREATE', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
+                       security="is_granted('CREATE_OBJECT', 'App\\Catalog\\Domain\\Entity\\CatalogObject')">
                 <denormalizationContext>
                     <values>
                         <value name="groups">

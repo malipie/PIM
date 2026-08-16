@@ -35,10 +35,14 @@ use Symfony\Component\Uid\Uuid;
  * the same attribute (affirmative strategy), so pre-PRD principals and the
  * cross-kind pickers that walk the unscoped collection are unaffected.
  *
- * Custom kinds are not mapped: `kind=custom` is shared by every custom
- * ObjectType, so a single PRD code cannot express "may list this one". They
- * stay on the broad grant until the dynamic per-type permission namespace
- * lands (same reason ObjectTypeVoter defers its auto-grant).
+ * Custom kinds map to the generic ULV-04a verb `object.view` (#985). #2848
+ * originally left them out, reasoning that `kind=custom` is shared by every
+ * tenant-defined ObjectType so a single PRD code cannot express "may list
+ * this one" — true, but the fallback that reasoning left them on is the
+ * legacy `object.read`, which is *wider* still: it opens products,
+ * categories and multimedia through the same attribute. #2881 corrects it.
+ * Per-type scoping remains the deferred `object_type_scope` work described
+ * on {@see \App\Identity\Infrastructure\Security\ObjectScopedVoter}.
  *
  * @extends Voter<string, string>
  */
@@ -60,6 +64,10 @@ final class ObjectCollectionVoter extends Voter
         'product' => 'products.view',
         'category' => 'categories.view',
         'asset' => 'multimedia.view',
+        // #2881 — the generic ULV-04a verb (#985) for tenant-defined
+        // types. See the note on `Custom kinds` above, which this entry
+        // corrects rather than contradicts.
+        'custom' => 'object.view',
     ];
 
     public function __construct(

@@ -42,6 +42,12 @@ final class CatalogObjectVoter extends AbstractRbacVoter
             // object.read principals keep browsing the unscoped collection
             // through this alias.
             'READ_OBJECT_COLLECTION' => 'read',
+            // #2881 — the poly-kind /api/objects POST did the same for
+            // writes so Prd\ObjectCreateVoter can grant per kind from the
+            // payload's objectTypeId. Legacy object.write principals — and
+            // any payload naming no readable ObjectType — keep creating
+            // through this alias.
+            'CREATE_OBJECT' => 'write',
             // #2845 — same story for the category / asset sugar paths: they
             // moved to kind-specific attributes so the PRD voters can answer
             // without opening the other kinds' lists. Legacy principals hold
