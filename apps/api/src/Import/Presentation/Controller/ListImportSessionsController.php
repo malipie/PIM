@@ -7,6 +7,7 @@ namespace App\Import\Presentation\Controller;
 use App\Backup\Domain\Entity\Backup;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Contracts\Auth\CurrentUserProvider;
+use App\Identity\Contracts\Policy\PermissionCheckerInterface;
 use App\Import\Domain\Entity\ImportSession;
 use App\Import\Domain\Enum\ImportSessionStatus;
 use DateTimeImmutable;
@@ -26,8 +27,16 @@ use Symfony\Component\Routing\Attribute\Route;
  * minimal-Hydra DataProvider can consume it directly. Filters:
  * `status` (single enum value), `q` (file_name or profile_name
  * ILIKE substring), `page` (1-based, pageSize 50 default, capped
- * at 200). Tenant-scoped + owner-scoped: each user sees only their
- * own sessions, matching the rest of the Import surface.
+ * at 200). Tenant-scoped, and owner-scoped by default: each user sees
+ * only their own sessions, matching the rest of the Import surface.
+ *
+ * #2881 — `imports.view_own` and `imports.view_all` are two different
+ * permissions and the endpoint must not accept them alike. The owner
+ * filter is what makes `view_own` mean what it says; it is lifted only
+ * for a caller holding `view_all`, which is the whole content of that
+ * second code. Legacy `import_session.read` principals keep the
+ * owner-scoped behaviour they have today — widening them is a separate
+ * decision from making the PRD codes work.
  */
 final class ListImportSessionsController
 {
@@ -37,6 +46,7 @@ final class ListImportSessionsController
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly CurrentUserProvider $currentUser,
+        private readonly PermissionCheckerInterface $permissions,
     ) {
     }
 
@@ -45,7 +55,11 @@ final class ListImportSessionsController
         name: 'imports_list',
         methods: ['GET'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'read')]
+    #[RequiresPermission(module: 'import_session', action: 'read', anyOf: [
+        'import_session.read',
+        'imports.view_own',
+        'imports.view_all',
+    ])]
     public function __invoke(Request $request): JsonResponse
     {
         $userId = $this->currentUser->userId();
@@ -76,10 +90,12 @@ final class ListImportSessionsController
             // badge does not trigger an N+1 across the page of sessions.
             ->leftJoin('s.backupSnapshot', 'b')
             ->where('s.tenant = :tenant')
-            ->andWhere('s.userId = :userId')
             ->orderBy('s.createdAt', 'DESC')
-            ->setParameter('tenant', $this->currentUser->tenant())
-            ->setParameter('userId', $userId);
+            ->setParameter('tenant', $this->currentUser->tenant());
+
+        if (!$this->permissions->userHasPermission($userId, 'imports.view_all')) {
+            $qb->andWhere('s.userId = :userId')->setParameter('userId', $userId);
+        }
 
         if ($status instanceof ImportSessionStatus) {
             $qb->andWhere('s.status = :status')->setParameter('status', $status->value);

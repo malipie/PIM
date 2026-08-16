@@ -84,7 +84,15 @@ final class ExportProfileController
         methods: ['POST'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    // #2881 — the reads on this controller already ask for exports.view_all
+    // and the writes asked for legacy integration.admin, so the writes join
+    // the reads. `exports.run` was the first choice and was wrong: it is
+    // held by roles that hold only exports.view_own, which would have let
+    // them configure an export profile they cannot list.
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.view_all',
+    ])]
     public function create(Request $request): JsonResponse
     {
         [$tenant, $userId] = $this->resolveTenantAndUser();
@@ -136,7 +144,10 @@ final class ExportProfileController
         methods: ['PATCH'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.view_all',
+    ])]
     public function patch(string $id, Request $request): JsonResponse
     {
         $profile = $this->loadOwnedOrFail($id);
@@ -192,7 +203,10 @@ final class ExportProfileController
         methods: ['DELETE'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.view_all',
+    ])]
     public function delete(string $id): Response
     {
         $profile = $this->loadOwnedOrFail($id);

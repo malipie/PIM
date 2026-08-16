@@ -38,7 +38,10 @@ final class ScheduleStateController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_schedule', action: 'write')]
+    #[RequiresPermission(module: 'import_schedule', action: 'write', anyOf: [
+        'import_schedule.write',
+        'imports.run',
+    ])]
     public function toggle(string $id): JsonResponse
     {
         $schedule = $this->load($id);
@@ -63,7 +66,10 @@ final class ScheduleStateController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_schedule', action: 'write')]
+    #[RequiresPermission(module: 'import_schedule', action: 'write', anyOf: [
+        'import_schedule.write',
+        'imports.run',
+    ])]
     public function runNow(string $id): JsonResponse
     {
         $schedule = $this->load($id);

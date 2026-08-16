@@ -41,7 +41,10 @@ final class FeedPullStatsController
 
     #[Route(path: '/api/feeds/pull-stats', name: 'pim_feeds_pull_stats_global', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function global(): JsonResponse
     {
         $tenant = $this->resolveTenant();
@@ -55,7 +58,10 @@ final class FeedPullStatsController
 
     #[Route(path: '/api/feeds/{id}/pull-stats', name: 'pim_feeds_pull_stats', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function perFeed(string $id): JsonResponse
     {
         $tenant = $this->resolveTenant();

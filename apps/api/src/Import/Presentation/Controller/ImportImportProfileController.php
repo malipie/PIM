@@ -53,7 +53,10 @@ final class ImportImportProfileController
         name: 'imports_profile_import',
         methods: ['POST'],
     )]
-    #[RequiresPermission(module: 'import_profile', action: 'write')]
+    #[RequiresPermission(module: 'import_profile', action: 'write', anyOf: [
+        'import_profile.write',
+        'imports.run',
+    ])]
     public function __invoke(Request $request): JsonResponse
     {
         $user = $this->security->getUser();

@@ -47,7 +47,10 @@ final class FeedPreviewController
 
     #[Route(path: '/api/feeds/preview', name: 'pim_feeds_preview_draft', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function draft(Request $request): JsonResponse
     {
         $this->resolveTenant();
@@ -80,7 +83,10 @@ final class FeedPreviewController
 
     #[Route(path: '/api/feeds/{id}/preview', name: 'pim_feeds_preview_saved', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function saved(string $id, Request $request): JsonResponse
     {
         $this->resolveTenant();

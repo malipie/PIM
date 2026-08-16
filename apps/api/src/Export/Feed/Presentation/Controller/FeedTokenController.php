@@ -40,7 +40,10 @@ final class FeedTokenController
 
     #[Route(path: '/api/feeds/{id}/token', name: 'pim_feeds_token_mint', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function mint(string $id): JsonResponse
     {
         $tenant = $this->resolveTenant();
@@ -57,7 +60,10 @@ final class FeedTokenController
 
     #[Route(path: '/api/feeds/{id}/token', name: 'pim_feeds_token_revoke', methods: ['DELETE'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function revoke(string $id): Response
     {
         $this->resolveTenant();

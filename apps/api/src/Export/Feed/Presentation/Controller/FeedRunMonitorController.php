@@ -49,7 +49,10 @@ final class FeedRunMonitorController
 
     #[Route(path: '/api/feed-runs', name: 'pim_feed_runs_list', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function list(Request $request): JsonResponse
     {
         $tenant = $this->resolveTenant();
@@ -79,7 +82,10 @@ final class FeedRunMonitorController
 
     #[Route(path: '/api/feed-runs/kpi', name: 'pim_feed_runs_kpi', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function kpi(): JsonResponse
     {
         $tenant = $this->resolveTenant();

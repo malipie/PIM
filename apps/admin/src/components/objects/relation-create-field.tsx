@@ -8,11 +8,21 @@
  * `/api/objects/{newId}/relations/{attributeCode}` after the main POST
  * succeeds.
  *
- * Candidates come from the same poly-kind `GET /api/objects?sku=` endpoint
- * the detail-page ObjectPickerDialog uses; we filter by the attribute's
- * `relation_target_object_type_ids` client-side. itemsPerPage=200 is
- * generous for MVP (~50k SKU max per the planning doc) and gets replaced
- * with a BE `objectTypeIds[]=` filter when scale demands it.
+ * Candidates come from the same poly-kind `GET /api/objects` endpoint the
+ * detail-page ObjectPickerDialog uses. itemsPerPage=200 is generous for
+ * MVP (~50k SKU max per the planning doc).
+ *
+ * #2881 — one request per allowed ObjectType, not one unscoped request
+ * filtered client-side. The unscoped collection is the question "give me
+ * every kind at once", which #2848 deliberately left on the broad legacy
+ * `object.read`, so every PRD role got a 403 here and the picker showed
+ * no candidates at all. Scoping by `?objectType=` is also what the
+ * per-kind read gate authorises, and it stops pulling rows the filter was
+ * going to throw away anyway.
+ *
+ * An attribute with no `relation_target_object_type_ids` really does mean
+ * "anything", so that case keeps asking the broad question — and keeps
+ * needing the broad grant.
  */
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -48,16 +58,26 @@ export function RelationCreateField({
   const allowedTypeIds = attribute.relation_target_object_type_ids ?? [];
   const cardinality = attribute.relation_cardinality ?? 'many';
 
-  const candidatesQuery = useQuery<ObjectsListResponse>({
+  const candidatesQuery = useQuery<CandidateRow[]>({
     queryKey: ['relation-candidates', allowedTypeIds.join(',')],
-    queryFn: () =>
-      jsonFetch<ObjectsListResponse>('/api/objects?itemsPerPage=200', {
-        accept: 'application/ld+json',
-      }),
+    queryFn: async () => {
+      const urls =
+        allowedTypeIds.length === 0
+          ? ['/api/objects?itemsPerPage=200']
+          : allowedTypeIds.map(
+              (typeId) => `/api/objects?itemsPerPage=200&objectType=${encodeURIComponent(typeId)}`,
+            );
+
+      const pages = await Promise.all(
+        urls.map((url) => jsonFetch<ObjectsListResponse>(url, { accept: 'application/ld+json' })),
+      );
+
+      return pages.flatMap((page) => page.member ?? page['hydra:member'] ?? []);
+    },
     staleTime: 30_000,
   });
 
-  const candidates = candidatesQuery.data?.member ?? candidatesQuery.data?.['hydra:member'] ?? [];
+  const candidates = candidatesQuery.data ?? [];
   const filtered =
     allowedTypeIds.length === 0
       ? candidates

@@ -55,7 +55,10 @@ final class ProfileOpenApiController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'api_profile', action: 'read')]
+    #[RequiresPermission(module: 'api_profile', action: 'read', anyOf: [
+        'api_profile.read',
+        'settings.integrations.manage',
+    ])]
     public function __invoke(string $id): JsonResponse
     {
         try {

@@ -58,7 +58,18 @@ final class CatalogProfileController
 
     #[Route(path: '/api/catalogs', name: 'pim_catalogs_create', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    // #2881 — the writes follow the SAME code this controller's reads use
+    // (`exports.view_all`), not `exports.run`. A first pass mapped them to
+    // exports.run and CI caught the incoherence: `marketing` holds
+    // exports.run but only exports.view_own, so it could create a PDF
+    // catalog it could not then open. A write reachable by someone who
+    // cannot read the surface is a worse gate than the legacy one it
+    // replaced. Minting the public pull token is a secret and follows
+    // `settings.integrations.manage` instead — see CatalogTokenController.
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.view_all',
+    ])]
     public function create(Request $request): JsonResponse
     {
         [$tenant] = $this->resolveTenant();
@@ -102,7 +113,10 @@ final class CatalogProfileController
 
     #[Route(path: '/api/catalogs/{id}', name: 'pim_catalogs_patch', methods: ['PATCH'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.view_all',
+    ])]
     public function patch(string $id, Request $request): JsonResponse
     {
         $catalog = $this->loadOrFail($id);
@@ -149,7 +163,10 @@ final class CatalogProfileController
 
     #[Route(path: '/api/catalogs/{id}', name: 'pim_catalogs_delete', methods: ['DELETE'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.view_all',
+    ])]
     public function delete(string $id): Response
     {
         $this->catalogs->remove($this->loadOrFail($id));

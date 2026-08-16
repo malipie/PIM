@@ -27,7 +27,11 @@ final class DictionaryController
         name: 'imports_dictionary',
         methods: ['GET'],
     )]
-    #[RequiresPermission(module: 'import_session', action: 'read')]
+    #[RequiresPermission(module: 'import_session', action: 'read', anyOf: [
+        'import_session.read',
+        'imports.view_own',
+        'imports.view_all',
+    ])]
     public function __invoke(): JsonResponse
     {
         $response = new JsonResponse(

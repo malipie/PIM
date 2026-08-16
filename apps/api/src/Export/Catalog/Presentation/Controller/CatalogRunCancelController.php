@@ -46,7 +46,10 @@ final class CatalogRunCancelController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.view_all',
+    ])]
     public function cancel(string $id): JsonResponse
     {
         $this->assertTenantUser();

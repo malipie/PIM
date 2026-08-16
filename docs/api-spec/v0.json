@@ -11735,7 +11735,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "api_profile.admin"
+                "x-cortex-permission": "api_profile.admin | settings.integrations.manage"
             }
         },
         "/api/api_profiles/{id}/test_webhook": {
@@ -11774,7 +11774,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "api_profile.admin"
+                "x-cortex-permission": "api_profile.admin | settings.integrations.manage"
             }
         },
         "/api/asset-folders": {
@@ -11800,7 +11800,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "asset.read"
+                "x-cortex-permission": "asset.read | multimedia.view"
             }
         },
         "/api/assets/bulk-delete": {
@@ -11826,7 +11826,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "asset.delete"
+                "x-cortex-permission": "asset.delete | multimedia.delete"
             }
         },
         "/api/assets/upload": {
@@ -11852,7 +11852,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "asset.write"
+                "x-cortex-permission": "asset.write | multimedia.add_edit_own | multimedia.add_edit_any"
             }
         },
         "/api/assets/{id}/preview": {
@@ -12108,7 +12108,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute_group.read"
+                "x-cortex-permission": "attribute_group.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/attribute_groups/{id}/usage": {
@@ -12147,7 +12147,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute_group.read"
+                "x-cortex-permission": "attribute_group.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/attributes/{code}/options": {
@@ -12186,7 +12186,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.read"
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view"
             },
             "post": {
                 "operationId": "api_attributes_code_options_post",
@@ -12274,7 +12274,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.delete"
+                "x-cortex-permission": "attribute.delete | modeling.delete_custom"
             },
             "patch": {
                 "operationId": "api_attributes_code_options_optioncode_patch",
@@ -12374,7 +12374,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.read"
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/attributes/{id}/migrate-type": {
@@ -12452,7 +12452,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.read"
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/attributes/{id}/relation_preview_fields": {
@@ -12491,7 +12491,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.read"
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/attributes/{id}/usage": {
@@ -12530,7 +12530,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.read"
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/auth/2fa/disable": {
@@ -13024,7 +13024,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "backup.write"
+                "x-cortex-permission": "backup.write | settings.tenant.manage | platform.tenants.manage"
             }
         },
         "/api/backups/{id}": {
@@ -13063,7 +13063,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "backup.read"
+                "x-cortex-permission": "backup.read | settings.tenant.manage | platform.tenants.manage"
             }
         },
         "/api/bulk-edit-jobs/{id}": {
@@ -13297,7 +13297,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/catalogs": {
@@ -13347,7 +13347,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/catalogs/bulk-generate": {
@@ -13373,7 +13373,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/catalogs/preview": {
@@ -13526,7 +13526,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             },
             "patch": {
                 "operationId": "api_catalogs_id_patch",
@@ -13563,7 +13563,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/catalogs/{id}/generate": {
@@ -13602,7 +13602,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/catalogs/{id}/preview": {
@@ -13719,7 +13719,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             },
             "delete": {
                 "operationId": "api_catalogs_id_token_delete",
@@ -13756,7 +13756,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             }
         },
         "/api/categories/{id}/attribute_groups": {
@@ -13795,7 +13795,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute_group.read"
+                "x-cortex-permission": "attribute_group.read | modeling.view | products.view | categories.view | multimedia.view"
             },
             "post": {
                 "operationId": "api_categories_id_attribute_groups_post",
@@ -14190,7 +14190,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.read"
+                "x-cortex-permission": "channel.read | publications.view"
             },
             "post": {
                 "operationId": "api_channels_channelid_navigation_tree_post",
@@ -14227,7 +14227,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.write"
+                "x-cortex-permission": "channel.write | publications.publish_unpublish"
             }
         },
         "/api/channels/{channelId}/navigation-tree/nodes": {
@@ -14266,7 +14266,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.write"
+                "x-cortex-permission": "channel.write | publications.publish_unpublish"
             }
         },
         "/api/channels/{channelId}/navigation-tree/nodes/{nodeId}": {
@@ -14317,7 +14317,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.write"
+                "x-cortex-permission": "channel.write | publications.publish_unpublish"
             },
             "patch": {
                 "operationId": "api_channels_channelid_navigation_tree_nodes_nodeid_patch",
@@ -14366,7 +14366,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.write"
+                "x-cortex-permission": "channel.write | publications.publish_unpublish"
             }
         },
         "/api/channels/{channelId}/navigation-tree/nodes/{nodeId}/move": {
@@ -14417,7 +14417,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.write"
+                "x-cortex-permission": "channel.write | publications.publish_unpublish"
             }
         },
         "/api/channels/{channelId}/node-mappings": {
@@ -14456,7 +14456,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.read"
+                "x-cortex-permission": "channel.read | publications.view"
             },
             "delete": {
                 "operationId": "api_channels_channelid_node_mappings_delete",
@@ -14493,7 +14493,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.write"
+                "x-cortex-permission": "channel.write | publications.publish_unpublish"
             }
         },
         "/api/channels/{channelId}/node-mappings/{masterCategoryId}": {
@@ -14544,7 +14544,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.write"
+                "x-cortex-permission": "channel.write | publications.publish_unpublish"
             },
             "delete": {
                 "operationId": "api_channels_channelid_node_mappings_mastercategoryid_delete",
@@ -14593,7 +14593,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.write"
+                "x-cortex-permission": "channel.write | publications.publish_unpublish"
             }
         },
         "/api/channels/{channelId}/node-placement-counts": {
@@ -14632,7 +14632,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "channel.read"
+                "x-cortex-permission": "channel.read | publications.view"
             }
         },
         "/api/connections/{id}/discover": {
@@ -15033,7 +15033,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/exports/profiles/{id}": {
@@ -15109,7 +15109,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             },
             "patch": {
                 "operationId": "api_exports_profiles_id_patch",
@@ -15146,7 +15146,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/exports/profiles/{id}/run": {
@@ -15287,7 +15287,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | exports.view_all"
             }
         },
         "/api/exports/sessions/{id}/cancel": {
@@ -15469,7 +15469,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feed-runs/kpi": {
@@ -15495,7 +15495,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feeds": {
@@ -15521,7 +15521,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             },
             "post": {
                 "operationId": "api_feeds_post",
@@ -15545,7 +15545,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             }
         },
         "/api/feeds/preview": {
@@ -15571,7 +15571,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feeds/pull-stats": {
@@ -15597,7 +15597,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feeds/pull/{tenantId}/{token}.xml": {
@@ -15674,7 +15674,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}": {
@@ -15713,7 +15713,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             },
             "delete": {
                 "operationId": "api_feeds_id_delete",
@@ -15750,7 +15750,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             },
             "patch": {
                 "operationId": "api_feeds_id_patch",
@@ -15787,7 +15787,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/health": {
@@ -15826,7 +15826,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/mapping": {
@@ -15865,7 +15865,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             },
             "put": {
                 "operationId": "api_feeds_id_mapping_put",
@@ -15902,7 +15902,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/pause": {
@@ -15941,7 +15941,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/preview": {
@@ -15980,7 +15980,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/pull-stats": {
@@ -16019,7 +16019,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/regenerate": {
@@ -16058,7 +16058,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/resume": {
@@ -16097,7 +16097,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/runs": {
@@ -16136,7 +16136,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/runs/{runId}": {
@@ -16187,7 +16187,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/runs/{runId}/cancel": {
@@ -16238,7 +16238,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/runs/{runId}/logs": {
@@ -16289,7 +16289,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "exports.view_all"
+                "x-cortex-permission": "exports.view_all | settings.integrations.manage"
             }
         },
         "/api/feeds/{id}/token": {
@@ -16328,7 +16328,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             },
             "delete": {
                 "operationId": "api_feeds_id_token_delete",
@@ -16365,7 +16365,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "integration.admin"
+                "x-cortex-permission": "integration.admin | settings.integrations.manage"
             }
         },
         "/api/import-profiles/import": {
@@ -16391,7 +16391,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_profile.write"
+                "x-cortex-permission": "import_profile.write | imports.run"
             }
         },
         "/api/import-profiles/{id}/duplicate": {
@@ -16430,7 +16430,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_profile.write"
+                "x-cortex-permission": "import_profile.write | imports.run"
             }
         },
         "/api/import-profiles/{id}/export": {
@@ -16469,7 +16469,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_profile.read"
+                "x-cortex-permission": "import_profile.read | imports.view_own | imports.view_all"
             }
         },
         "/api/import-schedules/upcoming": {
@@ -16495,7 +16495,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_schedule.read"
+                "x-cortex-permission": "import_schedule.read | imports.view_own | imports.view_all"
             }
         },
         "/api/import-schedules/{id}/run-now": {
@@ -16534,7 +16534,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_schedule.write"
+                "x-cortex-permission": "import_schedule.write | imports.run"
             }
         },
         "/api/import-schedules/{id}/runs": {
@@ -16573,7 +16573,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_schedule.read"
+                "x-cortex-permission": "import_schedule.read | imports.view_own | imports.view_all"
             }
         },
         "/api/import-schedules/{id}/toggle": {
@@ -16612,7 +16612,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_schedule.write"
+                "x-cortex-permission": "import_schedule.write | imports.run"
             }
         },
         "/api/import-sessions": {
@@ -16638,7 +16638,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.read"
+                "x-cortex-permission": "import_session.read | imports.view_own | imports.view_all"
             },
             "post": {
                 "operationId": "api_import_sessions_post",
@@ -16688,7 +16688,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.write"
+                "x-cortex-permission": "import_session.write | imports.run"
             }
         },
         "/api/import-sessions/dictionary": {
@@ -16714,7 +16714,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.read"
+                "x-cortex-permission": "import_session.read | imports.view_own | imports.view_all"
             }
         },
         "/api/import-sessions/parse-preview": {
@@ -16766,7 +16766,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.read"
+                "x-cortex-permission": "import_session.read | imports.view_own | imports.view_all"
             }
         },
         "/api/import-sessions/validate-dry-run": {
@@ -16831,7 +16831,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.read"
+                "x-cortex-permission": "import_session.read | imports.view_own | imports.view_all"
             }
         },
         "/api/import-sessions/{id}/cancel": {
@@ -16870,7 +16870,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.write"
+                "x-cortex-permission": "import_session.write | imports.run"
             }
         },
         "/api/import-sessions/{id}/pause": {
@@ -16909,7 +16909,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.write"
+                "x-cortex-permission": "import_session.write | imports.run"
             }
         },
         "/api/import-sessions/{id}/report.csv": {
@@ -16948,7 +16948,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.read"
+                "x-cortex-permission": "import_session.read | imports.view_own | imports.view_all"
             }
         },
         "/api/import-sessions/{id}/resume": {
@@ -16987,7 +16987,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.write"
+                "x-cortex-permission": "import_session.write | imports.run"
             }
         },
         "/api/import-sessions/{id}/rollback": {
@@ -17026,7 +17026,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.admin"
+                "x-cortex-permission": "import_session.admin | imports.run"
             }
         },
         "/api/import-sessions/{id}/rollback-preview": {
@@ -17065,7 +17065,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.admin"
+                "x-cortex-permission": "import_session.admin | imports.run"
             }
         },
         "/api/import-sessions/{id}/rollback/cancel": {
@@ -17104,7 +17104,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.admin"
+                "x-cortex-permission": "import_session.admin | imports.run"
             }
         },
         "/api/import-sessions/{id}/rollback/resume": {
@@ -17143,7 +17143,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_session.admin"
+                "x-cortex-permission": "import_session.admin | imports.run"
             }
         },
         "/api/import-sources/{id}/test-connection": {
@@ -17182,7 +17182,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "import_source.read"
+                "x-cortex-permission": "import_source.read | imports.run"
             }
         },
         "/api/invitations": {
@@ -17700,7 +17700,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object_type.read"
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/object_types/{id}/attached_groups": {
@@ -17739,7 +17739,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object_type.read"
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/object_types/{id}/attributes/bulk-attach": {
@@ -18273,7 +18273,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object_type.read"
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/objects/bulk": {
@@ -18299,7 +18299,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object.delete"
+                "x-cortex-permission": "object.delete | products.delete | categories.delete | multimedia.delete"
             }
         },
         "/api/objects/bulk-actions/preview": {
@@ -18429,7 +18429,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "asset.read"
+                "x-cortex-permission": "asset.read | multimedia.view"
             },
             "post": {
                 "operationId": "api_objects_id_assets_post",
@@ -18466,7 +18466,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "asset.write"
+                "x-cortex-permission": "asset.write | multimedia.add_edit_own | multimedia.add_edit_any"
             }
         },
         "/api/objects/{id}/assets/{assetId}": {
@@ -18517,7 +18517,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "asset.write"
+                "x-cortex-permission": "asset.write | multimedia.add_edit_own | multimedia.add_edit_any"
             }
         },
         "/api/objects/{id}/categories": {
@@ -18898,7 +18898,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object_type.read"
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view"
             }
         },
         "/api/objects/{id}/relations": {
@@ -19648,7 +19648,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "asset.read"
+                "x-cortex-permission": "asset.read | multimedia.view"
             },
             "post": {
                 "operationId": "api_products_id_assets_post",
@@ -19685,7 +19685,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "asset.write"
+                "x-cortex-permission": "asset.write | multimedia.add_edit_own | multimedia.add_edit_any"
             }
         },
         "/api/products/{id}/assets/{assetId}": {
@@ -19736,7 +19736,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "asset.write"
+                "x-cortex-permission": "asset.write | multimedia.add_edit_own | multimedia.add_edit_any"
             }
         },
         "/api/products/{id}/audit-log": {
@@ -20451,7 +20451,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "api_profile.read"
+                "x-cortex-permission": "api_profile.read | settings.integrations.manage"
             }
         },
         "/api/profiles/preview": {
@@ -20477,7 +20477,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "api_profile.read"
+                "x-cortex-permission": "api_profile.read | settings.integrations.manage"
             }
         },
         "/api/profiles/{code}/openapi.json": {
@@ -20516,7 +20516,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "api_profile.read"
+                "x-cortex-permission": "api_profile.read | settings.integrations.manage"
             }
         },
         "/api/profiles/{code}/test": {
@@ -20555,7 +20555,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "api_profile.read"
+                "x-cortex-permission": "api_profile.read | settings.integrations.manage"
             }
         },
         "/api/roles": {
@@ -20946,7 +20946,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "asset.read"
+                "x-cortex-permission": "asset.read | multimedia.view"
             }
         },
         "/api/search/categories": {
@@ -20972,7 +20972,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "category.read"
+                "x-cortex-permission": "category.read | categories.view"
             }
         },
         "/api/search/objects": {

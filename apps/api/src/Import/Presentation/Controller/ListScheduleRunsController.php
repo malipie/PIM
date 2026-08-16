@@ -30,7 +30,11 @@ final class ListScheduleRunsController
         requirements: ['id' => '[0-9a-fA-F-]{36}'],
         methods: ['GET'],
     )]
-    #[RequiresPermission(module: 'import_schedule', action: 'read')]
+    #[RequiresPermission(module: 'import_schedule', action: 'read', anyOf: [
+        'import_schedule.read',
+        'imports.view_own',
+        'imports.view_all',
+    ])]
     public function __invoke(
         string $id,
         ImportScheduleRepositoryInterface $schedules,

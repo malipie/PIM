@@ -46,7 +46,16 @@ final class UsageController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'attribute', action: 'read')]
+    // #2881 — schema metadata reads follow reading the data they describe,
+    // the #2838 pattern: a Catalog Manager needs the attribute's usage to
+    // render a product form without holding modeling.view.
+    #[RequiresPermission(module: 'attribute', action: 'read', anyOf: [
+        'attribute.read',
+        'modeling.view',
+        'products.view',
+        'categories.view',
+        'multimedia.view',
+    ])]
     public function attribute(string $id): JsonResponse
     {
         $attribute = $this->attributes->findById(Uuid::fromString($id));
@@ -64,7 +73,13 @@ final class UsageController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'attribute_group', action: 'read')]
+    #[RequiresPermission(module: 'attribute_group', action: 'read', anyOf: [
+        'attribute_group.read',
+        'modeling.view',
+        'products.view',
+        'categories.view',
+        'multimedia.view',
+    ])]
     public function attributeGroup(string $id): JsonResponse
     {
         $group = $this->attributeGroups->findById(Uuid::fromString($id));
@@ -82,7 +97,13 @@ final class UsageController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'object_type', action: 'read')]
+    #[RequiresPermission(module: 'object_type', action: 'read', anyOf: [
+        'object_type.read',
+        'modeling.view',
+        'products.view',
+        'categories.view',
+        'multimedia.view',
+    ])]
     public function objectType(string $id): JsonResponse
     {
         $type = $this->objectTypes->findById(Uuid::fromString($id));

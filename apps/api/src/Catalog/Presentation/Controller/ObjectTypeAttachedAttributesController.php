@@ -42,7 +42,13 @@ final class ObjectTypeAttachedAttributesController
         methods: ['GET'],
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'object_type', action: 'read')]
+    #[RequiresPermission(module: 'object_type', action: 'read', anyOf: [
+        'object_type.read',
+        'modeling.view',
+        'products.view',
+        'categories.view',
+        'multimedia.view',
+    ])]
     public function __invoke(string $id): JsonResponse
     {
         $objectType = $this->objectTypes->findById(Uuid::fromString($id));

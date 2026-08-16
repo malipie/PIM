@@ -42,7 +42,15 @@ final class CatalogTokenController
 
     #[Route(path: '/api/catalogs/{id}/token', name: 'pim_catalogs_token_mint', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    // #2881 — minting the public pull token is issuing a secret, so it
+    // follows `settings.integrations.manage` rather than the catalog's
+    // own read code. A Catalog Manager may build and regenerate a PDF
+    // catalog without being able to hand out a URL that serves it
+    // unauthenticated.
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function mint(string $id): JsonResponse
     {
         $tenant = $this->resolveTenant();
@@ -59,7 +67,10 @@ final class CatalogTokenController
 
     #[Route(path: '/api/catalogs/{id}/token', name: 'pim_catalogs_token_revoke', methods: ['DELETE'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function revoke(string $id): Response
     {
         $this->resolveTenant();

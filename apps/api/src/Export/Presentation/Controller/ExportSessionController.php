@@ -308,7 +308,10 @@ final class ExportSessionController
         methods: ['DELETE'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'exports.view_all',
+    ])]
     public function delete(string $id): Response
     {
         $session = $this->loadOwnedOrFail($id);

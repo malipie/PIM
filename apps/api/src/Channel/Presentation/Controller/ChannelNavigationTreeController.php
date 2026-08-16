@@ -55,7 +55,10 @@ final class ChannelNavigationTreeController
 
     #[Route('/api/channels/{channelId}/navigation-tree', name: 'pim_channel_navtree_list', methods: ['GET'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'read')]
+    #[RequiresPermission(module: 'channel', action: 'read', anyOf: [
+        'channel.read',
+        'publications.view',
+    ])]
     public function list(string $channelId): JsonResponse
     {
         $channel = $this->requireChannel($channelId);
@@ -68,7 +71,10 @@ final class ChannelNavigationTreeController
 
     #[Route('/api/channels/{channelId}/navigation-tree', name: 'pim_channel_navtree_create_root', methods: ['POST'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'write')]
+    #[RequiresPermission(module: 'channel', action: 'write', anyOf: [
+        'channel.write',
+        'publications.publish_unpublish',
+    ])]
     public function createRoot(string $channelId, Request $request): JsonResponse
     {
         $data = $this->decode($request);
@@ -87,7 +93,10 @@ final class ChannelNavigationTreeController
 
     #[Route('/api/channels/{channelId}/navigation-tree/nodes', name: 'pim_channel_navtree_add_node', methods: ['POST'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'write')]
+    #[RequiresPermission(module: 'channel', action: 'write', anyOf: [
+        'channel.write',
+        'publications.publish_unpublish',
+    ])]
     public function addNode(string $channelId, Request $request): JsonResponse
     {
         $data = $this->decode($request);
@@ -114,7 +123,10 @@ final class ChannelNavigationTreeController
      */
     #[Route('/api/channels/{channelId}/navigation-tree/nodes/{nodeId}/move', name: 'pim_channel_navtree_move_node', methods: ['PATCH'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'write')]
+    #[RequiresPermission(module: 'channel', action: 'write', anyOf: [
+        'channel.write',
+        'publications.publish_unpublish',
+    ])]
     public function moveNode(string $channelId, string $nodeId, Request $request): JsonResponse
     {
         $data = $this->decode($request);
@@ -135,7 +147,10 @@ final class ChannelNavigationTreeController
 
     #[Route('/api/channels/{channelId}/navigation-tree/nodes/{nodeId}', name: 'pim_channel_navtree_patch_node', methods: ['PATCH'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'write')]
+    #[RequiresPermission(module: 'channel', action: 'write', anyOf: [
+        'channel.write',
+        'publications.publish_unpublish',
+    ])]
     public function patchNode(string $channelId, string $nodeId, Request $request): JsonResponse
     {
         $data = $this->decode($request);
@@ -154,7 +169,10 @@ final class ChannelNavigationTreeController
 
     #[Route('/api/channels/{channelId}/navigation-tree/nodes/{nodeId}', name: 'pim_channel_navtree_delete_node', methods: ['DELETE'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'channel', action: 'write')]
+    #[RequiresPermission(module: 'channel', action: 'write', anyOf: [
+        'channel.write',
+        'publications.publish_unpublish',
+    ])]
     public function deleteNode(string $channelId, string $nodeId): Response
     {
         $this->dispatch(new DeleteChannelCategoryNodeCommand(

@@ -54,7 +54,10 @@ final class FeedRegenerateController
 
     #[Route(path: '/api/feeds/{id}/regenerate', name: 'pim_feeds_regenerate', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function regenerate(string $id): JsonResponse
     {
         $tenant = $this->resolveTenant();

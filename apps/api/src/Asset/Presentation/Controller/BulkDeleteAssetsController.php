@@ -34,7 +34,10 @@ final readonly class BulkDeleteAssetsController
     }
 
     #[Route(path: '/api/assets/bulk-delete', name: 'pim_assets_bulk_delete', methods: ['POST'], format: 'json')]
-    #[RequiresPermission(module: 'asset', action: 'delete')]
+    #[RequiresPermission(module: 'asset', action: 'delete', anyOf: [
+        'asset.delete',
+        'multimedia.delete',
+    ])]
     public function __invoke(Request $request): JsonResponse
     {
         $payload = json_decode($request->getContent(), true);

@@ -49,7 +49,10 @@ final class FeedRunCancelController
         requirements: ['id' => '[0-9a-fA-F-]{36}', 'runId' => '[0-9a-fA-F-]{36}'],
     )]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'integration', action: 'admin')]
+    #[RequiresPermission(module: 'integration', action: 'admin', anyOf: [
+        'integration.admin',
+        'settings.integrations.manage',
+    ])]
     public function cancel(string $id, string $runId): JsonResponse
     {
         $this->assertTenantUser();

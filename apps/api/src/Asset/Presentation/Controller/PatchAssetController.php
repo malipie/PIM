@@ -42,7 +42,18 @@ final readonly class PatchAssetController
     }
 
     #[Route(path: '/api/assets/{id}', name: 'pim_assets_patch', methods: ['PATCH'], format: 'json')]
-    #[RequiresPermission(module: 'asset', action: 'write')]
+    // #2881 — both multimedia write codes are accepted because the
+    // `assets` table carries no uploader column, so `_own` and `_any`
+    // cannot be told apart at all. Refusing `_own` would deny a
+    // permission the matrix grants; accepting it is honest only while
+    // this comment says why. Distinguishing them needs a schema change
+    // (uploaded_by) and is tracked separately — the boundary that IS
+    // enforced is that a role holding neither code stays out.
+    #[RequiresPermission(module: 'asset', action: 'write', anyOf: [
+        'asset.write',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+    ])]
     public function __invoke(Request $request, string $id): JsonResponse
     {
         $assetId = Uuid::fromString($id);

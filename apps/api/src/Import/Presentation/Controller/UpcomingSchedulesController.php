@@ -31,7 +31,11 @@ final class UpcomingSchedulesController
         name: 'imports_schedule_upcoming',
         methods: ['GET'],
     )]
-    #[RequiresPermission(module: 'import_schedule', action: 'read')]
+    #[RequiresPermission(module: 'import_schedule', action: 'read', anyOf: [
+        'import_schedule.read',
+        'imports.view_own',
+        'imports.view_all',
+    ])]
     public function __invoke(
         Request $request,
         ImportScheduleRepositoryInterface $schedules,

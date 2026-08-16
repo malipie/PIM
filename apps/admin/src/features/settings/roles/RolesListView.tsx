@@ -130,8 +130,12 @@ export function RolesListView() {
         <div className="font-mono text-[11.5px] text-zinc-500 sm:ml-auto">
           {t('settings.roles.showing_count', { shown: filtered.length, total: roles.length })}
         </div>
+        {/* #2881 — the last legacy code left on the frontend. Role
+            templates carry settings.roles.manage; `role.write` belongs to
+            the legacy grid and no panel-created role holds it, so this
+            button was invisible to every tenant Owner. */}
         <GatedButton
-          permission="role.write"
+          anyOf={['role.write', 'settings.roles.manage']}
           size="sm"
           className="h-9 gap-1.5 rounded-xl bg-zinc-900 px-3.5 text-[12.5px] font-medium text-white hover:bg-zinc-800"
           onClick={() => navigate('/settings/roles/new')}

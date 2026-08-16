@@ -28,7 +28,10 @@ final class FeedTemplatesController
 
     #[Route(path: '/api/feeds/templates', name: 'pim_feeds_templates', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[RequiresPermission(module: 'exports', action: 'view_all')]
+    #[RequiresPermission(module: 'exports', action: 'view_all', anyOf: [
+        'exports.view_all',
+        'settings.integrations.manage',
+    ])]
     public function list(): JsonResponse
     {
         return new JsonResponse([

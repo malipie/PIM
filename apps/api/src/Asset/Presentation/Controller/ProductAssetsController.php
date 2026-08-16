@@ -45,7 +45,10 @@ final readonly class ProductAssetsController
 
     #[Route(path: '/api/products/{id}/assets', name: 'pim_products_assets_list', methods: ['GET'], format: 'json')]
     #[Route(path: '/api/objects/{id}/assets', name: 'pim_objects_assets_list', methods: ['GET'], format: 'json')]
-    #[RequiresPermission(module: 'asset', action: 'read')]
+    #[RequiresPermission(module: 'asset', action: 'read', anyOf: [
+        'asset.read',
+        'multimedia.view',
+    ])]
     public function list(string $id): JsonResponse
     {
         $productId = $this->parseUuid($id, 'object');
@@ -64,7 +67,18 @@ final readonly class ProductAssetsController
 
     #[Route(path: '/api/products/{id}/assets', name: 'pim_products_assets_link', methods: ['POST'], format: 'json')]
     #[Route(path: '/api/objects/{id}/assets', name: 'pim_objects_assets_link', methods: ['POST'], format: 'json')]
-    #[RequiresPermission(module: 'asset', action: 'write')]
+    // #2881 — both multimedia write codes are accepted because the
+    // `assets` table carries no uploader column, so `_own` and `_any`
+    // cannot be told apart at all. Refusing `_own` would deny a
+    // permission the matrix grants; accepting it is honest only while
+    // this comment says why. Distinguishing them needs a schema change
+    // (uploaded_by) and is tracked separately — the boundary that IS
+    // enforced is that a role holding neither code stays out.
+    #[RequiresPermission(module: 'asset', action: 'write', anyOf: [
+        'asset.write',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+    ])]
     public function link(string $id, Request $request): JsonResponse
     {
         $productId = $this->parseUuid($id, 'object');
@@ -112,7 +126,11 @@ final readonly class ProductAssetsController
         methods: ['DELETE'],
         format: 'json',
     )]
-    #[RequiresPermission(module: 'asset', action: 'write')]
+    #[RequiresPermission(module: 'asset', action: 'write', anyOf: [
+        'asset.write',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+    ])]
     public function unlink(string $id, string $assetId): JsonResponse
     {
         $productId = $this->parseUuid($id, 'object');
