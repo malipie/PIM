@@ -21,8 +21,12 @@
  * going to throw away anyway.
  *
  * An attribute with no `relation_target_object_type_ids` really does mean
- * "anything", so that case keeps asking the broad question — and keeps
- * needing the broad grant.
+ * "anything" — the seeded `related_to` is one. Asking the unscoped
+ * collection for those was still a 403 for PRD roles, so "anything"
+ * resolves to "every ObjectType this tenant has" and scopes the same way.
+ * The result is the same list the client-side filter used to produce,
+ * minus the kinds the caller may not read — which is the correct list,
+ * not a smaller one.
  */
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +47,11 @@ interface ObjectsListResponse {
   'hydra:member'?: CandidateRow[];
 }
 
+interface ObjectTypesResponse {
+  member?: { id?: string }[];
+  'hydra:member'?: { id?: string }[];
+}
+
 export interface RelationCreateFieldProps {
   attribute: AttributeMeta;
   value: unknown;
@@ -61,15 +70,25 @@ export function RelationCreateField({
   const candidatesQuery = useQuery<CandidateRow[]>({
     queryKey: ['relation-candidates', allowedTypeIds.join(',')],
     queryFn: async () => {
-      const urls =
-        allowedTypeIds.length === 0
-          ? ['/api/objects?itemsPerPage=200']
-          : allowedTypeIds.map(
-              (typeId) => `/api/objects?itemsPerPage=200&objectType=${encodeURIComponent(typeId)}`,
-            );
+      let typeIds = allowedTypeIds;
+      if (typeIds.length === 0) {
+        const types = await jsonFetch<ObjectTypesResponse>('/api/object_types?itemsPerPage=200', {
+          accept: 'application/ld+json',
+        });
+        typeIds = (types.member ?? types['hydra:member'] ?? [])
+          .map((row) => row.id)
+          .filter((id): id is string => typeof id === 'string');
+      }
 
+      // A caller may legitimately lack read access to some of the types —
+      // a 403 on one of them must narrow the list, not blank the picker.
       const pages = await Promise.all(
-        urls.map((url) => jsonFetch<ObjectsListResponse>(url, { accept: 'application/ld+json' })),
+        typeIds.map((typeId) =>
+          jsonFetch<ObjectsListResponse>(
+            `/api/objects?itemsPerPage=200&objectType=${encodeURIComponent(typeId)}`,
+            { accept: 'application/ld+json' },
+          ).catch((): ObjectsListResponse => ({ member: [] })),
+        ),
       );
 
       return pages.flatMap((page) => page.member ?? page['hydra:member'] ?? []);
