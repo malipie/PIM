@@ -44,6 +44,19 @@ final readonly class BuiltInObjectTypeSeeder
         'asset' => [ObjectKind::Asset, ['pl' => 'Zasób', 'en' => 'Asset'], 'Image', '#8B5CF6'],
     ];
 
+    /**
+     * Codes this seeder owns. Exposed so callers can tell "this tenant is
+     * complete" from "a code is taken by something else" — the seeder skips
+     * the latter rather than adopting it, and a silent skip would leave the
+     * tenant short of a built-in with nothing to explain why.
+     *
+     * @return list<string>
+     */
+    public static function builtInCodes(): array
+    {
+        return array_keys(self::DEFINITIONS);
+    }
+
     public function __construct(
         private ObjectTypeRepositoryInterface $repository,
         private EntityManagerInterface $em,
@@ -63,8 +76,22 @@ final readonly class BuiltInObjectTypeSeeder
         try {
             $created = 0;
             foreach (self::DEFINITIONS as $code => [$kind, $label, $icon, $color]) {
-                $existing = $this->repository->findBuiltInByKind($kind, $tenant);
-                if (null !== $existing) {
+                if (null !== $this->repository->findBuiltInByKind($kind, $tenant)) {
+                    continue;
+                }
+
+                // #2875 — the code may already be taken by a CUSTOM type the
+                // tenant created itself: `(tenant_id, code)` is unique, and
+                // checking only for a built-in of this kind misses that. It
+                // is exactly what happens on a tenant that came up without
+                // built-ins (the bug this seeder now repairs) and whose owner
+                // built their own "Produkt" module through the wizard.
+                //
+                // Skip rather than adopt or replace: converting someone's
+                // custom type into a platform-owned, undeletable one would
+                // silently take their model away from them. The caller
+                // reports the gap so a human can rename and re-run.
+                if (null !== $this->repository->findByCode($code, $tenant)) {
                     continue;
                 }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Catalog;
 
 use App\Catalog\Application\BuiltInObjectTypeSeeder;
+use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Shared\Domain\Tenant;
@@ -115,5 +116,49 @@ final class BuiltInObjectTypeSeederTest extends KernelTestCase
         $em->flush();
 
         return $tenant;
+    }
+
+    /**
+     * #2875 — the tenant may already own a CUSTOM type under a built-in code.
+     * `(tenant_id, code)` is unique and the idempotency check looks for a
+     * built-in of that KIND, so it never saw the collision: the repair
+     * command died with SQLSTATE 23505 on production, halfway through a sweep.
+     *
+     * Skipping is the deliberate choice. Adopting the row — flipping it to
+     * built-in, undeletable, code-locked — would take the tenant's own model
+     * away from them without asking.
+     */
+    #[Test]
+    public function aCustomTypeHoldingABuiltInCodeIsSkippedNotAdopted(): void
+    {
+        $tenant = $this->createTenant('demo');
+        $em = self::getContainer()->get('doctrine')->getManager();
+        \assert($em instanceof EntityManagerInterface);
+
+        $mine = new ObjectType('product', ObjectKind::Custom, ['pl' => 'Mój produkt']);
+        // TenantAssignmentListener stamps this on prePersist in a request;
+        // a kernel test persists directly, so bind it here.
+        $mine->assignTenant($tenant);
+        $em->persist($mine);
+        $em->flush();
+
+        $created = $this->seeder()->seed($tenant);
+
+        // Category + Asset only — `product` was taken.
+        self::assertSame(2, $created);
+
+        $repo = $this->repository();
+        self::assertNull($repo->findBuiltInByKind(ObjectKind::Product, $tenant));
+
+        $stillMine = $repo->findByCode('product', $tenant);
+        self::assertNotNull($stillMine);
+        self::assertFalse($stillMine->isBuiltIn(), 'the tenant keeps its own type');
+        self::assertSame(ObjectKind::Custom, $stillMine->getKind());
+    }
+
+    #[Test]
+    public function builtInCodesAreExposedForCallersToCheckCompleteness(): void
+    {
+        self::assertSame(['product', 'category', 'asset'], BuiltInObjectTypeSeeder::builtInCodes());
     }
 }

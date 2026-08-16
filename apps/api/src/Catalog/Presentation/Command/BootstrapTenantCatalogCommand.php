@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Presentation\Command;
 
+use App\Catalog\Application\BuiltInObjectTypeSeeder;
 use App\Catalog\Contracts\Service\TenantCatalogBootstrap;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Shared\Application\TenantContext;
@@ -71,6 +72,7 @@ final class BootstrapTenantCatalogCommand extends Command
         }
 
         $rows = [];
+        $blocked = [];
         foreach ($tenants as $tenant) {
             $code = $tenant->getCode();
             $this->bindTenant($tenant);
@@ -82,6 +84,17 @@ final class BootstrapTenantCatalogCommand extends Command
                     $this->em->flush();
                 }
                 $after = \count($this->objectTypes->findAllByTenant($tenant));
+
+                // A built-in code can be occupied by a CUSTOM type the tenant
+                // built itself. The seeder skips those rather than adopting
+                // them, so without this the run reports success and the
+                // tenant quietly stays short of a built-in.
+                foreach (BuiltInObjectTypeSeeder::builtInCodes() as $builtInCode) {
+                    $occupant = $this->objectTypes->findByCode($builtInCode, $tenant);
+                    if (null !== $occupant && !$occupant->isBuiltIn()) {
+                        $blocked[] = \sprintf('%s → kod `%s` zajmuje typ własny', $code, $builtInCode);
+                    }
+                }
             } finally {
                 $this->unbindTenant();
             }
@@ -90,6 +103,14 @@ final class BootstrapTenantCatalogCommand extends Command
         }
 
         $io->table(['tenant', 'typów przed', 'typów po'], $rows);
+
+        if ([] !== $blocked) {
+            $io->warning(array_merge(
+                ['Wbudowane typy pominięte — kod zajęty przez typ własny:'],
+                $blocked,
+                ['Zmień kod typu własnego, potem uruchom ponownie. Komenda niczego nie nadpisuje.'],
+            ));
+        }
 
         if ($dryRun) {
             $io->note('Dry run — nothing was written.');
