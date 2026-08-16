@@ -81,6 +81,13 @@ test('assign a product to a channel navigation node from the Kategorie tab', asy
   expect((await putResponse).status()).toBe(200);
 
   // 5. The placement breadcrumb + manual marker surface in the row.
+  // #2881 — wait for the picker to close first. The dialog carries a button
+  // with the same node name, so asserting while it is still on screen is a
+  // strict-mode violation ("resolved to 2 elements") rather than a failure:
+  // the placement had already succeeded, the dialog just had not gone yet.
+  // Same class as the counted-nav-item assertion from #2845 — the assertion
+  // was measuring render timing, not the placement.
+  await expect(dialog).toBeHidden();
   await expect(page.getByText(/E2E Telewizory/i)).toBeVisible();
   await expect(page.getByText(/\(ręcznie\)/i)).toBeVisible();
 
