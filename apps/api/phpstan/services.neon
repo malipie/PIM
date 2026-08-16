@@ -24,3 +24,11 @@ services:
         class: App\PHPStan\Rules\FlushWithoutClearInLoopRule
         tags:
             - phpstan.rules.rule
+    # #2881 — the two permission catalogues. An endpoint gated by a legacy
+    # `{resource}.{action}` code alone is closed to every role a tenant can
+    # create through the panel; that defect was fixed five times, screen by
+    # screen, because nothing stopped the next feature from reintroducing it.
+    -
+        class: App\PHPStan\Rules\LegacyPermissionCodeRule
+        tags:
+            - phpstan.rules.rule
