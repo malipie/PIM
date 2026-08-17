@@ -6,7 +6,7 @@
 > **Po każdym wdrożeniu, które czegoś nauczyło, dopisz to tutaj.** Dokument bez aktualizacji zestarzeje się
 > szybciej niż stack.
 >
-> Ostatnia aktualizacja: 2026-08-13 (wdrożenie `346936ca`).
+> Ostatnia aktualizacja: 2026-08-17 (wdrożenie `d10a769e`).
 > Pierwsze postawienie hosta: [`../operations/deploy-runbook.md`](../operations/deploy-runbook.md).
 
 ## Zanim zaczniesz — co musi być prawdą
@@ -164,6 +164,33 @@ Sprawdź storage, zanim zaczniesz obwiniać wdrożony kod.
 
 Po odtworzeniu bazy `pim_app` dostaje `permission denied for schema public` — migracja nadająca granty
 nie uruchamia się ponownie. Trzeba nadać ręcznie. Dotyczy ścieżki odtwarzania, nie zwykłego wdrożenia.
+
+### 7. Front bez zmian w `apps/api` też bywa wdrożeniem (2026-08-17, `d10a769e`)
+
+Trzy zmienione pliki w `apps/admin/src` wystarczą, żeby pominięcie `pnpm --filter @pim/admin build`
++ `rsync apps/admin/dist` zostawiło produkcję na starym bundlu przy w pełni poprawnym backendzie —
+objaw byłby identyczny jak „poprawka nie działa".
+
+**Tani dowód, że bundle faktycznie doszedł** — porównaj hash pliku wejściowego po obu stronach:
+
+```bash
+curl -s https://app.harmonpim.pl/ | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1
+grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' apps/admin/dist/index.html | head -1
+```
+
+Zgodne = produkcja serwuje to, co zbudowałeś. To sprawdzenie kosztuje sekundę i zamyka całą klasę
+„wdrożone, a nie działa".
+
+### 8. Odmowa uprawnień przestała zaśmiecać bramkę logów (2026-08-17, #2881)
+
+Bramka z kroku 6 greppowała m.in. `uncaught`, a **każde 403 loguje się jako**
+`Uncaught PHP Exception AccessDeniedHttpException` — więc zdrowa praca RBAC wyglądała na
+kilkadziesiąt błędów krytycznych. Do tego `fingers_crossed` nie miał 403 w `excluded_http_codes`,
+przez co jedna odmowa zrzucała cały 50-rekordowy bufor.
+
+Jedno i drugie naprawione; bramka odfiltrowuje `AccessDenied` i liczy odmowy osobno. Jeśli kiedyś
+znowu zobaczysz „dziesiątki błędów" po zdrowym wdrożeniu — sprawdź najpierw, **czego szuka grep**,
+a dopiero potem czego szuka aplikacja.
 
 ## Co warto zmierzyć przy zmianach w uprawnieniach
 
