@@ -219,6 +219,16 @@ services:
       MAILER_DSN: ${MAILER_DSN:?MAILER_DSN jest wymagany — bez niego zaproszenia i resety hasła są martwymi linkami.}
       MAILER_FROM: ${MAILER_FROM:?MAILER_FROM jest wymagany — nadawca na domenie z SPF/DKIM.}
       APP_BYOK_KEY_V1: ${APP_BYOK_KEY_V1:?APP_BYOK_KEY_V1 jest wymagany — `php -r "echo base64_encode(random_bytes(32));"`, szyfruje sekrety SSO/TOTP/BYOK.}
+      # Klucze JWT NIE generują się same w tym stacku: autogeneracja w
+      # entrypoincie jest zabramkowana `PIM_JWT_AUTOGEN` i przeznaczona dla
+      # dev/test, a `api` i `worker` współdzielą tu wolumen `api_jwt` — dwa
+      # kontenery generujące równolegle przy pierwszym starcie mogłyby
+      # przepleść się w niedopasowaną parę kluczy. Parę tworzy skrypt
+      # provisioningu (#2861) jednym, uporządkowanym wywołaniem
+      # `lexik:jwt:generate-keypair`, zanim instancja zacznie obsługiwać ruch.
+      # Bez tej zmiennej Symfony wziąłby placeholder z apps/api/.env i każde
+      # logowanie kończyłoby się błędem 500.
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?JWT_PASSPHRASE jest wymagany — hasło pary kluczy JWT, losowane per tenant. Parę generuje skrypt provisioningu przed pierwszym uruchomieniem ruchu.}
       WORKFLOW_CUSTOM_DEFINITIONS: ${WORKFLOW_CUSTOM_DEFINITIONS:-true}
     expose:
       - "80"
@@ -281,6 +291,9 @@ services:
       MAILER_DSN: ${MAILER_DSN:?MAILER_DSN jest wymagany.}
       MAILER_FROM: ${MAILER_FROM:?MAILER_FROM jest wymagany.}
       APP_BYOK_KEY_V1: ${APP_BYOK_KEY_V1:?APP_BYOK_KEY_V1 jest wymagany.}
+      # Worker nie koduje JWT, ale współdzieli wolumen `api_jwt` i wczytuje tę
+      # samą konfigurację bundla — niedopasowane hasło wywróciłoby boot.
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?JWT_PASSPHRASE jest wymagany.}
       WORKFLOW_CUSTOM_DEFINITIONS: ${WORKFLOW_CUSTOM_DEFINITIONS:-true}
     command:
       - "php"
