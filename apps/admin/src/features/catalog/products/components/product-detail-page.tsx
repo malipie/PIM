@@ -7,6 +7,7 @@ import { DetailNotFoundState } from '@/components/catalog/detail-not-found-state
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useContentRecipes } from '@/features/agent/hooks/use-content-recipes';
+import { HttpError } from '@/lib/http';
 import { useIdentity } from '@/lib/identity';
 import { fetchWorkflowState } from '@/lib/workflow/api';
 import { computeEditLock } from '@/lib/workflow/edit-lock';
@@ -343,6 +344,12 @@ export function ProductDetailPage({
   // /api/products/{id} endpoint enforced this server-side).
   const kindMismatch =
     isEditMode && requireKind !== undefined && product != null && product.kind !== requireKind;
+  // #2881 — a refused read is not a missing row. Every failure used to
+  // render "nie istnieje lub został usunięty", so a role without the
+  // permission for this ObjectType was told its data had been deleted and
+  // went looking for the wrong problem. Reported from production on a
+  // custom module opened by a viewer.
+  const isForbidden = productQuery.error instanceof HttpError && productQuery.error.status === 403;
   if (
     isEditMode &&
     (productQuery.isError || product === null || product === undefined || kindMismatch)
@@ -351,13 +358,26 @@ export function ProductDetailPage({
       <DetailNotFoundState
         id={id}
         backHref={backHref}
-        title={t('products.detail.errors.not_found_title', {
-          defaultValue: 'Produkt nie znaleziony',
-        })}
-        description={t('products.detail.errors.not_found_description', {
-          defaultValue: 'Produkt o ID "{{id}}" nie istnieje lub został usunięty.',
-          id,
-        })}
+        title={
+          isForbidden
+            ? t('products.detail.errors.forbidden_title', {
+                defaultValue: 'Brak uprawnień do tego obiektu',
+              })
+            : t('products.detail.errors.not_found_title', {
+                defaultValue: 'Produkt nie znaleziony',
+              })
+        }
+        description={
+          isForbidden
+            ? t('products.detail.errors.forbidden_description', {
+                defaultValue:
+                  'Twoja rola nie ma uprawnienia do odczytu tego typu obiektu. Poproś administratora o dostęp.',
+              })
+            : t('products.detail.errors.not_found_description', {
+                defaultValue: 'Produkt o ID "{{id}}" nie istnieje lub został usunięty.',
+                id,
+              })
+        }
         backLabel={t('products.detail.errors.back_to_list', {
           defaultValue: 'Wróć do listy produktów',
         })}

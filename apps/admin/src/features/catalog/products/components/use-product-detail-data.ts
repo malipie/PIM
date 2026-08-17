@@ -63,8 +63,11 @@ export function useProductDetailData({
     enabled: isEditMode && id !== '',
     // A 404 is conclusive — retrying it three times keeps the operator on
     // "Ładowanie…" for ~8s before the not-found state appears (#1043).
+    // #2881 — 403 joins 404 as conclusive. Retrying a refused read three
+    // times only delays the message, and the delay is what made the page
+    // look like it loaded before failing.
     retry: (failureCount, error) =>
-      !(error instanceof HttpError && error.status === 404) && failureCount < 3,
+      !(error instanceof HttpError && [403, 404].includes(error.status)) && failureCount < 3,
   });
 
   const { objectTypeId: defaultProductTypeId } = useDefaultObjectType('product');
