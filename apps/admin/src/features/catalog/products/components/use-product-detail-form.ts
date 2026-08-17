@@ -1,4 +1,4 @@
-import type { UseQueryResult } from '@tanstack/react-query';
+import { type UseQueryResult, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -69,6 +69,24 @@ export function useProductDetailForm({
 }: UseProductDetailFormArgs) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  /**
+   * #2881 — both object lists cache for 30s and nothing dropped that cache
+   * after a write, so returning to the list right after creating an object
+   * showed the page without it. It looked like the save had not worked;
+   * clicking through another tab or a hard reload "fixed" it, which is the
+   * signature of a stale query rather than a missing row.
+   *
+   * Prefix keys, so every page / sort / variants-mode combination of the
+   * two list hooks is covered, plus the sidebar counters that read the same
+   * data.
+   */
+  const invalidateObjectLists = (): void => {
+    for (const key of [['object-list'], ['object-list-browse'], ['nav-counts']]) {
+      void queryClient.invalidateQueries({ queryKey: key });
+    }
+  };
 
   const [dirtyFields, setDirtyFields] = useState<Record<string, unknown>>({});
   // #1350 — codes of required attributes that blocked the last save.
@@ -257,6 +275,7 @@ export function useProductDetailForm({
               : t('object_create.success', { defaultValue: 'Utworzono {{code}}', code: sku }),
           );
         }
+        invalidateObjectLists();
         navigate(detailPathFor(created.id));
       } else {
         if (Object.keys(dirtyFields).length === 0) {
@@ -333,6 +352,8 @@ export function useProductDetailForm({
           code: product?.code ?? id,
         }),
       );
+      // Same staleness on the way out: a deleted row lingered on the list.
+      invalidateObjectLists();
       navigate(backHref);
     } catch {
       toast.error(
