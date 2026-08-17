@@ -14,14 +14,12 @@ import {
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
 import { httpErrorDetail, jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
-
 import {
   type AttributePermissionLevel,
   AttributePermissionsSection,
@@ -30,6 +28,7 @@ import {
 import { resolveRoleColor } from './colors';
 import type { PermissionGroup } from './PermissionMatrix';
 import { PermissionMatrixAccordion } from './PermissionMatrixAccordion';
+import { visibleGroups } from './permission-catalogue';
 import { resolveRoleScope } from './scope';
 import type { RoleDetail, RoleListItem } from './types';
 
@@ -262,8 +261,11 @@ export function RoleEditorPage() {
   };
 
   const counts = useMemo(() => {
+    // #2881 — count what the matrix actually renders. The denominator used
+    // to include the legacy codes the builder no longer offers, so the badge
+    // read "11 / 127" over a screen showing 61 rows.
     let totalCells = 0;
-    for (const group of groups) totalCells += group.permissions.length;
+    for (const group of visibleGroups(groups, selected)) totalCells += group.permissions.length;
     return { selected: selected.size, total: totalCells };
   }, [groups, selected]);
 
