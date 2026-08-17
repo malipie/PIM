@@ -12,11 +12,23 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 /**
  * Rate limiter on `/api/auth/refresh` (#97 / 0.11.2).
  *
- * 30 attempts per IP per 1-hour sliding window. A real browser
- * tab refreshes the access token every ~15 minutes — at most ~5
- * legitimate calls per hour per tab — so 30/h covers a small honest
- * burst while clamping a stolen-cookie replay loop (where a
- * malicious script polls `/refresh` to siphon fresh access tokens).
+ * 30 FAILED refreshes per IP per 1-hour sliding window.
+ *
+ * #2881 — the estimate this was built on ("~5 legitimate calls per hour
+ * per tab") does not survive contact with the admin: every page load runs
+ * `authProvider.check()`, which refreshes. An operator working through the
+ * panel exhausts thirty in minutes, and then the SPA bounces them to the
+ * login screen, where logging in works and the next navigation bounces
+ * them again — the shape reported from production, which reads as "my
+ * role was taken away".
+ *
+ * A successful refresh is a browser doing its job, so it no longer spends
+ * the budget. What the limiter is actually for — a stolen-cookie replay
+ * loop polling `/refresh` — produces *failures*, and those still count:
+ * {@see AuthRefreshFailureRateLimitListener} consumes on a 4xx.
+ *
+ * A success does not clear the bucket either, so recorded failures keep
+ * counting down their window.
  *
  * Mirrors {@see AuthLoginRateLimitListener} — runs at priority 32 so
  * the limiter checks before the Lexik refresh-cookie consumer.
@@ -45,12 +57,15 @@ final readonly class AuthRefreshRateLimitListener
         }
 
         $limiter = $this->authRefreshLimiter->create($request->getClientIp() ?? 'unknown');
-        $consumed = $limiter->consume();
-        if ($consumed->isAccepted()) {
+        // consume(0) reports the bucket without spending it. The accepted
+        // flag is unusable for a zero-token request — Symfony hardcodes
+        // `true` on that branch — so read the remaining tokens.
+        $peeked = $limiter->consume(0);
+        if ($peeked->getRemainingTokens() > 0) {
             return;
         }
 
-        $retryAfter = $consumed->getRetryAfter();
+        $retryAfter = $peeked->getRetryAfter();
         $secondsUntilReset = max(1, $retryAfter->getTimestamp() - time());
 
         throw new TooManyRequestsHttpException(

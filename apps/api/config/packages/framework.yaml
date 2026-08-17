@@ -2,6 +2,21 @@
 framework:
     secret: '%env(APP_SECRET)%'
 
+    # #2881 — without this every request looks like it came from Caddy, so
+    # the per-IP rate limiters keyed one shared bucket for the whole
+    # installation: one operator working through the admin exhausted the
+    # refresh budget for everybody, and `pim:security:unblock-ip` had to be
+    # pointed at a container address to help. Audit records carried the
+    # proxy's address too.
+    #
+    # `private_ranges` is the honest scope here: the api container is not
+    # published to the host (`expose`, not `ports`), so the only thing that
+    # can reach it is Caddy on the compose network. A forwarded header from
+    # a public client cannot arrive without going through the proxy first,
+    # which overwrites it.
+    trusted_proxies: 'private_ranges'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']
+
     # Note that the session will be started ONLY if you read or write from it.
     session: true
 
