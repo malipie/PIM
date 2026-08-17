@@ -167,6 +167,36 @@ final class PrdRoleSurfaceAccessTest extends CatalogApiTestCase
     }
 
     /**
+     * #2881 — a grant you cannot use is not a grant. The product create
+     * form requires a category (#891) and reads the category collection to
+     * offer one, so a role allowed only to add products could open the
+     * form, watch the picker hang on "Ładowanie…", and never save. Found
+     * by the operator on production with exactly this role.
+     *
+     * The read is what opens; creating or changing a category still needs
+     * `categories.add_edit`, which is the half that must not follow.
+     */
+    #[Test]
+    public function creatingAProductImpliesReadingTheCategoriesItRequires(): void
+    {
+        $this->givenUserWithPermissions('add-only@demo.localhost', 'control_add_only', ['products.add']);
+
+        $client = $this->authenticatedClient('add-only@demo.localhost');
+        $client->request('GET', '/api/categories');
+        self::assertResponseIsSuccessful('the create form cannot offer a category it may not read');
+
+        $client->request('POST', '/api/categories', [
+            'headers' => ['content-type' => 'application/ld+json'],
+            'body' => json_encode([
+                'code' => 'ADD-ONLY-SHOULD-NOT',
+                'objectTypeId' => $this->objectTypeIdFor(ObjectKind::Category),
+                'categoryTargetObjectTypeId' => $this->objectTypeIdFor(ObjectKind::Product),
+            ], JSON_THROW_ON_ERROR),
+        ]);
+        self::assertResponseStatusCodeSame(403, 'reading the list must not become creating a category');
+    }
+
+    /**
      * Reading a surface is not permission to change it. `publications.view`
      * opens the channel list; creating a channel needs the publish grant,
      * and without that separation the table above would have quietly turned
