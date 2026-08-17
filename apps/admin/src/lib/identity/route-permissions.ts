@@ -30,6 +30,10 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, readonly string[
   ['/modeling', ['modeling.view']],
 
   // Catalog objects.
+  // #2881 — longest prefix wins, so the create page is gated on its own
+  // code. A role granted only "add a product" was blocked out of the
+  // section that contains the create form, which made the grant useless.
+  ['/products/new', ['products.add', 'products.view']],
   ['/products', ['products.view']],
   ['/objects', ['object.view', 'products.view']],
   ['/assets', ['multimedia.view']],

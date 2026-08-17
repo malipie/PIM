@@ -13,7 +13,11 @@ export {
   type Identity,
   type MeResponse,
 } from './identity';
-export { isMenuRefVisible, MENU_PERMISSIONS } from './menu-permissions';
+export {
+  isMenuRefVisible,
+  isObjectTypeMenuItemVisible,
+  MENU_PERMISSIONS,
+} from './menu-permissions';
 export {
   decideFieldMode,
   type FieldRenderMode,

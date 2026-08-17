@@ -49,6 +49,11 @@ final class AttributeGroupAttributesController
         'products.view',
         'categories.view',
         'multimedia.view',
+        'products.add',
+        'categories.add_edit',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+        'object.add',
     ])]
     public function __invoke(string $id): JsonResponse
     {

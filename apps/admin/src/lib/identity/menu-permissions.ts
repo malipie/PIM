@@ -75,3 +75,39 @@ export function isMenuRefVisible(identity: Identity | null, ref: string): boolea
   }
   return hasAnyPermission(identity, required);
 }
+
+/**
+ * #2881 — the same gate the backend applies, for menu entries that point
+ * at an ObjectType.
+ *
+ * `isMenuRefVisible` treats an unmapped `ref` as public, and an
+ * ObjectType entry's `ref` is a UUID, so every module — including a
+ * tenant's own custom ones — was advertised to every role and then 403'd
+ * on click. That is the shape #2830 removed from the built-in sections;
+ * it survived here because the map is keyed by name and these entries
+ * are keyed by id.
+ *
+ * The codes mirror `Prd\ObjectCollectionVoter::KIND_PERMISSIONS` on
+ * purpose: the sidebar must not offer what the collection endpoint will
+ * refuse. An unknown kind falls back to the generic verb rather than to
+ * "visible" — the failure mode of a new kind should be a hidden entry,
+ * not a broken one.
+ */
+const OBJECT_TYPE_KIND_PERMISSIONS: Readonly<Record<string, readonly string[]>> = {
+  product: ['products.view'],
+  category: ['categories.view'],
+  asset: ['multimedia.view'],
+  custom: ['object.view'],
+};
+
+export function isObjectTypeMenuItemVisible(
+  identity: Identity | null,
+  objectTypeKind: string | undefined,
+): boolean {
+  if (!identity) {
+    return false;
+  }
+  const required = OBJECT_TYPE_KIND_PERMISSIONS[objectTypeKind ?? ''] ?? ['object.view'];
+
+  return hasAnyPermission(identity, required);
+}

@@ -70,7 +70,18 @@ final class ObjectTypeEffectiveGroupsPreviewController
         priority: 200,
     )]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    #[RequiresPermission(module: 'products', action: 'view')]
+    // #2881 — this is the create form's schema. Gating it on products.view
+    // alone meant a role granted only "add a product" could POST an object
+    // it had no way to compose: the form could not render. Reading the
+    // schema follows reading OR creating the data it describes.
+    #[RequiresPermission(module: 'products', action: 'view', anyOf: [
+        'products.view',
+        'products.add',
+        'categories.add_edit',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+        'object.add',
+    ])]
     public function preview(string $id, Request $request): JsonResponse
     {
         try {
