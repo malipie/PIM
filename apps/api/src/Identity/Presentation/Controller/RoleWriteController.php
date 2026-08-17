@@ -11,6 +11,7 @@ use App\Identity\Domain\Entity\Permission;
 use App\Identity\Domain\Entity\Role;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Rbac\PrdRoleTemplates;
+use App\Identity\Domain\Rbac\RbacMatrix;
 use App\Identity\Domain\Repository\PermissionRepositoryInterface;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Identity\Domain\Repository\UserRepositoryInterface;
@@ -258,11 +259,24 @@ final readonly class RoleWriteController
             return $this->problem(Response::HTTP_NOT_FOUND, 'Not Found', 'Role not found.');
         }
 
-        if (!$role->isGlobal()) {
-            $roleTenant = $role->getTenant();
-            if (null === $roleTenant || !$caller->getTenant()->getId()->equals($roleTenant->getId())) {
+        // #2881 — a GLOBAL role is shared by every tenant, and this loader
+        // used to wave one through on the strength of being global: any
+        // tenant's admin could PATCH `super_admin` and change what it grants
+        // across the whole installation. Editing a cross-tenant role belongs
+        // to the platform operator, so everyone else gets the same "not
+        // found" a foreign tenant's role gets — the answer must not reveal
+        // that the role exists.
+        if ($role->isGlobal()) {
+            if (!$this->permissionResolver->resolve($caller)->has(RbacMatrix::PERMISSION_PLATFORM_TENANTS_MANAGE)) {
                 return $this->problem(Response::HTTP_NOT_FOUND, 'Not Found', 'Role not found.');
             }
+
+            return $role;
+        }
+
+        $roleTenant = $role->getTenant();
+        if (null === $roleTenant || !$caller->getTenant()->getId()->equals($roleTenant->getId())) {
+            return $this->problem(Response::HTTP_NOT_FOUND, 'Not Found', 'Role not found.');
         }
 
         return $role;

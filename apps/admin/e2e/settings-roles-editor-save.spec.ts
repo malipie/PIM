@@ -32,12 +32,20 @@ test('Settings → Role editor — save surfaces real errors + happy path', asyn
     { timeout: 30_000 },
   );
   const listJson = (await listResponse.json()) as {
-    member?: Array<{ id: string; type?: string }>;
-    'hydra:member'?: Array<{ id: string; type?: string }>;
+    member?: Array<{ id: string; type?: string; code?: string }>;
+    'hydra:member'?: Array<{ id: string; type?: string; code?: string }>;
   };
   const items = listJson.member ?? listJson['hydra:member'] ?? [];
   expect(items.length).toBeGreaterThan(0);
-  const target = items.find((r) => r.type === 'custom') ?? items[0];
+  // #2881 — the fallback must not land on a GLOBAL role. `super_admin` is
+  // shared by every tenant and sorts first, so `items[0]` used to pick it
+  // whenever the fixture had no custom role: this spec was quietly editing
+  // a cross-tenant object, which the backend now refuses with 404. Skipping
+  // the platform codes keeps the spec honest whatever the list contains.
+  const platformCodes = new Set(['super_admin', 'platform_operator']);
+  const editable = items.filter((r) => !platformCodes.has(r.code ?? ''));
+  const target = editable.find((r) => r.type === 'custom') ?? editable[0];
+  expect(target, 'the fixture must expose at least one tenant role').toBeDefined();
 
   // Deep-link into the editor; it hydrates from GET /api/roles/{id}.
   await page.goto(`/settings/roles/${target.id}/edit`);
