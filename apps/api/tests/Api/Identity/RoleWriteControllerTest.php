@@ -161,6 +161,73 @@ final class RoleWriteControllerTest extends ApiTestCase
         self::assertResponseStatusCodeSame(404);
     }
 
+    /**
+     * #2881 — a global role is shared by every tenant, and the loader used
+     * to wave one through on the strength of being global: any tenant's
+     * admin could PATCH `super_admin` and change what it grants across the
+     * whole installation. It is also the only role holding legacy codes,
+     * so a save from a UI that no longer offers them would have stripped
+     * twenty-two grants at once.
+     *
+     * The refusal is 404, not 403, for the same reason as the foreign-tenant
+     * case above: the answer must not confirm that the role exists.
+     *
+     * Until now this was blocked only by accident — the built-in rename
+     * guard rejected every payload carrying a name, which is the bug fixed
+     * in the same ticket. Fixing that opened this path for real.
+     */
+    #[Test]
+    public function tenantAdminCannotEditAGlobalRole(): void
+    {
+        $roles = self::getContainer()->get(RoleRepositoryInterface::class);
+        $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
+        \assert(null !== $superAdmin);
+
+        $client = $this->clientFor(self::ADMIN_A_EMAIL);
+        $client->request('PATCH', '/api/roles/'.$superAdmin->getId()->toRfc4122(), [
+            'json' => ['permission_codes' => ['user.read']],
+        ]);
+        self::assertResponseStatusCodeSame(404, 'a tenant admin must not reach a cross-tenant role');
+
+        $client->request('DELETE', '/api/roles/'.$superAdmin->getId()->toRfc4122());
+        self::assertResponseStatusCodeSame(404);
+
+        // And the grants are untouched — the point of the guard.
+        $this->em()->clear();
+        $reloaded = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
+        \assert(null !== $reloaded);
+        self::assertGreaterThan(1, \count($reloaded->getPermissions()), 'nothing was stripped');
+    }
+
+    /**
+     * The other half: the guard is about WHO, not about global roles being
+     * frozen. A platform operator still edits them — otherwise the panel
+     * that owns cross-tenant roles would have no way to touch them.
+     */
+    #[Test]
+    public function aPlatformOperatorStillEditsAGlobalRole(): void
+    {
+        $roles = self::getContainer()->get(RoleRepositoryInterface::class);
+        $operatorRole = $roles->findGlobalByCode(RbacMatrix::ROLE_PLATFORM_OPERATOR);
+        $superAdmin = $roles->findGlobalByCode(RbacMatrix::ROLE_SUPER_ADMIN);
+        \assert(null !== $operatorRole && null !== $superAdmin);
+
+        $user = self::getContainer()->get(UserRepositoryInterface::class)->findByEmail(self::ADMIN_A_EMAIL);
+        \assert(null !== $user);
+        // ADR-0034 — addRole() is the single write path for assignments.
+        $user->addRole($operatorRole);
+        $this->em()->flush();
+        $this->em()->clear();
+
+        $this->clientFor(self::ADMIN_A_EMAIL)->request(
+            'PATCH',
+            '/api/roles/'.$superAdmin->getId()->toRfc4122(),
+            ['json' => ['permission_codes' => ['user.read', 'user.admin']]],
+        );
+
+        self::assertResponseIsSuccessful('platform.tenants.manage is what unlocks a cross-tenant role');
+    }
+
     #[Test]
     public function adminCannotDeleteForeignTenantRole(): void
     {
