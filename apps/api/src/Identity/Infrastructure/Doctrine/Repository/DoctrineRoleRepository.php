@@ -63,12 +63,21 @@ class DoctrineRoleRepository extends ServiceEntityRepository implements RoleRepo
         // excluded — it is never assignable inside a tenant (assignment is
         // already rejected by the tenant-scoped findByCode lookup) and must
         // not be surfaced as an option in Settings → Roles.
+        //
+        // #2881: `super_admin` joins it, for the same reason one exclusion
+        // was not enough. It is a GLOBAL row shared by every tenant, so a
+        // tenant's Settings → Roles was listing — and offering to edit —
+        // an object that does not belong to that tenant. The write path now
+        // refuses it, but leaving it on screen only invites the attempt and
+        // tells the operator something about the platform they have no
+        // business seeing. Assignment was already impossible: the
+        // tenant-scoped findByCode lookup does not resolve global codes.
         /** @var list<Role> $roles */
         $roles = $this->createQueryBuilder('r')
             ->where('r.tenant IS NULL OR r.tenant = :tenant')
-            ->andWhere('r.code != :platformOperator')
+            ->andWhere('r.code NOT IN (:platformRoles)')
             ->setParameter('tenant', $tenant->getId())
-            ->setParameter('platformOperator', RbacMatrix::ROLE_PLATFORM_OPERATOR)
+            ->setParameter('platformRoles', [RbacMatrix::ROLE_PLATFORM_OPERATOR, RbacMatrix::ROLE_SUPER_ADMIN])
             ->orderBy('CASE WHEN r.tenant IS NULL THEN 0 ELSE 1 END', 'ASC')
             ->addOrderBy('r.name', 'ASC')
             ->getQuery()
