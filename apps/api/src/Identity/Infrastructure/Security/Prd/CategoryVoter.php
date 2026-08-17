@@ -45,7 +45,24 @@ final class CategoryVoter extends AbstractPrdVoter
             // to anyone holding categories.view — the escalation
             // ProductCreatePermissionApiTest guards, and the reason #2838
             // left these out. Products solved it the same way in #2416.
-            'READ_CATEGORY' => 'categories.view',
+            // #2881 — the create form REQUIRES a category (#891) and reads
+            // this collection to offer one, so a role allowed to create a
+            // categorisable object must be able to read the list or its
+            // grant is unusable: the picker hangs on "Ładowanie…" and the
+            // form refuses to save. Measured with a role holding only
+            // products.add + products.view — the one the operator built.
+            //
+            // This is the read half only; `CREATE_CATEGORY` below still
+            // needs categories.add_edit, so nobody gains the ability to
+            // create or change a category by being allowed to create a
+            // product.
+            'READ_CATEGORY' => [
+                'categories.view',
+                'products.add',
+                'multimedia.add_edit_own',
+                'multimedia.add_edit_any',
+                'object.add',
+            ],
             'CREATE_CATEGORY' => 'categories.add_edit',
 
             // Instance-carrying operations are safe on the shared attribute:
