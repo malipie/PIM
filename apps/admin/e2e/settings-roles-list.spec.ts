@@ -36,11 +36,16 @@ test('Settings → Roles list — smoke', async ({ page }) => {
   await expect(page.getByRole('button', { name: /^platform$/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /^custom$/i })).toBeVisible();
 
-  // Seeded global + tenant-local roles render as rounded-3xl cards.
-  // Each role name surfaces twice (the card identity heading plus the
-  // role chip in the right-hand actions area), so `.first()` keeps
-  // strict-mode happy.
-  await expect(page.getByText(/super admin/i).first()).toBeVisible();
+  // Seeded tenant roles render as rounded-3xl cards. Each role name
+  // surfaces twice (the card identity heading plus the role chip in the
+  // right-hand actions area), so `.first()` keeps strict-mode happy.
+  //
+  // #2881 — `super admin` is deliberately absent. It is a GLOBAL row
+  // shared by every tenant, so listing it offered an edit of an object
+  // that does not belong to this tenant (and the write path refuses it).
+  // This assertion used to require it; the reversal is the change, not a
+  // casualty of it.
+  await expect(page.getByText(/super admin/i)).toHaveCount(0);
   await expect(page.getByText(/catalog manager/i).first()).toBeVisible();
   await expect(page.getByText(/integration manager/i).first()).toBeVisible();
   await expect(page.getByText('Viewer', { exact: true }).first()).toBeVisible();
