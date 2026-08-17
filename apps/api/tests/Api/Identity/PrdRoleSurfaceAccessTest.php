@@ -98,6 +98,75 @@ final class PrdRoleSurfaceAccessTest extends CatalogApiTestCase
     }
 
     /**
+     * #2881 follow-up — the third gate. Some controllers do not stop at
+     * their `#[RequiresPermission]`: they re-check `isGranted(...)` in the
+     * method body against the entity. That second check answered only to
+     * the legacy grid, so uploading a file returned "Forbidden" on
+     * production to a role holding every multimedia code — the attribute
+     * let it in and the inline check threw it out.
+     *
+     * Two inventories missed this (attributes, then API Platform
+     * resources), which is why the assertion is written against the
+     * behaviour rather than the mechanism: whatever gates the upload, a
+     * holder of the multimedia write code gets past it.
+     */
+    #[Test]
+    public function theInlineEntityCheckAcceptsThePrdCodeToo(): void
+    {
+        $this->givenUserWithPermissions('media-writer@demo.localhost', 'control_media_write', ['multimedia.add_edit_own']);
+        $this->givenUserWithPermissions('media-reader@demo.localhost', 'control_media_read', ['multimedia.view']);
+
+        // A malformed multipart body is fine: the guards run first, so the
+        // holder lands on the controller's own 400 and the reader does not.
+        $writer = $this->authenticatedClient('media-writer@demo.localhost');
+        $response = $writer->request('POST', '/api/assets/upload', ['headers' => ['content-type' => 'multipart/form-data']]);
+        self::assertNotSame(403, $response->getStatusCode(), 'multimedia.add_edit_own must pass BOTH upload gates');
+
+        $reader = $this->authenticatedClient('media-reader@demo.localhost');
+        $reader->request('POST', '/api/assets/upload', ['headers' => ['content-type' => 'multipart/form-data']]);
+        self::assertResponseStatusCodeSame(403, 'multimedia.view alone must not upload');
+    }
+
+    /**
+     * `?parent_id=` narrows the poly-kind collection exactly as
+     * `?objectType=` does — children share their parent's ObjectType — so
+     * the gate reads the kind from it instead of refusing. Without this
+     * the variants tab 403s on a product's own variant list.
+     */
+    #[Test]
+    public function theCollectionReadsTheKindFromParentIdToo(): void
+    {
+        $this->givenUserWithPermissions('variants-reader@demo.localhost', 'control_variants', ['products.view']);
+        $this->givenUserWithPermissions('variants-nocatalog@demo.localhost', 'control_novariants', ['workflow.view']);
+
+        $masterId = $this->givenProduct('PARENT-SCOPE-1');
+
+        $this->authenticatedClient('variants-reader@demo.localhost')
+            ->request('GET', '/api/objects?parent_id='.$masterId);
+        self::assertResponseIsSuccessful('products.view must reach a product\'s variants');
+
+        $this->authenticatedClient('variants-nocatalog@demo.localhost')
+            ->request('GET', '/api/objects?parent_id='.$masterId);
+        self::assertResponseStatusCodeSame(403, 'and a role without products.view must not');
+    }
+
+    private function givenProduct(string $code): string
+    {
+        $created = $this->authenticatedClient()->request('POST', '/api/objects', [
+            'headers' => ['content-type' => 'application/ld+json'],
+            'body' => json_encode([
+                'code' => $code,
+                'objectTypeId' => $this->objectTypeIdFor(ObjectKind::Product),
+            ], JSON_THROW_ON_ERROR),
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $id = $created->toArray()['id'];
+        \assert(\is_string($id));
+
+        return $id;
+    }
+
+    /**
      * Reading a surface is not permission to change it. `publications.view`
      * opens the channel list; creating a channel needs the publish grant,
      * and without that separation the table above would have quietly turned

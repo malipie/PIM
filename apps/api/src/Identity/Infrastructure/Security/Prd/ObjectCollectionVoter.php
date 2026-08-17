@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Infrastructure\Security\Prd;
 
+use App\Catalog\Contracts\Query\ObjectSummaryPort;
 use App\Catalog\Contracts\Query\ObjectTypeSummaryPort;
 use App\Identity\Application\PermissionResolverInterface;
 use App\Identity\Domain\Entity\User;
@@ -73,6 +74,7 @@ final class ObjectCollectionVoter extends Voter
     public function __construct(
         private readonly PermissionResolverInterface $resolver,
         private readonly ObjectTypeSummaryPort $objectTypes,
+        private readonly ObjectSummaryPort $objects,
         private readonly RequestStack $requests,
     ) {
     }
@@ -104,7 +106,23 @@ final class ObjectCollectionVoter extends Voter
 
     /**
      * The kind the current request is scoped to, or null when the query is
-     * unscoped, malformed, or names a type this tenant cannot see.
+     * unscoped, malformed, or names a row this tenant cannot see.
+     *
+     * Two parameters narrow this collection to one kind, and both are
+     * equally sound to authorise against:
+     *
+     *   - `?objectType=` names the type directly,
+     *   - `?parent_id=` names one object, and children share their
+     *     parent's ObjectType — a product's variants are products, a
+     *     category's children are categories.
+     *
+     * The second was missed in #2848 and cost the variants tab: it fetches
+     * `/api/objects?parent_id=<master>` with no `objectType`, so every PRD
+     * role got a 403 on a product's own variant list.
+     *
+     * Cross-tenant ids resolve to nothing through the Doctrine
+     * TenantFilter, so an id borrowed from another tenant is
+     * indistinguishable from a typo — both deny.
      */
     private function requestedKind(): ?string
     {
@@ -114,13 +132,18 @@ final class ObjectCollectionVoter extends Voter
         }
 
         $objectType = $request->query->get('objectType');
-        if (!\is_string($objectType) || !Uuid::isValid($objectType)) {
-            return null;
+        if (\is_string($objectType) && Uuid::isValid($objectType)) {
+            return $this->objectTypes->byId(Uuid::fromString($objectType))?->kind->value;
         }
 
-        // Cross-tenant ids resolve to null through the Doctrine TenantFilter,
-        // so an id borrowed from another tenant is indistinguishable from a
-        // typo — both deny.
-        return $this->objectTypes->byId(Uuid::fromString($objectType))?->kind->value;
+        $parentId = $request->query->get('parent_id');
+        if (\is_string($parentId) && Uuid::isValid($parentId)) {
+            $summaries = $this->objects->summariesByIds([$parentId]);
+            $parent = reset($summaries);
+
+            return false === $parent ? null : $parent->kind->value;
+        }
+
+        return null;
     }
 }

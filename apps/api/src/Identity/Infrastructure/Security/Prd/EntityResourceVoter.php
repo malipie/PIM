@@ -70,6 +70,17 @@ final class EntityResourceVoter extends Voter
             ['publications.publish_unpublish'],
         ],
 
+        // #2881 follow-up — Backup is reached through inline
+        // `isGranted('READ', $backup)` / `isGranted('WRITE', Backup::class)`
+        // in the trigger, get and start-import controllers, not through an
+        // API Platform resource. Same codes their #[RequiresPermission]
+        // already carries: a backup is a tenant-admin action, and the
+        // platform code stays for the operator panel.
+        'App\\Backup\\Domain\\Entity\\Backup' => [
+            ['settings.tenant.manage', 'platform.tenants.manage'],
+            ['settings.tenant.manage', 'platform.tenants.manage'],
+        ],
+
         'App\\Import\\Domain\\Entity\\ImportProfile' => [
             ['imports.view_own', 'imports.view_all'],
             ['imports.run'],
