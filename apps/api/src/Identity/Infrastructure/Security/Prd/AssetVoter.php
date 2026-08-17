@@ -54,6 +54,19 @@ final class AssetVoter extends AbstractPrdVoter
             // discriminator to be blind to, so the class-string subject is
             // already unambiguous.
             'READ' => 'multimedia.view',
+
+            // #2881 follow-up — the upload, patch and delete controllers do
+            // not stop at their #[RequiresPermission]: they re-check
+            // `isGranted('CREATE'|'UPDATE'|'DELETE', Asset)` in the method
+            // body. That second gate answered only to the legacy grid, so
+            // upload returned "Forbidden" on production to a role holding
+            // every multimedia code — the endpoint attribute let it in and
+            // the inline check threw it out. Same codes as the attribute,
+            // for the same reason (`assets` has no uploader column, so
+            // `_own` and `_any` are indistinguishable).
+            'CREATE' => ['multimedia.add_edit_own', 'multimedia.add_edit_any'],
+            'UPDATE' => ['multimedia.add_edit_own', 'multimedia.add_edit_any'],
+            'DELETE' => 'multimedia.delete',
         ];
     }
 
