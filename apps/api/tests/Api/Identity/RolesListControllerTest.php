@@ -106,14 +106,12 @@ final class RolesListControllerTest extends ApiTestCase
         self::assertResponseStatusCodeSame(200);
         $body = $this->decodeResponse($client);
 
-        // #2837 — the tenant now carries the 9 PRD role templates instead
-        // of a mix of global and per-tenant copies; plus the global
-        // super_admin and tenant A's own custom_a. custom_b lives on tenant
-        // B and must NOT appear. Asserting on the codes below rather than
-        // pinning a count keeps this from breaking every time the PRD
-        // template list grows.
+        // #2837 — the tenant carries the 9 PRD role templates instead of a
+        // mix of global and per-tenant copies, plus tenant A's own custom_a.
+        // custom_b lives on tenant B and must NOT appear. Asserting on the
+        // codes below rather than pinning a count keeps this from breaking
+        // every time the PRD template list grows.
         $codes = $this->extractField($body, 'code');
-        self::assertContains(RbacMatrix::ROLE_SUPER_ADMIN, $codes);
         self::assertContains(RbacMatrix::ROLE_CATALOG_MANAGER, $codes);
         self::assertContains(RbacMatrix::ROLE_INTEGRATION_MANAGER, $codes);
         self::assertContains(RbacMatrix::ROLE_VIEWER, $codes);
@@ -122,6 +120,12 @@ final class RolesListControllerTest extends ApiTestCase
         // AUD-003 (#1575): the platform-level operator role is never offered
         // as an assignable tenant role.
         self::assertNotContains(RbacMatrix::ROLE_PLATFORM_OPERATOR, $codes);
+        // #2881: neither is super_admin. It is a GLOBAL row shared by every
+        // tenant, so listing it invited an edit of an object that does not
+        // belong to this tenant — and the tenant-scoped assignment lookup
+        // never resolved it anyway, so it was never selectable. This
+        // assertion used to be assertContains; the change is deliberate.
+        self::assertNotContains(RbacMatrix::ROLE_SUPER_ADMIN, $codes);
     }
 
     #[Test]
@@ -159,7 +163,8 @@ final class RolesListControllerTest extends ApiTestCase
         $counts = $this->extractCounts($body);
 
         // The fixture wires one admin + one catalog_manager on tenant A.
-        self::assertSame(1, $counts[RbacMatrix::ROLE_SUPER_ADMIN] ?? null);
+        // #2881 — super_admin is no longer listed, so it has no count row.
+        self::assertArrayNotHasKey(RbacMatrix::ROLE_SUPER_ADMIN, $counts);
         self::assertSame(1, $counts[RbacMatrix::ROLE_CATALOG_MANAGER] ?? null);
         self::assertSame(0, $counts[RbacMatrix::ROLE_VIEWER] ?? null);
         self::assertSame(0, $counts['custom_a'] ?? null);
