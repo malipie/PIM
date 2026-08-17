@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Presentation\Controller;
 
+use App\Identity\Application\PermissionResolverInterface;
 use App\Identity\Application\RoleDetailResponseBuilder;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Domain\Entity\Permission;
@@ -47,6 +48,7 @@ final readonly class RoleWriteController
         private PermissionRepositoryInterface $permissions,
         private UserRepositoryInterface $users,
         private RoleDetailResponseBuilder $builder,
+        private PermissionResolverInterface $permissionResolver,
     ) {
     }
 
@@ -131,22 +133,32 @@ final readonly class RoleWriteController
         // a tenant; renaming them would desynchronise them from the seeder.
         $isCustom = !$role->isGlobal() && !PrdRoleTemplates::isTemplateCode($role->getCode());
 
+        // #2881 — reject a RENAME, not a payload that merely mentions the
+        // name. The role editor PATCHes the whole role, so a built-in role
+        // always carried its own unchanged name and the guard refused every
+        // edit — including the permission-only ones it explicitly tells the
+        // operator to make ("Edit only `permission_codes`"). Granting a
+        // permission to a built-in role was impossible through the UI.
         if (\array_key_exists('name', $payload)) {
-            if (!$isCustom) {
-                return $this->problem(
-                    Response::HTTP_BAD_REQUEST,
-                    'Bad Request',
-                    'Built-in roles cannot be renamed. Edit only `permission_codes`.',
-                );
-            }
             $name = $this->extractName($payload);
             if ($name instanceof JsonResponse) {
                 return $name;
             }
-            $role->rename($name);
+            if ($name !== $role->getName()) {
+                if (!$isCustom) {
+                    return $this->problem(
+                        Response::HTTP_BAD_REQUEST,
+                        'Bad Request',
+                        'Built-in roles cannot be renamed. Edit only `permission_codes`.',
+                    );
+                }
+                $role->rename($name);
+            }
         }
 
-        if (\array_key_exists('code', $payload) && !$isCustom) {
+        // Same shape for the code: echoing back the current one is not an
+        // attempt to change it.
+        if (\array_key_exists('code', $payload) && !$isCustom && $payload['code'] !== $role->getCode()) {
             return $this->problem(
                 Response::HTTP_BAD_REQUEST,
                 'Bad Request',
@@ -182,6 +194,13 @@ final readonly class RoleWriteController
         }
 
         $this->roles->save($role);
+
+        // #2881 — every holder of this role is carrying a cached permission
+        // set that no longer matches the database. Without this the grant
+        // lands in `role_permissions` and changes nothing the user can see
+        // until the entry expires, which reads as "the save did not work" —
+        // and the editor's own footer promises the opposite.
+        $this->permissionResolver->invalidateRole($role->getId()->toRfc4122());
 
         return new JsonResponse($this->builder->buildOne($role));
     }

@@ -82,6 +82,12 @@ final class ContractsUserScopedPermissionCheckerTest extends TestCase
             {
                 return $this->set;
             }
+
+            public function invalidateRole(string $roleId): void
+            {
+                // This double answers permission questions; cache
+                // invalidation is not part of what it is standing in for.
+            }
         };
     }
 }

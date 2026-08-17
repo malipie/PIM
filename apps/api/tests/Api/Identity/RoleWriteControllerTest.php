@@ -276,6 +276,43 @@ final class RoleWriteControllerTest extends ApiTestCase
         }
     }
 
+    /**
+     * #2881 — the guard above must reject a RENAME, not a payload that
+     * mentions the name. The role editor PATCHes the whole role, so a
+     * built-in role always carried its own unchanged name and every
+     * permission-only edit was refused with "Built-in roles cannot be
+     * renamed. Edit only `permission_codes`." — the very thing it was
+     * telling the operator to do. Granting a permission to a built-in
+     * role was impossible through the UI. (The codes below are the ones
+     * this class seeds; the point is the guard, not which grant.)
+     */
+    #[Test]
+    public function aBuiltInRoleAcceptsPermissionsWhenTheNameIsUnchanged(): void
+    {
+        $roles = self::getContainer()->get(RoleRepositoryInterface::class);
+        $role = $roles->findByCode('viewer', $this->tenantA());
+        \assert(null !== $role);
+
+        $client = $this->clientFor(self::ADMIN_A_EMAIL);
+        $client->request('PATCH', '/api/roles/'.$role->getId()->toRfc4122(), [
+            'json' => [
+                'name' => $role->getName(),
+                'permission_codes' => ['object.read', 'object.write'],
+            ],
+        ]);
+
+        self::assertResponseIsSuccessful('echoing the current name is not a rename');
+
+        $this->em()->clear();
+        $reloaded = $roles->findByCode('viewer', $this->tenantA());
+        \assert(null !== $reloaded);
+        $codes = [];
+        foreach ($reloaded->getPermissions() as $permission) {
+            $codes[] = $permission->getCode();
+        }
+        self::assertContains('object.write', $codes, 'the grant must actually land');
+    }
+
     /** A genuinely user-made role stays fully editable. */
     #[Test]
     public function customRoleRemainsDeletable(): void
