@@ -82,3 +82,37 @@ export function sortGroups<T extends { module: string }>(groups: T[]): T[] {
     return a.module.localeCompare(b.module);
   });
 }
+
+/**
+ * #2881 — the role builder offers the PRD catalogue only.
+ *
+ * Permissions live in one table but two catalogues: the PRD §3.2 codes
+ * (`products.view`, `settings.roles.manage`, the ULV `object.*` verbs) and
+ * the legacy `{resource}.{action}` grid (`object.read`, `object_type.admin`,
+ * `integration.write`). **Endpoints honour the PRD codes for roles created
+ * through the panel**, so offering the legacy grid alongside them puts
+ * choices on screen that do not do what their name suggests — with
+ * untranslated labels like "admin" and "write" next to proper ones.
+ *
+ * The split cannot be derived from the code text: `object.delete` is a
+ * single row serving both catalogues. It comes from the backend, which
+ * knows its own seeders.
+ *
+ * A legacy group is still shown when the role already holds something in
+ * it, so editing such a role cannot silently drop grants the UI decided
+ * not to display. In practice only the global `super_admin` holds legacy
+ * codes and it is no longer editable from a tenant, but a builder that can
+ * strip permissions it never showed is a bad shape regardless.
+ */
+export function visibleGroups<
+  T extends { permissions: { code: string; catalogue?: 'prd' | 'legacy' }[] },
+>(groups: T[], selectedCodes: ReadonlySet<string>): T[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      permissions: group.permissions.filter(
+        (permission) => permission.catalogue !== 'legacy' || selectedCodes.has(permission.code),
+      ),
+    }))
+    .filter((group) => group.permissions.length > 0);
+}

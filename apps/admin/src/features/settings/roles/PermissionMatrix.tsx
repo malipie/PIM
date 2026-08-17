@@ -2,12 +2,22 @@ import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 
-import { permissionActionLabel, permissionGroupLabel, sortGroups } from './permission-catalogue';
+import {
+  permissionActionLabel,
+  permissionGroupLabel,
+  sortGroups,
+  visibleGroups,
+} from './permission-catalogue';
 
 export interface PermissionEntry {
   id: string;
   code: string;
   action: string;
+  /**
+   * #2881 — which of the two permission catalogues this code belongs to.
+   * Optional so an older backend simply behaves as before.
+   */
+  catalogue?: 'prd' | 'legacy';
 }
 
 export interface PermissionGroup {
@@ -44,7 +54,7 @@ export function PermissionMatrix({
   disabled = false,
 }: PermissionMatrixProps) {
   const { t } = useTranslation();
-  const ordered = sortGroups(groups);
+  const ordered = sortGroups(visibleGroups(groups, selectedCodes));
 
   // Build the unique action column set across the visible groups so
   // each module row aligns with the same x-axis. Actions are stored
