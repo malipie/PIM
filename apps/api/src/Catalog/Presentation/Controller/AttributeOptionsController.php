@@ -60,6 +60,11 @@ final class AttributeOptionsController
         'products.view',
         'categories.view',
         'multimedia.view',
+        'products.add',
+        'categories.add_edit',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+        'object.add',
     ])]
     public function list(string $code): JsonResponse
     {
@@ -95,6 +100,11 @@ final class AttributeOptionsController
         'products.view',
         'categories.view',
         'multimedia.view',
+        'products.add',
+        'categories.add_edit',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+        'object.add',
     ])]
     public function usage(string $code, string $optionCode): JsonResponse
     {

@@ -28,6 +28,7 @@ import {
   hasFeature,
   hasPermission,
   isMenuRefVisible,
+  isObjectTypeMenuItemVisible,
   useIdentity,
 } from '@/lib/identity';
 import { type EffectiveMenuItem, useEffectiveMenu } from '@/lib/use-effective-menu';
@@ -212,8 +213,13 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
   const { pathname } = useLocation();
 
   const rawItems: EffectiveMenuItem[] = data && !isError ? data.visible : FALLBACK_ITEMS;
+  // #2881 — ObjectType entries are keyed by uuid, which the ref map cannot
+  // know, so they used to fall through as "public": every module, custom
+  // ones included, was offered to roles that get a 403 on opening it.
   const items: EffectiveMenuItem[] = rawItems.filter((item) =>
-    isMenuRefVisible(identity, item.ref),
+    item.kind === 'object_type'
+      ? isObjectTypeMenuItemVisible(identity, item.objectTypeKind)
+      : isMenuRefVisible(identity, item.ref),
   );
 
   const integrationsRouteActive = pathname.startsWith('/integrations');

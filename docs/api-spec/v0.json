@@ -12108,7 +12108,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute_group.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "attribute_group.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/attribute_groups/{id}/usage": {
@@ -12147,7 +12147,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute_group.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "attribute_group.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/attributes/{code}/options": {
@@ -12186,7 +12186,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             },
             "post": {
                 "operationId": "api_attributes_code_options_post",
@@ -12374,7 +12374,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/attributes/{id}/migrate-type": {
@@ -12452,7 +12452,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/attributes/{id}/relation_preview_fields": {
@@ -12491,7 +12491,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/attributes/{id}/usage": {
@@ -12530,7 +12530,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/auth/2fa/disable": {
@@ -13795,7 +13795,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "attribute_group.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "attribute_group.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             },
             "post": {
                 "operationId": "api_categories_id_attribute_groups_post",
@@ -17700,7 +17700,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/object_types/{id}/attached_groups": {
@@ -17739,7 +17739,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/object_types/{id}/attributes/bulk-attach": {
@@ -18046,7 +18046,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "products.view"
+                "x-cortex-permission": "products.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/object_types/{id}/groups/{groupId}": {
@@ -18234,7 +18234,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/object_types/{id}/usage": {
@@ -18273,7 +18273,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/objects/bulk": {
@@ -18898,7 +18898,7 @@
                     }
                 ],
                 "x-pim-source": "custom-route",
-                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view"
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
         "/api/objects/{id}/relations": {

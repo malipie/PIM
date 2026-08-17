@@ -56,12 +56,22 @@ final class ObjectTypeListSchemaController
     // `modeling.view`) alone made a Catalog Manager's own product list 403
     // on its type definition, which the UI reported as "run the catalog
     // seeder". Reading schema metadata follows reading the data.
+    // #2881 — the create codes join the read codes. A role granted only
+    // "add a product" could POST an object it had no way to compose: the
+    // form reads the schema first, and the schema asked for a *view* code
+    // it did not hold. Reading the schema follows reading OR creating the
+    // data it describes; #2838 only covered the reading half.
     #[RequiresPermission(module: 'object_type', action: 'read', anyOf: [
         'object_type.read',
         'modeling.view',
         'products.view',
         'categories.view',
         'multimedia.view',
+        'products.add',
+        'categories.add_edit',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+        'object.add',
     ])]
     public function __invoke(string $id, Request $request): JsonResponse
     {

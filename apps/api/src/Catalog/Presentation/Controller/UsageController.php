@@ -55,6 +55,11 @@ final class UsageController
         'products.view',
         'categories.view',
         'multimedia.view',
+        'products.add',
+        'categories.add_edit',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+        'object.add',
     ])]
     public function attribute(string $id): JsonResponse
     {
@@ -79,6 +84,11 @@ final class UsageController
         'products.view',
         'categories.view',
         'multimedia.view',
+        'products.add',
+        'categories.add_edit',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+        'object.add',
     ])]
     public function attributeGroup(string $id): JsonResponse
     {
@@ -103,6 +113,11 @@ final class UsageController
         'products.view',
         'categories.view',
         'multimedia.view',
+        'products.add',
+        'categories.add_edit',
+        'multimedia.add_edit_own',
+        'multimedia.add_edit_any',
+        'object.add',
     ])]
     public function objectType(string $id): JsonResponse
     {
