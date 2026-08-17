@@ -4,7 +4,12 @@ import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/utils';
 import type { PermissionGroup } from './PermissionMatrix';
-import { permissionActionLabel, permissionGroupLabel, sortGroups } from './permission-catalogue';
+import {
+  permissionActionLabel,
+  permissionGroupLabel,
+  sortGroups,
+  visibleGroups,
+} from './permission-catalogue';
 
 interface PermissionMatrixAccordionProps {
   groups: PermissionGroup[];
@@ -69,7 +74,7 @@ export function PermissionMatrixAccordion({
   disabled = false,
 }: PermissionMatrixAccordionProps) {
   const { t } = useTranslation();
-  const ordered = sortGroups(groups);
+  const ordered = sortGroups(visibleGroups(groups, selectedCodes));
 
   // Default to all expanded — operators usually want full visibility on first
   // open. Per-module collapse is a manual operation from there.

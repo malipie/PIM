@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Presentation\Controller;
 
+use App\Identity\Application\PrdPermissionSeeder;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Repository\PermissionRepositoryInterface;
@@ -92,6 +93,14 @@ final readonly class PermissionsListController
                 'id' => $permission->getId()->toRfc4122(),
                 'code' => $code,
                 'action' => $action,
+                // #2881 — which of the two catalogues this code belongs to.
+                // The role builder offers the PRD one, because that is what
+                // endpoints honour for roles created through the panel; the
+                // legacy grid is held only by pre-PRD principals and API
+                // keys and is noise on that screen. The distinction cannot
+                // be derived from the name: `object.delete` is one row
+                // serving both, so it has to come from the catalogue itself.
+                'catalogue' => \in_array($code, PrdPermissionSeeder::PRD_PERMISSION_CODES, true) ? 'prd' : 'legacy',
             ];
         }
 
