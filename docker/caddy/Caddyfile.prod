@@ -41,12 +41,24 @@
 # `localhost` rides along for the container healthcheck (base compose probes
 # https://localhost/api with --no-check-certificate); Caddy issues an internal
 # self-signed cert for it while {$DOMAIN} gets a real ACME certificate.
-{$DOMAIN}, localhost {
+# ─── Trasy jednej instancji PIM (epik TNT, #2856) ────────────────────────────
+#
+# Snippet przyjmuje dwa argumenty, żeby ten sam komplet tras obsługiwał stack
+# współdzielony i instancję dowolnego tenanta:
+#   {args[0]} — host kontenera api      (np. `api` albo `pim-acme-api`)
+#   {args[1]} — host kontenera mercure  (np. `mercure` albo `pim-acme-mercure`)
+#
+# Bundel SPA i dokumentacja są WSPÓLNE (są origin-relative, więc ten sam
+# artefakt obsługuje każdą subdomenę) — dlatego nie są parametryzowane.
+#
+# Dołożenie tenanta to pięć linii na dole tego pliku. Docelowo znika i to,
+# gdy wejdzie routing dynamiczny z on-demand TLS (#2908).
+(pim_routes) {
     import common_security_prod
 
     # Mercure hub — must precede the /api* matcher.
     handle /.well-known/mercure* {
-        reverse_proxy mercure:80
+        reverse_proxy {args[1]}:80
     }
 
     # #2729 — metrics stay internal-only.
@@ -63,7 +75,7 @@
         request_body {
             max_size 150MB
         }
-        reverse_proxy api:80
+        reverse_proxy {args[0]}:80
     }
 
     # Documentation site (user guides + API reference) — static build
@@ -113,3 +125,39 @@
         file_server
     }
 }
+
+# ─── Instancje ───────────────────────────────────────────────────────────────
+
+# Stack współdzielony. `localhost` jedzie razem dla healthchecku kontenera
+# (base compose sonduje https://localhost/api); Caddy wystawia mu certyfikat
+# wewnętrzny, a {$DOMAIN} dostaje prawdziwy z ACME.
+{$DOMAIN}, localhost {
+    import pim_routes api mercure
+}
+
+# Instancja tenanta — WZORZEC. Skrypt provisioningu (#2861) wypisuje gotowy
+# blok do wklejenia; dopóki nie ma routingu dynamicznego (#2908), dokłada się
+# go tutaj ręcznie i przeładowuje Caddy'ego:
+#
+#   acme.{$DOMAIN} {
+#       import pim_routes pim-acme-api pim-acme-mercure
+#   }
+#
+# Nazwy hostów pochodzą z aliasów sieciowych w docker-compose.tenant.yml,
+# więc zgadzają się z kodem tenanta bez dodatkowej konfiguracji.
+
+# Stary adres bez subdomeny — 301 na instancję `harmon`.
+#
+# Po przeniesieniu pierwszego klienta na `harmon.{$DOMAIN}` adres bez
+# subdomeny musi dalej działać: prowadzą do niego zakładki operatora ORAZ
+# linki w już wysłanych zaproszeniach i resetach hasła. Przekierowanie jest
+# trwałe i zachowuje ścieżkę oraz query.
+#
+# UWAGA: włączyć DOPIERO po wystawieniu certyfikatu dla harmon.{$DOMAIN}
+# i potwierdzeniu logowania pod nowym adresem — inaczej odcina jedyną
+# działającą drogę do panelu.
+#
+#   {$DOMAIN} {
+#       import common_security_prod
+#       redir https://harmon.{$DOMAIN}{uri} permanent
+#   }
