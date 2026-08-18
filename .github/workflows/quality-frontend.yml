@@ -115,7 +115,16 @@ jobs:
     # 20 got outgrown by the suite (~16.5m tests + ~4m stack setup): the job
     # died as "canceled" AFTER "15x passed", masquerading as merge-ref flake.
     # Keep headroom; revisit when the suite gets sharded.
-    timeout-minutes: 30
+    # TNT-P4-06 (#2907) — podniesione z 30. Suita chodzi ~28 min, wiec kazdy
+    # nowy spec przekracza limit i job jest ANULOWANY, co w PR wyglada jak
+    # oblany test, a nie jak wyczerpany czas. Dwa kolejne przebiegi #2937
+    # padly dokladnie tak (30m24s, 30m31s).
+    #
+    # To jest lek na objaw. Prawdziwy problem: E2E to najdrozszy job w repo
+    # (~24% minut CI) i stoi na granicy budzetu czasowego — kolejne widoki
+    # beda go przepychac dalej. Zrownoleglenie/sharding zasluguje na wlasny
+    # ticket, tak jak dostal go PHPUnit (#2843).
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
 
