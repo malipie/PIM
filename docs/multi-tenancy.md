@@ -2,6 +2,61 @@
 
 PIM jest **multi-tenant ready, single-tenant deployed** (ADR-003). Każda tabela domenowa niesie `tenant_id UUID` od dnia 1, izolacja na poziomie aplikacji (Doctrine `TenantFilter`) działa od Sprintu 0. Od **W1-1 / AUD-002** druga linia obrony jest realna: aplikacja łączy się jako nie-uprzywilejowana rola `pim_app` (NOSUPERUSER, NOBYPASSRLS, nie-owner), a wszystkie tabele z `tenant_id` mają `FORCE ROW LEVEL SECURITY` + polityki izolacji. Bug w `TenantFilter` (native SQL, zapomniany `TenantScoped`, `disable('tenant')` bez re-enable) nie jest już cross-tenant leakiem — RLS odrzuca obce wiersze na poziomie bazy.
 
+## Trzecia warstwa: instancja per tenant (epik TNT, ADR-0035)
+
+Od epiku TNT każdy tenant produkcyjny dostaje **własną instancję aplikacji
+z własnym klastrem Postgresa**. To NIE zastępuje niczego, co opisuje reszta
+tego dokumentu — `TenantFilter` i RLS zostają bez zmian i nadal są granicą
+**wewnątrz** instancji. Kod ma działać poprawnie także tam, gdzie w jednej
+bazie siedzi wielu tenantów, bo tak wygląda dev, testy i CI.
+
+Trzy warstwy, od najbliższej kodowi:
+
+1. **`TenantFilter`** (Doctrine) — dokleja `tenant_id = :current_tenant` do
+   zapytań po encjach `TenantScoped`.
+2. **RLS** (Postgres, `FORCE`, rola `pim_app` z `NOBYPASSRLS`) — łapie to, co
+   omija Doctrine: natywny SQL, zapomniany `TenantScoped`, `disable('tenant')`.
+3. **Instancja** — osobne procesy, osobny klaster, osobne klucze JWT, osobne
+   hasła bazy. Błąd w warstwach 1–2 nie sięga cudzych danych, bo cudze dane są
+   w innym klastrze.
+
+### Dlaczego osobny klaster, a nie osobna baza w jednym klastrze
+
+Osobna baza (`DATABASE`) w jednym klastrze zawiera błędną migrację i `DELETE`
+bez `WHERE` dokładnie tak samo. Rozstrzygnął pgBackRest: **stanza obejmuje
+cały klaster**, więc odtworzenie jednego tenanta do punktu w czasie cofałoby
+wszystkich pozostałych. Osobny klaster to jedyny sposób na niezależne PITR —
+i przy okazji na przeniesienie klienta na inną maszynę przez skopiowanie
+wolumenu. Pełne uzasadnienie i odrzucone warianty: ADR-0035.
+
+### Gdzie granica NIE jest podwójna
+
+Dwie rzeczy zostają współdzielone i trzeba o tym pamiętać:
+
+| Zasób | Co rozdziela | Druga linia obrony |
+|---|---|---|
+| **Meilisearch** | filtr `tenantId` w `CatalogSearchService`, wspólny indeks `objects` | **brak** — osobny indeks wymagałby zmiany kodu (stała `IndexSettingsTemplate::INDEX_NAME`) |
+| **MinIO** | bucket per tenant + użytkownik z polityką ograniczoną do jego bucketów | polityka po stronie MinIO (dostęp odmawiany przez serwer, nie przez aplikację) |
+
+Wyszukiwarka jest **jedynym** miejscem w modelu, gdzie izolacja opiera się
+wyłącznie na poprawności kodu aplikacji. Dlatego test przecieku wyników jest
+obowiązkową częścią `scripts/pim-tenant-isolation-check.sh` (#2868),
+uruchamianego po każdym dołożeniu klienta.
+
+### Świadomy kompromis: baza w sieci wspólnej
+
+Baza tenanta jest podłączona także do sieci stacku współdzielonego, bo
+pgBackRest wypycha kopie i segmenty WAL przez sidecar `minio-tls`. Jest więc
+osiągalna po nazwie kontenera z innych stacków. **Granicą są osobne hasła per
+instancja**, nie brak trasy sieciowej — i dlatego skrypt sprawdzający izolację
+najpierw dowodzi, że cudza baza odpowiada (własnym hasłem), a dopiero potem
+wymaga odmowy dla hasła sąsiada. Odmowa bez tej kontroli mogłaby oznaczać
+zwykły brak sieci i nie dowodziłaby niczego.
+
+Operacyjnie: `docs/runbook/tenant-instances.md`.
+
+---
+
 ## Tabele i ich tenant scope
 
 | Tabela | `tenant_id` | Uwagi |
