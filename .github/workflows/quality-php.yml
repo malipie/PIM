@@ -92,6 +92,13 @@ jobs:
         working-directory: .
         run: bash scripts/lint-prod-env-example.sh
 
+      # TNT-P4-04 (#2905) — walidator zlecen provisioningu stoi miedzy
+      # zadaniem HTTP a komponentem z dostepem do demona Dockera. Bramka
+      # jest tu, obok pozostalych lintow shellowych, bo pada w sekundy.
+      - name: Provisioner job validator (unit)
+        working-directory: .
+        run: bash scripts/lint-provisioner.sh
+
       # GOLIVE #2192 — PHP twin of the admin max-lines guard: baseline-frozen
       # count of src/ files over 800 lines (currently 1: ImportRunHandler).
       - name: API max-lines guard

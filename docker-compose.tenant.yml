@@ -204,6 +204,12 @@ services:
           - pim-${TENANT_CODE:?TENANT_CODE jest wymagany dla aliasu sieciowego.}-mercure
 
   api:
+    # Instancja NIE buduje obrazu — używa tego, który zbudowało wdrożenie.
+    # Powody są dwa: determinizm (wszystkie instancje na tym samym artefakcie)
+    # i to, że provisioner (#2905) działa bez sieci, a BuildKit rozwiązuje
+    # obraz frontendu po stronie klienta, więc budowanie stamtąd jest
+    # niewykonalne. `build:` zostaje dla `--build` uruchamianego świadomie.
+    image: "${PIM_API_IMAGE:?PIM_API_IMAGE jest wymagany — obraz zbudowany przez wdrożenie, np. pim-api:latest z produkcji. Wartość domyślna byłaby zgadywaniem, bo obraz deweloperski nie zawiera kodu (w dev przesłania go bind-mount), a instancja tenanta bind-mounta nie ma i wstałaby pusta.}"
     build:
       context: ./apps/api
       dockerfile: Dockerfile
@@ -292,6 +298,7 @@ services:
   # workera — pominięcie tego kosztowało 40 minut przy wdrożeniu #2821.
   # Orkiestrator wdrożeń (#2863) musi czyścić OBA.
   worker:
+    image: "${PIM_API_IMAGE:?PIM_API_IMAGE jest wymagany — obraz zbudowany przez wdrożenie, np. pim-api:latest z produkcji. Wartość domyślna byłaby zgadywaniem, bo obraz deweloperski nie zawiera kodu (w dev przesłania go bind-mount), a instancja tenanta bind-mounta nie ma i wstałaby pusta.}"
     build:
       context: ./apps/api
       dockerfile: Dockerfile
