@@ -51,11 +51,18 @@ Sprawdź, że plik, który miał dojechać, faktycznie dojechał (`ls -la` na cz
 ### 3. Obrazy
 
 ```bash
-ssh $HOST "cd /opt/pim && $DC build api worker"
+ssh $HOST "cd /opt/pim && $DC build api worker caddy"
 ```
 
 Produkcja **nie bind-mountuje kodu PHP** — nowy kod trafia do środka wyłącznie przez przebudowany obraz.
 To jest źródło pułapki nr 1 poniżej.
+
+`caddy` jest na tej liście od #2908: edge nie stoi już na gotowym `caddy:2-alpine`, tylko na obrazie
+budowanym z `docker/caddy/Dockerfile` (Caddy z pluginem DNS Cloudflare — bez niego nie ma certyfikatu
+wildcard dla subdomen tenantów). **`up -d` buduje obraz tylko wtedy, gdy go BRAKUJE**, więc zmiana
+w tym `Dockerfile` — bump wersji Caddy'ego albo pluginu — przeszłaby bez śladu, a edge zostałby na
+starej binarce. Objaw byłby odległy od przyczyny: nie błąd wdrożenia, tylko nieodnowiony certyfikat
+kilkadziesiąt dni później, **u wszystkich klientów naraz**.
 
 ### 4. Migracje — z NOWEGO obrazu, ale PRZED wypuszczeniem nowego kodu
 
