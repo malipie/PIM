@@ -38,6 +38,16 @@ CONFIRM=true
 DRY_RUN=false
 STANZA="${PGBACKREST_STANZA:-pim}"
 
+# TNT-P2-02 (#2864) — odtwarzanie POJEDYNCZEJ instancji tenanta.
+#
+# Stanza pgBackRest obejmuje cały klaster, więc dopiero osobny klaster per
+# tenant (ADR-0035) pozwala cofnąć jednego klienta bez ruszania pozostałych.
+# `--tenant <kod>` przełącza wszystkie wywołania compose na projekt tego
+# klienta i ustawia jego stanzę; bez tej flagi skrypt działa jak dotąd, na
+# stacku współdzielonym.
+TENANT=""
+COMPOSE_ARGS=()
+
 usage() {
     sed -n '2,/^set -euo/p' "$0" | sed 's/^# \?//'
     exit "${1:-0}"
@@ -45,6 +55,7 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --tenant) TENANT="$2"; shift 2 ;;
         --type) TYPE="$2"; shift 2 ;;
         --target) TARGET="$2"; shift 2 ;;
         --no-confirm) CONFIRM=false; shift ;;
@@ -53,6 +64,24 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown flag: $1" >&2; usage 2 ;;
     esac
 done
+
+# Konfiguracja projektu tenanta. MUSI stać PRZED zbudowaniem PGBACKREST_ARGS:
+# `--stanza` jest tam utrwalane, więc ustawienie STANZA później dawało
+# odtwarzanie ze stanzy `pim` (stack współdzielony) do bazy tenanta.
+if [[ -n "${TENANT}" ]]; then
+    TENANT_ENV=".env.tenant.${TENANT}"
+    if [[ ! -f "${TENANT_ENV}" ]]; then
+        echo "Brak ${TENANT_ENV} — nie wiem, którą instancję odtwarzać." >&2
+        exit 2
+    fi
+    COMPOSE_ARGS=(-p "pim-${TENANT}" --env-file "${TENANT_ENV}" -f docker-compose.tenant.yml)
+    STANZA="pim-${TENANT}"
+    # DSN-y i nazwy bazy pochodzą z pliku instancji, nie ze środowiska powłoki.
+    POSTGRES_USER="$(grep -E '^POSTGRES_USER=' "${TENANT_ENV}" | tail -1 | cut -d= -f2- || true)"
+    POSTGRES_DB="$(grep -E '^POSTGRES_DB=' "${TENANT_ENV}" | tail -1 | cut -d= -f2- || true)"
+    export POSTGRES_USER POSTGRES_DB
+    echo "Instancja tenanta: ${TENANT} (projekt pim-${TENANT}, stanza ${STANZA})"
+fi
 
 PGBACKREST_ARGS=("--stanza=${STANZA}")
 case "${TYPE}" in
@@ -70,6 +99,8 @@ case "${TYPE}" in
         ;;
     *) echo "Unsupported --type '${TYPE}' (use latest|time|immediate)" >&2; exit 2 ;;
 esac
+
+
 PGBACKREST_ARGS+=("restore")
 
 cat <<EOF
@@ -100,8 +131,8 @@ run() {
 }
 
 # 1+2. Quiesce — api first (drops connections cleanly), then postgres.
-run docker compose stop api
-run docker compose stop database
+run docker compose "${COMPOSE_ARGS[@]}" stop api
+run docker compose "${COMPOSE_ARGS[@]}" stop database
 
 # 3. Wipe + restore inside a one-shot container that reuses the database
 #    service's image, volumes and env vars. --entrypoint "" plus a custom
@@ -115,13 +146,21 @@ QUOTED_ARGS=""
 for arg in "${PGBACKREST_ARGS[@]}"; do
     QUOTED_ARGS+=" \"${arg}\""
 done
-RESTORE_CMD="rm -rf /var/lib/postgresql/data/* /var/lib/postgresql/data/.[!.]* 2>/dev/null; "
+# TNT-P2-02 (#2864) — konfigurację pgBackRest trzeba wyrenderować RÓWNIEŻ
+# w kontenerze jednorazowym. Startuje on z `--entrypoint /bin/sh`, więc omija
+# start-pim.sh, a w obrazie leży wersja z zapieczoną sekcją `[pim]` i ścieżką
+# repozytorium `/pim`. Bez tego kroku `--stanza=pim-<kod>` nie znajduje swojej
+# sekcji, pgBackRest spada na globalną ścieżkę i odtwarza do bazy tenanta
+# kopię STACKU WSPÓLNEGO — wykryte na żywym przebiegu, zanim ktokolwiek
+# użyłby tego na produkcji.
+RESTORE_CMD="/usr/local/bin/pim-render-pgbackrest-conf.sh >/dev/null 2>&1 || true; "
+RESTORE_CMD+="rm -rf /var/lib/postgresql/data/* /var/lib/postgresql/data/.[!.]* 2>/dev/null; "
 RESTORE_CMD+="exec su -s /bin/sh postgres -c 'pgbackrest${QUOTED_ARGS}'"
 
-run docker compose run --rm --no-deps --entrypoint /bin/sh database -c "${RESTORE_CMD}"
+run docker compose "${COMPOSE_ARGS[@]}" run --rm --no-deps --entrypoint /bin/sh database -c "${RESTORE_CMD}"
 
 # 4. Bring postgres back. archive_command resumes as soon as postgres starts.
-run docker compose up -d --wait database
+run docker compose "${COMPOSE_ARGS[@]}" up -d --wait database
 
 # 4b. Re-grant the runtime role. A physical restore can land the cluster with
 # the pre-W1-1 grant state (or the app role's schema grants otherwise dropped);
@@ -129,7 +168,7 @@ run docker compose up -d --wait database
 # "permission denied for schema public". Idempotent — safe on every restore.
 if ! ${DRY_RUN}; then
     echo "==> Re-granting pim_app (post-restore quirk)"
-    docker compose exec -T database psql -U "${POSTGRES_USER:-pim}" -d "${POSTGRES_DB:-pim}" <<'SQL' || true
+    docker compose "${COMPOSE_ARGS[@]}" exec -T database psql -U "${POSTGRES_USER:-pim}" -d "${POSTGRES_DB:-pim}" <<'SQL' || true
 GRANT USAGE ON SCHEMA public TO pim_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO pim_app;
 GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO pim_app;
@@ -139,12 +178,12 @@ SQL
 fi
 
 # 5. Bring api back. The --wait flag blocks until healthchecks pass.
-run docker compose up -d --wait api
+run docker compose "${COMPOSE_ARGS[@]}" up -d --wait api
 
 cat <<EOF
 
 ==> Restore complete.
     Verify with:
-      docker compose exec database psql -U \${POSTGRES_USER:-pim} -d \${POSTGRES_DB:-pim} -c '\\dt'
+      docker compose "${COMPOSE_ARGS[@]}" exec database psql -U \${POSTGRES_USER:-pim} -d \${POSTGRES_DB:-pim} -c '\\dt'
       curl -k https://pim.localhost/api/products | head
 EOF

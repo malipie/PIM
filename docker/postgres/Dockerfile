@@ -34,8 +34,10 @@ COPY pim-init-backup.sh /usr/local/bin/pim-init-backup.sh
 COPY pim-init-app-role.sh /usr/local/bin/pim-init-app-role.sh
 COPY pim-cron.sh /usr/local/bin/pim-cron.sh
 COPY pim-restore-test.sh /usr/local/bin/pim-restore-test.sh
+COPY pim-render-pgbackrest-conf.sh /usr/local/bin/pim-render-pgbackrest-conf.sh
 COPY start-pim.sh /usr/local/bin/start-pim.sh
 RUN chmod 0755 /usr/local/bin/pim-init-backup.sh \
+                /usr/local/bin/pim-render-pgbackrest-conf.sh \
                 /usr/local/bin/pim-init-app-role.sh \
                 /usr/local/bin/pim-cron.sh \
                 /usr/local/bin/pim-restore-test.sh \

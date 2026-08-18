@@ -28,6 +28,12 @@ fi
 # dcron logs to stderr; -L /dev/stderr keeps everything visible in `docker logs`.
 crond -b -L /dev/stderr
 
+# TNT-P2-02 (#2864): sekcja stanzy w konfiguracji pgBackRest jest renderowana
+# pod TĘ instancję, ZANIM ruszy cokolwiek, co czyta tę konfigurację (cron,
+# init-backup, archive_command). Bez tego instancja tenanta ze stanzą
+# `pim-<kod>` nie miałaby własnej sekcji i każda komenda pgBackRest padałaby.
+/usr/local/bin/pim-render-pgbackrest-conf.sh || echo "[start-pim] WARN: render konfiguracji pgBackRest nie powiódł się"
+
 # Background init: wait + stanza-create + initial backup. Survives postgres
 # restarts because of the cron-based hourly schedule, but on first run we want
 # the repo populated immediately so the restore test can run any time.

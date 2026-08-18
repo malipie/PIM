@@ -115,6 +115,23 @@ services:
       PGBACKREST_STANZA: pim-${TENANT_CODE:?TENANT_CODE jest wymagany dla stanzy pgBackRest.}
       PGBACKREST_REPO1_S3_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER jest wymagany (repozytorium kopii w MinIO).}
       PGBACKREST_REPO1_S3_KEY_SECRET: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD jest wymagany (repozytorium kopii w MinIO).}
+    # Archiwizacja WAL do stanzy TEJ instancji. Bez `archive_mode=on` pgBackRest
+    # odmawia wykonania kopii („archive_mode must be enabled"), a bez ciągłego
+    # strumienia WAL nie ma odtwarzania do punktu w czasie — czyli znika jedyny
+    # powód, dla którego każdy tenant dostaje własny klaster (ADR-0035).
+    # Nazwa stanzy w archive_command MUSI zgadzać się z PGBACKREST_STANZA.
+    command:
+      - "postgres"
+      - "-c"
+      - "archive_mode=on"
+      - "-c"
+      - "archive_command=pgbackrest --stanza=pim-${TENANT_CODE} archive-push %p"
+      - "-c"
+      - "wal_level=replica"
+      - "-c"
+      - "max_wal_senders=3"
+      - "-c"
+      - "archive_timeout=60"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -124,7 +141,20 @@ services:
       retries: 5
       start_period: 20s
     networks:
+      # Baza jest też w sieci wspólnej, bo pgBackRest wypycha kopie i segmenty
+      # WAL do współdzielonego repozytorium przez sidecar `minio-tls`
+      # (pgBackRest nie obsługuje S3 po zwykłym HTTP). Bez tego stanza tenanta
+      # istnieje, ale każda komenda kończy się `unable to get address for
+      # 'minio-tls'` — czyli instancja bez kopii zapasowych.
+      #
+      # ŚWIADOMY KOMPROMIS (#2864): wcześniej baza tenanta była nieosiągalna po
+      # DNS z innych stacków. Teraz jest widoczna po nazwie kontenera. Granicą
+      # pozostają: osobne hasła per instancja (generator #2859), FORCE RLS
+      # i brak współdzielonych sekretów — połączenie bez poświadczeń tej
+      # instancji nadal nic nie daje. Test negatywny „poświadczenia A → baza B"
+      # jest obowiązkową częścią #2868.
       - internal
+      - edge
 
   redis:
     image: redis:7-alpine

@@ -11,6 +11,11 @@
 # skrypt bywa wołany z automatu (#2909), a potwierdzenie „na ślepy Enter" nie
 # jest potwierdzeniem.
 #
+# `--purge-storage` usuwa też katalog stanzy w repozytorium pgBackRest
+# (`pim-pgbackrest/pim-<kod>`). Bez tego ponowne założenie tenanta o tym samym
+# kodzie kończy się błędem 51 („is this the correct stanza?"): repozytorium
+# pamięta kopie POPRZEDNIEGO klastra, a nowy ma inny identyfikator systemowy.
+#
 # Buckety MinIO domyślnie ZOSTAJĄ. Pliki klienta przeżywają usunięcie instancji
 # — odtworzenie assetów z kopii bazy jest niemożliwe, a pochopne `rb --force`
 # nieodwracalne. Usunięcie za jawnym `--purge-storage`.
@@ -160,8 +165,13 @@ if [ "$purge_storage" = true ]; then
             mc rb --force t/${exports} || true
             mc admin user remove t '${access_key}' || true
             mc admin policy remove t pim-tenant-${code} || true
+            # --versions jest KONIECZNE: wiadro repozytorium ma włączone
+            # wersjonowanie, więc zwykłe `rm` zostawia wersje i poprzednie
+            # kopie, a pgBackRest odmawia potem `stanza-create` błędem 40
+            # („backup directory and/or archive directory not empty").
+            mc rm --recursive --force --versions t/pim-pgbackrest/pim-${code} || true
         " >/dev/null 2>&1 || true
-    echo "      buckety, użytkownik i polityka usunięte"
+    echo "      buckety, użytkownik, polityka i repozytorium kopii usunięte"
 else
     echo "[3/4] Buckety MinIO zachowane (użyj --purge-storage, żeby je usunąć)."
 fi
