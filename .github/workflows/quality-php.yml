@@ -99,6 +99,13 @@ jobs:
         working-directory: .
         run: bash scripts/lint-provisioner.sh
 
+      # TNT-P4-09 (#2910) — gniazdo Dockera to root na hoscie, wiec ma je
+      # dokladnie jedna usluga (`provisioner`, ADR-0036). Granica pęka przez
+      # jedna linijke w compose dolozona „na chwile, do debugowania".
+      - name: Docker socket guard
+        working-directory: .
+        run: bash scripts/lint-docker-socket.sh
+
       # GOLIVE #2192 — PHP twin of the admin max-lines guard: baseline-frozen
       # count of src/ files over 800 lines (currently 1: ImportRunHandler).
       - name: API max-lines guard
