@@ -190,6 +190,58 @@ rules:
       include:
         - "apps/api/src/**/*.php"
 
+  # TNT-P4-09 (#2910 / ADR-0036) — API nie uruchamia procesów, kropka.
+  #
+  # Instancje tenantów powstają i giną przez `provisioner`, jedyny komponent
+  # z dostępem do gniazda Dockera. API odkłada zlecenie plikiem i nie ma czym
+  # uruchomić niczego samo. Ta reguła pilnuje, żeby to się nie zmieniło
+  # przypadkiem: wystarczy jedno `shell_exec` w kontrolerze i cała separacja
+  # z ADR-0036 przestaje cokolwiek znaczyć, bo API działa jako `www-data`
+  # w kontenerze, który zaraz ktoś „dla wygody" dopnie do socketu.
+  #
+  # Zakazane są WSZYSTKIE wywołania, nie tylko te z interpolacją. Reguła
+  # z wyjątkiem na literały byłaby zaproszeniem do sklejania polecenia
+  # z fragmentów, z których każdy z osobna wygląda niewinnie.
+  - id: cortex-no-process-execution-in-api
+    languages: [php]
+    severity: ERROR
+    message: >-
+      Process execution in the API. Instances are started and stopped by the
+      `provisioner` service (ADR-0036) — the only component with access to the
+      Docker socket. The API enqueues a typed job and never runs a process, so
+      a compromised web request cannot reach the host. If you need a new
+      operation on an instance, add an action to the provisioner and enqueue
+      it; do not open a shell here.
+    patterns:
+      - pattern-either:
+          - pattern: exec(...)
+          - pattern: shell_exec(...)
+          - pattern: system(...)
+          - pattern: passthru(...)
+          - pattern: proc_open(...)
+          - pattern: popen(...)
+          - pattern: pcntl_exec(...)
+          - pattern: new Symfony\Component\Process\Process(...)
+          - pattern: Symfony\Component\Process\Process::fromShellCommandline(...)
+    paths:
+      include:
+        - "apps/api/src/**/*.php"
+      # Trzy wyjątki, każdy uruchamiany przez OPERATORA z konsoli albo
+      # z workera, nigdy z żądania HTTP. Wyliczone imiennie, żeby nowy plik
+      # w tych samych katalogach reguły nie omijał.
+      exclude:
+        # Komendy zakładania i seedowania — wołane ręcznie po wdrożeniu.
+        - "apps/api/src/DataFixtures/Bootstrap/TenantBootstrapCommand.php"
+        - "apps/api/src/DataFixtures/Demo/SeedElectronicsDemoCommand.php"
+        # Reset bazy deweloperskiej; pod APP_ENV=prod odmawia bez --force-prod.
+        - "apps/api/src/Shared/Infrastructure/Maintenance/DatabaseResetCommand.php"
+        # RYZYKO REZYDUALNE, nie zwolnienie: `pgbackrest` odpalany z workera po
+        # wiadomości, którą wysyła kontroler HTTP. Argumenty są tablicą stałych
+        # (bez powłoki), a stanza pochodzi z konfiguracji, nie z żądania —
+        # ale to JEST proces uruchamiany na skutek żądania. Opisane
+        # w docs/security/threat-model.md.
+        - "apps/api/src/Backup/Infrastructure/Service/PgBackRestRunner.php"
+
   - id: cortex-requires-permission-attribute-missing
     languages: [php]
     severity: ERROR

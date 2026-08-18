@@ -132,3 +132,96 @@
 - **Timing-safe compare podpisu webhooka** — do jawnej weryfikacji w B3.
 - **Prompt classifier / tool sandbox** (agent) — hook §13.5 jeśli wektor
   kiedykolwiek pokona approval.
+
+---
+
+# Threat model — provisioning instancji tenantów (STRIDE)
+
+> TNT-P4-09 (#2910). Powierzchnia dołożona przez epik TNT: **aplikacja webowa
+> pośrednio uruchamia kontenery na hoście**. Model orkiestracji i uzasadnienie
+> podziału: ADR-0036. Runbook operacyjny: `docs/runbook/tenant-instances.md`.
+
+## Dlaczego ta powierzchnia jest osobno
+
+Reszta systemu operuje na wierszach w bazie. Ta ścieżka kończy się procesem
+uruchomionym na hoście. Dostęp do gniazda demona Dockera jest **równoważny
+uprawnieniom roota na hoście** — kto może wołać demona, ten może wystartować
+kontener z podmontowanym `/`. Skala pomyłki jest tu inna niż wszędzie indziej
+w tym dokumencie: nie wyciek danych jednego tenanta, tylko cały serwer ze
+wszystkimi klientami.
+
+## Ścieżka i granice zaufania
+
+```
+operator (przeglądarka)
+   │  HTTPS, JWT + platform.tenants.manage
+   ▼
+┌──────────────────────────┐
+│ API instancji platformowej│   ① granica: uwierzytelnienie + uprawnienie
+│  (PIM_INSTANCE_ROLE=      │   ② granica: walidacja kodu i subdomeny
+│   platform)               │      NIE MA dostępu do Dockera
+└──────────┬───────────────┘
+           │  plik `<uuid>.job.json` w katalogu kolejki
+           ▼                    ③ granica: kolejka plikowa, brak portu
+┌──────────────────────────┐
+│ provisioner               │   ④ granica: walidacja POWTÓRZONA
+│  network_mode: none       │      + allowlista projektów
+└──────────┬───────────────┘
+           │  gniazdo uniksowe
+           ▼
+      demon Dockera  ──►  stack instancji tenanta
+```
+
+Cztery decyzje, na których to stoi:
+
+1. **Kolejka plikowa zamiast HTTP.** Komponent z uprawnieniami roota na hoście
+   nie nasłuchuje na żadnym porcie. Jego powierzchnia sieciowa wynosi zero
+   i `network_mode: none` to egzekwuje.
+2. **Walidacja powtórzona po drugiej stronie.** Provisioner nie ufa API, choć
+   API waliduje pierwsze. To osobne komponenty, a ten drugi umie uruchamiać
+   kontenery — przyjęcie „wołający już sprawdził" byłoby jedyną warstwą.
+3. **Procesy uruchamiane tablicą argumentów, nigdy przez powłokę.**
+   `shell=False` jest decyzją bezpieczeństwa, nie stylem: kod tenanta pochodzi
+   z żądania HTTP, a powłoka interpretowałaby w nim znaki specjalne.
+4. **Projekt wyprowadzany z kodu, nigdy z ładunku.** `project = f"pim-{code}"`,
+   a `pim` i `pim-platform` są na twardej liście projektów zakazanych. Zlecenie nie może
+   wskazać, w który stack ma uderzyć.
+
+## STRIDE — provisioning
+
+| Category | Vector | Mitigation | Ref / residual |
+|----------|--------|------------|----------------|
+| **Spoofing** | Właściciel tenanta (globalny `super_admin`) podszywa się pod operatora platformy i zakłada/kasuje instancje | Bramka `platform.tenants.manage`, rozdzielona od ról tenanta; panel istnieje **tylko** na instancji platformowej (404 na routingu, nie 403) | AUD-003; test `ProvisioningNegativeSurfaceTest` — 403 **przed** kolejką, katalog zleceń pusty |
+| **Tampering** | Wstrzyknięcie polecenia przez kod tenanta lub subdomenę (`acme; rm -rf /`, `$(id)`, nowa linia) | Dwie niezależne walidacje po stronie API (kod + wartość `TenantSubdomain`) + trzecia w provisionerze; wywołania tablicą argumentów bez powłoki | `ProvisioningNegativeSurfaceTest` (8 ładunków, failing-first) + `test_provisioner.py` |
+| **Tampering** | Zlecenie celujące w stack współdzielony albo w instancję platformową | `PROTECTED_PROJECTS = {pim, pim-platform}` sprawdzane **przed** wykonaniem czegokolwiek | `test_provisioner.py::test_protected_projects_are_unreachable` |
+| **Tampering** | Ładunek dyktuje projekt, akcję albo hasło właściciela | Endpoint wybiera akcję; projekt wyprowadzany z kodu; hasło tymczasowe losuje kolejka | `ProvisioningNegativeSurfaceTest::anAttackerCannotNameTheProjectTheJobWillTouch` |
+| **Tampering** | Operacja Compose'a bez jawnego projektu trafia w stack z katalogu roboczego | Każde wywołanie ma `-p` i `--env-file`; kształt przypięty testem | Incydent #2929 (odtworzenie cudzej bazy) — `test_provisioner.py::ComposeCallsAreAlwaysScopedToOneInstance` |
+| **Repudiation** | „Nie zlecałem usunięcia tego klienta" | `requested_by` w każdym zleceniu + log audytowy provisionera (linia JSON na zdarzenie, na stdout → `docker logs`, przeżywa czyszczenie kolejki) | — |
+| **Information disclosure** | Odczyt dowolnego pliku przez identyfikator zlecenia w ścieżce (`../`) | Kształt UUID sprawdzany **zanim** cokolwiek zostanie sklejone, w kolejce i w wymaganiach trasy | `ProvisioningNegativeSurfaceTest::theProgressEndpointCannotBeUsedToReadArbitraryFiles` |
+| **Information disclosure** | Hasło tymczasowe właściciela w liście procesów hosta | Hasło idzie zmienną środowiskową pojedynczego wywołania, nie argumentem | — |
+| **Information disclosure** | Postęp provisioningu ujawnia istnienie klientów osobie bez uprawnień | Ten sam kod uprawnienia co reszta panelu | `ProvisioningNegativeSurfaceTest::aTenantOwnerCannotReadProvisioningProgress` |
+| **Denial of service** | Zlecenie wieszające provisionera i blokujące kolejkę dla pozostałych | `PROVISIONER_STEP_TIMEOUT` (1800 s) na krok, limit czasu na oczekiwanie na zdrowie instancji (180 s), pętla nie umiera na wyjątku | — |
+| **Denial of service** | Instancja jednego klienta zjada zasoby sąsiadów | Twarde limity pamięci i CPU per usługa w `docker-compose.tenant.yml` | ADR-0035 |
+| **Elevation of privilege** | Gniazdo Dockera dołożone do `api` „na chwilę, do debugowania" | Bramka CI `scripts/lint-docker-socket.sh` — montaż dozwolony **wyłącznie** w usłudze `provisioner` | #2910 |
+| **Elevation of privilege** | Uruchomienie procesu z kodu API (nowy `shell_exec`, `Process`) | Semgrep `cortex-no-process-execution-in-api` (ERROR, blokujące) z trzema imiennymi wyjątkami | #2910 |
+| **Elevation of privilege** | Kompromitacja kontenera provisionera → root na hoście | Usługa minimalna, bez sieci, bez sekretów aplikacji; **ryzyko rezydualne** — patrz niżej | ADR-0036 |
+
+## Ryzyko rezydualne
+
+- **Brak pośrednika przed API Dockera.** Provisioner ma pełny dostęp do demona,
+  a nie zawężony zestaw operacji. Kandydat: `docker-socket-proxy` z allowlistą
+  endpointów. Zapisane przy zamknięciu #2905 i nadal otwarte — obecną granicą
+  jest to, że usługa jest mała, jednozadaniowa i nie ma sieci.
+- **Zapis do drzewa repozytorium.** Provisioner montuje `.:/workspace` do
+  **zapisu**, bo musi wygenerować `.env.tenant.<kod>`. Kto przejmie tę usługę,
+  może podmienić skrypt, który sam potem wykona. Świadome ustępstwo — bez niego
+  nie da się wygenerować środowiska instancji.
+- **`pgbackrest` uruchamiany na skutek żądania HTTP.** `PgBackRestRunner` woła
+  binarkę z workera po wiadomości wysłanej przez kontroler. Argumenty są tablicą
+  stałych, a stanza pochodzi z konfiguracji, nie z żądania — ale to jest proces
+  uruchamiany w reakcji na ruch z sieci. Wyłączony imiennie z reguły Semgrepa,
+  żeby wyjątek był widoczny, a nie zaszyty w zakresie ścieżek.
+- **Rozjazd rejestru i stanu faktycznego.** Gdy zatrzymanie kontenerów padnie,
+  tenant jest zawieszony w rejestrze, a jego instancja dalej odpowiada. Wybór
+  jest świadomy (fail-closed po stronie dostępu), a rozjazd trafia do logów na
+  poziomie `error` — nie jest jednak nigdzie alertowany.

@@ -120,6 +120,40 @@ class ValidateRejectsDangerousJobs(unittest.TestCase):
                 self.assert_rejected(code=bad)
 
 
+class JobsCannotChooseWhatTheyTouch(unittest.TestCase):
+    """TNT-P4-09 (#2910) — zlecenie opisuje TENANTA, nie polecenie.
+
+    Provisioner wyprowadza projekt z kodu i ignoruje wszystko, co ładunek
+    mówi o tym, gdzie ma uderzyć. Bez tego pole formularza wskazywałoby stack
+    cudzego klienta, a walidacja kodu chroniłaby tylko nazwę, nie cel.
+    """
+
+    def test_project_field_in_the_payload_is_ignored(self):
+        spec = validate(job(code="newbie", project="pim-harmon"))
+        self.assertEqual("pim-newbie", spec["project"])
+
+    def test_lifecycle_job_cannot_aim_at_the_shared_stack(self):
+        for action in ("suspend", "reactivate", "delete", "purge"):
+            for code in ("pim", "platform"):
+                with self.subTest(action=action, code=code):
+                    with self.assertRaises(Rejected):
+                        validate(job(action=action, code=code,
+                                     owner_email=None, owner_password=None))
+
+    def test_purge_is_validated_as_strictly_as_create(self):
+        for bad in ["harmon; rm -rf /", "../harmon", "x$(id)", "PIM"]:
+            with self.subTest(code=bad):
+                with self.assertRaises(Rejected):
+                    validate(job(action="purge", code=bad,
+                                 owner_email=None, owner_password=None))
+
+    def test_only_whitelisted_keys_survive_validation(self):
+        spec = validate(job(shell="/bin/sh", volumes=["/:/host"],
+                            image="attacker/evil:latest"))
+        for forbidden in ("shell", "volumes", "image", "project_override"):
+            self.assertNotIn(forbidden, spec)
+
+
 class ComposeCallsAreAlwaysScopedToOneInstance(unittest.TestCase):
     """#2929: Compose bez jawnego projektu i pliku środowiska trafia w stack
     współdzielony. Raz już tak odtworzyliśmy cudzą bazę — kształt wywołania
