@@ -168,6 +168,8 @@ kopii w repozytorium pgBackRest.
 | `archive_mode must be enabled` | instancja wstała bez `archive_mode=on`; bez WAL nie ma PITR |
 | Caddy `unhealthy`, ruch działa | osierocone procesy `ssl_client` wyczerpały PID-y; policz zombie zamiast szukać wycieku, `init: true` |
 | Alert „instancja nie odpowiada" dla usuniętego klienta | został plik `docker/prometheus/targets/pim-<kod>.yml` |
+| Logowanie zwraca 429 mimo restartu redisa | limiter przeżywa restart, bo wolumen redisa ma trwały zapis (RDB). Czyść `redis-cli FLUSHALL` albo `cache:pool:clear --all` w kontenerze api **tej** instancji |
+| `TRUNCATE`/`DELETE` „przeszedł", ale nic nie skasował | pod `FORCE ROW LEVEL SECURITY` bez ustawionego `app.current_tenant` polityka odrzuca wiersze **bez błędu**. Brak błędu nie oznacza, że coś się stało — ustaw GUC albo użyj DDL |
 
 ---
 
