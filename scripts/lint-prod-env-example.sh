@@ -8,6 +8,7 @@
 # Covers two pairs:
 #   docker-compose.prod.yml   ↔ .env.prod.example      (produkcja)
 #   docker-compose.tenant.yml ↔ .env.tenant.example    (epik TNT, #2858/#2859)
+#   docker-compose.platform.yml ↔ .env.platform.example (epik TNT, #2903)
 #
 # The tenant pair earns its place the same way: JWT_PASSPHRASE was missing from
 # the tenant stack on first write, and without a fail-loud declaration every
@@ -56,6 +57,7 @@ check_pair() {
 
 check_pair "docker-compose.prod.yml" ".env.prod.example"
 check_pair "docker-compose.tenant.yml" ".env.tenant.example"
+check_pair "docker-compose.platform.yml" ".env.platform.example"
 
 if [ "$missing" -ne 0 ]; then
     echo "FAIL: an env template is out of sync with its compose file's required variables."

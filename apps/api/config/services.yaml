@@ -7,6 +7,10 @@ imports:
     - { resource: services_agent.yaml, ignore_errors: not_found }
 
 parameters:
+    # TNT-P4-02 (#2903) — rola instancji: `platform` (panel operatora) albo
+    # `tenant` (instancja klienta). Domyslnie `platform`, zeby wdrozenie tej
+    # zmiany nie odcielo operatora od panelu w istniejacej instalacji.
+    pim_instance_role_default: 'platform'
     # Sprint 0 fallback: until full auth lands in #4 / #24, the listener resolves
     # the active tenant by code from this env var. Smoke test #12 (0.0.12) flips
     # the env between two seeded tenants to verify isolation. Production sets it
@@ -733,6 +737,14 @@ services:
     # time; this listener is the defence-in-depth layer that throws in
     # dev when an unannotated /api/* endpoint sneaks through, and logs
     # a warning in prod (operator playbook: tail Loki for it).
+    # TNT-P4-02 (#2903 / ADR-0036) — panel operatora istnieje wylacznie
+    # w instancji platformowej. Wartosc domyslna `platform` zachowuje
+    # zachowanie istniejacego wdrozenia jednoinstancyjnego; szablon stacku
+    # tenanta ustawia `tenant` jawnie.
+    App\Identity\Infrastructure\Http\PlatformOnlyRoutesListener:
+        arguments:
+            $instanceRole: '%env(string:default:pim_instance_role_default:PIM_INSTANCE_ROLE)%'
+
     App\Identity\Infrastructure\Http\EndpointGuardListener:
         arguments:
             $environment: '%kernel.environment%'

@@ -1,51 +1,30 @@
-# PIM — szablon stacku POJEDYNCZEGO TENANTA (epik TNT, ADR-0035).
+# PIM — stack INSTANCJI PLATFORMOWEJ (epik TNT, #2903, ADR-0036).
 #
-# Ten plik jest SAMODZIELNY — nie jest nakładką na docker-compose.yml. Opisuje
-# komplet usług, które w modelu „instancja per tenant" należą wyłącznie do
-# jednego klienta:
+# Panel operatora nie może żyć w instancji klienta: `POST /api/admin/tenants`
+# zapisuje do bazy, do której jest podłączony, więc wywołany u klienta założyłby
+# drugiego tenanta w JEGO bazie. Platforma dostaje więc własną, małą instancję.
 #
-#   database  — własny klaster Postgresa + własna stanza pgBackRest
-#               (niezależny PITR; stanza pgBackRest obejmuje KLASTER, więc bez
-#               osobnego klastra nie da się cofnąć jednego tenanta — to jest
-#               powód całego epiku, patrz ADR-0035)
-#   redis     — cache, rate limiter, lock store
-#   mercure   — hub SSE (własny klucz JWT, brak współdzielenia sekretu)
-#   api       — FrankenPHP / Symfony
-#   worker    — pula konsumentów Messengera
+# Ten sam obraz co reszta — brak osobnej gałęzi kodu do utrzymania, wdrożenie
+# idzie tym samym orkiestratorem.
 #
-# WSPÓŁDZIELONE i CELOWO nieobecne w tym pliku (żyją w projekcie `pim`):
-#   caddy (edge), bundel SPA, docs, meilisearch, minio, gotenberg, monitoring.
+# Czego tu NIE ma i dlaczego:
+#   worker  — platforma nie przetwarza katalogu ani importów;
+#   meili   — nie wyszukuje produktów;
+#   minio   — nie trzyma assetów.
+# Mercure ZOSTAJE: bundel SPA jest ten sam i otwiera połączenie SSE po
+# zalogowaniu; bez huba panel działałby, ale sypał błędami w konsoli.
 #
 # ── Uruchamianie ────────────────────────────────────────────────────────────
 #
-#   docker compose -p pim-<kod> --env-file .env.tenant.<kod> \
-#       -f docker-compose.tenant.yml up -d
+#   docker compose -p pim-platform --env-file .env.platform \
+#       -f docker-compose.platform.yml up -d
 #
-# Nazwa projektu (`-p`) prefiksuje kontenery i wolumeny, więc dwa tenanty nigdy
-# nie kolidują. Plik NIE deklaruje `name:` właśnie po to, żeby `-p` był jedynym
-# źródłem nazwy projektu.
-#
-# ── Dlaczego zero `ports:` ──────────────────────────────────────────────────
-#
-# Ruch wchodzi wyłącznie przez współdzielony edge Caddy, który sięga do tych
-# kontenerów po sieci `pim_default`. Publikowanie portów byłoby (a) kolizją
-# przy drugim tenancie, (b) obejściem TLS i nagłówków bezpieczeństwa z edge.
-# Ta sama lekcja co przy stronie marketingowej: usługa dokładana do sieci PIM-a
-# nie może publikować portów i MUSI deklarować sieć `pim_default`, inaczej
-# Caddy dostaje 502.
-#
-# ── Dlaczego aliasy sieciowe zamiast `container_name` ───────────────────────
-#
-# Edge Caddy potrzebuje przewidywalnej nazwy (`pim-<kod>-api`), ale `container_name`
-# uniemożliwia `--scale` (worker w prodzie chodzi w dwóch replikach). Alias na
-# sieci `edge` daje stabilny DNS bez tej ceny.
-#
-# ── Dlaczego bez PgBouncera (świadome odejście od prod-parity) ──────────────
-#
-# Prod wstawia PgBouncer między api a bazę, bo jeden klaster obsługuje pulę
-# procesów FrankenPHP. Tutaj każdy tenant ma WŁASNY klaster, więc arytmetyka
-# połączeń jest lokalna i mała. Dołożyć PgBouncera, gdy pojedynczy tenant
-# realnie zbliży się do `max_connections` — nie „na wszelki wypadek".
+# Bootstrap konta operatora po pierwszym starcie:
+#   1. `pim:tenant:bootstrap --code platform --owner-email …`
+#   2. nadanie roli `platform_operator` (SQL — rola jest celowo niedostępna
+#      w Ustawieniach → Role, AUD-003)
+#   3. OBOWIĄZKOWO `cache:pool:clear --all` — PermissionResolver cache'uje
+#      uprawnienia w Redisie i surowy INSERT ich nie unieważnia.
 
 x-default-restart: &default_restart
   restart: unless-stopped
@@ -87,12 +66,10 @@ x-limits-tiny: &limits_tiny
 # `docker compose config|up` kodem != 0, zamiast wystartować instancję klienta
 # z dobrze znanym hasłem. Wzorzec przejęty z docker-compose.prod.yml (AUD-009).
 x-tenant-env: &tenant_env
-  # TNT-P4-02 (#2903 / ADR-0036) — to jest instancja KLIENTA, nie platformy.
-  # Trasy panelu operatora (`/api/admin/tenants*`, break-glass) zwracają tu
-  # 404 na poziomie routingu, niezależnie od uprawnień: wywołane w instancji
-  # klienta założyłyby drugiego tenanta w JEGO bazie.
-  PIM_INSTANCE_ROLE: tenant
-  TENANT_CODE: ${TENANT_CODE:?TENANT_CODE jest wymagany — kod tenanta, np. `acme`. Bez niego aliasy sieciowe i stanza pgBackRest byłyby wspólne dla wszystkich instancji.}
+  # To JEST instancja platformowa — trasy panelu operatora tu istnieją.
+  # Jedyne miejsce w całym wdrożeniu, gdzie ta wartość ma brzmieć `platform`.
+  PIM_INSTANCE_ROLE: platform
+  TENANT_CODE: ${TENANT_CODE:-platform}
   APP_ENV: prod
   APP_DEBUG: "0"
 
@@ -117,7 +94,7 @@ services:
       # Obraz bazy synchronizuje ją idempotentnie przy każdym starcie.
       APP_DB_USER: ${APP_DB_USER:-pim_app}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD jest wymagany — hasło roli runtime, losowane per tenant.}
-      PGBACKREST_STANZA: pim-${TENANT_CODE:?TENANT_CODE jest wymagany dla stanzy pgBackRest.}
+      PGBACKREST_STANZA: ${PGBACKREST_STANZA:-pim-platform}
       PGBACKREST_REPO1_S3_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER jest wymagany (repozytorium kopii w MinIO).}
       PGBACKREST_REPO1_S3_KEY_SECRET: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD jest wymagany (repozytorium kopii w MinIO).}
     # Archiwizacja WAL do stanzy TEJ instancji. Bez `archive_mode=on` pgBackRest
@@ -201,7 +178,7 @@ services:
       internal:
       edge:
         aliases:
-          - pim-${TENANT_CODE:?TENANT_CODE jest wymagany dla aliasu sieciowego.}-mercure
+          - pim-platform-mercure
 
   api:
     build:
@@ -237,20 +214,9 @@ services:
       MERCURE_PUBLIC_URL: ${APP_BASE_URL}/.well-known/mercure
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:?MERCURE_JWT_SECRET jest wymagany.}
       MERCURE_TOPIC_BASE: ${APP_BASE_URL}
-      # Meilisearch i MinIO są WSPÓŁDZIELONE — instancja sięga po nie przez
-      # sieć `pim_default`. Indeks jest wspólny (stała IndexSettingsTemplate::
-      # INDEX_NAME), a granicą jest filtr `tenantId` w CatalogSearchService.
-      # To jedyne miejsce w modelu, gdzie izolacja opiera się na warstwie
-      # aplikacji, a nie na osobnym silniku — dlatego #2868 testuje je wprost.
-      MEILI_URL: ${MEILI_URL:-http://meilisearch:7700}
-      MEILI_KEY: ${MEILI_MASTER_KEY:?MEILI_MASTER_KEY jest wymagany (wspólna instancja Meilisearch).}
-      # Buckety per tenant — polityka MinIO ogranicza poświadczenia wyłącznie
-      # do nich (#2860).
-      AWS_ASSETS_BUCKET: ${AWS_ASSETS_BUCKET:?AWS_ASSETS_BUCKET jest wymagany, np. `acme-assets`.}
-      AWS_IMPORTS_BUCKET: ${AWS_IMPORTS_BUCKET:?AWS_IMPORTS_BUCKET jest wymagany, np. `acme-imports`.}
-      AWS_EXPORTS_BUCKET: ${AWS_EXPORTS_BUCKET:?AWS_EXPORTS_BUCKET jest wymagany, np. `acme-exports`.}
-      AWS_ASSETS_KEY: ${AWS_ASSETS_KEY:?AWS_ASSETS_KEY jest wymagany — użytkownik MinIO tego tenanta, nie root.}
-      AWS_ASSETS_SECRET: ${AWS_ASSETS_SECRET:?AWS_ASSETS_SECRET jest wymagany — sekret użytkownika MinIO tego tenanta.}
+      # Bez Meilisearch i MinIO — platforma nie wyszukuje produktów ani nie
+      # trzyma assetów. Brak tych poświadczeń jest celowy: instancja, która
+      # ich nie dostaje, nie może ich przypadkiem użyć.
       MAILER_DSN: ${MAILER_DSN:?MAILER_DSN jest wymagany — bez niego zaproszenia i resety hasła są martwymi linkami.}
       MAILER_FROM: ${MAILER_FROM:?MAILER_FROM jest wymagany — nadawca na domenie z SPF/DKIM.}
       APP_BYOK_KEY_V1: ${APP_BYOK_KEY_V1:?APP_BYOK_KEY_V1 jest wymagany — `php -r "echo base64_encode(random_bytes(32));"`, szyfruje sekrety SSO/TOTP/BYOK.}
@@ -283,67 +249,7 @@ services:
       internal:
       edge:
         aliases:
-          - pim-${TENANT_CODE:?TENANT_CODE jest wymagany dla aliasu sieciowego.}-api
-
-  # ─── Pula konsumentów Messengera ───────────────────────────────────────────
-  #
-  # UWAGA: `kernel.cache_dir` workera to /app/var/cache-worker/prod, a api ma
-  # /app/var/cache/prod. `cache:clear` w kontenerze api NIE czyści cache'u
-  # workera — pominięcie tego kosztowało 40 minut przy wdrożeniu #2821.
-  # Orkiestrator wdrożeń (#2863) musi czyścić OBA.
-  worker:
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile
-      target: prod
-    <<: [*default_restart, *limits_worker]
-    depends_on:
-      database:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      <<: *tenant_env
-      APP_SECRET: ${APP_SECRET:?APP_SECRET jest wymagany.}
-      DATABASE_URL: postgresql://${APP_DB_USER:-pim_app}:${APP_DB_PASSWORD:?APP_DB_PASSWORD jest wymagany.}@database:5432/${POSTGRES_DB:?POSTGRES_DB jest wymagany.}?serverVersion=16&charset=utf8&application_name=pim_worker
-      DATABASE_URL_OWNER: postgresql://${POSTGRES_USER:?POSTGRES_USER jest wymagany.}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD jest wymagany.}@database:5432/${POSTGRES_DB:?POSTGRES_DB jest wymagany.}?serverVersion=16&charset=utf8
-      MESSENGER_TRANSPORT_DSN: doctrine://default?queue_name=async&auto_setup=0
-      MESSENGER_IMPORT_TRANSPORT_DSN: doctrine://default?auto_setup=0
-      LOCK_DSN: redis://redis:6379
-      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL jest wymagany.}
-      APP_DEFAULT_TENANT_CODE: ""
-      MERCURE_URL: http://mercure/.well-known/mercure
-      MERCURE_PUBLIC_URL: ${APP_BASE_URL}/.well-known/mercure
-      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:?MERCURE_JWT_SECRET jest wymagany.}
-      MERCURE_TOPIC_BASE: ${APP_BASE_URL}
-      MEILI_URL: ${MEILI_URL:-http://meilisearch:7700}
-      MEILI_KEY: ${MEILI_MASTER_KEY:?MEILI_MASTER_KEY jest wymagany.}
-      AWS_ASSETS_BUCKET: ${AWS_ASSETS_BUCKET:?AWS_ASSETS_BUCKET jest wymagany.}
-      AWS_IMPORTS_BUCKET: ${AWS_IMPORTS_BUCKET:?AWS_IMPORTS_BUCKET jest wymagany.}
-      AWS_EXPORTS_BUCKET: ${AWS_EXPORTS_BUCKET:?AWS_EXPORTS_BUCKET jest wymagany.}
-      AWS_ASSETS_KEY: ${AWS_ASSETS_KEY:?AWS_ASSETS_KEY jest wymagany.}
-      AWS_ASSETS_SECRET: ${AWS_ASSETS_SECRET:?AWS_ASSETS_SECRET jest wymagany.}
-      MAILER_DSN: ${MAILER_DSN:?MAILER_DSN jest wymagany.}
-      MAILER_FROM: ${MAILER_FROM:?MAILER_FROM jest wymagany.}
-      APP_BYOK_KEY_V1: ${APP_BYOK_KEY_V1:?APP_BYOK_KEY_V1 jest wymagany.}
-      # Worker nie koduje JWT, ale współdzieli wolumen `api_jwt` i wczytuje tę
-      # samą konfigurację bundla — niedopasowane hasło wywróciłoby boot.
-      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?JWT_PASSPHRASE jest wymagany.}
-      WORKFLOW_CUSTOM_DEFINITIONS: ${WORKFLOW_CUSTOM_DEFINITIONS:-true}
-    command:
-      - "php"
-      - "bin/console"
-      - "messenger:consume"
-      - "import"
-      - "scheduler_maintenance"
-      - "--time-limit=3600"
-      - "--memory-limit=256M"
-      - "-vv"
-    volumes:
-      - api_var:/app/var
-      - api_jwt:/app/config/jwt
-    networks:
-      - internal
+          - pim-platform-api
 
 networks:
   # Sieć wewnętrzna tenanta — prefiksowana nazwą projektu, więc baza jednego
