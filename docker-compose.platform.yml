@@ -251,6 +251,44 @@ services:
         aliases:
           - pim-platform-api
 
+  # ─── Provisioner: jedyny komponent z dostępem do demona Dockera ────────────
+  #
+  # ADR-0036: dostęp do socketu jest równoważny uprawnieniom roota na hoście,
+  # więc należy do usługi małej i jednozadaniowej, a nie do API z autentykacją,
+  # uploadem plików i integracjami.
+  #
+  # `network_mode: none` — usługa NIE MA sieci. Zlecenia przychodzą plikiem
+  # w katalogu kolejki, wyniki wracają tą samą drogą, a polecenia Dockera idą
+  # przez gniazdo uniksowe. Powierzchnia sieciowa komponentu z uprawnieniami
+  # roota wynosi zero i tak ma zostać.
+  #
+  # Warunek, żeby to działało: instancje NIE budują obrazów. BuildKit rozwiązuje
+  # obraz frontendu po stronie klienta, więc `--build` z wnętrza tej usługi
+  # kończy się `network is unreachable` — sprawdzone, nie przewidziane. Obraz
+  # api powstaje we wdrożeniu, a instancja tylko go uruchamia
+  # (`docker-compose.tenant.yml`, klucz `image:`).
+  provisioner:
+    build:
+      context: ./docker/provisioner
+    <<: [*default_restart, *limits_tiny]
+    network_mode: none
+    environment:
+      PROVISIONER_SPOOL: /spool
+      PROVISIONER_WORKSPACE: /workspace
+      PROVISIONER_SHARED_ENV: ${PROVISIONER_SHARED_ENV:-.env.prod}
+      PROVISIONER_STEP_TIMEOUT: ${PROVISIONER_STEP_TIMEOUT:-1800}
+    volumes:
+      # Gniazdo Dockera — TO jest ten wrażliwy montaż. Zawężenie dostępnych
+      # operacji API Dockera przez pośrednika pozostaje otwarte (#2905).
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Drzewo repozytorium: provisioner uruchamia skrypty z `scripts/` i musi
+      # zapisać `.env.tenant.<kod>` nowej instancji, więc montaż jest do
+      # zapisu. Świadome ustępstwo — bez niego nie da się wygenerować
+      # środowiska tenanta.
+      - .:/workspace
+      # Kolejka zleceń, współdzielona z api platformy (#2906).
+      - provisioner_spool:/spool
+
 networks:
   # Sieć wewnętrzna tenanta — prefiksowana nazwą projektu, więc baza jednego
   # klienta jest nieosiągalna z kontenerów drugiego.
@@ -263,6 +301,7 @@ networks:
     name: ${EDGE_NETWORK:-pim_default}
 
 volumes:
+  provisioner_spool:
   postgres_data:
   redis_data:
   mercure_data:

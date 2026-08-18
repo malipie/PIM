@@ -126,6 +126,12 @@ echo ""
 step "env" "running" "$env_file"
 if [ -f "$env_file" ]; then
     step "env" "ok" "plik już istnieje — zachowany (nadpisanie zrotowałoby hasła bazy)"
+elif docker volume inspect "${project}_postgres_data" >/dev/null 2>&1; then
+    # Wolumen po poprzedniej instancji o tym samym kodzie przeżył, a pliku
+    # środowiska nie ma. Wygenerowanie nowego dałoby NOWE hasła do STAREJ bazy:
+    # instancja wstaje, a migracje padają na "password authentication failed",
+    # co nie wskazuje na prawdziwą przyczynę. Lepiej zatrzymać się tutaj.
+    fail "env" 2 "wolumen ${project}_postgres_data istnieje, ale brakuje ${env_file} — nowy plik miałby inne hasła niż baza. Odtwórz plik środowiska albo usuń instancję: scripts/pim-tenant-remove.sh --code ${code} --confirm ${code} --purge-storage"
 else
     env_args=(--code "$code" --subdomain "$subdomain" --domain-base "$domain_base" --out "$env_file")
     [ -n "$shared_env" ] && env_args+=(--shared-env "$shared_env")
@@ -181,8 +187,26 @@ wait_healthy redis || fail "stack-data" 10 "kontener redis nie osiągnął stanu
 step "stack-data" "ok" "baza i redis healthy"
 
 # ── 3. API ──────────────────────────────────────────────────────────────────
-step "stack-api" "running" "budowanie obrazu i start api"
-dc up -d --build api >/dev/null 2>&1 || fail "stack-api" 10 "api nie wstało"
+# Obraz pochodzi z wdrożenia, nie z tego skryptu: wszystkie instancje mają
+# stać na tym samym artefakcie, a provisioner (#2905) działa bez sieci, więc
+# budowanie z jego wnętrza jest niewykonalne (BuildKit rozwiązuje obraz
+# frontendu po stronie klienta).
+step "stack-api" "running" "start api z obrazu wdrożeniowego"
+api_image="$(grep -E '^PIM_API_IMAGE=' "$env_file" | tail -1 | cut -d= -f2- || true)"
+if [ -z "$api_image" ]; then
+    fail "stack-api" 10 "PIM_API_IMAGE nie jest ustawione w ${env_file} — instancja nie buduje obrazu, tylko uruchamia ten z wdrożenia"
+fi
+if ! docker image inspect "$api_image" >/dev/null 2>&1; then
+    fail "stack-api" 10 "brak obrazu ${api_image} — zbuduj go we wdrożeniu albo popraw PIM_API_IMAGE"
+fi
+# Obraz DEWELOPERSKI nie zawiera kodu (w dev przesłania go bind-mount), więc
+# instancja wstałaby pusta i wywróciła się dopiero przy bootstrapie tenanta,
+# z komunikatem o nieznanej komendzie. Sprawdzamy to od razu, na obrazie,
+# zanim cokolwiek wystartuje.
+if ! docker run --rm --entrypoint sh "$api_image" -c 'test -f /app/bin/console && test -d /app/src/DataFixtures/Bootstrap' >/dev/null 2>&1; then
+    fail "stack-api" 10 "obraz ${api_image} nie wygląda na produkcyjny (brak kodu aplikacji w środku) — użyj obrazu z wdrożenia"
+fi
+dc up -d api >/dev/null 2>&1 || fail "stack-api" 10 "api nie wstało"
 wait_running api 180 || fail "stack-api" 10 "kontener api nie wystartował"
 step "stack-api" "ok" "api uruchomione (healthcheck dopiero po migracjach — patrz niżej)"
 

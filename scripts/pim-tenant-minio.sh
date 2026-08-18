@@ -110,13 +110,17 @@ if [ "$dry_run" = true ]; then
     exit 0
 fi
 
-workdir="$(mktemp -d)"
-trap 'rm -rf "$workdir"' EXIT
-
 # Polityka wpuszcza wyłącznie do trzech bucketów tenanta. Brak wpisu na
 # `arn:aws:s3:::*` jest tu istotą rzeczy: MinIO odmawia wszystkiego, czego
 # polityka nie dopuszcza wprost, więc listowanie cudzych bucketów nie przejdzie.
-cat > "${workdir}/policy.json" <<EOF
+# Polityka jest przekazywana ZMIENNĄ ŚRODOWISKOWĄ, nie montowanym plikiem.
+#
+# Powód: skrypt bywa uruchamiany z wnętrza kontenera (provisioner, #2905),
+# a demon Dockera rozwiązuje źródła montowań na HOŚCIE. Katalog z `mktemp`
+# istnieje wtedy tylko w kontenerze wywołującym, więc `-v` dawał pusty montaż
+# i `mc` kończył się „open /work/policy.json: no such file or directory".
+# Zmienna środowiskowa jest widoczna niezależnie od tego, gdzie skrypt działa.
+policy_json="$(cat <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -141,6 +145,7 @@ cat > "${workdir}/policy.json" <<EOF
   ]
 }
 EOF
+)"
 
 policy_name="pim-tenant-${code}"
 
@@ -152,10 +157,11 @@ policy_name="pim-tenant-${code}"
 # `--entrypoint sh`: obraz minio/mc ma `mc` jako entrypoint, więc bez tego
 # powłoka trafiłaby do niego jako nieznana podkomenda.
 docker run --rm --network "$network" \
-    -v "${workdir}:/work:ro" \
     -e MC_HOST_tenant="http://${root_user}:${root_password}@${endpoint#http://}" \
+    -e POLICY_JSON="$policy_json" \
     --entrypoint sh \
     minio/mc:latest -c "
+        printf '%s' \"\$POLICY_JSON\" > /tmp/policy.json
         mc mb -p tenant/${assets_bucket} || true
         mc mb -p tenant/${imports_bucket} || true
         mc mb -p tenant/${exports_bucket} || true
@@ -164,7 +170,7 @@ docker run --rm --network "$network" \
         mc version enable tenant/${exports_bucket} || true
         mc ilm rule add --expire-days 7 tenant/${imports_bucket} || true
         mc admin user add tenant '${access_key}' '${secret_key}' || true
-        mc admin policy create tenant ${policy_name} /work/policy.json || true
+        mc admin policy create tenant ${policy_name} /tmp/policy.json || true
         mc admin policy attach tenant ${policy_name} --user '${access_key}' || true
     "
 

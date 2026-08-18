@@ -121,6 +121,9 @@ minio_user="$(read_shared MINIO_ROOT_USER)"
 minio_password="$(read_shared MINIO_ROOT_PASSWORD)"
 mailer_dsn="$(read_shared MAILER_DSN)"
 mailer_from="$(read_shared MAILER_FROM)"
+# Obraz aplikacji jest wspólny dla wszystkich instancji — pochodzi z wdrożenia,
+# nie z tego skryptu (instancja go nie buduje).
+api_image="$(read_shared PIM_API_IMAGE)"
 
 # Sekrety WYŁĄCZNIE heksadecymalne. Hasła bazy trafiają do DSN-ów w postaci
 # URL (schemat postgresql, hasło w części poświadczeń), więc znak małpy,
@@ -154,6 +157,7 @@ cat > "$out_file" <<EOF
 
 TENANT_CODE=${code}
 APP_BASE_URL=https://${fqdn}
+PIM_API_IMAGE=${api_image}
 TRUSTED_HOSTS=${trusted_hosts}
 
 APP_SECRET=${app_secret}
@@ -200,6 +204,7 @@ incomplete=""
 [ -n "$minio_password" ] || incomplete="${incomplete} MINIO_ROOT_PASSWORD"
 [ -n "$mailer_dsn" ] || incomplete="${incomplete} MAILER_DSN"
 [ -n "$mailer_from" ] || incomplete="${incomplete} MAILER_FROM"
+[ -n "$api_image" ] || incomplete="${incomplete} PIM_API_IMAGE"
 
 if [ -n "$incomplete" ]; then
     echo ""
