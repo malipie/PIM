@@ -157,6 +157,14 @@ if [ "$purge_storage" = true ]; then
     network="$(read_env EDGE_NETWORK)"
     [ -n "$network" ] || network="pim_default"
 
+    # UWAGA: poniższy łańcuch jest w podwójnych cudzysłowach, więc NIE wolno
+    # umieszczać w nim komentarzy z backtickami — powłoka potraktowałaby je
+    # jako podstawienia poleceń i wykonała. Wyjaśnienia trzymamy tutaj:
+    #
+    # `--versions` przy czyszczeniu repozytorium kopii jest konieczne, bo
+    # wiadro ma włączone wersjonowanie. Bez tej flagi zostają wersje, a
+    # pgBackRest odmawia potem utworzenia stanzy błędem 40 (katalog niepusty)
+    # i ponowne założenie tenanta o tym samym kodzie kończy się błędem 51.
     docker run --rm --network "$network" \
         -e MC_HOST_t="http://${root_user}:${root_password}@minio:9000" \
         --entrypoint sh minio/mc:latest -c "
@@ -165,10 +173,6 @@ if [ "$purge_storage" = true ]; then
             mc rb --force t/${exports} || true
             mc admin user remove t '${access_key}' || true
             mc admin policy remove t pim-tenant-${code} || true
-            # --versions jest KONIECZNE: wiadro repozytorium ma włączone
-            # wersjonowanie, więc zwykłe `rm` zostawia wersje i poprzednie
-            # kopie, a pgBackRest odmawia potem `stanza-create` błędem 40
-            # („backup directory and/or archive directory not empty").
             mc rm --recursive --force --versions t/pim-pgbackrest/pim-${code} || true
         " >/dev/null 2>&1 || true
     echo "      buckety, użytkownik, polityka i repozytorium kopii usunięte"
@@ -181,9 +185,16 @@ fi
 # Routing i monitoring są dziś konfiguracją stacku współdzielonego, a ten
 # skrypt celowo nie edytuje cudzych plików bez pytania. Wypisuje, co zostało
 # do sprzątnięcia — dynamiczny routing (#2908) usunie pierwszy z tych punktów.
+# Target Prometheusa znika razem z instancją — inaczej po usunięciu klienta
+# zostaje alert „instancja nie odpowiada" dla czegoś, co celowo nie istnieje.
+target_file="docker/prometheus/targets/pim-${code}.yml"
+if [ -f "$target_file" ]; then
+    rm -f "$target_file"
+    echo "      usunięto ${target_file}"
+fi
+
 echo "[4/4] Pozostało do usunięcia ręcznie:"
 echo "      - blok hosta tenanta w Caddyfile (#2856; niepotrzebne po #2908)"
-echo "      - target Prometheusa dla ${project} (#2866)"
 echo "      - plik środowiska ${env_file} (zawiera sekrety — usuń świadomie)"
 echo ""
 echo "Instancja ${code} usunięta. Kopia: ${dump_path}"

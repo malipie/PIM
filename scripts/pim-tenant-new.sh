@@ -256,6 +256,28 @@ step "stack-worker" "running" "start workera"
 dc up -d worker mercure >/dev/null 2>&1 || fail "stack-worker" 10 "worker/mercure nie wstały"
 step "stack-worker" "ok" "worker i mercure działają"
 
+# ── 8b. Target Prometheusa ──────────────────────────────────────────────────
+#
+# Plik jest generowany, nie dopisywany ręcznie — ręczna lista rozjeżdża się
+# z rzeczywistością przy pierwszym kliencie założonym w pośpiechu. Prometheus
+# czyta katalog przez file_sd i przeładowuje bez restartu, więc pozostałe
+# instancje nie tracą ciągłości metryk (#2866).
+step "monitoring" "running" "target Prometheusa"
+targets_dir="docker/prometheus/targets"
+if [ -d "$targets_dir" ]; then
+    cat > "${targets_dir}/pim-${code}.yml" <<EOF
+# Generowane przez scripts/pim-tenant-new.sh — nie edytuj ręcznie.
+- targets: ["pim-${code}-api:80"]
+  labels:
+    tenant: "${code}"
+    service: api
+    tier: web
+EOF
+    step "monitoring" "ok" "${targets_dir}/pim-${code}.yml"
+else
+    step "monitoring" "skipped" "brak katalogu ${targets_dir} — pomijam"
+fi
+
 # ── 9. Smoke test ───────────────────────────────────────────────────────────
 #
 # Nie „kontener działa", tylko „właściciel się loguje i dostaje dane swojej
@@ -300,6 +322,5 @@ Instancja '${code}' gotowa.
 
 Pozostaje do wykonania poza tym skryptem:
   1. Routing edge Caddy dla hosta ${fqdn} (#2856; dynamiczny w #2908).
-  2. Target Prometheusa dla instancji (#2866).
-  3. Redirect URI SSO dla ${fqdn} u dostawcy tożsamości, jeśli tenant korzysta z SSO.
+  2. Redirect URI SSO dla ${fqdn} u dostawcy tożsamości, jeśli tenant korzysta z SSO.
 EOF
