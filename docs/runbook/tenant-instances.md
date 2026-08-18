@@ -203,7 +203,124 @@ bo tam kolejki nie ma.
 
 ---
 
-## 5. Usunięcie tenanta ręcznie (bez panelu)
+## 5. Provisioning padł w połowie
+
+Zakładanie instancji to dziewięć kroków, z których każdy potrafi paść osobno.
+Skrypt raportuje linie `STEP|krok|status|szczegół`, a **kod wyjścia mówi, gdzie
+stanął**:
+
+| Kod | Krok | Co już istnieje w tym momencie |
+|---|---|---|
+| `2` | walidacja / plik środowiska | nic |
+| `10` | stack (`database`, `redis`, `api`, `worker`) | plik `.env.tenant.<kod>`, być może wolumeny |
+| `30` | klucze JWT | stack działa, baza pusta |
+| `20` | migracje | stack + para kluczy |
+| `40` | storage (MinIO) | schemat bazy |
+| `50` | bootstrap tenanta i właściciela | buckety i polityka MinIO |
+| `60` | smoke test | wszystko poza potwierdzeniem, że da się zalogować |
+
+### Zasada nadrzędna: dokończ tym samym poleceniem
+
+**Nie wymyślaj komend na miejscu.** `pim-tenant-new.sh` jest idempotentny —
+powtórzenie **dokładnie tego samego wywołania** pomija to, co już jest, i podnosi
+przebieg od miejsca awarii:
+
+```bash
+export NEW_OWNER_PW='...'            # to samo hasło, co za pierwszym razem
+bash scripts/pim-tenant-new.sh \
+    --code acme --name "Acme Sp. z o.o." \
+    --owner-email owner@acme.pl --owner-password-env NEW_OWNER_PW \
+    --shared-env .env.prod
+```
+
+Co robi przy powtórzeniu: plik środowiska **zachowuje** (nadpisanie zrotowałoby
+hasła do istniejącej bazy), klucze JWT sprawdza stanem faktycznym (czy klucz
+prywatny otwiera się hasłem tej instancji), migracje puszcza z
+`--allow-no-migration`, a bootstrap tenanta i buckety MinIO są idempotentne
+z założenia.
+
+Hasło **musi być to samo**. Inne hasło przy powtórzeniu po kroku `50` nie
+zmienia hasła właściciela (konto już istnieje), ale wywróci smoke test — i będzie
+to wyglądało na awarię instancji, którą właśnie naprawiłeś.
+
+### Sprawdzenie stanu faktycznego, krok po kroku
+
+Zanim cokolwiek powtórzysz, zobacz, co naprawdę istnieje. Wszystkie polecenia
+poniżej zakładają `code=acme`:
+
+```bash
+code=acme; project="pim-${code}"; env="--env-file .env.tenant.${code}"
+dc() { docker compose -p "$project" $env -f docker-compose.tenant.yml "$@"; }
+
+ls -l ".env.tenant.${code}"                       # plik środowiska
+docker volume ls --filter "name=${project}_"      # wolumeny (dane!)
+dc ps                                             # co działa i w jakim stanie
+dc exec -T api php bin/console doctrine:migrations:status | head -20
+dc exec -T api php bin/console dbal:run-sql "SELECT code, status FROM tenants"
+```
+
+| Objaw / kod wyjścia | Jak sprawdzić | Co zrobić |
+|---|---|---|
+| `2`, komunikat o wolumenie bez pliku środowiska | `docker volume ls --filter name=pim-acme_` | Wolumen po **poprzedniej** instancji o tym kodzie. Nowy plik miałby inne hasła niż baza. Albo odtwórz plik środowiska, albo usuń instancję razem ze storage — patrz sekcja „kiedy odpuścić" |
+| `10` — stack nie wstał | `dc ps -a`, `dc logs database --tail 50` | Najczęściej brak pamięci albo zajęty port. `free -m`, potem powtórz polecenie |
+| `30` — klucze JWT | `dc exec -T api sh -c 'openssl pkey -in /app/config/jwt/private.pem -passin pass:"$JWT_PASSPHRASE" -noout'` | Powtórz skrypt — wykryje niepasującą parę i nadpisze ją. Instancja bez pasującej pary odpowiada 500 na każde logowanie |
+| `20` — migracje | `doctrine:migrations:status` | **Najpoważniejszy przypadek.** Schemat może być częściowy. Sprawdź, czy migracja padła na błędzie środowiska (brak połączenia, timeout) czy na treści migracji. Pierwsze: powtórz. Drugie: **nie klep migracji ręcznie** — usuń instancję i napraw migrację, bo ta sama awaria czeka wszystkich pozostałych klientów przy wdrożeniu |
+| `40` — storage | `docker run --rm --network pim_default -e MC_HOST_t=... minio/mc ls t/` | Zwykle MinIO w stanie `degraded` — `docker restart minio` i powtórz. Buckety częściowo utworzone nie przeszkadzają, skrypt jest idempotentny |
+| `50` — bootstrap | `dbal:run-sql "SELECT code FROM tenants"` + `"SELECT email FROM users"` | Jeśli wiersz tenanta jest, a użytkownika nie — powtórz skrypt. Jeśli oba są, a padło dalej, przejdź do `60` |
+| `60` — smoke | `dc exec -T api curl -sS -X POST http://127.0.0.1/api/auth/login -H 'Content-Type: application/json' -d '{"email":"…","password":"…"}'` | Instancja **istnieje** i wymaga diagnozy, nie odtwarzania. `bad decrypt` → klucze JWT (krok `30`). 429 → limiter logowania, `dc restart redis api`. 500 z innym błędem → sekcja Diagnostyka |
+| Certyfikat się nie wystawił | `curl -sI https://acme.app.harmonpim.pl` | Krok **poza** skryptem (routing edge, dziś ręczny wpis w Caddyfile — #2856). Instancja działa, tylko nie jest osiągalna z zewnątrz. Sprawdź DNS na wszystkich serwerach nazw i limit Let's Encrypt |
+| Zaproszenie nie doszło | `step invite` = `warning` w wyjściu | **Nie jest awarią provisioningu** — skrypt celowo nie wywraca z tego powodu instancji. Sprawdź `MAILER_DSN`, potem `dc exec -T api php bin/console pim:tenant:invite-owner --code acme --email owner@acme.pl` |
+
+### Kiedy odpuścić i usunąć zamiast naprawiać
+
+Kryterium, nie przeczucie. **Usuń instancję i załóż od nowa**, gdy zachodzi
+którykolwiek z warunków:
+
+1. **Migracje padły na treści migracji, nie na środowisku.** Baza jest wtedy
+   w stanie, którego nikt nie opisał, a ręczne dokończenie schematu tworzy
+   instancję różniącą się od pozostałych. Napraw migrację, potem załóż od nowa.
+2. **Nie ma pliku `.env.tenant.<kod>`, a wolumen bazy istnieje.** Haseł do tej
+   bazy nikt już nie zna. Dane są w niej nieosiągalne — odtworzenie ich wymaga
+   kopii, a nie tego skryptu.
+3. **Trzy nieudane przebiegi z tą samą przyczyną.** Czwarty niczego nie zmieni;
+   przyczyna jest poza skryptem.
+4. **Instancja nie miała jeszcze ani jednego zalogowania klienta.** To jest
+   warunek **poboczny**, ale rozstrzygający wątpliwości: dopóki nikt się nie
+   zalogował, nie ma czego stracić, a świeży przebieg jest szybszy niż każda
+   diagnostyka.
+
+**Nie usuwaj**, gdy klient już pracował na instancji — nawet jeden dzień pracy
+jest wart diagnostyki. Wtedy: zrzut (`scripts/pim-tenant-dump.sh --code acme
+--label pre-fix`), potem naprawa.
+
+Usunięcie nieudanej instancji:
+
+```bash
+bash scripts/pim-tenant-remove.sh --code acme                    # sam plan
+bash scripts/pim-tenant-remove.sh --code acme --confirm acme --purge-storage
+```
+
+`--purge-storage` przy zakładaniu **od nowa pod tym samym kodem jest
+obowiązkowe** — inaczej repozytorium pgBackRest pamięta kopie poprzedniego
+klastra i `stanza-create` kończy się błędem 40, a kopia błędem 51.
+
+### Rejestr mówi co innego niż instancja
+
+Provisioning zlecony z panelu zostawia wiersz w stanie `provisioning` albo
+`failed`. Po ręcznym dokończeniu rejestr **sam się nie poprawi**, bo rozliczane
+jest zlecenie, a nie stan faktyczny. Popraw go świadomie na instancji
+platformowej:
+
+```sql
+UPDATE tenants SET status = 'active' WHERE code = 'acme';
+```
+
+Jeśli natomiast instancja **nie** powstała, a wiersz został — zostaw go
+w `failed`. To jest stan prawdziwy i ma być widoczny w panelu.
+
+---
+
+## 6. Usunięcie tenanta ręcznie (bez panelu)
 
 ```bash
 bash scripts/pim-tenant-remove.sh --code acme                      # sam plan
@@ -228,7 +345,7 @@ kopii w repozytorium pgBackRest.
 
 ---
 
-## 6. Diagnostyka
+## 7. Diagnostyka
 
 | Objaw | Prawdopodobna przyczyna |
 |---|---|
