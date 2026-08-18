@@ -84,12 +84,15 @@ storage · `50` bootstrap · `60` smoke.
 **Skrypt kończy się błędem, jeśli smoke nie przejdzie.** Instancja, do której
 nikt się nie zaloguje, nie jest instancją gotową.
 
-Po zakończeniu zostają dwa kroki ręczne:
+Po zakończeniu zostaje **jeden** krok ręczny:
 
-1. **Routing edge Caddy** dla nowego hosta (#2856; zniknie po wprowadzeniu
-   routingu dynamicznego, #2908).
-2. **Redirect URI SSO** u Google/Microsoft, jeśli tenant korzysta z SSO —
+1. **Redirect URI SSO** u Google/Microsoft, jeśli tenant korzysta z SSO —
    dostawcy nie mają API, którym dałoby się to zautomatyzować.
+
+Routing i certyfikat krokiem ręcznym **nie są** (#2908): edge ma jeden blok
+`*.app.harmonpim.pl` z upstreamem wyprowadzonym z hosta i certyfikat wildcard,
+więc instancja jest osiągalna od razu po wstaniu kontenerów — bez wpisu
+w Caddyfile i bez przeładowania. Sprawdzenie: `curl -sI https://acme.app.harmonpim.pl/api`.
 
 Na koniec uruchom dowód izolacji wobec dowolnej istniejącej instancji:
 
@@ -268,7 +271,8 @@ dc exec -T api php bin/console dbal:run-sql "SELECT code, status FROM tenants"
 | `40` — storage | `docker run --rm --network pim_default -e MC_HOST_t=... minio/mc ls t/` | Zwykle MinIO w stanie `degraded` — `docker restart minio` i powtórz. Buckety częściowo utworzone nie przeszkadzają, skrypt jest idempotentny |
 | `50` — bootstrap | `dbal:run-sql "SELECT code FROM tenants"` + `"SELECT email FROM users"` | Jeśli wiersz tenanta jest, a użytkownika nie — powtórz skrypt. Jeśli oba są, a padło dalej, przejdź do `60` |
 | `60` — smoke | `dc exec -T api curl -sS -X POST http://127.0.0.1/api/auth/login -H 'Content-Type: application/json' -d '{"email":"…","password":"…"}'` | Instancja **istnieje** i wymaga diagnozy, nie odtwarzania. `bad decrypt` → klucze JWT (krok `30`). 429 → limiter logowania, `dc restart redis api`. 500 z innym błędem → sekcja Diagnostyka |
-| Certyfikat się nie wystawił | `curl -sI https://acme.app.harmonpim.pl` | Krok **poza** skryptem (routing edge, dziś ręczny wpis w Caddyfile — #2856). Instancja działa, tylko nie jest osiągalna z zewnątrz. Sprawdź DNS na wszystkich serwerach nazw i limit Let's Encrypt |
+| Host odpowiada 404 mimo działających kontenerów | `docker compose -p pim-acme ps` + `docker exec pim-caddy-1 nslookup pim-acme-api` | Edge nie widzi upstreamu. Najczęściej: stack tenanta nie jest w sieci wspólnej albo alias sieciowy nie zgadza się z kodem. 404 z edge oznacza „nie mogę połączyć się z instancją", nie „nie ma takiego klienta" |
+| Błąd TLS zamiast strony | `docker logs pim-caddy-1 \| grep -i cloudflare` | Certyfikat wildcard nie został odnowiony — token Cloudflare wygasł albo stracił uprawnienie `Zone:DNS:Edit`. Dotyczy **wszystkich** instancji naraz, bo certyfikat jest jeden |
 | Zaproszenie nie doszło | `step invite` = `warning` w wyjściu | **Nie jest awarią provisioningu** — skrypt celowo nie wywraca z tego powodu instancji. Sprawdź `MAILER_DSN`, potem `dc exec -T api php bin/console pim:tenant:invite-owner --code acme --email owner@acme.pl` |
 
 ### Kiedy odpuścić i usunąć zamiast naprawiać

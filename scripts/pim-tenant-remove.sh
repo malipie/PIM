@@ -182,9 +182,9 @@ fi
 
 # ── 4. Ślady w konfiguracji wspólnej ────────────────────────────────────────
 #
-# Routing i monitoring są dziś konfiguracją stacku współdzielonego, a ten
-# skrypt celowo nie edytuje cudzych plików bez pytania. Wypisuje, co zostało
-# do sprzątnięcia — dynamiczny routing (#2908) usunie pierwszy z tych punktów.
+# Routing nie zostawia już śladu do sprzątnięcia (#2908): edge kieruje ruch
+# blokiem wildcard, więc zniknięcie kontenerów wystarczy — host odpowiada 404.
+# Zostaje monitoring, bo target Prometheusa jest plikiem.
 # Target Prometheusa znika razem z instancją — inaczej po usunięciu klienta
 # zostaje alert „instancja nie odpowiada" dla czegoś, co celowo nie istnieje.
 target_file="docker/prometheus/targets/pim-${code}.yml"
@@ -194,7 +194,6 @@ if [ -f "$target_file" ]; then
 fi
 
 echo "[4/4] Pozostało do usunięcia ręcznie:"
-echo "      - blok hosta tenanta w Caddyfile (#2856; niepotrzebne po #2908)"
 echo "      - plik środowiska ${env_file} (zawiera sekrety — usuń świadomie)"
 echo ""
 echo "Instancja ${code} usunięta. Kopia: ${dump_path}"
