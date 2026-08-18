@@ -375,6 +375,12 @@ function StatusBadge({ status }: { status: TenantStatus }) {
     active: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
     suspended: 'bg-amber-50 text-amber-800 ring-amber-200',
     deleted: 'bg-rose-50 text-rose-700 ring-rose-200',
+    // TNT-P4-06 (#2907) — instancja w trakcie powstawania jest neutralna
+    // (nic nie wymaga reakcji), a nieudana czerwona jak usunięta: obie
+    // oznaczają, że pod tym adresem nikt się nie zaloguje.
+    pending: 'bg-slate-50 text-slate-600 ring-slate-200',
+    provisioning: 'bg-sky-50 text-sky-700 ring-sky-200',
+    failed: 'bg-rose-50 text-rose-700 ring-rose-200',
   };
   return (
     <span
