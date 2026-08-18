@@ -138,7 +138,10 @@
       "status": {
         "active": "Active",
         "suspended": "Suspended",
-        "deleted": "Deleted"
+        "deleted": "Deleted",
+        "pending": "Pending",
+        "provisioning": "Provisioning",
+        "failed": "Failed"
       },
       "actions": {
         "suspend": "Suspend tenant",
@@ -172,7 +175,16 @@
         "code_copied": "Code copied.",
         "error_duplicate": "A tenant with this code already exists.",
         "error_validation": "Backend rejected the submission.",
-        "error_generic": "Could not create the tenant."
+        "error_generic": "Could not create the tenant.",
+        "field_subdomain": "Subdomain",
+        "field_subdomain_hint": "The customer instance address. 3–32 characters: lowercase letters, digits and hyphens, not starting or ending with a hyphen.",
+        "field_subdomain_preview": "The instance will be available at:",
+        "subdomain_error_empty": "Enter a subdomain.",
+        "subdomain_error_too_short": "The subdomain must be at least 3 characters.",
+        "subdomain_error_too_long": "The subdomain may be at most 32 characters.",
+        "subdomain_error_charset": "Only lowercase letters, digits and hyphens are allowed.",
+        "subdomain_error_edges": "The subdomain cannot start or end with a hyphen.",
+        "error_subdomain_taken": "That subdomain is already taken."
       },
       "detail": {
         "back": "Back to tenant list",
@@ -185,6 +197,15 @@
         "field_locales": "Locales",
         "field_locales_hint": "Primary locale: {{primary}}. The rest are secondary.",
         "crud_deferred": "Plan change / suspend / delete land in #711. Storage usage + bandwidth metrics once the backend exposes a telemetry endpoint."
+      },
+      "provisioning": {
+        "queued": "The job is waiting in the queue…",
+        "running": "The instance is being created…",
+        "in_progress": "in progress",
+        "done": "The instance is ready.",
+        "failed": "Creating the instance failed.",
+        "timeout": "The provisioner has been silent for a while — check the service logs.",
+        "title": "Creating the instance"
       }
     },
     "break_glass": {
