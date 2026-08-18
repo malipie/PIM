@@ -178,6 +178,11 @@ export function AdminTenantsListPage() {
               <option value="active">{t('admin.tenants.status.active')}</option>
               <option value="suspended">{t('admin.tenants.status.suspended')}</option>
               <option value="deleted">{t('admin.tenants.status.deleted')}</option>
+              {/* TNT-P4-06 (#2907) — stany instancji, która dopiero powstaje
+                  albo nie powstała. Bez nich operator nie odfiltruje tego, co
+                  wymaga jego uwagi. */}
+              <option value="provisioning">{t('admin.tenants.status.provisioning')}</option>
+              <option value="failed">{t('admin.tenants.status.failed')}</option>
             </select>
           </label>
           <div className="text-xs text-muted-foreground sm:ml-auto">

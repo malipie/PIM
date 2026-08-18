@@ -140,7 +140,10 @@
       "status": {
         "active": "Aktywny",
         "suspended": "Zawieszony",
-        "deleted": "Usunięty"
+        "deleted": "Usunięty",
+        "pending": "Oczekuje",
+        "provisioning": "Powstaje",
+        "failed": "Niepowodzenie"
       },
       "actions": {
         "suspend": "Zawieś tenanta",
@@ -174,7 +177,16 @@
         "code_copied": "Kod skopiowany.",
         "error_duplicate": "Tenant o tym kodzie już istnieje.",
         "error_validation": "Backend odrzucił dane.",
-        "error_generic": "Nie udało się utworzyć tenanta."
+        "error_generic": "Nie udało się utworzyć tenanta.",
+        "field_subdomain": "Subdomena",
+        "field_subdomain_hint": "Adres instancji klienta. 3–32 znaki: małe litery, cyfry i myślniki, bez myślnika na początku i końcu.",
+        "field_subdomain_preview": "Instancja będzie dostępna pod adresem:",
+        "subdomain_error_empty": "Podaj subdomenę.",
+        "subdomain_error_too_short": "Subdomena musi mieć co najmniej 3 znaki.",
+        "subdomain_error_too_long": "Subdomena może mieć najwyżej 32 znaki.",
+        "subdomain_error_charset": "Dozwolone są tylko małe litery, cyfry i myślniki.",
+        "subdomain_error_edges": "Subdomena nie może zaczynać się ani kończyć myślnikiem.",
+        "error_subdomain_taken": "Ta subdomena jest już zajęta."
       },
       "detail": {
         "back": "Wróć do listy tenantów",
@@ -187,6 +199,15 @@
         "field_locales": "Locales",
         "field_locales_hint": "Primary locale: {{primary}}. Pozostałe są secondary.",
         "crud_deferred": "Zmiana planu / suspend / delete tenanta dochodzą w #711. Storage usage + bandwidth metrics gdy backend wystawi telemetry endpoint."
+      },
+      "provisioning": {
+        "queued": "Zlecenie czeka w kolejce…",
+        "running": "Instancja powstaje…",
+        "in_progress": "w toku",
+        "done": "Instancja gotowa.",
+        "failed": "Zakładanie instancji nie powiodło się.",
+        "timeout": "Provisioner nie odpowiada od dłuższego czasu — sprawdź logi usługi.",
+        "title": "Zakładanie instancji"
       }
     },
     "break_glass": {

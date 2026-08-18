@@ -15,7 +15,15 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
 import { jsonFetch } from '@/lib/http';
 
+import { ProvisioningProgress } from './ProvisioningProgress';
+import { instanceUrl, subdomainShapeError, suggestSubdomain } from './subdomain';
 import type { AdminTenantSummary } from './types';
+
+/**
+ * Domena bazowa instancji. Panel pokazuje pełny adres pod polem, żeby operator
+ * widział, co dokładnie powstanie — sama subdomena bez kontekstu bywa myląca.
+ */
+const BASE_DOMAIN = 'app.harmonpim.pl';
 
 interface ApiProblem {
   detail?: string;
@@ -46,6 +54,10 @@ interface Props {
 export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
   const { t } = useTranslation();
   const [code, setCode] = useState('');
+  const [subdomain, setSubdomain] = useState('');
+  // Operator mógł nadpisać podpowiedź — wtedy przestajemy ją przeliczać z kodu.
+  const [subdomainTouched, setSubdomainTouched] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [plan, setPlan] = useState<'starter' | 'pro' | 'enterprise'>('starter');
@@ -54,6 +66,9 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
 
   const reset = () => {
     setCode('');
+    setSubdomain('');
+    setSubdomainTouched(false);
+    setJobId(null);
     setName('');
     setOwnerEmail('');
     setPlan('starter');
@@ -66,9 +81,23 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
     onOpenChange(next);
   };
 
+  // Subdomena domyślnie idzie za kodem, dopóki operator jej nie tknie.
+  const effectiveSubdomain = subdomainTouched
+    ? subdomain.trim().toLowerCase()
+    : suggestSubdomain(code);
+  const shapeError = effectiveSubdomain === '' ? null : subdomainShapeError(effectiveSubdomain);
+  const subdomainMessage = shapeError
+    ? t(`admin.tenants.create.subdomain_error_${shapeError}`)
+    : null;
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (submitting) return;
+    if (shapeError !== null || effectiveSubdomain === '') {
+      toast.error(subdomainMessage ?? t('admin.tenants.create.subdomain_error_empty'));
+
+      return;
+    }
     setSubmitting(true);
     try {
       const result = await jsonFetch<AdminTenantSummary>('/api/admin/tenants', {
@@ -78,11 +107,16 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
           name: name.trim(),
           owner_email: ownerEmail.trim(),
           plan,
+          subdomain: effectiveSubdomain,
         },
         accept: 'application/json',
         contentType: 'application/json',
       });
       setSuccess(result);
+      // Ścieżka panelowa zwraca identyfikator zlecenia — wtedy zamiast
+      // komunikatu „utworzono" pokazujemy postęp, bo instancja dopiero
+      // powstaje (#2906).
+      setJobId(result.provisioning_job_id ?? null);
       toast.success(t('admin.tenants.create.toast_created', { name: result.name }));
       onSuccess();
     } catch (error: unknown) {
@@ -90,6 +124,10 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
       const body = (error as { body?: ApiProblem })?.body;
       if (status === 409 && body?.code === 'duplicate_code') {
         toast.error(body?.detail ?? t('admin.tenants.create.error_duplicate'));
+      } else if (status === 422 && body?.code === 'invalid_subdomain') {
+        toast.error(body?.detail ?? t('admin.tenants.create.subdomain_error_charset'));
+      } else if (status === 409 && body?.code === 'duplicate_subdomain') {
+        toast.error(body?.detail ?? t('admin.tenants.create.error_subdomain_taken'));
       } else if (status === 400) {
         toast.error(body?.detail ?? t('admin.tenants.create.error_validation'));
       } else if (status === 403) {
@@ -105,7 +143,28 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
   return (
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="max-w-md">
-        {success ? (
+        {success && jobId ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>{t('admin.tenants.provisioning.title')}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              {t('admin.tenants.create.field_subdomain_preview')}{' '}
+              <a
+                href={instanceUrl(effectiveSubdomain, BASE_DOMAIN)}
+                className="font-mono underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {instanceUrl(effectiveSubdomain, BASE_DOMAIN)}
+              </a>
+            </p>
+            <ProvisioningProgress jobId={jobId} onFinished={() => onSuccess()} />
+            <DialogFooter>
+              <Button onClick={() => close(false)}>{t('admin.tenants.create.close')}</Button>
+            </DialogFooter>
+          </>
+        ) : success ? (
           <>
             <DialogHeader>
               <div className="mb-2 inline-grid size-10 place-items-center rounded-full bg-emerald-100 text-emerald-700">
@@ -170,6 +229,45 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
                 <p className="text-[11px] text-muted-foreground">
                   {t('admin.tenants.create.field_code_hint')}
                 </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="tenant-subdomain">
+                  {t('admin.tenants.create.field_subdomain')}
+                </Label>
+                <Input
+                  id="tenant-subdomain"
+                  required
+                  value={effectiveSubdomain}
+                  onChange={(e) => {
+                    setSubdomainTouched(true);
+                    setSubdomain(e.target.value);
+                  }}
+                  placeholder="acme"
+                  maxLength={32}
+                  className="font-mono"
+                  autoComplete="off"
+                  aria-invalid={subdomainMessage !== null}
+                  aria-describedby="tenant-subdomain-hint"
+                />
+                <p id="tenant-subdomain-hint" className="text-[11px] text-muted-foreground">
+                  {t('admin.tenants.create.field_subdomain_hint')}
+                </p>
+                {/* Pełny adres pod polem: sama subdomena bez kontekstu bywa
+                    myląca, a operator ma zobaczyć dokładnie to, co powstanie. */}
+                {effectiveSubdomain !== '' && subdomainMessage === null && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {t('admin.tenants.create.field_subdomain_preview')}{' '}
+                    <code className="font-mono">
+                      {instanceUrl(effectiveSubdomain, BASE_DOMAIN)}
+                    </code>
+                  </p>
+                )}
+                {subdomainMessage !== null && (
+                  <p className="text-[11px] text-destructive" role="alert">
+                    {subdomainMessage}
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="tenant-name">{t('admin.tenants.create.field_name')}</Label>
