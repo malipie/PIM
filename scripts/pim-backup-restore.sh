@@ -76,10 +76,19 @@ if [[ -n "${TENANT}" ]]; then
     fi
     COMPOSE_ARGS=(-p "pim-${TENANT}" --env-file "${TENANT_ENV}" -f docker-compose.tenant.yml)
     STANZA="pim-${TENANT}"
-    # DSN-y i nazwy bazy pochodzą z pliku instancji, nie ze środowiska powłoki.
+    # Nazwa bazy i użytkownik pochodzą z pliku instancji, nie ze środowiska
+    # powłoki.
+    #
+    # ⚠ CELOWO BEZ `export`. Zmienne środowiskowe mają w Compose pierwszeństwo
+    # przed `--env-file`, więc wyeksportowanie ich tutaj wstrzykiwało nazwę
+    # bazy TENANTA do każdego kolejnego wywołania `docker compose` — łącznie
+    # z tymi, które dotyczą stacku współdzielonego. Skutek zaobserwowany na
+    # żywym stacku deweloperskim: kontener `api` został odtworzony z
+    # `DATABASE_URL` wskazującym bazę tenanta i każde logowanie zwracało 500
+    # (`database "pim_pitr1" does not exist`). Zwykłe przypisanie wystarcza —
+    # potrzebujemy tych wartości tylko do argumentów `psql` w tym skrypcie.
     POSTGRES_USER="$(grep -E '^POSTGRES_USER=' "${TENANT_ENV}" | tail -1 | cut -d= -f2- || true)"
     POSTGRES_DB="$(grep -E '^POSTGRES_DB=' "${TENANT_ENV}" | tail -1 | cut -d= -f2- || true)"
-    export POSTGRES_USER POSTGRES_DB
     echo "Instancja tenanta: ${TENANT} (projekt pim-${TENANT}, stanza ${STANZA})"
 fi
 
