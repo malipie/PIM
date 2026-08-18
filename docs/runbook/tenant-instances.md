@@ -26,6 +26,34 @@ politykę dostępu, a osobny indeks Meili wymagałby zmiany kodu (stała
 
 ---
 
+## Adresowanie — ustalenie operatora (2026-08-18)
+
+Każda instancja ma **jeden kanoniczny adres**: `<kod>.app.harmonpim.pl`.
+Pierwszy klient (`harmon`) nie jest wyjątkiem — jego adresem jest
+`harmon.app.harmonpim.pl`.
+
+Stary adres `app.harmonpim.pl` **przekierowuje trwale (301)** na adres
+kanoniczny, zachowując ścieżkę i query. Nie jest aliasem: dwa równorzędne
+adresy tej samej instancji rozjeżdżają linki w mailach, wpisy SSO i zakładki,
+a po kilku klientach nikt nie pamięta, który jest właściwy.
+
+**Warunek włączenia przekierowania:** najpierw `harmon.app.harmonpim.pl` musi
+mieć wystawiony certyfikat i potwierdzone logowanie. Włączone wcześniej odcina
+jedyną działającą drogę do panelu.
+
+Ryzyko przekierowania dla klientów API sprawdzone przed decyzją: w instancji
+`harmon` było **0 tokenów API i 0 kluczy API**, a ruch z tygodnia to wyłącznie
+przeglądarki i sonda monitoringu. Gdyby kiedyś doszła integracja wołająca stary
+adres — 301 obsługuje ją poprawnie tylko wtedy, gdy klient podąża za
+przekierowaniem; przy nowych integracjach podawaj od razu adres kanoniczny.
+
+Dlaczego produkt siedzi pod `app.`, a nie wprost pod `harmonpim.pl`: przestrzeń
+nazw domeny firmowej zostaje wolna dla `send` (poczta), `www` i wszystkiego, co
+dojdzie później. Nazwa klienta nigdy nie kolidowała z infrastrukturą, a literówka
+w adresie trafia w nieistniejącą nazwę zamiast na stronę logowania.
+
+---
+
 ## 1. Dodanie tenanta
 
 Przed rozpoczęciem sprawdź:
