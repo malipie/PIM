@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Identity\Presentation\Command;
 
 use App\Identity\Application\SuperAdmin\SuperAdminContext;
+use App\Identity\Infrastructure\Provisioning\ProvisioningQueue;
+use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Infrastructure\Maintenance\TenantPurger;
 use App\Shared\Infrastructure\Maintenance\TenantStoragePurgeException;
 use Doctrine\DBAL\Connection;
 use InvalidArgumentException;
+use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -57,6 +60,8 @@ final class PurgeDeletedTenantsCommand extends Command
         private readonly Connection $connection,
         private readonly SuperAdminContext $superAdminContext,
         private readonly TenantPurger $tenantPurger,
+        private readonly TenantRepositoryInterface $tenants,
+        private readonly ProvisioningQueue $provisioning,
     ) {
         parent::__construct();
     }
@@ -135,6 +140,14 @@ final class PurgeDeletedTenantsCommand extends Command
                 continue;
             }
 
+            // TNT-P4-08 (#2909) — okno odzyskania właśnie się zamknęło, więc
+            // TERAZ, i tylko teraz, giną stack i wolumeny instancji. Zlecenie
+            // idzie PRZED skasowaniem wiersza: po nim nie byłoby już z czego
+            // odczytać kodu tenanta, a provisioner adresuje instancję kodem.
+            // Skrypt usuwania i tak zaczyna od zrzutu końcowego, więc kolejność
+            // „zlecenie → kasowanie wiersza" nie kasuje niczego w ciemno.
+            $this->enqueuePurge($callerId, $uuid, $io);
+
             // The purger sets the RLS GUC to this exact tenant for its
             // deletes; running inside cross-tenant mode additionally drops
             // the Doctrine TenantFilter for any ORM read it may trigger.
@@ -172,6 +185,34 @@ final class PurgeDeletedTenantsCommand extends Command
         $io->success(\sprintf('Hard-deleted %d tenant(s).', $deleted));
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Zleca zniszczenie stacku instancji. Porażka kolejki NIE przerywa
+     * sprzątania bazy: obowiązek z art. 17 RODO dotyczy danych, a osierocone
+     * kontenery są problemem operacyjnym, nie prawnym — trzeba je jednak
+     * zobaczyć, stąd ostrzeżenie.
+     */
+    private function enqueuePurge(Uuid $callerId, Uuid $tenantId, SymfonyStyle $io): void
+    {
+        if (!$this->provisioning->isAvailable()) {
+            return;
+        }
+
+        try {
+            $this->superAdminContext->runCrossTenant($callerId, function () use ($tenantId, $callerId): void {
+                $tenant = $this->tenants->findById($tenantId);
+                if (null !== $tenant) {
+                    $this->provisioning->enqueueLifecycle($tenant, 'purge', $callerId);
+                }
+            });
+        } catch (RuntimeException $exception) {
+            $io->warning(\sprintf(
+                'Nie udało się zlecić usunięcia instancji %s: %s. Stack i wolumeny zostają — usuń je ręcznie skryptem pim-tenant-remove.sh.',
+                $tenantId->toRfc4122(),
+                $exception->getMessage(),
+            ));
+        }
     }
 
     /**

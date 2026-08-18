@@ -23,9 +23,16 @@ const MAX_POLLS = 240;
 interface Props {
   jobId: string;
   onFinished?: (state: ProvisioningStatus['state']) => void;
+  /**
+   * TNT-P4-08 (#2909) — ten sam mechanizm obsługuje też zawieszanie,
+   * wznawianie i kasowanie instancji, a wtedy „Instancja powstaje…" byłoby
+   * po prostu nieprawdą. Zmienia się wyłącznie opis stanu; kroki, błędy
+   * i odpytywanie są wspólne.
+   */
+  variant?: 'create' | 'lifecycle';
 }
 
-export function ProvisioningProgress({ jobId, onFinished }: Props) {
+export function ProvisioningProgress({ jobId, onFinished, variant = 'create' }: Props) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<ProvisioningStatus | null>(null);
   const [pollsExhausted, setPollsExhausted] = useState(false);
@@ -78,14 +85,18 @@ export function ProvisioningProgress({ jobId, onFinished }: Props) {
 
   const state = status?.state ?? 'queued';
   const steps = status?.steps ?? [];
+  const key = (name: string) =>
+    variant === 'lifecycle'
+      ? `admin.tenants.lifecycle.${name}`
+      : `admin.tenants.provisioning.${name}`;
 
   return (
     <div className="space-y-3" data-testid="provisioning-progress">
       <p className="text-sm text-muted-foreground">
-        {state === 'queued' && t('admin.tenants.provisioning.queued')}
-        {state === 'running' && t('admin.tenants.provisioning.running')}
-        {state === 'done' && t('admin.tenants.provisioning.done')}
-        {(state === 'failed' || state === 'rejected') && t('admin.tenants.provisioning.failed')}
+        {state === 'queued' && t(key('queued'))}
+        {state === 'running' && t(key('running'))}
+        {state === 'done' && t(key('done'))}
+        {(state === 'failed' || state === 'rejected') && t(key('failed'))}
       </p>
 
       <ol className="space-y-1.5" aria-live="polite">

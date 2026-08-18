@@ -15,7 +15,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from provisioner import PROTECTED_PROJECTS, RESERVED, Rejected, validate  # noqa: E402
+from provisioner import (  # noqa: E402
+    ACTIONS,
+    PROTECTED_PROJECTS,
+    RESERVED,
+    Rejected,
+    _json_objects,
+    compose,
+    validate,
+)
 
 
 def job(**overrides):
@@ -48,7 +56,7 @@ class ValidateAcceptsWellFormedJobs(unittest.TestCase):
         self.assertEqual("acme", spec["subdomain"])
 
     def test_lifecycle_actions_need_no_owner(self):
-        for action in ("suspend", "reactivate", "delete"):
+        for action in ("suspend", "reactivate", "delete", "purge"):
             with self.subTest(action=action):
                 spec = validate(job(action=action, owner_email=None,
                                     owner_password=None))
@@ -110,6 +118,65 @@ class ValidateRejectsDangerousJobs(unittest.TestCase):
         for bad in [None, 42, ["acme"], {"code": "acme"}]:
             with self.subTest(code=bad):
                 self.assert_rejected(code=bad)
+
+
+class ComposeCallsAreAlwaysScopedToOneInstance(unittest.TestCase):
+    """#2929: Compose bez jawnego projektu i pliku środowiska trafia w stack
+    współdzielony. Raz już tak odtworzyliśmy cudzą bazę — kształt wywołania
+    jest przypięty testem, a nie tylko komentarzem."""
+
+    def test_project_and_env_file_are_explicit(self):
+        argv = compose("acme", "pim-acme", "stop")
+        self.assertEqual(
+            ["docker", "compose", "-p", "pim-acme",
+             "--env-file", ".env.tenant.acme",
+             "-f", "docker-compose.tenant.yml", "stop"],
+            argv,
+        )
+
+    def test_no_argument_is_a_shell_string(self):
+        for arg in compose("acme", "pim-acme", "ps", "--format", "json"):
+            self.assertNotIn(" ", arg, "argument sklejony ze spacją idzie do powłoki jako jeden token")
+
+
+class HealthOutputParsing(unittest.TestCase):
+    """`docker compose ps --format json` wypisuje raz tablicę, raz obiekt na
+    linię — zależnie od wersji Compose'a. Oba kształty muszą działać, inaczej
+    wznowienie instancji „nigdy się nie kończy" na nowszym hoście."""
+
+    def test_object_per_line(self):
+        raw = '{"Service":"api","State":"running","Health":"healthy"}\n'
+        self.assertEqual([{"Service": "api", "State": "running", "Health": "healthy"}],
+                         _json_objects(raw))
+
+    def test_json_array(self):
+        raw = '[{"Service":"api","State":"running","Health":"starting"}]'
+        self.assertEqual("starting", _json_objects(raw)[0]["Health"])
+
+    def test_garbage_is_skipped_not_crashed(self):
+        self.assertEqual([], _json_objects("nie-json\n\n"))
+
+
+class DeleteAndPurgeAreDifferentActions(unittest.TestCase):
+    """Kryterium akceptacji #2909: skasowanie w panelu jest odwracalne przez
+    30 dni, a wolumeny giną dopiero przy `purge`. Gdyby obie rzeczy robiła
+    jedna akcja, pomyłka operatora byłaby nieodwracalna."""
+
+    def test_both_actions_exist_and_are_distinct(self):
+        self.assertIn("delete", ACTIONS)
+        self.assertIn("purge", ACTIONS)
+
+    def test_matches_php_contract(self):
+        php = (Path(__file__).parents[2]
+               / "apps/api/src/Identity/Infrastructure/Provisioning/ProvisioningQueue.php")
+        if not php.is_file():
+            self.skipTest(f"brak {php} — uruchomienie spoza repozytorium")
+
+        import re
+        block = re.search(r"LIFECYCLE_ACTIONS = \[(.*?)\];", php.read_text(encoding="utf-8"), re.S)
+        self.assertIsNotNone(block, "ProvisioningQueue nie deklaruje LIFECYCLE_ACTIONS")
+        from_php = set(re.findall(r"'([a-z]+)'", block.group(1)))
+        self.assertEqual(from_php | {"create"}, ACTIONS)
 
 
 class ReservedListMatchesTheRestOfTheSystem(unittest.TestCase):

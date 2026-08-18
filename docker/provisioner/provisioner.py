@@ -52,7 +52,19 @@ RESERVED = {
 # zleceniem, które przeszło walidację, a mimo to celuje w cudzy stack.
 PROTECTED_PROJECTS = {"pim", "pim-platform"}
 
-ACTIONS = {"create", "suspend", "reactivate", "delete"}
+# Kontrakt MUSI zgadzać się z ProvisioningQueue::LIFECYCLE_ACTIONS (+ create).
+#
+# `delete` i `purge` są rozdzielone celowo. `delete` to reakcja na skasowanie
+# tenanta w panelu: zrzut końcowy i wygaszenie instancji, ale ani jeden wolumen
+# nie ginie — przez 30 dni klient jest do odzyskania jednym `start`. Dopiero
+# `purge`, zlecany przez `pim:tenants:purge-deleted` po wygaśnięciu okna,
+# niszczy stack i dane. Gdyby obie rzeczy robiła jedna akcja, pomyłka
+# w panelu byłaby nieodwracalna (#2909).
+ACTIONS = {"create", "suspend", "reactivate", "delete", "purge"}
+
+# Ile czekać na to, aż wznowiona instancja zgłosi się jako zdrowa.
+HEALTH_TIMEOUT = int(os.environ.get("PROVISIONER_HEALTH_TIMEOUT", "180"))
+HEALTH_POLL_SECONDS = float(os.environ.get("PROVISIONER_HEALTH_POLL_SECONDS", "3"))
 
 
 def now() -> str:
@@ -130,13 +142,18 @@ def write_status(job_id: str, **fields) -> None:
     tmp.replace(path)
 
 
-def run_step(job_id: str, name: str, argv: list[str], env: dict | None = None) -> tuple[int, str]:
+def run_step(job_id: str, name: str, argv: list[str], env: dict | None = None,
+             quiet: bool = False) -> tuple[int, str]:
     """Uruchamia proces TABLICĄ argumentów, nigdy przez powłokę.
 
     `shell=False` jest tu decyzją bezpieczeństwa, nie stylem: kod tenanta
     pochodzi z żądania HTTP, a powłoka interpretowałaby w nim znaki specjalne.
     """
-    audit("step_start", job_id=job_id, step=name, argv=argv)
+    # `quiet` jest dla odpytywania w pętli: bez tego jedno wznowienie
+    # instancji zostawia sto kilkadziesiąt linii audytu o sprawdzaniu zdrowia
+    # i topi w nich zdarzenia, które naprawdę coś znaczą.
+    if not quiet:
+        audit("step_start", job_id=job_id, step=name, argv=argv)
     try:
         completed = subprocess.run(
             argv,
@@ -152,8 +169,81 @@ def run_step(job_id: str, name: str, argv: list[str], env: dict | None = None) -
         return 124, f"krok '{name}' przekroczyl limit {STEP_TIMEOUT}s"
 
     output = (completed.stdout or "") + (completed.stderr or "")
-    audit("step_end", job_id=job_id, step=name, exit_code=completed.returncode)
+    if not quiet:
+        audit("step_end", job_id=job_id, step=name, exit_code=completed.returncode)
     return completed.returncode, output
+
+
+def compose(code: str, project: str, *args: str) -> list[str]:
+    """Wywołanie `docker compose` dla stacku JEDNEJ instancji.
+
+    Projekt i plik środowiska są podawane jawnie przy każdym wywołaniu. Bez
+    tego Compose bierze je z katalogu roboczego i operacja celująca w tenanta
+    trafia w stack współdzielony — dokładnie to zdarzyło się w #2929.
+    """
+    return [
+        "docker", "compose",
+        "-p", project,
+        "--env-file", f".env.tenant.{code}",
+        "-f", "docker-compose.tenant.yml",
+        *args,
+    ]
+
+
+def wait_healthy(job_id: str, code: str, project: str) -> tuple[bool, str]:
+    """Czeka, aż instancja zgłosi się jako zdrowa.
+
+    Kryterium akceptacji #2909 mówi wprost: status wraca na `active` dopiero
+    po weryfikacji, że instancja wstała. „Polecenie start zwróciło zero" tego
+    nie dowodzi — kontener potrafi wstać i zaraz paść na migracji albo na
+    braku klucza JWT. Pytamy więc Dockera o stan zdrowia usługi `api`.
+    """
+    deadline = time.monotonic() + HEALTH_TIMEOUT
+    last = "brak odpowiedzi od `docker compose ps`"
+
+    while time.monotonic() < deadline:
+        rc, out = run_step(
+            job_id, "health",
+            compose(code, project, "ps", "--format", "json", "api"),
+            quiet=True,
+        )
+        if rc == 0:
+            states = []
+            # Compose wypisuje albo tablicę JSON, albo po jednym obiekcie
+            # w linii — zależnie od wersji. Obsługujemy oba kształty.
+            for chunk in _json_objects(out):
+                name = chunk.get("Service") or chunk.get("Name") or "?"
+                health = (chunk.get("Health") or "").lower()
+                state = (chunk.get("State") or "").lower()
+                states.append(f"{name}: state={state or '?'} health={health or 'brak'}")
+                if health == "healthy" or (health == "" and state == "running"):
+                    return True, "; ".join(states)
+            if states:
+                last = "; ".join(states)
+        else:
+            last = out.strip()[-500:] or last
+
+        time.sleep(HEALTH_POLL_SECONDS)
+
+    return False, f"instancja nie zglosila sie jako zdrowa w {HEALTH_TIMEOUT}s ({last})"
+
+
+def _json_objects(raw: str) -> list[dict]:
+    """Wyciąga obiekty JSON z wyjścia `docker compose ps --format json`."""
+    objects: list[dict] = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            objects.append(parsed)
+        elif isinstance(parsed, list):
+            objects.extend(item for item in parsed if isinstance(item, dict))
+    return objects
 
 
 def handle(job_id: str, job: dict) -> None:
@@ -186,21 +276,42 @@ def handle(job_id: str, job: dict) -> None:
         )
         record("provision", rc == 0, out)
     elif action == "delete":
+        # Skasowanie w panelu jest ODWRACALNE przez 30 dni, więc tutaj nie
+        # ginie ani jeden wolumen: zrzut końcowy, potem wygaszenie kontenerów.
+        # Zrzut jest pierwszy — po zatrzymaniu bazy nie da się go już zrobić.
         rc, out = run_step(
-            job_id, "deprovision",
+            job_id, "final-dump",
+            ["bash", "scripts/pim-tenant-dump.sh",
+             "--code", code, "--label", "final"],
+        )
+        record("final-dump", rc == 0, out)
+
+        if rc == 0:
+            rc, out = run_step(job_id, "stop", compose(code, project, "stop"))
+            record("stop", rc == 0, out)
+    elif action == "purge":
+        # Jedyna nieodwracalna ścieżka. Zleca ją wyłącznie
+        # `pim:tenants:purge-deleted` po wygaśnięciu okna odzyskania.
+        # `--purge-storage` usuwa też buckety — po 30 dniach to jest realizacja
+        # obowiązku usunięcia danych, nie sprzątanie.
+        rc, out = run_step(
+            job_id, "purge",
             ["bash", "scripts/pim-tenant-remove.sh",
-             "--code", code, "--confirm", code],
+             "--code", code, "--confirm", code, "--purge-storage"],
         )
-        record("deprovision", rc == 0, out)
+        record("purge", rc == 0, out)
+    elif action == "suspend":
+        rc, out = run_step(job_id, "stop", compose(code, project, "stop"))
+        record("stop", rc == 0, out)
     else:
-        compose_action = "stop" if action == "suspend" else "start"
-        rc, out = run_step(
-            job_id, compose_action,
-            ["docker", "compose", "-p", project,
-             "--env-file", f".env.tenant.{code}",
-             "-f", "docker-compose.tenant.yml", compose_action],
-        )
-        record(compose_action, rc == 0, out)
+        rc, out = run_step(job_id, "start", compose(code, project, "start"))
+        record("start", rc == 0, out)
+
+        if rc == 0:
+            healthy, detail = wait_healthy(job_id, code, project)
+            record("health", healthy, detail)
+            if not healthy:
+                rc = 1
 
     state = "done" if rc == 0 else "failed"
     write_status(job_id, state=state, action=action, code=code, steps=steps,

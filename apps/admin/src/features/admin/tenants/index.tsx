@@ -16,6 +16,13 @@ import { Link } from 'react-router';
 import { GatedButton } from '@/components/identity';
 import { Button } from '@/components/ui/button';
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -28,6 +35,7 @@ import { cn } from '@/lib/utils';
 
 import { AdminTenantShowPage } from './AdminTenantShowPage';
 import { CreateTenantModal } from './CreateTenantModal';
+import { ProvisioningProgress } from './ProvisioningProgress';
 import type { AdminTenantSummary, TenantStatus } from './types';
 
 export { AdminTenantShowPage };
@@ -298,19 +306,34 @@ function TenantActions({
 }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
+  // TNT-P4-08 (#2909) — przy instancjach per tenant operacja cyklu życia nie
+  // kończy się z odpowiedzią HTTP: zatrzymanie albo wznowienie stacku trwa
+  // dalej. Gdy API odda identyfikator zlecenia, pokazujemy jego postęp — bez
+  // tego „Przywróć" wyglądałoby na akcję bez skutku, bo status wraca na
+  // `active` dopiero po potwierdzeniu, że instancja odpowiada.
+  const [job, setJob] = useState<{ id: string; action: string } | null>(null);
 
-  const callAction = async (path: string, method: 'POST' | 'DELETE', confirmKey?: string) => {
+  const callAction = async (
+    path: string,
+    method: 'POST' | 'DELETE',
+    action: string,
+    confirmKey?: string,
+  ) => {
     if (confirmKey) {
       const confirmText = t(confirmKey, { name: tenant.name, code: tenant.code });
       if (!window.confirm(confirmText)) return;
     }
     setBusy(true);
     try {
-      await jsonFetch(`/api/admin/tenants/${tenant.id}${path}`, {
-        method,
-        accept: 'application/json',
-      });
-      toast.success(t('admin.tenants.actions.toast_done'));
+      const response = await jsonFetch<AdminTenantSummary>(
+        `/api/admin/tenants/${tenant.id}${path}`,
+        { method, accept: 'application/json' },
+      );
+      if (response.provisioning_job_id) {
+        setJob({ id: response.provisioning_job_id, action });
+      } else {
+        toast.success(t('admin.tenants.actions.toast_done'));
+      }
       onChanged();
     } catch (error: unknown) {
       const body = (error as { body?: { detail?: string } })?.body;
@@ -320,52 +343,79 @@ function TenantActions({
     }
   };
 
+  const progress = job ? (
+    <Dialog open onOpenChange={() => setJob(null)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t(`admin.tenants.lifecycle.title_${job.action}`)}</DialogTitle>
+        </DialogHeader>
+        <ProvisioningProgress jobId={job.id} variant="lifecycle" onFinished={() => onChanged()} />
+        <DialogFooter>
+          <Button onClick={() => setJob(null)}>{t('admin.tenants.create.close')}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ) : null;
+
   if (tenant.status === 'deleted') {
     return (
-      <span className="text-[11px] text-muted-foreground">
-        {t('admin.tenants.actions.deleted_label')}
-      </span>
+      <>
+        <span className="text-[11px] text-muted-foreground">
+          {t('admin.tenants.actions.deleted_label')}
+        </span>
+        {progress}
+      </>
     );
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={busy}
-          aria-label={t('admin.tenants.col_actions')}
-        >
-          <MoreHorizontal className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {tenant.status === 'active' ? (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={busy}
+            aria-label={t('admin.tenants.col_actions')}
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {tenant.status === 'active' ? (
+            <DropdownMenuItem
+              onSelect={() =>
+                void callAction(
+                  '/suspend',
+                  'POST',
+                  'suspend',
+                  'admin.tenants.actions.confirm_suspend',
+                )
+              }
+            >
+              <Ban className="mr-2 size-4 text-amber-700" aria-hidden="true" />
+              {t('admin.tenants.actions.suspend')}
+            </DropdownMenuItem>
+          ) : null}
+          {tenant.status === 'suspended' ? (
+            <DropdownMenuItem onSelect={() => void callAction('/reactivate', 'POST', 'reactivate')}>
+              <Play className="mr-2 size-4 text-emerald-700" aria-hidden="true" />
+              {t('admin.tenants.actions.reactivate')}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem
             onSelect={() =>
-              void callAction('/suspend', 'POST', 'admin.tenants.actions.confirm_suspend')
+              void callAction('', 'DELETE', 'delete', 'admin.tenants.actions.confirm_delete')
             }
+            className="text-rose-600 focus:text-rose-700"
           >
-            <Ban className="mr-2 size-4 text-amber-700" aria-hidden="true" />
-            {t('admin.tenants.actions.suspend')}
+            <Trash2 className="mr-2 size-4" aria-hidden="true" />
+            {t('admin.tenants.actions.delete')}
           </DropdownMenuItem>
-        ) : null}
-        {tenant.status === 'suspended' ? (
-          <DropdownMenuItem onSelect={() => void callAction('/reactivate', 'POST')}>
-            <Play className="mr-2 size-4 text-emerald-700" aria-hidden="true" />
-            {t('admin.tenants.actions.reactivate')}
-          </DropdownMenuItem>
-        ) : null}
-        <DropdownMenuItem
-          onSelect={() => void callAction('', 'DELETE', 'admin.tenants.actions.confirm_delete')}
-          className="text-rose-600 focus:text-rose-700"
-        >
-          <Trash2 className="mr-2 size-4" aria-hidden="true" />
-          {t('admin.tenants.actions.delete')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {progress}
+    </>
   );
 }
 

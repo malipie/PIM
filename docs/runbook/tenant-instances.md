@@ -161,7 +161,49 @@ Szybsze niż PITR i wystarczające dla „migracja zepsuła dane".
 
 ---
 
-## 4. Usunięcie tenanta
+## 4. Zawieszenie, wznowienie i skasowanie z panelu
+
+Trzy akcje w `/admin/tenants` **dotykają stacku instancji**, a nie tylko wiersza
+w rejestrze (#2909). API nigdy nie rozmawia z Dockerem — odkłada zlecenie dla
+provisionera i oddaje `202` z jego identyfikatorem, a panel pokazuje postęp.
+
+| Akcja w panelu | Co dzieje się z instancją | Kiedy rejestr się zmienia |
+|---|---|---|
+| **Zawieś** | `docker compose stop` | **od razu** — odmowa dostępu ma obowiązywać natychmiast |
+| **Przywróć** | `start` + odpytywanie o stan zdrowia usługi `api` | **dopiero** gdy instancja się zgłosi; porażka zostawia tenanta zawieszonego |
+| **Usuń (soft)** | zrzut końcowy do `backups/final/` + `stop` | od razu (`deleted`), okno odzyskania 30 dni |
+| `pim:tenants:purge-deleted` (cron, 03:00 UTC) | `purge` — stack, wolumeny i buckety | wiersz i dane znikają |
+
+Wygaszenie z panelu **nie usuwa ani jednego wolumenu**. Instancja skasowana
+przez pomyłkę wraca poleceniem `docker compose -p pim-<kod> --env-file
+.env.tenant.<kod> -f docker-compose.tenant.yml start` plus zdjęciem `deleted_at`
+w rejestrze. Nieodwracalny jest wyłącznie `purge`.
+
+### Rozliczanie wyników zleceń
+
+Provisioner nie ma sieci, więc nie odeśle wyniku — zostawia go plikiem.
+Rejestr dogania stan instancji, gdy panel odpytuje o postęp, ale operator
+zamyka przeglądarkę, a instancja wstaje dalej. Pewną ścieżką jest cron na
+hoście, obok kopii zapasowych:
+
+```cron
+*/2 * * * * cd /opt/pim && docker compose -p pim-platform --env-file .env.platform \
+    -f docker-compose.platform.yml exec -T api php bin/console pim:tenants:reconcile-provisioning
+```
+
+Komenda jest idempotentna (rozliczone zlecenia są pomijane po znaczniku
+`<job>.reconciled` w kolejce) i na instancji **klienta** kończy się bez efektu,
+bo tam kolejki nie ma.
+
+> **Tenant utknął w `provisioning` albo `suspended` mimo działającej
+> instancji?** Najpierw sprawdź, czy rozliczenie w ogóle biegnie —
+> `ls /var/lib/docker/volumes/pim-platform_provisioner_spool/_data/` pokaże
+> pliki `*.status.json` bez pary `*.reconciled`. Uruchom komendę ręcznie
+> i przeczytaj `docker logs pim-platform-provisioner-1`.
+
+---
+
+## 5. Usunięcie tenanta ręcznie (bez panelu)
 
 ```bash
 bash scripts/pim-tenant-remove.sh --code acme                      # sam plan
@@ -186,7 +228,7 @@ kopii w repozytorium pgBackRest.
 
 ---
 
-## 5. Diagnostyka
+## 6. Diagnostyka
 
 | Objaw | Prawdopodobna przyczyna |
 |---|---|

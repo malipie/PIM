@@ -142,6 +142,51 @@ final class TenantOffboardingPurgeTest extends KernelTestCase
         self::assertTrue($exports->directoryExists($keeper->toRfc4122()), 'Keeper exports prefix intact.');
     }
 
+    /**
+     * TNT-P4-08 (#2909) — po wygaśnięciu okna odzyskania giną nie tylko wiersze
+     * w bazie, ale i stack instancji. To JEDYNE miejsce, które zleca `purge`;
+     * panel zleca `delete`, czyli operację odwracalną.
+     */
+    #[Test]
+    public function ordersTheInstanceStackDestroyedOnceTheWindowHasExpired(): void
+    {
+        $spool = sys_get_temp_dir().'/pim-spool-purge-'.bin2hex(random_bytes(6));
+        mkdir($spool);
+        $_ENV['PROVISIONER_SPOOL'] = $spool;
+        $_SERVER['PROVISIONER_SPOOL'] = $spool;
+
+        try {
+            $kernel = self::bootKernel();
+            $connection = $this->connection($kernel);
+
+            $throwaway = Uuid::v7();
+            $this->seedTenant($connection, $throwaway, 'purge-stack');
+            $this->softDelete($connection, $throwaway, '-40 days');
+
+            $tester = $this->commandTester($kernel);
+            $tester->execute([]);
+
+            $jobs = glob($spool.'/*.job.json');
+            self::assertIsArray($jobs);
+            self::assertCount(1, $jobs, $tester->getDisplay());
+
+            $job = json_decode((string) file_get_contents($jobs[0]), true);
+            self::assertIsArray($job);
+            self::assertSame('purge', $job['action']);
+            // `seedTenant()` dokleja losowy przyrostek, żeby kody się nie
+            // zderzały między przebiegami — sprawdzamy prefiks, nie równość.
+            self::assertIsString($job['code']);
+            self::assertStringStartsWith('purge-stack', $job['code']);
+        } finally {
+            $leftovers = glob($spool.'/*');
+            foreach (false === $leftovers ? [] : $leftovers as $file) {
+                unlink($file);
+            }
+            rmdir($spool);
+            unset($_ENV['PROVISIONER_SPOOL'], $_SERVER['PROVISIONER_SPOOL']);
+        }
+    }
+
     #[Test]
     public function dryRunDeletesNothing(): void
     {
