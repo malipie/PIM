@@ -14,6 +14,7 @@ use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Rbac\RbacMatrix;
 use App\Identity\Infrastructure\Provisioning\ProvisioningQueue;
+use App\Identity\Infrastructure\Provisioning\ProvisioningReconciler;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
 use App\Shared\Domain\TenantSubdomain;
@@ -52,6 +53,13 @@ use Symfony\Component\Uid\Uuid;
  *                                                   `pim:tenants:purge-deleted`
  *                                                   hard-deletes.
  *
+ * TNT-P4-08 (#2909) — przy instancjach per tenant (ADR-0036) sam wiersz
+ * w rejestrze niczego nie zmienia: zawieszony tenant, którego kontenery dalej
+ * chodzą, jest zawieszony wyłącznie na papierze. Każda z trzech operacji
+ * cyklu życia odkłada więc zlecenie dla provisionera i wraca `202` z jego
+ * identyfikatorem. Tam, gdzie kolejki nie ma (dev, testy, instalacja
+ * jednoinstancyjna), zachowanie i kod odpowiedzi zostają bez zmian.
+ *
  * Defaults per operator spec (epic 0.X RBAC marathon-3):
  *   - plan       = 'starter'
  *   - locales    = ['pl']
@@ -78,6 +86,7 @@ final readonly class SuperAdminTenantWriteController
         private TenantCatalogBootstrap $bootstrapCatalog,
         private InvitationService $invitations,
         private ProvisioningQueue $provisioning,
+        private ProvisioningReconciler $reconciler,
     ) {
     }
 
@@ -240,6 +249,12 @@ final readonly class SuperAdminTenantWriteController
     {
         $this->guard->require(RbacMatrix::PERMISSION_PLATFORM_TENANTS_MANAGE);
 
+        // Panel odpytuje ten endpoint w pętli, więc jest to najtańsze miejsce,
+        // w którym rejestr może dogonić stan instancji. Zaplanowany przebieg
+        // (`pim:tenants:reconcile-provisioning`) jest tym pewnym — ten tylko
+        // sprawia, że operator widzi wynik od razu, nie po minucie.
+        $this->reconciler->reconcile();
+
         $status = $this->provisioning->status($jobId);
         if (null === $status) {
             // Brak pliku statusu = provisioner jeszcze nie przejął zlecenia.
@@ -316,10 +331,15 @@ final readonly class SuperAdminTenantWriteController
             $caller,
             $id,
             static function (Tenant $tenant): Tenant {
+                // Rejestr zmienia się OD RAZU, jeszcze zanim kontenery staną.
+                // Zawieszenie jest odmową dostępu, a odmowa ma obowiązywać
+                // natychmiast — gdyby zatrzymanie stacku padło, chcemy
+                // tenanta zamkniętego i błędu w logach, nie odwrotnie.
                 $tenant->suspend();
 
                 return $tenant;
             },
+            lifecycleAction: 'suspend',
         );
     }
 
@@ -337,11 +357,21 @@ final readonly class SuperAdminTenantWriteController
         return $this->mutate(
             $caller,
             $id,
-            static function (Tenant $tenant): Tenant {
-                $tenant->reactivate();
+            function (Tenant $tenant): Tenant {
+                // Celowo BEZ `reactivate()`. Instancja dopiero wstaje, a
+                // kontrakt #2909 mówi, że status wraca na `active` po
+                // potwierdzeniu, że odpowiada. Robi to
+                // {@see ProvisioningReconciler} na podstawie wyniku zlecenia.
+                // Tam, gdzie kolejki nie ma (dev, testy, instalacja
+                // jednoinstancyjna), przełącza się od razu — nie ma czego
+                // uruchamiać.
+                if (!$this->provisioning->isAvailable()) {
+                    $tenant->reactivate();
+                }
 
                 return $tenant;
             },
+            lifecycleAction: 'reactivate',
         );
     }
 
@@ -360,10 +390,15 @@ final readonly class SuperAdminTenantWriteController
             $caller,
             $id,
             static function (Tenant $tenant): Tenant {
+                // Miękkie skasowanie z 30-dniowym oknem, jak dotąd. Zlecenie
+                // `delete` robi na stacku zrzut końcowy i wygasza instancję —
+                // NIE usuwa wolumenów. Niszczy je dopiero
+                // `pim:tenants:purge-deleted` po wygaśnięciu okna.
                 $tenant->softDelete();
 
                 return $tenant;
             },
+            lifecycleAction: 'delete',
         );
     }
 
@@ -371,9 +406,14 @@ final readonly class SuperAdminTenantWriteController
      * Shared mutation pipeline — load tenant by id under cross-tenant
      * mode, run the supplied closure, persist, project.
      *
+     * TNT-P4-08 (#2909): gdy podano `lifecycleAction`, zmiana rejestru jest
+     * tylko połową roboty — druga połowa dzieje się na stacku instancji
+     * i zleca ją provisioner. API **nie dotyka Dockera**; odkłada zlecenie
+     * i oddaje 202 z jego identyfikatorem, żeby panel mógł pokazać postęp.
+     *
      * @param callable(Tenant): (Tenant|JsonResponse) $mutator
      */
-    private function mutate(User $caller, string $id, callable $mutator): JsonResponse
+    private function mutate(User $caller, string $id, callable $mutator, ?string $lifecycleAction = null): JsonResponse
     {
         try {
             $uuid = Uuid::fromString($id);
@@ -381,10 +421,10 @@ final readonly class SuperAdminTenantWriteController
             return $this->problem(Response::HTTP_NOT_FOUND, 'Not Found', 'Tenant not found.');
         }
 
-        /** @var Tenant|JsonResponse $result */
+        /** @var array{tenant: Tenant, job_id: ?string}|JsonResponse $result */
         $result = $this->superAdminContext->runCrossTenant(
             $caller->getId(),
-            function () use ($uuid, $mutator): Tenant|JsonResponse {
+            function () use ($uuid, $mutator, $lifecycleAction, $caller): array|JsonResponse {
                 $tenant = $this->tenants->findById($uuid);
                 if (null === $tenant) {
                     return $this->problem(Response::HTTP_NOT_FOUND, 'Not Found', 'Tenant not found.');
@@ -395,7 +435,15 @@ final readonly class SuperAdminTenantWriteController
                 }
                 $this->tenants->save($mutated);
 
-                return $mutated;
+                $jobId = null;
+                if (null !== $lifecycleAction && $this->provisioning->isAvailable()) {
+                    // Zlecenie idzie PO zapisie rejestru: gdyby kolejka padła,
+                    // decyzja operatora i tak nie ginie, a rozjazd widać
+                    // w błędzie zamiast w cichym braku efektu.
+                    $jobId = $this->provisioning->enqueueLifecycle($mutated, $lifecycleAction, $caller->getId());
+                }
+
+                return ['tenant' => $mutated, 'job_id' => $jobId];
             },
         );
 
@@ -403,7 +451,15 @@ final readonly class SuperAdminTenantWriteController
             return $result;
         }
 
-        return new JsonResponse($this->builder->buildOne($result));
+        $body = $this->builder->buildOne($result['tenant']);
+        if (null === $result['job_id']) {
+            return new JsonResponse($body);
+        }
+
+        return new JsonResponse(
+            $body + ['provisioning_job_id' => $result['job_id']],
+            Response::HTTP_ACCEPTED,
+        );
     }
 
     /**

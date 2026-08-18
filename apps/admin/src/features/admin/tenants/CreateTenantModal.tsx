@@ -221,7 +221,11 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="acme_corp"
-                  pattern="[a-z0-9_-]{2,64}"
+                  // Myślnik MUSI być zaescape'owany. Przeglądarki kompilują
+                  // `pattern` z flagą `v`, a w niej `[a-z0-9_-]` jest błędem
+                  // składni — atrybut był po cichu martwy i walidacja HTML
+                  // nie działała wcale (znalezione E2E w #2909).
+                  pattern="[a-z0-9_\-]{2,64}"
                   maxLength={64}
                   className="font-mono"
                   autoComplete="off"

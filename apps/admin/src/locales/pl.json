@@ -208,6 +208,16 @@
         "failed": "Zakładanie instancji nie powiodło się.",
         "timeout": "Provisioner nie odpowiada od dłuższego czasu — sprawdź logi usługi.",
         "title": "Zakładanie instancji"
+      },
+      "lifecycle": {
+        "title_suspend": "Zawieszanie instancji",
+        "title_reactivate": "Wznawianie instancji",
+        "title_delete": "Wygaszanie instancji",
+        "queued": "Zlecenie czeka w kolejce…",
+        "running": "Operacja na instancji trwa…",
+        "in_progress": "w toku",
+        "done": "Instancja odpowiada — gotowe.",
+        "failed": "Operacja na instancji nie powiodła się."
       }
     },
     "break_glass": {

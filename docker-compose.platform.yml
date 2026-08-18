@@ -219,6 +219,9 @@ services:
       # ich nie dostaje, nie może ich przypadkiem użyć.
       MAILER_DSN: ${MAILER_DSN:?MAILER_DSN jest wymagany — bez niego zaproszenia i resety hasła są martwymi linkami.}
       MAILER_FROM: ${MAILER_FROM:?MAILER_FROM jest wymagany — nadawca na domenie z SPF/DKIM.}
+      # Katalog kolejki zleceń provisioningu. Pusty (albo brak) = instancja
+      # niczego nie zleca — tak ma być na instancji KLIENTA.
+      PROVISIONER_SPOOL: /spool
       APP_BYOK_KEY_V1: ${APP_BYOK_KEY_V1:?APP_BYOK_KEY_V1 jest wymagany — `php -r "echo base64_encode(random_bytes(32));"`, szyfruje sekrety SSO/TOTP/BYOK.}
       # Klucze JWT NIE generują się same w tym stacku: autogeneracja w
       # entrypoincie jest zabramkowana `PIM_JWT_AUTOGEN` i przeznaczona dla
@@ -239,6 +242,12 @@ services:
     volumes:
       - api_var:/app/var
       - api_jwt:/app/config/jwt
+      # Kolejka zleceń, WSPÓŁDZIELONA z provisionerem. Bez tego montażu
+      # `ProvisioningQueue::isAvailable()` jest fałszem i panel po cichu wraca
+      # na ścieżkę lokalną — czyli zakłada tenanta w bazie platformy zamiast
+      # postawić mu instancję. Dokładnie ta pułapka, dla której powstało M4
+      # (znalezione przy #2909).
+      - provisioner_spool:/spool
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1/api"]
       interval: 10s

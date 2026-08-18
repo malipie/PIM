@@ -206,6 +206,16 @@
         "failed": "Creating the instance failed.",
         "timeout": "The provisioner has been silent for a while — check the service logs.",
         "title": "Creating the instance"
+      },
+      "lifecycle": {
+        "title_suspend": "Suspending the instance",
+        "title_reactivate": "Restarting the instance",
+        "title_delete": "Shutting the instance down",
+        "queued": "The job is waiting in the queue…",
+        "running": "Working on the instance…",
+        "in_progress": "in progress",
+        "done": "The instance answers — done.",
+        "failed": "The operation on the instance failed."
       }
     },
     "break_glass": {
