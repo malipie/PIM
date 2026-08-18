@@ -122,3 +122,33 @@ groups:
             Prometheus cannot scrape the blackbox exporter, so dependency
             outages will NOT fire DependencyDown. Restart the blackbox
             container to restore outage visibility.
+
+  # ─── Instancje tenantów (epik TNT, #2866) ──────────────────────────────
+  #
+  # Alerty są rozbite `by (tenant)`, żeby problem jednego klienta nie ginął
+  # w agregacie i żeby dyżurny od razu wiedział, czyja instancja jest chora.
+  - name: pim-tenant-instances
+    rules:
+      - alert: TenantInstanceDown
+        expr: up{job="pim-tenant-api"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instancja tenanta {{ $labels.tenant }} nie odpowiada"
+          description: >-
+            Prometheus nie zebrał metryk z {{ $labels.instance }} przez 3 minuty.
+            Sprawdź `docker compose -p pim-{{ $labels.tenant }} ps` — pozostałe
+            instancje działają niezależnie, więc to problem tego jednego klienta.
+
+      - alert: TenantWorkerMemoryHigh
+        expr: max_over_time(frankenphp_worker_memory_bytes{job="pim-tenant-api"}[5m]) > 256 * 1024 * 1024
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker instancji {{ $labels.tenant }} przekracza 256 MB"
+          description: >-
+            W trybie worker Doctrine Identity Map narasta między żądaniami.
+            Szukaj flush bez clear w handlerze wsadowym; limit kontenera
+            (512 MB) jest ostatnią zaporą, nie rozwiązaniem.

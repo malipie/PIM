@@ -22,6 +22,26 @@ alerting:
             - "alertmanager:9093"
 
 scrape_configs:
+  # ─── Instancje tenantów (epik TNT, #2866) ─────────────────────────────
+  #
+  # Targety NIE są tu wpisywane ręcznie. Każda instancja dokłada plik
+  # `targets/pim-<kod>.yml` przy provisioningu (#2861) i usuwa go przy
+  # deprovisioningu (#2862) — ręczna lista rozjechałaby się z rzeczywistością
+  # przy pierwszym kliencie założonym w pośpiechu.
+  #
+  # Prometheus przeładowuje file_sd bez restartu, więc dołożenie klienta nie
+  # przerywa zbierania metryk pozostałych.
+  #
+  # Etykieta `tenant` pochodzi z pliku targetu i pozwala rozróżnić instancje
+  # na dashboardach oraz w alertach (`by (tenant)`).
+  - job_name: "pim-tenant-api"
+    metrics_path: /api/metrics
+    scheme: http
+    file_sd_configs:
+      - files:
+          - /etc/prometheus/targets/*.yml
+        refresh_interval: 30s
+
   - job_name: "pim-api"
     metrics_path: /api/metrics
     # Scraped directly on the internal docker network — the edge Caddy 404s

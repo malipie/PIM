@@ -491,6 +491,9 @@ services:
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      # TNT-P2-04 (#2866) — targety instancji tenantów, dokładane przez skrypt
+      # provisioningu i czytane przez file_sd (przeładowanie bez restartu).
+      - ./docker/prometheus/targets:/etc/prometheus/targets:ro
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
