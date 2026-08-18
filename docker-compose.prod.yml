@@ -260,6 +260,13 @@ services:
     profiles: ["dev-only"]
 
   caddy:
+    # TNT-P4-07 (#2908) — edge z pluginem DNS Cloudflare. Certyfikat wildcard
+    # `*.{DOMAIN}` można uzyskać wyłącznie wyzwaniem DNS-01, a oficjalny obraz
+    # nie zawiera żadnego providera DNS. Bez tego nowy tenant wymagałby
+    # osobnego certyfikatu i endpointu `ask` przy każdym połączeniu TLS.
+    build:
+      context: ./docker/caddy
+    image: pim-caddy:local
     depends_on: !override
       api:
         condition: service_healthy
@@ -271,6 +278,12 @@ services:
       DOMAIN: ${DOMAIN:?DOMAIN is required in prod — public host served by Caddy, e.g. `pim.example.com` (no default).}
       # ACME account e-mail for certificate expiry notices.
       ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required in prod — e-mail registered with Let's Encrypt (no default).}
+      # TNT-P4-07 (#2908) — token do wyzwania DNS-01 dla certyfikatu wildcard
+      # `*.${DOMAIN}`, którym adresowane są instancje tenantów. Zawężony do
+      # JEDNEJ strefy i uprawnienia `Zone:DNS:Edit`; szerszy token oznaczałby,
+      # że przejęcie edge daje kontrolę nad całym DNS-em domeny. Bez tej
+      # zmiennej instancje klientów nie dostaną certyfikatu.
+      CF_API_TOKEN: ${CF_API_TOKEN:?CF_API_TOKEN is required in prod — Cloudflare API token (Zone:DNS:Edit, single zone) used for the wildcard certificate covering tenant subdomains.}
     # Prod serves the BUILT SPA bundle (apps/admin/dist — `pnpm --filter
     # @pim/admin build` on the host before `up`, see deploy runbook) and the
     # docs site as static files; the Vite dev server stays parked under the

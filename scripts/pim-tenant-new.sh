@@ -353,9 +353,10 @@ fi
 
 # ── 10. Kroki ręczne ────────────────────────────────────────────────────────
 #
-# Świadomie NIE wykonywane przez ten skrypt: routing i certyfikat są dziś
-# konfiguracją edge Caddy'ego (#2856), a docelowo mają być dynamiczne (#2908).
-# Rejestracja redirect URI SSO nie ma API u dostawców.
+# Routing i certyfikat NIE są już krokiem ręcznym (#2908): edge ma jeden blok
+# `*.{$DOMAIN}` z upstreamem wyprowadzonym z hosta i certyfikat wildcard, więc
+# instancja jest osiągalna od razu — bez wpisu w Caddyfile i bez przeładowania.
+# Zostaje rejestracja redirect URI SSO, bo dostawcy tożsamości nie mają API.
 step "done" "ok" "instancja gotowa"
 
 cat <<EOF
@@ -366,7 +367,9 @@ Instancja '${code}' gotowa.
   projekt    : ${project}
   środowisko : ${env_file}
 
+Routing i certyfikat: bez kroków ręcznych — edge obsługuje ${fqdn} blokiem
+wildcard (#2908). Sprawdź: curl -sI https://${fqdn}/api
+
 Pozostaje do wykonania poza tym skryptem:
-  1. Routing edge Caddy dla hosta ${fqdn} (#2856; dynamiczny w #2908).
-  2. Redirect URI SSO dla ${fqdn} u dostawcy tożsamości, jeśli tenant korzysta z SSO.
+  1. Redirect URI SSO dla ${fqdn} u dostawcy tożsamości, jeśli tenant korzysta z SSO.
 EOF
