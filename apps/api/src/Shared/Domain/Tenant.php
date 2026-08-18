@@ -40,6 +40,26 @@ class Tenant
     public const string STATUS_SUSPENDED = 'suspended';
     public const string STATUS_DELETED = 'deleted';
 
+    /**
+     * TNT-P4-03 (#2904) — stany cyklu życia INSTANCJI, nie danych.
+     *
+     * Od ADR-0035 tenant to osobna instancja, która przez chwilę powstaje
+     * i może nie powstać wcale. Bez tych stanów panel operatora mógłby pokazać
+     * wyłącznie „jest" albo „nie ma", a zakładanie klienta trwa kilkadziesiąt
+     * sekund i bywa przerywane.
+     *
+     *   - `pending`      wpis w rejestrze jest, zlecenie jeszcze nie ruszyło;
+     *   - `provisioning` zlecenie w toku (kroki raportuje skrypt #2861);
+     *   - `failed`       zlecenie przerwane; instancja może być w stanie
+     *                    częściowym, ponowienie jest bezpieczne (#2911).
+     *
+     * Żaden z nich NIE oznacza instancji zdatnej do pracy — `isActive()`
+     * pozostaje jedynym testem na to.
+     */
+    public const string STATUS_PENDING = 'pending';
+    public const string STATUS_PROVISIONING = 'provisioning';
+    public const string STATUS_FAILED = 'failed';
+
     private Uuid $id;
     private string $code;
     private string $name;
@@ -200,6 +220,46 @@ class Tenant
         }
         $this->status = self::STATUS_SUSPENDED;
         $this->suspendedAt = $when ?? new DateTimeImmutable();
+    }
+
+    /**
+     * Zlecenie provisioningu ruszyło. Wołane przez platformę przy przyjęciu
+     * zadania, zanim provisioner cokolwiek uruchomi.
+     */
+    public function markProvisioning(): void
+    {
+        $this->status = self::STATUS_PROVISIONING;
+    }
+
+    /**
+     * Instancja powstała i przeszła smoke test. Dopiero tutaj tenant staje
+     * się aktywny — „kontenery wstały" to za mało, bo instancja, do której
+     * nikt się nie zaloguje, nie jest gotowa (kontrakt skryptu z #2861).
+     */
+    public function markProvisioned(): void
+    {
+        $this->status = self::STATUS_ACTIVE;
+        $this->suspendedAt = null;
+    }
+
+    /**
+     * Provisioning przerwany. Stan celowo NIE jest `deleted`: instancja może
+     * być częściowo utworzona, a ponowienie zlecenia jest normalną ścieżką,
+     * nie wyjątkiem.
+     */
+    public function markProvisioningFailed(): void
+    {
+        $this->status = self::STATUS_FAILED;
+    }
+
+    public function isProvisioning(): bool
+    {
+        return \in_array($this->status, [self::STATUS_PENDING, self::STATUS_PROVISIONING], true);
+    }
+
+    public function hasFailedProvisioning(): bool
+    {
+        return self::STATUS_FAILED === $this->status;
     }
 
     public function reactivate(): void
