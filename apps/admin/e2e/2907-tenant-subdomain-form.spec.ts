@@ -1,7 +1,15 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-import { loginAsAdmin } from './helpers/auth';
+import { ADMIN_PASSWORD, loginAsAdmin } from './helpers/auth';
+
+/**
+ * Panel operatora widzi WYŁĄCZNIE konto z rolą `platform_operator` — rola
+ * jest celowo niedostępna dla właściciela tenanta (AUD-003), więc zwykły
+ * `admin@demo.localhost` dostaje tu 404/403. Fixtures zakładają dedykowane
+ * konto operatora platformy i to nim się logujemy.
+ */
+const PLATFORM_OPERATOR_EMAIL = 'platform-operator@cortex.localhost';
 
 /**
  * TNT-P4-06 (#2907) — pole subdomeny w formularzu zakładania instancji.
@@ -15,7 +23,7 @@ import { loginAsAdmin } from './helpers/auth';
 test('subdomena: podpowiedź z kodu, podgląd adresu i odmowa dla złego kształtu', async ({
   page,
 }) => {
-  await loginAsAdmin(page);
+  await loginAsAdmin(page, PLATFORM_OPERATOR_EMAIL, ADMIN_PASSWORD);
   await page.goto('/admin/tenants');
 
   await page.getByRole('button', { name: /nowy tenant|new tenant/i }).click();
