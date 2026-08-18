@@ -101,8 +101,17 @@ final readonly class ProvisioningQueue
             return null;
         }
 
-        /* @var array<string, mixed> $decoded */
-        return $decoded;
+        // Przepisanie zamiast adnotacji: plik statusu pisze inny proces, wiec
+        // ksztalt jest zewnetrzny i lepiej go zawezic w kodzie niz obiecac
+        // komentarzem. Klucze nietekstowe sa odrzucane.
+        $status = [];
+        foreach ($decoded as $key => $value) {
+            if (\is_string($key)) {
+                $status[$key] = $value;
+            }
+        }
+
+        return $status;
     }
 
     /**
