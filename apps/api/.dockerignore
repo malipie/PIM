@@ -19,3 +19,16 @@
 .php-cs-fixer.cache
 phpstan.cache
 psalm.cache
+
+# Klucze JWT NIGDY nie wchodzą do obrazu.
+#
+# Są gitignorowane, ale leżą na dysku dewelopera i operatora, więc bez tej
+# reguły `docker build` zapiekał je w warstwie obrazu. Konsekwencje wykryte
+# przy pierwszym provisioningu instancji tenanta (epik TNT, #2861):
+#   - świeża instancja dostawała parę kluczy zaszyfrowaną CUDZYM hasłem,
+#     więc logowanie kończyło się błędem 500 („bad decrypt");
+#   - gdyby hasła się zgadzały, WSZYSTKIE instancje podpisywałyby tokeny tym
+#     samym kluczem, czyli token z instancji jednego klienta byłby ważny
+#     w instancji drugiego — odwrotność izolacji zapisanej w ADR-0035.
+# Parę generuje się per instancja (skrypt provisioningu / entrypoint w dev).
+/config/jwt/
