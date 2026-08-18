@@ -31,9 +31,11 @@ politykę dostępu, a osobny indeks Meili wymagałby zmiany kodu (stała
 Przed rozpoczęciem sprawdź:
 
 - [ ] **wolny RAM ≥ 1,5 GB** (`free -m`) — instancja zajmuje 650 MB – 1,1 GB;
-- [ ] **DNS** dla `<kod>.app.harmonpim.pl` rozwiązuje się na **wszystkich trzech**
-      serwerach nazw (`dns1/2/3.tld.pl`) — Let's Encrypt losuje serwer, a nieudane
-      próby liczą się do limitu 5/h/nazwę;
+- [ ] **DNS** — rekord wildcard `*.app.harmonpim.pl` istnieje (Cloudflare, **DNS only**,
+      bez proxy), więc nowa subdomena rozwiązuje się od razu. Sprawdzenie:
+      `dig +short A <kod>.app.harmonpim.pl` musi zwrócić adres serwera, a nie
+      adresy Cloudflare — przy włączonym proxy TLS terminowałby Cloudflare
+      zamiast naszego Caddy'ego;
 - [ ] **limit Let's Encrypt** nienaruszony (50 certów/tydzień na `harmonpim.pl`).
 
 ```bash
