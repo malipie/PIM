@@ -39,6 +39,7 @@ shared_env=""
 locale_default="pl_PL"
 locale_secondary=""
 skip_smoke=false
+invite_owner=false
 
 usage() {
     cat <<'USAGE'
@@ -58,6 +59,9 @@ Opcjonalne:
   --shared-env <plik>          Plik z wartościami wspólnymi; domyślnie .env.prod
   --locale-default <kod>       Domyślny język; domyślnie pl_PL (pełny kod, jak w tabeli locales)
   --locale-secondary <kod>     Dodatkowy język.
+  --invite-owner               Po smoke teście wyślij właścicielowi zaproszenie
+                               do ustawienia własnego hasła (ścieżka panelowa:
+                               hasła tymczasowego nikt nie ogląda).
   --skip-smoke                 Pomiń smoke test (WYŁĄCZNIE do diagnostyki).
   -h, --help                   Ta pomoc.
 USAGE
@@ -74,6 +78,7 @@ while [ $# -gt 0 ]; do
         --shared-env) shared_env="${2:-}"; shift 2 ;;
         --locale-default) locale_default="${2:-}"; shift 2 ;;
         --locale-secondary) locale_secondary="${2:-}"; shift 2 ;;
+        --invite-owner) invite_owner=true; shift ;;
         --skip-smoke) skip_smoke=true; shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Nieznana opcja: $1" >&2; usage >&2; exit 2 ;;
@@ -303,6 +308,23 @@ else
         *BRAK_TOKENU*) fail "smoke" 60 "logowanie właściciela nie zwróciło tokenu" ;;
         *) fail "smoke" 60 "smoke test zwrócił '${smoke_out}' zamiast 200" ;;
     esac
+fi
+
+# ── 9b. Zaproszenie właściciela ─────────────────────────────────────────────
+#
+# Wysyłane przez TĘ instancję, nie przez platformę: link budowany jest
+# z `APP_BASE_URL` instancji klienta. Zaproszenie z platformy prowadziłoby pod
+# adres panelu operatora (ADR-0036).
+if [ "$invite_owner" = true ]; then
+    step "invite" "running" "zaproszenie dla ${owner_email}"
+    if dc exec -T api php bin/console pim:tenant:invite-owner --code "$code" --email "$owner_email" >/dev/null 2>&1; then
+        step "invite" "ok" "zaproszenie wysłane"
+    else
+        # Nieudane zaproszenie NIE przekreśla instancji — ona działa, a właściciel
+        # może dostać dostęp przez reset hasła. Zgłaszamy to jako ostrzeżenie,
+        # zamiast wywracać cały provisioning.
+        step "invite" "warning" "nie udało się wysłać zaproszenia — sprawdź MAILER_DSN; instancja działa"
+    fi
 fi
 
 # ── 10. Kroki ręczne ────────────────────────────────────────────────────────

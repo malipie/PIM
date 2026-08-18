@@ -13,8 +13,10 @@ use App\Identity\Application\SuperAdmin\SuperAdminTenantResponseBuilder;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Rbac\RbacMatrix;
+use App\Identity\Infrastructure\Provisioning\ProvisioningQueue;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
+use App\Shared\Domain\TenantSubdomain;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -75,6 +77,7 @@ final readonly class SuperAdminTenantWriteController
         private SeedTenantPrdRolesService $seedRoles,
         private TenantCatalogBootstrap $bootstrapCatalog,
         private InvitationService $invitations,
+        private ProvisioningQueue $provisioning,
     ) {
     }
 
@@ -117,10 +120,24 @@ final readonly class SuperAdminTenantWriteController
             );
         }
 
+        // TNT-P4-05 (#2906) — subdomena adresuje instancję, więc jest polem
+        // pierwszej klasy, a nie opcjonalną ozdobą. Domyślnie równa kodowi.
+        $subdomainRaw = self::pickString($payload, 'subdomain') ?? $code;
+        try {
+            $subdomain = TenantSubdomain::fromString($subdomainRaw);
+        } catch (InvalidArgumentException $exception) {
+            return $this->problem(
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+                'Invalid subdomain',
+                $exception->getMessage(),
+                ['code' => 'invalid_subdomain'],
+            );
+        }
+
         /** @var Tenant|JsonResponse $result */
         $result = $this->superAdminContext->runCrossTenant(
             $caller->getId(),
-            function () use ($code, $name, $ownerEmail, $plan, $domain, $caller): Tenant|JsonResponse {
+            function () use ($code, $name, $ownerEmail, $plan, $domain, $subdomain, $caller): Tenant|JsonResponse {
                 if (null !== $this->tenants->findByCode($code)) {
                     return $this->problem(
                         Response::HTTP_CONFLICT,
@@ -130,7 +147,35 @@ final readonly class SuperAdminTenantWriteController
                     );
                 }
 
-                $tenant = new Tenant(code: $code, name: $name, domain: $domain, plan: $plan);
+                $tenant = new Tenant(
+                    code: $code,
+                    name: $name,
+                    domain: $domain ?? $subdomain->value,
+                    plan: $plan,
+                );
+
+                // TNT-P4-05 (#2906 / ADR-0036) — ścieżka PANELOWA: platforma
+                // nie tworzy tenanta u siebie, tylko odkłada zlecenie, a
+                // instancja klienta powstaje osobno. Wiersz w rejestrze jest
+                // od razu w stanie `provisioning`, bo instancji jeszcze nie ma
+                // i nie wolno pokazać jej jako gotowej.
+                //
+                // Ścieżka lokalna (poniżej) zostaje dla dev/test i instalacji
+                // jednoinstancyjnych, gdzie kolejki nie ma.
+                if ($this->provisioning->isAvailable()) {
+                    $tenant->markProvisioning();
+                    $this->tenants->save($tenant);
+
+                    $jobId = $this->provisioning->enqueueCreate(
+                        tenant: $tenant,
+                        subdomain: $subdomain,
+                        ownerEmail: $ownerEmail,
+                        requestedBy: $caller->getId(),
+                    );
+
+                    return $this->accepted($tenant, $jobId);
+                }
+
                 $this->tenants->save($tenant);
 
                 // PRD-spec'd auto-seed: every new tenant gets the full
@@ -166,6 +211,43 @@ final readonly class SuperAdminTenantWriteController
         }
 
         return new JsonResponse($this->builder->buildOne($result), Response::HTTP_CREATED);
+    }
+
+    /**
+     * Odpowiedź dla ścieżki panelowej: instancja jeszcze nie istnieje, więc
+     * 202, nie 201. `job_id` pozwala pytać o postęp (#2907).
+     */
+    private function accepted(Tenant $tenant, string $jobId): JsonResponse
+    {
+        return new JsonResponse(
+            $this->builder->buildOne($tenant) + ['provisioning_job_id' => $jobId],
+            Response::HTTP_ACCEPTED,
+        );
+    }
+
+    /**
+     * Postęp provisioningu instancji. Panel odpytuje ten endpoint, dopóki
+     * stan nie jest terminalny (`done`, `failed`, `rejected`).
+     */
+    #[Route(
+        path: '/api/admin/tenants/provisioning/{jobId}',
+        methods: ['GET'],
+        name: 'api_admin_tenants_provisioning_status',
+        requirements: ['jobId' => '[0-9a-f-]{36}'],
+    )]
+    #[RequiresPermission(module: 'platform.tenants', action: 'manage')]
+    public function provisioningStatus(string $jobId): JsonResponse
+    {
+        $this->guard->require(RbacMatrix::PERMISSION_PLATFORM_TENANTS_MANAGE);
+
+        $status = $this->provisioning->status($jobId);
+        if (null === $status) {
+            // Brak pliku statusu = provisioner jeszcze nie przejął zlecenia.
+            // To NIE jest błąd: panel ma pokazać „w kolejce", a nie 404.
+            return new JsonResponse(['job_id' => $jobId, 'state' => 'queued'], Response::HTTP_OK);
+        }
+
+        return new JsonResponse($status, Response::HTTP_OK);
     }
 
     #[Route(

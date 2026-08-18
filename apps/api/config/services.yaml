@@ -11,6 +11,8 @@ parameters:
     # `tenant` (instancja klienta). Domyslnie `platform`, zeby wdrozenie tej
     # zmiany nie odcielo operatora od panelu w istniejacej instalacji.
     pim_instance_role_default: 'platform'
+    # Katalog kolejki provisioningu; pusty = brak kolejki (instancja tenanta).
+    pim_provisioner_spool_default: ''
     # Sprint 0 fallback: until full auth lands in #4 / #24, the listener resolves
     # the active tenant by code from this env var. Smoke test #12 (0.0.12) flips
     # the env between two seeded tenants to verify isolation. Production sets it
@@ -741,6 +743,13 @@ services:
     # w instancji platformowej. Wartosc domyslna `platform` zachowuje
     # zachowanie istniejacego wdrozenia jednoinstancyjnego; szablon stacku
     # tenanta ustawia `tenant` jawnie.
+    # TNT-P4-05 (#2906) — kolejka zlecen provisioningu. Katalog jest wspolny
+    # z usluga provisionera (#2905); API tylko odklada zlecenia i czyta status,
+    # nigdy nie dotyka Dockera.
+    App\Identity\Infrastructure\Provisioning\ProvisioningQueue:
+        arguments:
+            $spoolDir: '%env(string:default:pim_provisioner_spool_default:PROVISIONER_SPOOL)%'
+
     App\Identity\Infrastructure\Http\PlatformOnlyRoutesListener:
         arguments:
             $instanceRole: '%env(string:default:pim_instance_role_default:PIM_INSTANCE_ROLE)%'

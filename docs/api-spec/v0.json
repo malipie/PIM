@@ -10966,6 +10966,45 @@
                 "x-cortex-permission": "platform.tenants.manage"
             }
         },
+        "/api/admin/tenants/provisioning/{jobId}": {
+            "get": {
+                "operationId": "api_admin_tenants_provisioning_jobid_get",
+                "tags": [
+                    "admin"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api admin tenants provisioning jobId",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "jobId",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "platform.tenants.manage"
+            }
+        },
         "/api/admin/tenants/{id}": {
             "get": {
                 "operationId": "api_admin_tenants_id_get",
