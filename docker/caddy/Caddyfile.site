@@ -129,10 +129,18 @@
 
 # ─── Instancje ───────────────────────────────────────────────────────────────
 
-# Stack współdzielony — obsługuje ruch do czasu przeniesienia tenantów na własne
-# instancje. Po migracji ten blok zastępuje przekierowanie na dole pliku.
+# Stary adres bez subdomeny — 301 na instancję `harmon` (migracja 2026-08-19).
+#
+# Po przeniesieniu tenantów na własne instancje pod tym adresem nie ma już
+# czego serwować: stack współdzielony jest wygaszony. Przekierowanie zostaje,
+# bo prowadzą tu zakładki operatora ORAZ linki w wysłanych zaproszeniach
+# i resetach hasła. Trwałe, z zachowaniem ścieżki i parametrów.
+#
+# Nie jest to alias, tylko przekierowanie — decyzja operatora z 2026-08-18
+# o jednym kanonicznym adresie na instancję.
 {$DOMAIN} {
-    import pim_routes api mercure
+    import common_security_prod
+    redir https://harmon.{$DOMAIN}{uri} permanent
 }
 
 # ─── Instancja platformowa: panel operatora ─────────────────────────────────

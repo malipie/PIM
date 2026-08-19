@@ -157,6 +157,36 @@ curl -sI "https://$KOD.app.harmonpim.pl/api" | head -1
 Routing działa bez edycji czegokolwiek — blok wildkardowy wyprowadza upstream z nazwy hosta, a
 certyfikat wildcard już te nazwy pokrywa (#2908).
 
+## 6a. Rejestr platformy — krok, o którym łatwo zapomnieć
+
+Instancja powstała, ale **panel operatora jej nie widzi**: rejestr żyje w bazie platformy, a migracja
+go nie dotknęła. Dopisz wiersz ręcznie:
+
+```sql
+INSERT INTO tenants (id, code, name, domain, plan, status, enabled_locales, primary_locale, created_at)
+VALUES (gen_random_uuid(), 'trzeci-tenant', 'Trzeci Tenant', 'trzeci-tenant',
+        'starter', 'active', '["pl_PL"]', 'pl_PL', NOW())
+ON CONFLICT (code) DO NOTHING;
+```
+
+`code` i `domain` to kod **instancji** (z myślnikiem), nie kod tenanta w jego własnej bazie.
+
+> **Licznik użytkowników pokaże 0** i tak zostanie. Panel liczy użytkowników w bazie platformy,
+> a ci należą do instancji klienta. To ograniczenie modelu, nie usterka: rejestr z definicji nie
+> zagląda do cudzych baz.
+
+## 6b. Cron rozliczający zlecenia
+
+Bez niego wznowiony tenant zostaje w panelu jako „zawieszony", bo status wraca dopiero po rozliczeniu
+wyniku, a rozliczenie robi się przy podglądzie postępu albo z crona:
+
+```cron
+*/2 * * * * root cd /opt/pim && docker compose -p pim-platform --env-file .env.platform \
+    -f docker-compose.platform.yml exec -T api php bin/console pim:tenants:reconcile-provisioning >/dev/null 2>&1
+```
+
+Plik: `/etc/cron.d/pim-reconcile-provisioning`. Komenda jest idempotentna.
+
 ## 7. Kontrola końcowa
 
 | Sprawdzenie | Oczekiwane |
@@ -168,6 +198,20 @@ certyfikat wildcard już te nazwy pokrywa (#2908).
 | Miniatura zdjęcia produktu | ładuje się (dowód, że MinIO zmigrowany) |
 | Wyszukiwarka w panelu | zwraca wyniki (dowód reindeksu) |
 | `scripts/pim-tenant-isolation-check.sh` wobec innej instancji | kod wyjścia **0** |
+
+## Czego się spodziewać po drodze (zmierzone 2026-08-19)
+
+`pim:tenants:purge-deleted` **wywróci się trzy razy**, zanim przejdzie — to defekt purgera (#2956),
+nie migracji. Kolejno zablokują go: zaproszenie z innego tenanta wskazujące usuwanego użytkownika,
+tabele agenta i tabele katalogów PDF. Purger zna 46 z 69 tabel z `tenant_id`.
+
+Do czasu naprawy #2956 wyczyść ręcznie **przed** uruchomieniem sweepa: zużyte zaproszenia
+(`accepted_at IS NOT NULL`) wskazujące użytkowników obcych tenantów oraz wiersze obcych tenantów
+w 27 tabelach spoza listy purgera (agent, integracje, workflow, feedy, katalogi, dashboard,
+powiadomienia, audyt) — w kolejności dzieci przed rodzicami.
+
+Czasy z produkcji: instancja od zera **~30 s**, odtworzenie zrzutu 66 MB **48 s**, kopiowanie
+153 000 plików w MinIO **~4 min**, reindeks 101 905 obiektów **~2 min**.
 
 ## Wycofanie
 
