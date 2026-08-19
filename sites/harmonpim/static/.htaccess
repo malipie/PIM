@@ -1,0 +1,43 @@
+# Harmon PIM — konfiguracja Apache (typowy hosting współdzielony)
+
+# --- HTTPS + bez www (odkomentuj po podpięciu domeny i certyfikatu) ---
+# RewriteEngine On
+# RewriteCond %{HTTPS} off [OR]
+# RewriteCond %{HTTP_HOST} ^www\. [NC]
+# RewriteRule ^ https://harmonpim.pl%{REQUEST_URI} [L,R=301]
+
+# --- ładne adresy: /produkt/ zamiast /produkt/index.html ---
+DirectoryIndex index.html
+Options -Indexes
+
+# przekierowanie /strona → /strona/ robi Apache (DirectorySlash on, domyślne)
+
+# --- strona błędu ---
+ErrorDocument 404 /404.html
+
+# --- kompresja ---
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain application/javascript application/json image/svg+xml application/xml
+</IfModule>
+
+# --- cache przeglądarki ---
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 0 seconds"
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+<IfModule mod_headers.c>
+  <FilesMatch "\.(webp|png|svg|woff2)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  Header always set X-Content-Type-Options "nosniff"
+</IfModule>
+
+# --- poprawne typy MIME ---
+AddType font/woff2 .woff2
+AddType image/webp .webp

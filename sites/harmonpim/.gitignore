@@ -1,0 +1,5 @@
+# Kopie i archiwa zostają poza gitem — wersjonowaniem jest sama historia repo.
+backups/
+*.zip
+node_modules/
+.DS_Store

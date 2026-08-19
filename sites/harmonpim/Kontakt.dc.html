@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Kontakt - Harmon PIM</title>
+<meta name="description" content="Kontakt do zespołu Harmon PIM - adres, telefon, e-mail i formularz prezentacji.">
+<meta property="og:title" content="Kontakt - Harmon PIM">
+<meta property="og:description" content="Napisz, zadzwoń albo umów 30-minutową prezentację.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ffffff'/%3E%3Crect x='7.5' y='6' width='9' height='52' rx='4.5' fill='%230E1830'/%3E%3Crect x='21' y='24' width='9' height='19' rx='4.5' fill='%230E1830'/%3E%3Crect x='34.5' y='24' width='9' height='13' rx='4.5' fill='%23FF4F00'/%3E%3Crect x='48' y='24' width='9' height='34' rx='4.5' fill='%230E1830'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+<script>document.documentElement.lang='pl';</script>
+<style>
+html { scroll-behavior: smooth; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: #16233f; background: #ffffff; letter-spacing: -0.011em; font-feature-settings: "ss01", "cv11"; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+a { color: #bd3a08; text-decoration: none; }
+a:hover { color: #e64700; text-decoration: underline; }
+button { font-family: inherit; letter-spacing: -0.011em; }
+input { font-family: inherit; letter-spacing: -0.011em; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</helmet>
+<header data-screen-label="Nawigacja" style="position:sticky;top:0;z-index:60;background:rgba(255,255,255,.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid #e3e9f1">
+  <div style="max-width:1200px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;gap:24px">
+    <a href="Harmon PIM - Landing.dc.html" aria-label="Harmon PIM - strona główna" style="display:flex;align-items:center;gap:11px;text-decoration:none;flex-shrink:0">
+      <svg width="24" height="25" viewBox="7.5 6 49.5 52" aria-hidden="true" style="display:block"><rect x="7.5" y="6" width="9" height="52" rx="4.5" fill="#0E1830"></rect><rect x="21" y="24" width="9" height="19" rx="4.5" fill="#0E1830"></rect><rect x="34.5" y="24" width="9" height="13" rx="4.5" fill="#FF4F00"></rect><rect x="48" y="24" width="9" height="34" rx="4.5" fill="#0E1830"></rect></svg>
+      <span style="font-family:'Manrope',sans-serif;font-size:21px;font-weight:700;letter-spacing:0.025em;line-height:1;color:#0E1830;padding-bottom:1px">harmon</span>
+      <span style="font-family:'Manrope',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.18em;padding:3px 5px 3px 7px;border-radius:5px;background:#FF4F00;color:#ffffff">PIM</span>
+    </a>
+    <nav aria-label="Nawigacja główna" style="display:{{ navDisp }};align-items:center;gap:26px">
+      <div onMouseEnter="{{ openProd }}" onMouseLeave="{{ closeProd }}" style="position:relative;display:flex;align-items:center">
+        <button type="button" onClick="{{ toggleProd }}" aria-haspopup="true" aria-expanded="{{ prodExp }}" style="display:inline-flex;align-items:center;gap:6px;background:transparent;border:none;padding:0 0 2px;cursor:pointer;font-size:15px;font-weight:500;color:#2f405a;white-space:nowrap" style-hover="color:#16233f" style-focus="outline:none;color:#16233f;box-shadow:0 0 0 4px rgba(20,32,58,.08);border-radius:4px">
+          Produkt
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+        <sc-if value="{{ prodOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:100%;left:-14px;padding-top:16px;min-width:230px">
+            <div style="background:#ffffff;border:1px solid #e3e9f1;border-radius:14px;padding:8px;box-shadow:0 24px 48px -18px rgba(20,32,58,.22),0 2px 6px rgba(20,32,58,.06);display:flex;flex-direction:column;gap:2px">
+              <a href="Produkt.dc.html" onClick="{{ closeProd }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Przegląd produktu</a>
+              <a href="Funkcje.dc.html" onClick="{{ closeProd }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Funkcje</a>
+              <a href="Integracje.dc.html" onClick="{{ closeProd }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Integracje</a>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <a href="Wdrozenie.dc.html" style="font-size:15px;font-weight:500;color:#2f405a;text-decoration:none;white-space:nowrap" style-hover="color:#16233f;text-decoration:none">Wdrożenie PIM</a>
+      <a href="Cennik.dc.html" style="font-size:15px;font-weight:500;color:#2f405a;text-decoration:none;white-space:nowrap" style-hover="color:#16233f;text-decoration:none">Cennik</a>
+      <div onMouseEnter="{{ openZas }}" onMouseLeave="{{ closeZas }}" style="position:relative;display:flex;align-items:center">
+        <a href="Zasoby.dc.html" aria-haspopup="true" aria-expanded="{{ zasExp }}" style="display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:500;color:#2f405a;text-decoration:none;white-space:nowrap" style-hover="color:#16233f;text-decoration:none">Zasoby <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></a>
+        <sc-if value="{{ zasOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:100%;left:-14px;padding-top:16px;min-width:230px">
+            <div style="background:#ffffff;border:1px solid #e3e9f1;border-radius:14px;padding:8px;box-shadow:0 24px 48px -18px rgba(20,32,58,.22),0 2px 6px rgba(20,32,58,.06);display:flex;flex-direction:column;gap:2px">
+              <a href="Zasoby.dc.html#selfhost" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Self-host Harmon</a>
+              <a href="Zasoby.dc.html#dokumentacja" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Dokumentacja</a>
+              <a href="Zasoby.dc.html#api" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Dokumentacja API</a>
+              <a href="Zasoby.dc.html#licencja" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Licencja</a>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <a href="Kontakt.dc.html" aria-current="page" style="font-size:15px;font-weight:600;color:#16233f;text-decoration:none;white-space:nowrap;border-bottom:2px solid #ff4f00;padding-bottom:2px" style-hover="color:#16233f;text-decoration:none">Kontakt</a>
+    </nav>
+    <div style="display:{{ navDisp }};align-items:center;gap:12px">
+      <a href="#" style="background:#16233f;color:#ffffff;font-size:14px;font-weight:600;padding:10px 18px;border-radius:12px;text-decoration:none;transition:background .15s ease;white-space:nowrap" style-hover="background:#2f405a;color:#ffffff;text-decoration:none" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">Zaloguj się</a>
+      <button type="button" onClick="{{ openModal }}" style="background:#ff4f00;color:#ffffff;font-size:19px;font-weight:700;padding:10px 22px;border-radius:12px;border:none;cursor:pointer;transition:background .15s ease,transform .15s ease;white-space:nowrap" style-hover="background:#e64700;transform:translateY(-1px)" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.18)">Umów prezentację</button>
+    </div>
+    <button type="button" onClick="{{ toggleMenu }}" aria-label="Menu" aria-expanded="{{ menuOpen }}" style="display:{{ hamDisp }};align-items:center;justify-content:center;width:44px;height:44px;background:transparent;border:1px solid #e3e9f1;border-radius:12px;cursor:pointer" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16233f" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path></svg>
+    </button>
+  </div>
+  <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:100%;left:0;right:0;background:#ffffff;border-bottom:1px solid #e3e9f1;box-shadow:0 24px 48px -20px rgba(20,32,58,.08);padding:12px 24px 24px;display:flex;flex-direction:column">
+      <a href="Produkt.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px 10px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none">Produkt</a>
+      <div style="display:flex;flex-direction:column;padding:0 0 12px 14px;border-bottom:1px solid #eef2f7;border-left:2px solid #ffd0bd;margin-left:2px">
+        <a href="Produkt.dc.html" onClick="{{ closeMenu }}" style="padding:9px 0;font-size:15px;font-weight:500;color:#5b6b87;text-decoration:none">Przegląd produktu</a>
+        <a href="Funkcje.dc.html" onClick="{{ closeMenu }}" style="padding:9px 0;font-size:15px;font-weight:500;color:#5b6b87;text-decoration:none">Funkcje</a>
+        <a href="Integracje.dc.html" onClick="{{ closeMenu }}" style="padding:9px 0;font-size:15px;font-weight:500;color:#5b6b87;text-decoration:none">Integracje</a>
+      </div>
+      <a href="Wdrozenie.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none;border-bottom:1px solid #eef2f7">Wdrożenie PIM</a>
+      <a href="Cennik.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none;border-bottom:1px solid #eef2f7">Cennik</a>
+      <a href="Zasoby.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none">Zasoby</a>
+      <a href="Kontakt.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none;border-bottom:1px solid #eef2f7">Kontakt</a>
+      <button type="button" onClick="{{ openModal }}" style="margin-top:14px;background:#ff4f00;color:#ffffff;font-size:19px;font-weight:700;padding:14px 28px;border-radius:12px;border:none;cursor:pointer;width:100%">Umów darmową prezentację</button>
+    </div>
+  </sc-if>
+</header>
+<main id="top">
+
+<section data-screen-label="Kontakt" style="background:#ffffff;padding:64px 24px 40px">
+  <div style="max-width:860px;margin:0 auto;text-align:center">
+    <div data-reveal="0" style="display:flex;align-items:center;justify-content:center;gap:10px;font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#bd3a08">
+      <a href="Harmon PIM - Landing.dc.html" style="color:#8a93a6;text-decoration:none" style-hover="color:#bd3a08;text-decoration:none">Start</a>
+      <span style="color:#c8d5e6">/</span>
+      <span>Kontakt</span>
+    </div>
+    <h1 data-reveal="1" style="margin:16px 0 0;font-size:clamp(32px,4.2vw,54px);font-weight:800;letter-spacing:-0.04em;line-height:1.04;color:#16233f;text-wrap:balance">Napisz albo zadzwoń</h1>
+    <p data-reveal="2" style="margin:20px auto 0;max-width:560px;font-size:19px;line-height:1.55;color:#2f405a;text-wrap:pretty">Odpowiadamy tego samego dnia. Jeśli wolisz od razu zobaczyć system - umów 30-minutową prezentację.</p>
+  </div>
+</section>
+
+<section data-screen-label="Formularz" style="background:#f6f8fb;border-radius:clamp(44px,8vw,130px) clamp(44px,8vw,130px) 0 0;padding:80px 24px 88px">
+  <div style="max-width:660px;margin:0 auto">
+    <div data-reveal="1" style="background:#ffffff;border:1px solid #e3e9f1;border-radius:22px;padding:32px 30px;box-shadow:0 1px 0 rgba(20,32,58,.04),0 20px 46px -20px rgba(20,32,58,.14)">
+      <sc-if value="{{ notSent }}" hint-placeholder-val="{{ true }}">
+        <form onSubmit="{{ submitDemo }}" style="display:flex;flex-direction:column;gap:16px">
+        <label style="display:block">
+          <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">Imię i nazwisko</span>
+          <input type="text" name="imie" required placeholder="np. Kasia Nowak" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;color:#16233f;background:#ffffff" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)" />
+        </label>
+        <label style="display:block">
+          <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">E-mail firmowy</span>
+          <input type="email" name="email" required placeholder="kasia@twojafirma.pl" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;color:#16233f;background:#ffffff" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)" />
+        </label>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+        <label style="display:block">
+          <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">Telefon</span>
+          <input type="tel" name="telefon" placeholder="+48 600 000 000" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;color:#16233f;background:#ffffff" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)" />
+        </label>
+        <label style="display:block">
+          <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">Firma</span>
+          <input type="text" name="firma" required placeholder="Nazwa firmy" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;color:#16233f;background:#ffffff" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)" />
+        </label>
+          </div>
+          <label style="display:block">
+            <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">Wiadomość</span>
+            <textarea name="wiadomosc" rows="4" placeholder="Ile masz produktów, w jakich kanałach sprzedajesz, czego szukasz" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;line-height:1.55;color:#16233f;background:#ffffff;font-family:inherit;resize:vertical" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)"></textarea>
+          </label>
+          <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+            <input type="checkbox" required style="margin:3px 0 0;width:16px;height:16px;accent-color:#ff4f00;flex-shrink:0" />
+            <span style="font-size:13px;line-height:1.5;color:#5b6b87">Wyrażam zgodę na kontakt w sprawie Harmon PIM i przetwarzanie moich danych osobowych w tym celu (RODO).</span>
+          </label>
+          <button type="submit" style="width:100%;background:#ff4f00;color:#ffffff;font-size:19px;font-weight:700;padding:14px 28px;border-radius:12px;border:none;cursor:pointer;transition:background .15s ease" style-hover="background:#e64700" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.18)">Wyślij wiadomość</button>
+        </form>
+      </sc-if>
+      <sc-if value="{{ sent }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:26px 0;text-align:center">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:999px;background:#e7f7f0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#12855c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+          <div style="font-size:21px;font-weight:700;letter-spacing:-0.02em;color:#16233f">Dziękujemy, wiadomość wysłana</div>
+          <p style="margin:0;max-width:400px;font-size:15.5px;line-height:1.6;color:#5b6b87;text-wrap:pretty">Odpowiadamy tego samego dnia roboczego.</p>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="margin-top:18px;display:flex;flex-wrap:wrap;align-items:stretch;gap:18px">
+      <div data-reveal="2" style="flex:1 1 260px;background:#ffffff;border:1px solid #e3e9f1;border-radius:20px;padding:24px 22px;display:flex;gap:13px;align-items:flex-start">
+        <span style="flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:#f6f8fb;border:1px solid #e3e9f1"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16233f" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"></path><circle cx="12" cy="10" r="2.6"></circle></svg></span>
+        <div style="font-size:16px;line-height:1.6;color:#2f405a">
+          <div style="font-weight:600;color:#16233f">Harmon PIM</div>
+          <div>Bakalarska 15/66</div>
+          <div>02-212 Warszawa</div>
+        </div>
+      </div>
+      <div data-reveal="3" style="flex:1 1 260px;background:#ffffff;border:1px solid #e3e9f1;border-radius:20px;padding:24px 22px;display:flex;flex-direction:column;justify-content:center;gap:14px">
+        <div style="display:flex;gap:13px;align-items:center">
+          <span style="flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:#f6f8fb;border:1px solid #e3e9f1"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16233f" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1.1 1A16 16 0 0 1 4 5.1A1 1 0 0 1 5 4z"></path></svg></span>
+          <span style="font-size:16.5px;font-weight:600;color:#16233f">+48 603 833 482</span>
+        </div>
+        <div style="display:flex;gap:13px;align-items:center">
+          <span style="flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:#f6f8fb;border:1px solid #e3e9f1"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#16233f" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16v12H4z"></path><path d="m4 8 8 5 8-5"></path></svg></span>
+          <span style="font-size:16.5px;font-weight:600;color:#16233f">kontakt@harmonpim.pl</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+<footer data-screen-label="Stopka" style="background:#ffffff;border-radius:clamp(44px,8vw,130px) clamp(44px,8vw,130px) 0 0;margin-top:-72px;padding:128px 24px 40px">
+  <div style="max-width:1200px;margin:0 auto">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:40px 32px">
+      <div>
+        <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#16233f">Produkt</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <a href="Produkt.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Przegląd produktu</a>
+          <a href="Funkcje.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Funkcje</a>
+          <a href="Integracje.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Integracje</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#16233f">Zasoby</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <a href="Zasoby.dc.html#selfhost" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Self-host Harmon</a>
+          <a href="Zasoby.dc.html#dokumentacja" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Dokumentacja</a>
+          <a href="Zasoby.dc.html#api" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Dokumentacja API</a>
+          <a href="Zasoby.dc.html#licencja" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Licencja</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#16233f">Firma</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <a href="Wdrozenie.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Wdrożenie PIM</a>
+          <a href="Cennik.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Cennik</a>
+          <a href="Kontakt.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Kontakt</a>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:56px;padding-top:28px;border-top:1px solid #e3e9f1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <svg width="19" height="20" viewBox="7.5 6 49.5 52" aria-hidden="true" style="display:block;flex-shrink:0"><rect x="7.5" y="6" width="9" height="52" rx="4.5" fill="#0E1830"></rect><rect x="21" y="24" width="9" height="19" rx="4.5" fill="#0E1830"></rect><rect x="34.5" y="24" width="9" height="13" rx="4.5" fill="#FF4F00"></rect><rect x="48" y="24" width="9" height="34" rx="4.5" fill="#0E1830"></rect></svg>
+        <span style="font-family:'Manrope',sans-serif;font-size:16px;font-weight:700;letter-spacing:0.025em;color:#0E1830">harmon</span>
+        <span style="font-size:14px;color:#2f405a">Harmon - PIM, który myśli i działa.</span>
+      </div>
+      <span style="font-size:13px;color:#5b6b87">© 2026 Harmon PIM. Wszystkie prawa zastrzeżone.</span>
+    </div>
+  </div>
+</footer>
+<sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+  <dc-import name="Formularz-demo" on-close="{{ closeModal }}" hint-size="100%,100%"></dc-import>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;animacje&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Zachowanie&quot;}}">
+class Component extends DCLogic {
+  state = { prod: false, zas: false, modal: false, sent: false, menu: false, mobile: false, kat: "wszystkie" };
+  componentDidMount() {
+    this._touts = [];
+    this._rm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this._anim = (this.props.animacje ?? true) && !this._rm;
+    this._mq = window.matchMedia("(max-width: 1120px)");
+    this._setM = () => this.setState({ mobile: this._mq.matches, menu: false });
+    this._mq.addEventListener("change", this._setM);
+    if (this._mq.matches) this.setState({ mobile: true });
+    this._kd = (e) => { if (e.key === "Escape") this.setState({ prod: false, zas: false, modal: false, menu: false }); };
+    window.addEventListener("keydown", this._kd);
+    this.initReveal();
+  }
+  componentWillUnmount() {
+    this._mq.removeEventListener("change", this._setM);
+    window.removeEventListener("keydown", this._kd);
+    window.removeEventListener("scroll", this._rv);
+    window.removeEventListener("resize", this._rv);
+    (this._touts || []).forEach(clearTimeout);
+    document.body.style.overflow = "";
+  }
+  componentDidUpdate() {
+    const want = this.state.modal ? "hidden" : "";
+    if (document.body.style.overflow !== want) document.body.style.overflow = want;
+  }
+  initReveal() {
+    const els = Array.from(document.querySelectorAll("[data-reveal]"));
+    if (!els.length) return;
+    if (!this._anim) { els.forEach((el) => { el.style.opacity = "1"; el.style.transform = "none"; }); return; }
+    els.forEach((el) => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(10px)";
+      el.style.transition = "opacity .45s ease, transform .45s ease";
+      el.style.transitionDelay = (parseInt(el.getAttribute("data-reveal"), 10) || 0) * 70 + "ms";
+    });
+    this._pending = els;
+    const show = (el) => { el.style.opacity = "1"; el.style.transform = "none"; };
+    this._rv = () => {
+      if (!this._pending || !this._pending.length) return;
+      const h = window.innerHeight || 800;
+      this._pending = this._pending.filter((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.top < h - 24 && r.bottom > -80) { show(el); return false; }
+        return true;
+      });
+    };
+    window.addEventListener("scroll", this._rv, { passive: true });
+    window.addEventListener("resize", this._rv);
+    this._rv();
+    requestAnimationFrame(() => requestAnimationFrame(this._rv));
+    const T = (ms, fn) => this._touts.push(setTimeout(fn, ms));
+    T(120, this._rv);
+    T(700, this._rv);
+    T(1600, () => { (this._pending || []).forEach((el) => { const r = el.getBoundingClientRect(); if (r.top < (window.innerHeight || 800) * 1.2) show(el); }); this._rv(); });
+  }
+  renderVals() {
+    const s = this.state;
+    return {
+      navDisp: s.mobile ? "none" : "flex",
+      hamDisp: s.mobile ? "inline-flex" : "none",
+      menuOpen: s.menu && s.mobile,
+      toggleMenu: () => this.setState({ menu: !this.state.menu }),
+      closeMenu: () => this.setState({ menu: false }),
+      prodOpen: s.prod,
+      zasOpen: s.zas,
+      zasExp: s.zas ? "true" : "false",
+      openZas: () => this.setState({ zas: true, prod: false }),
+      closeZas: () => this.setState({ zas: false }),
+      prodExp: s.prod ? "true" : "false",
+      openProd: () => this.setState({ prod: true, zas: false }),
+      closeProd: () => this.setState({ prod: false }),
+      toggleProd: () => this.setState({ prod: !this.state.prod }),
+      modalOpen: s.modal,
+      sent: s.sent,
+      notSent: !s.sent,
+      openModal: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ modal: true, sent: false, menu: false }); },
+      closeModal: () => this.setState({ modal: false }),
+      overlayClick: (e) => { if (e.target === e.currentTarget) this.setState({ modal: false }); },
+      submitDemo: (e) => { e.preventDefault(); this.setState({ sent: true }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

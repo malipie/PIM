@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div onClick="{{ overlayClick }}" style="position:fixed;inset:0;z-index:100;background:rgba(14,24,48,.55);display:flex;align-items:center;justify-content:center;padding:24px">
+  <div role="dialog" aria-modal="true" aria-label="Umów darmową prezentację" style="position:relative;width:min(480px,100%);max-height:calc(100vh - 48px);overflow:auto;background:#ffffff;border-radius:16px;padding:32px;box-shadow:0 1px 0 rgba(20,32,58,.04),0 2px 4px rgba(20,32,58,.04),0 24px 60px -20px rgba(20,32,58,.08)">
+    <button type="button" onClick="{{ close }}" aria-label="Zamknij" style="position:absolute;top:14px;right:14px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:transparent;border:none;border-radius:8px;cursor:pointer;color:#5b6b87" style-hover="background:#f5f5f4;color:#16233f" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+    </button>
+    <sc-if value="{{ notSent }}" hint-placeholder-val="{{ true }}">
+      <h3 style="margin:0;font-size:24px;font-weight:800;letter-spacing:-0.025em;color:#16233f">Umów darmową prezentację</h3>
+      <form onSubmit="{{ submitDemo }}" style="margin-top:24px;display:flex;flex-direction:column;gap:16px">
+        <label style="display:block">
+          <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">Imię</span>
+          <input type="text" name="imie" required placeholder="np. Kasia" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;color:#16233f;background:#ffffff" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)">
+        </label>
+        <label style="display:block">
+          <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">E-mail firmowy</span>
+          <input type="email" name="email" required placeholder="kasia@twojafirma.pl" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;color:#16233f;background:#ffffff" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)">
+        </label>
+        <label style="display:block">
+          <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">Telefon</span>
+          <input type="tel" name="telefon" placeholder="+48 600 000 000" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;color:#16233f;background:#ffffff" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)">
+        </label>
+        <label style="display:block">
+          <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">Firma</span>
+          <input type="text" name="firma" required placeholder="Nazwa firmy" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;color:#16233f;background:#ffffff" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)">
+        </label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px">
+          <label style="display:block">
+            <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">Platforma sklepu</span>
+            <select name="platforma" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;color:#16233f;background:#ffffff;cursor:pointer" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)">
+              <option>Inna</option>
+              <option>AtomStore</option>
+              <option>IdoSell</option>
+              <option>Magento</option>
+              <option>PrestaShop</option>
+              <option>Shoper</option>
+              <option>Shopify</option>
+              <option>WooCommerce</option>
+            </select>
+          </label>
+          <label style="display:block">
+            <span style="display:block;margin-bottom:6px;font-size:13px;font-weight:600;color:#2f405a">Liczba SKU</span>
+            <select name="sku" style="width:100%;padding:12px 14px;border:1px solid #d7dfe9;border-radius:12px;font-size:15px;color:#16233f;background:#ffffff;cursor:pointer" style-focus="outline:none;border-color:#ff4f00;box-shadow:0 0 0 4px rgba(255,79,0,.18)">
+              <option>&lt;1 tys.</option>
+              <option>1–5 tys.</option>
+              <option>5–20 tys.</option>
+              <option>20 tys.+</option>
+            </select>
+          </label>
+        </div>
+        <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+          <input type="checkbox" required style="margin:3px 0 0;width:16px;height:16px;accent-color:#ff4f00;flex-shrink:0">
+          <span style="font-size:13px;line-height:1.5;color:#5b6b87">Wyrażam zgodę na kontakt w sprawie prezentacji Harmon PIM i przetwarzanie moich danych osobowych w tym celu (RODO).</span>
+        </label>
+        <button type="submit" style="width:100%;background:#ff4f00;color:#ffffff;font-size:19px;font-weight:700;padding:14px 28px;border-radius:12px;border:none;cursor:pointer;transition:background .15s ease" style-hover="background:#e64700" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.18)">Wyślij zgłoszenie</button>
+      </form>
+    </sc-if>
+    <sc-if value="{{ sent }}" hint-placeholder-val="{{ false }}">
+      <div style="text-align:center;padding:24px 0 8px">
+        <span style="display:inline-flex;width:56px;height:56px;border-radius:999px;background:#fff1ec;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#e64700" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span>
+        <h3 style="margin:20px 0 0;font-size:24px;font-weight:800;letter-spacing:-0.025em;color:#16233f;text-wrap:balance">Dziękujemy! Odezwiemy się w 24 h.</h3>
+        <button type="button" onClick="{{ close }}" style="margin-top:24px;border:1px solid #16233f;background:transparent;color:#16233f;font-size:16px;font-weight:600;padding:11px 24px;border-radius:12px;cursor:pointer;transition:background .15s ease" style-hover="background:rgba(22,35,63,.05)" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">Zamknij</button>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:560,&quot;height&quot;:760},&quot;onClose&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}">
+class Component extends DCLogic {
+  state = { sent: false };
+  renderVals() {
+    const close = () => { this.setState({ sent: false }); if (this.props.onClose) this.props.onClose(); };
+    return {
+      sent: this.state.sent,
+      notSent: !this.state.sent,
+      close,
+      overlayClick: (e) => { if (e.target === e.currentTarget) close(); },
+      submitDemo: (e) => { e.preventDefault(); this.setState({ sent: true }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

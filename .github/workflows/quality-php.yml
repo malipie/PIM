@@ -31,12 +31,24 @@ on:
       - "**/*.md"
       - "docs/**"
       - "!docs/api-spec/**"
+      # Strona marketingowa (#2952) — wciagnieta do repo, zeby miec historie
+      # i kopie, ale NIE jest aplikacja PIM: nie ma w niej PHP, encji ani
+      # uprawnien, wiec PHPStan/Deptrac/PHPUnit nie maja czego sprawdzac.
+      # Wykluczenie jest po SCIEZCE, nie po rozszerzeniu — inaczej kazda zmiana
+      # tresci marketingowej odpalalaby 40 minut bramek backendu.
+      - "sites/**"
   push:
     branches: [main]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
       - "!docs/api-spec/**"
+      # Strona marketingowa (#2952) — wciagnieta do repo, zeby miec historie
+      # i kopie, ale NIE jest aplikacja PIM: nie ma w niej PHP, encji ani
+      # uprawnien, wiec PHPStan/Deptrac/PHPUnit nie maja czego sprawdzac.
+      # Wykluczenie jest po SCIEZCE, nie po rozszerzeniu — inaczej kazda zmiana
+      # tresci marketingowej odpalalaby 40 minut bramek backendu.
+      - "sites/**"
   # Nightly full validation of main. Compensates for the heavy jobs that no
   # longer run on push (matrix, benchmark, agent-removability): nothing is
   # dropped, it moves to a ≤24h window. `schedule` ignores paths filters and

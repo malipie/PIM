@@ -1,0 +1,67 @@
+# Harmon PIM — strona marketingowa harmonpim.pl.
+#
+# TOPOLOGIA PO CUTOVERZE (2026-08-07):
+# Ten kontener NIE publikuje już portów. TLS terminuje `pim-caddy` ze stacku
+# PIM (blok `harmonpim.pl` w docker/caddy/Caddyfile.site) i przekazuje ruch
+# przez `reverse_proxy harmon-www-www-1:80` po wewnętrznej sieci `pim_default`.
+# Dzięki temu jeden Caddy trzyma 80/443 dla obu hostów, a cała logika strony
+# (PHP dla mail.php, cache, 404, CSP) zostaje tutaj.
+#
+# Deploy:  ./serwer/deploy.sh            — sama treść (dist/)
+#          ./serwer/deploy.sh --config   — dodatkowo Caddyfile + ten plik
+#
+# Obraz: ten sam FrankenPHP (Caddy + PHP), co apps/api w stacku PIM.
+
+name: harmon-www
+
+services:
+  www:
+    # Obraz własny: FrankenPHP + msmtp (patrz Dockerfile). Bez msmtp funkcja
+    # PHP mail() nie ma czym wysłać i formularz zwraca 500.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: harmon-www:local
+    restart: unless-stopped
+
+    # UWAGA — NIE dodawaj tu `ports:`. Port 80 i 443 na hoście należą do
+    # `pim-caddy`; publikacja stąd kończy się błędem "port is already
+    # allocated" i kontener nie wstaje, co zdejmuje harmonpim.pl z sieci.
+
+    # Obie sieci są konieczne: `default` to sieć tego stacku, `pim` daje
+    # pim-caddy możliwość rozwiązania nazwy `harmon-www-www-1`. Bez zadeklarowania
+    # tego tutaj przypięcie zrobione ręcznym `docker network connect` ginie przy
+    # każdym `up --force-recreate`, a harmonpim.pl zaczyna zwracać 502.
+    networks:
+      - default
+      - pim
+
+    volumes:
+      - ./Caddyfile:/etc/frankenphp/Caddyfile:ro
+      - ./site:/srv/site:ro
+      # Konfiguracja msmtp z kluczem API Resend. Plik żyje WYŁĄCZNIE na
+      # serwerze (600, root) i nie jest wersjonowany — nie dopisuj go do repo.
+      - /etc/msmtprc:/etc/msmtprc:ro
+      # Zostają na wypadek powrotu do samodzielnego terminowania TLS —
+      # przy pracy za pim-caddy są nieużywane, ale nic nie kosztują.
+      - caddy_data:/data
+      - caddy_config:/config
+
+    # Sonda celuje w `/`, a nie w konkretny plik. Poprzednia wersja pytała
+    # o /wejscie.html (bramka wdrożeniowa) i po jej usunięciu kontener na
+    # stałe raportował `unhealthy` mimo w pełni sprawnej strony.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  pim:
+    external: true
+    name: pim_default
+
+volumes:
+  caddy_data:
+  caddy_config:
