@@ -65,6 +65,12 @@ jobs:
   static:
     name: PHP static (phpstan + deptrac + cs-fixer + openapi + shell linters)
     runs-on: ubuntu-latest
+    # #2949 — bez tego obowiazuje domyslny limit GitHuba: SZESC GODZIN.
+    # Zawieszony job nie jest czerwony, tylko „w toku", wiec nie da sie go
+    # odroznic od wolnego — blokuje PR i trzyma runnera, dopoki ktos nie
+    # zauwazy i nie anuluje recznie. Limity sa ~2x zmierzonego czasu.
+    # Mierzone: ~2,5 min.
+    timeout-minutes: 20
     steps:
       # fetch-depth:0 — tracked-secrets-lint needs the real tree on
       # push-to-main (git ls-files), not a shallow clone.
@@ -229,6 +235,8 @@ jobs:
     # Pre-commit hook locally; CI runs on every PR.
     name: Semgrep (Cortex RBAC rules)
     runs-on: ubuntu-latest
+    # #2949 — mierzone: ~30 s.
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: .
@@ -275,6 +283,10 @@ jobs:
     # below (was a sequential step here, ~4 min reclaimed by running it concurrently).
     name: PHPUnit
     runs-on: ubuntu-latest
+    # #2949 — mierzone per shard: api-catalog ~9 min, api-rest ~14 min,
+    # api-heavy ~16 min. Limit obejmuje najwolniejszy z zapasem; przekroczenie
+    # oznacza zawieszenie, nie „wolniej niz zwykle".
+    timeout-minutes: 35
     # Skipped on push:main (the PR validated this very tree; a squash only
     # changes the SHA) and on npm bumps (a JS dependency cannot break PHPStan
     # or PHPUnit — composer bumps still get the full matrix). Job-level `if:`
@@ -397,6 +409,8 @@ jobs:
     # sequential step (~4 min off the critical path). Same env/setup as above.
     name: PHPUnit benchmarks (import-benchmark)
     runs-on: ubuntu-latest
+    # #2949 — benchmark 5k/50k jest z zalozenia dlugi, stad wyzszy limit.
+    timeout-minutes: 30
     # ~11.6 billable min on every push for a gate that did not fire once in
     # the measured week. The main leak vector (flush without clear in a loop)
     # stays blocked on every PR statically by
@@ -490,6 +504,8 @@ jobs:
     # dependency, never this job. DoD gate for every epic-0.7 ticket.
     name: Agent removability (open-core gate)
     runs-on: ubuntu-latest
+    # #2949 — mierzone: ~110 s, ale job kompiluje wszystko od zera.
+    timeout-minutes: 30
     # The cheap half of this gate (grep for App\Agent in the core) now runs on
     # every PR inside `static`. The expensive half — delete the module and
     # recompile everything, of which ~48s of 110s is a repeated PHPStan — runs
