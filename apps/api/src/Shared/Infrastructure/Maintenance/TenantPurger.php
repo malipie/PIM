@@ -126,6 +126,44 @@ final readonly class TenantPurger
         ['api_profiles', 'tenant_id'],
         ['backups', 'tenant_id'],
 
+        // ── Agent (#2956) — wiadomości i wywołania narzędzi wiszą na runach
+        ['agent_tool_calls', 'tenant_id'],
+        ['agent_messages', 'tenant_id'],
+        ['agent_runs', 'tenant_id'],
+        ['content_recipes', 'tenant_id'],
+        ['brand_voice_profiles', 'tenant_id'],
+
+        // ── Integracje (#2956) — logi przed przebiegami, przebiegi przed
+        //    konfiguracją, wszystko przed połączeniem
+        ['integration_sync_run_logs', 'tenant_id'],
+        ['integration_sync_runs', 'tenant_id'],
+        ['integration_sync_bindings', 'tenant_id'],
+        ['integration_field_mappings', 'tenant_id'],
+        ['integration_remote_fields', 'tenant_id'],
+        ['integration_remote_endpoints', 'tenant_id'],
+        ['api_webhook_deliveries', 'tenant_id'],
+        ['integration_connections', 'tenant_id'],
+
+        // ── Workflow (#2956) ───────────────────────────────────────────
+        ['workflow_transitions', 'tenant_id'],
+        ['workflow_tasks', 'tenant_id'],
+        ['workflow_definitions', 'tenant_id'],
+
+        // ── Feedy i katalogi PDF (#2956) ───────────────────────────────
+        ['feed_run_logs', 'tenant_id'],
+        ['feed_runs', 'tenant_id'],
+        ['feed_pull_stats', 'tenant_id'],
+        ['feed_profiles', 'tenant_id'],
+        ['catalog_runs', 'tenant_id'],
+        ['catalog_profiles', 'tenant_id'],
+
+        // ── Pulpit, powiadomienia, zmiany oczekujące, audyt (#2956) ─────
+        ['dashboard_alert_acks', 'tenant_id'],
+        ['dashboard_snapshots', 'tenant_id'],
+        ['notifications', 'tenant_id'],
+        ['pending_changes', 'tenant_id'],
+        ['audit_logs', 'tenant_id'],
+
         // ── Identity (children of users before users) ──────────────────
         ['invitations', 'tenant_id'],
         ['api_tokens', 'tenant_id'],
@@ -190,6 +228,23 @@ final readonly class TenantPurger
             // for purging a different tenant, so it is intentionally bypassed.
             $total = 0;
             try {
+                // #2956 — zaproszenia PRZEKRACZAJĄ granicę tenanta. `invited_by_user_id`
+                // wskazuje osobę, która zaprosiła, a operator zapraszający właściciela
+                // nowego klienta ze swojego konta tworzy zaproszenie w tenancie A
+                // wskazujące użytkownika z tenanta B. To normalna ścieżka, nie nadużycie.
+                //
+                // Kasowanie „po tenancie" takiego wiersza nie obejmuje, więc usunięcie
+                // użytkowników wywraca się na `fk_invitations_invited_by` (ON DELETE
+                // RESTRICT) i CAŁY purge pada. Zmierzone na produkcji: 3 z 7 zaproszeń.
+                //
+                // Ten krok idzie PRZED pętlą, bo dotyczy wierszy, których pętla z
+                // definicji nie widzi — należą do innego tenanta.
+                $total += (int) $conn->executeStatement(
+                    'DELETE FROM invitations WHERE invited_by_user_id IN '
+                    .'(SELECT id FROM users WHERE tenant_id = :tenant)',
+                    ['tenant' => $idString],
+                );
+
                 foreach (self::DELETE_ORDER as [$table, $column]) {
                     // $table / $column are compile-time constants from
                     // DELETE_ORDER, never external input — safe to inline.
