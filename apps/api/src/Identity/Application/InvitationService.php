@@ -165,37 +165,71 @@ final class InvitationService
         // threw. Marking the invitation consumed up-front makes a stale token
         // (already-accepted / revoked / expired) surface as a 400 with no
         // user/role side effect.
-        $invitation->accept();
-        $this->invitations->save($invitation);
+        // Stan zaproszenia sprawdzany PRZED jakimkolwiek zapisem. To jest ta
+        // sama ochrona, którą wprowadziło AUD-024 (ponowne użycie tokenu ma dać
+        // 400, nie 500) — tyle że jako jawne sprawdzenie, a nie jako efekt
+        // uboczny wcześniejszego zapisu. Dzięki temu drugie kliknięcie
+        // w zużyty link nie zmienia hasła i nie dotyka konta.
+        if ($invitation->isAccepted()) {
+            throw new LogicException('Invitation already accepted.');
+        }
+        if ($invitation->isRevoked()) {
+            throw new LogicException('Invitation revoked.');
+        }
+        if ($invitation->isExpired()) {
+            throw new LogicException('Invitation expired.');
+        }
 
-        // Create User + hash password.
-        $user = new User(
-            tenant: $tenant,
-            email: $invitation->getEmail(),
-            passwordHash: '', // placeholder, hashed below — User ctor requires non-null
-            roles: ['ROLE_USER'],
-            id: Uuid::v7(),
-        );
-        $hashed = $this->passwordHasher->hashPassword($user, $newPassword);
-        // Re-instantiate User with the real hash — User has no setPassword;
-        // construct directly with the hash this time.
-        $user = new User(
-            tenant: $tenant,
-            email: $invitation->getEmail(),
-            passwordHash: $hashed,
-            roles: ['ROLE_USER'],
-            id: $user->getId(),
-        );
-        $this->users->save($user);
-
-        // Assign the invited role, unrestricted by default (ADR-0034 — the
-        // assignment table is the only record of who holds what).
+        // Rola musi istnieć ZANIM cokolwiek zapiszemy — inaczej zaproszenie
+        // zostaje zużyte, a użytkownik bez roli, do której był zapraszany.
         $invitedRole = $this->roles->findById($invitation->getRoleId());
         if (null === $invitedRole) {
             throw new RuntimeException('Role attached to the invitation no longer exists.');
         }
+
+        // Konto MOŻE już istnieć — i przy tenancie zakładanym z panelu istnieje
+        // ZAWSZE. `pim:tenant:bootstrap` tworzy właściciela z hasłem tymczasowym,
+        // żeby instancja w ogóle wstała i przeszła smoke test, a zaproszenie jest
+        // sposobem, w jaki właściciel przejmuje to konto i ustawia własne hasło.
+        //
+        // Wstawianie drugiego użytkownika kończyło się `users_email_uniq`
+        // i błędem 500 — przy JEDNOCZEŚNIE zużytym już zaproszeniu, bo stan
+        // zaproszenia zapisywany był wcześniej. Token przepadał, hasło zostawało
+        // tymczasowe i losowe, więc nikt nie mógł wejść do świeżej instancji.
+        $existing = $this->users->findByEmail($invitation->getEmail());
+        $sameTenant = null !== $existing
+            && $existing->getTenant()->getId()->equals($tenant->getId());
+
+        // Adres zajęty przez konto z INNEGO tenanta w tej samej bazie. Kolumna
+        // `users.email` ma unikalność globalną, nie per tenant, więc wstawienie
+        // i tak by się nie udało — tyle że jako 500 z surowego błędu bazy.
+        // Odrzucamy przed zapisem, żeby zaproszenie zostało nietknięte i dało
+        // się je wystawić na inny adres.
+        if (null !== $existing && !$sameTenant) {
+            throw new LogicException('An account with this email already exists in another tenant.');
+        }
+
+        $user = $sameTenant ? $existing : new User(
+            tenant: $tenant,
+            email: $invitation->getEmail(),
+            passwordHash: '', // hash ustawiany niżej — konstruktor wymaga wartości
+            roles: ['ROLE_USER'],
+            id: Uuid::v7(),
+        );
+
+        $user->changePassword($this->passwordHasher->hashPassword($user, $newPassword));
         $user->addRole($invitedRole);
-        $this->users->save($user);
+
+        // Zaproszenie znaczone jako zużyte DOPIERO po udanym zapisie konta.
+        // Odwrotna kolejność (AUD-024) chroniła przed ponownym użyciem tokenu,
+        // ale zamieniała każdą awarię zapisu w bezpowrotną utratę zaproszenia.
+        // Ochronę przed ponowieniem daje sprawdzenie stanu wyżej, a spójność —
+        // jedna transakcja obejmująca oba zapisy.
+        $this->em->wrapInTransaction(function () use ($user, $invitation): void {
+            $this->users->save($user);
+            $invitation->accept();
+            $this->invitations->save($invitation);
+        });
 
         return $user;
     }
