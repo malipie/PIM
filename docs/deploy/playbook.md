@@ -25,6 +25,35 @@ DC='docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.
 Trzy `-f` i `--env-file` to nie ozdoba: bez `--env-file .env.prod` compose przerywa na brakujących zmiennych,
 bez `docker-compose.site.yml` nie widzi kontenerów strony (po cutoverze domeny `pim-caddy` obsługuje oba hosty).
 
+## ⚠ Od 2026-08-19 produkcja to N instancji, nie jedna
+
+Migracja rozdzieliła klientów na osobne instancje. **Wdrożenie kodu dotyczy każdej z nich osobno** —
+każda ma własną bazę, własny obraz i własne migracje do wykonania.
+
+| Co | Gdzie żyje | Czym się wdraża |
+|---|---|---|
+| Kod aplikacji dla klientów i panelu | `pim-platform`, `pim-harmon`, `pim-trzeci-tenant`, … | **`scripts/pim-deploy-all.sh`** — po kolei, ze zrzutem przed każdą |
+| Bundel SPA | wspólny, montowany do edge | `pnpm --filter @pim/admin build` + `rsync apps/admin/dist` |
+| Konfiguracja edge | `docker/caddy/Caddyfile.site` (w repo od #2952) | `scp` + `caddy validate` + `caddy reload` |
+| Strona marketingowa | stack `harmon-www` | `sites/harmonpim/serwer/deploy.sh` |
+| Usługi wspólne (Meili, MinIO, Prometheus) | stack `pim` | zwykłe `up -d` w tym stacku |
+
+```bash
+# całość, platforma pierwsza (trzyma rejestr i zleca provisioning)
+bash scripts/pim-deploy-all.sh
+
+# jedna instancja po naprawie
+bash scripts/pim-deploy-all.sh --only harmon
+```
+
+Orkiestrator dla **każdej** instancji robi: zrzut → build → migracje z nowego obrazu → `up -d` →
+`cache:clear` w api i worker → restart → smoke, i **przerywa na pierwszym błędzie**, nie ruszając
+pozostałych. To jest zamierzone: lepiej mieć trzech klientów na starym kodzie i jednego zepsutego
+niż wszystkich zepsutych.
+
+Kroki 1–6 poniżej opisują, co orkiestrator robi pod spodem, i obowiązują, gdy wdrażasz ręcznie
+albo diagnozujesz przerwany przebieg.
+
 ## Przebieg
 
 ### 1. Backup — zanim cokolwiek ruszysz
@@ -220,6 +249,23 @@ FROM role_permissions;
 ```
 
 **Agreguj per (tenant, rola), nigdy per sam kod roli.** Każdy tenant ma własny komplet ról PRD, więc `GROUP BY r.code` podwaja wszystkie liczby, gdy tylko powstanie drugi tenant — i wygląda to dokładnie jak zduplikowane role, czyli klasa błędu, którą naprawiały #2832 / #2840. **Zdarzyło się** (2026-08-14): `catalog_manager` pokazał 62 zamiast 31, `tenant_owner` 114 zamiast 57, a wdrożenie z nieodwracalną migracją omal nie zostało przerwane. Rozstrzygające były trzy fakty: `role_permissions` miało tyle samo wierszy co unikalnych par (jest tam unikalny PK, więc duplikaty są niemożliwe), `super_admin` nie drgnął (jest globalny), a `tenants` zawierał drugi wpis z wczorajszą datą.
+
+### 12. Wdrożenie pomijało instancję platformową (2026-08-19)
+
+Orkiestrator wykrywał instancje globem `.env.tenant.*`, a instancja platformowa ma własny plik
+środowiska i własny plik Compose — więc była **cicho pomijana**. Klienci dostawali nowy kod, panel
+operatora i provisioner zostawały na starym, bez błędu i bez śladu w logu.
+
+Naprawione: platforma jedzie pierwsza. Sprawdzenie po wdrożeniu, że nikt nie został z tyłu:
+
+```bash
+ssh $HOST "cd /opt/pim && for p in pim-platform pim-harmon pim-trzeci-tenant; do
+  printf '%-20s ' \$p
+  docker inspect \$p-api-1 --format '{{.Config.Image}} {{.State.StartedAt}}'
+done"
+```
+
+Czasy startu powinny pochodzić z tego samego wdrożenia.
 
 ## Wycofanie
 
