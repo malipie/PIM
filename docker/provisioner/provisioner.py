@@ -129,6 +129,10 @@ def validate(job: dict) -> dict:
         "owner_email": job.get("owner_email"),
         "owner_password": job.get("owner_password"),
         "name": job.get("name") or code,
+        # Kolejka ustawia to na `true` przy każdym zakładaniu z panelu i BEZ
+        # przekazania dalej właściciel nie ma jak wejść do swojej instancji:
+        # hasło tymczasowe jest losowane i nikt go nigdy nie ogląda.
+        "invite_owner": bool(job.get("invite_owner")),
         "requested_by": job.get("requested_by"),
     }
 
@@ -263,15 +267,24 @@ def handle(job_id: str, job: dict) -> None:
     if action == "create":
         # Hasło idzie zmienną środowiskową POJEDYNCZEGO wywołania, nie
         # argumentem: argumenty są widoczne w liście procesów całego hosta.
+        argv = ["bash", "scripts/pim-tenant-new.sh",
+                "--code", code,
+                "--name", spec["name"],
+                "--subdomain", spec["subdomain"],
+                "--owner-email", spec["owner_email"],
+                "--owner-password-env", "PROVISIONER_OWNER_PASSWORD",
+                "--shared-env", SHARED_ENV]
+
+        # Zaproszenie wysyła NOWA instancja, nie platforma — link budowany jest
+        # z jej własnego APP_BASE_URL, więc wysłany z panelu prowadziłby pod zły
+        # adres (ADR-0036). Flaga w skrypcie jest domyślnie WYŁĄCZONA, więc jej
+        # nieprzekazanie kończy się instancją, do której właściciel nie ma jak
+        # wejść: hasło tymczasowe jest losowane i nikomu nie pokazywane.
+        if spec["invite_owner"]:
+            argv.append("--invite-owner")
+
         rc, out = run_step(
-            job_id, "provision",
-            ["bash", "scripts/pim-tenant-new.sh",
-             "--code", code,
-             "--name", spec["name"],
-             "--subdomain", spec["subdomain"],
-             "--owner-email", spec["owner_email"],
-             "--owner-password-env", "PROVISIONER_OWNER_PASSWORD",
-             "--shared-env", SHARED_ENV],
+            job_id, "provision", argv,
             env={"PROVISIONER_OWNER_PASSWORD": spec["owner_password"]},
         )
         record("provision", rc == 0, out)

@@ -129,6 +129,33 @@ final readonly class SuperAdminTenantWriteController
             );
         }
 
+        // Kod tenanta staje się nazwą projektu Compose, nazwą bazy i stanzą
+        // kopii zapasowych, więc przy zakładaniu instancji obowiązuje go WĘŻSZY
+        // kontrakt niż ogólny `[a-z0-9_-]{2,64}` sprawdzony wyżej: bez
+        // podkreśleń. Bez tego sprawdzenia panel przyjmował `tenant_z_panelu`,
+        // zwracał 202, a provisioner odrzucał zlecenie chwilę później — operator
+        // dostawał w panelu „niepowodzenie" i komunikat o schemacie, którego nie
+        // miał jak przewidzieć wypełniając formularz.
+        //
+        // Sprawdzane TYLKO gdy kolejka jest dostępna: w instalacji
+        // jednoinstancyjnej kod nie tworzy żadnej instancji i szerszy zestaw
+        // znaków nikomu nie przeszkadza.
+        if ($this->provisioning->isAvailable()) {
+            try {
+                TenantSubdomain::fromString($code);
+            } catch (InvalidArgumentException $exception) {
+                return $this->problem(
+                    Response::HTTP_UNPROCESSABLE_ENTITY,
+                    'Invalid code',
+                    \sprintf(
+                        'Kod tenanta staje się nazwą instancji, więc obowiązuje go ten sam kontrakt co subdomenę: %s',
+                        $exception->getMessage(),
+                    ),
+                    ['code' => 'invalid_code_for_instance'],
+                );
+            }
+        }
+
         // TNT-P4-05 (#2906) — subdomena adresuje instancję, więc jest polem
         // pierwszej klasy, a nie opcjonalną ozdobą. Domyślnie równa kodowi.
         $subdomainRaw = self::pickString($payload, 'subdomain') ?? $code;
