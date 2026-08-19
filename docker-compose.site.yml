@@ -1,0 +1,27 @@
+# Nakładka hosta produkcyjnego — edge obsługujący PIM i stronę (#2952).
+#
+# Do 2026-08-19 ten plik i `docker/caddy/Caddyfile.site` istniały WYŁĄCZNIE na
+# serwerze. Powstały przy cutoverze domeny (2026-08-07) i przez dwanaście dni
+# rozjeżdżały się z repozytorium — na tyle, że praca nad routingiem z epiku TNT
+# (#2856, #2908) była na produkcji martwa mimo zielonego CI i przebudowanego
+# obrazu. Wykryła to jedna linia z logu Caddy'ego: `*.app.harmonpim.pl` nie było
+# na liście zarządzanych domen. Dlatego oba pliki są teraz w gicie.
+#
+# Edge PIM-a jest jedynym procesem trzymającym porty 80/443 na hoście i obsługuje:
+#   app.harmonpim.pl        → 301 na harmon.app.harmonpim.pl (po migracji)
+#   admin.app.harmonpim.pl  → instancja platformowa (panel operatora)
+#   *.app.harmonpim.pl      → instancja tenanta, upstream z nazwy hosta
+#   harmonpim.pl            → strona marketingowa (stack harmon-www)
+#   www.harmonpim.pl        → 301 na harmonpim.pl
+#
+# Użycie (trzeci `-f`, patrz docs/deploy/playbook.md):
+#   docker compose --env-file .env.prod \
+#       -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.site.yml …
+services:
+  caddy:
+    volumes: !override
+      - ./docker/caddy/Caddyfile.site:/etc/caddy/Caddyfile:ro
+      - ./apps/admin/dist:/srv/admin:ro
+      - ./apps/docs/dist:/srv/docs:ro
+      - caddy_data:/data
+      - caddy_config:/config
