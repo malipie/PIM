@@ -117,13 +117,22 @@ deploy_one() {
     local project="pim-${tenant}"
     local compose_file="$COMPOSE_FILE"
 
-    # Platforma ma własny plik Compose (mniejszy stack, za to z provisionerem)
-    # i własny plik środowiska. Poza tym przebieg jest identyczny, więc nie ma
-    # powodu na drugą funkcję, która zaraz rozjedzie się z tą.
+    # Usługi, które biorą udział we wdrożeniu. NIE są takie same w obu stackach
+    # i to jest istota różnicy, nie szczegół: instancja platformowa **nie ma
+    # workera** (nie przetwarza katalogu ani importów), za to ma provisionera.
+    # Zaszyte `api worker` wywracało wdrożenie na kroku 2 komunikatem
+    # `no such service: worker`.
+    local do_budowy="api worker"      # obrazy do przebudowania
+    local z_cache="api worker"        # osobne kernel.cache_dir, osobny cache:clear
+    local do_restartu="api worker"
+
     if [ "$tenant" = platform ]; then
         env_file=".env.platform"
         project="pim-platform"
         compose_file="docker-compose.platform.yml"
+        do_budowy="api provisioner"
+        z_cache="api"
+        do_restartu="api provisioner"
     fi
 
     dc() { docker compose -p "$project" --env-file "$env_file" -f "$compose_file" "$@"; }
@@ -134,14 +143,19 @@ deploy_one() {
         echo "  [1/7] zrzut POMINIĘTY"
     else
         echo "  [1/7] zrzut przed wdrożeniem"
-        bash scripts/pim-tenant-dump.sh --code "$tenant" --label pre-deploy --tag "$tag" >/dev/null || {
+        # `--env-file` i `--compose` przekazywane jawnie: instancja platformowa
+        # nie trzyma środowiska pod nazwą `.env.tenant.<kod>`, więc bez tego
+        # zrzut szukałby pliku, którego nie ma, i wdrożenie padało na kroku 1.
+        bash scripts/pim-tenant-dump.sh --code "$tenant" --label pre-deploy --tag "$tag" \
+            --env-file "$env_file" --compose "$compose_file" >/dev/null || {
             echo "  BŁĄD: zrzut się nie powiódł — wdrożenie na ${tenant} PRZERWANE." >&2
             return 20
         }
     fi
 
-    echo "  [2/7] build api worker"
-    dc build api worker >/dev/null 2>&1 || { echo "  BŁĄD: build nie powiódł się." >&2; return 30; }
+    echo "  [2/7] build ${do_budowy}"
+    # shellcheck disable=SC2086 # lista usług ma się rozwinąć na osobne argumenty
+    dc build $do_budowy >/dev/null 2>&1 || { echo "  BŁĄD: build nie powiódł się." >&2; return 30; }
 
     # Migracje z NOWEGO obrazu, zanim nowe kontenery zaczną obsługiwać ruch.
     echo "  [3/7] migracje (nowy obraz, przed up -d)"
@@ -151,15 +165,17 @@ deploy_one() {
     echo "  [4/7] up -d"
     dc up -d >/dev/null 2>&1 || { echo "  BŁĄD: kontenery nie wstały." >&2; return 30; }
 
-    # OBA kontenery — mają różne kernel.cache_dir.
-    echo "  [5/7] cache:clear w api i w worker"
-    dc exec -T api php bin/console cache:clear >/dev/null 2>&1 \
-        || { echo "  BŁĄD: cache:clear w api nie powiódł się." >&2; return 50; }
-    dc exec -T worker php bin/console cache:clear >/dev/null 2>&1 \
-        || { echo "  BŁĄD: cache:clear w worker nie powiódł się." >&2; return 50; }
+    # Każdy kontener aplikacji ma własny kernel.cache_dir, więc czyszczenie
+    # tylko w jednym zostawia drugi na skompilowanym kontenerze DI sprzed zmiany.
+    echo "  [5/7] cache:clear w: ${z_cache}"
+    for usluga in $z_cache; do
+        dc exec -T "$usluga" php bin/console cache:clear >/dev/null 2>&1 \
+            || { echo "  BŁĄD: cache:clear w ${usluga} nie powiódł się." >&2; return 50; }
+    done
 
-    echo "  [6/7] restart api worker"
-    dc restart api worker >/dev/null 2>&1 || { echo "  BŁĄD: restart nie powiódł się." >&2; return 30; }
+    echo "  [6/7] restart ${do_restartu}"
+    # shellcheck disable=SC2086 # jw.
+    dc restart $do_restartu >/dev/null 2>&1 || { echo "  BŁĄD: restart nie powiódł się." >&2; return 30; }
 
     echo "  [7/7] smoke"
     local tries=30 status=""
