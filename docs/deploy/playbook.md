@@ -6,7 +6,7 @@
 > **Po każdym wdrożeniu, które czegoś nauczyło, dopisz to tutaj.** Dokument bez aktualizacji zestarzeje się
 > szybciej niż stack.
 >
-> Ostatnia aktualizacja: 2026-08-17 (wdrożenie `d10a769e`).
+> Ostatnia aktualizacja: 2026-08-19 (wdrożenie epiku TNT, `0bc63aa0`).
 > Pierwsze postawienie hosta: [`../operations/deploy-runbook.md`](../operations/deploy-runbook.md).
 
 ## Zanim zaczniesz — co musi być prawdą
@@ -228,9 +228,83 @@ Jedno i drugie naprawione; bramka odfiltrowuje `AccessDenied` i liczy odmowy oso
 znowu zobaczysz „dziesiątki błędów" po zdrowym wdrożeniu — sprawdź najpierw, **czego szuka grep**,
 a dopiero potem czego szuka aplikacja.
 
+### 9. Produkcja może czytać plik, którego nie ma w repo (2026-08-19, `0bc63aa0`)
+
+Wdrożenie routingu subdomen przeszło całe: obraz zbudowany, kod żywy w kontenerze, CI zielone —
+i **nie zadziałało**, bo edge produkcji montuje `docker/caddy/Caddyfile.site` przez
+`docker-compose.site.yml`, a **żadnego z tych plików nie ma w gicie**. Powstały przy cutoverze domeny
+i od 12 dni rozjeżdżały się z repozytorium; zmieniony `Caddyfile.prod` nie był przez nikogo czytany.
+
+**Sweep przed wdrożeniem czegokolwiek, co dotyka infrastruktury** — jedno polecenie odpowiada na pytanie
+„czy to, co wdrażam, jest tym, co on czyta":
+
+```bash
+ssh $HOST "docker inspect pim-caddy-1 --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}'"
+git ls-files docker/caddy/
+```
+
+Rozjazd = zatrzymaj się i zdecyduj świadomie, zanim ogłosisz sukces.
+
+**Ten konkretny rozjazd jest już zamknięty** (#2952): `Caddyfile.site` i `docker-compose.site.yml`
+są w repozytorium i przy wdrożeniu 2026-08-19 plik w gicie był identyczny co do bajtu z tym, który
+serwuje produkcja. Sweep zostaje, bo pilnuje **następnego** takiego pliku, nie tego jednego.
+
+### 9b. `tar`/`scp` z macOS zostawia na hoście pliki `._*` (2026-08-19)
+
+Na produkcji leżało **91 plików `._*`** (AppleDouble — metadane macOS), najstarsze z pierwszych wdrożeń.
+Są bezczynne: nie są poprawnym PHP, a autoloading mapuje nazwy klas na nazwy plików, więc nikt ich nie
+ładuje. Szkodzą tylko przy porównywaniu drzewa „repo vs produkcja", bo produkcja ma wtedy więcej plików
+niż `git ls-files` i różnica wygląda na dryf kodu.
+
+Skąd się biorą: `tar` na macOS domyślnie pakuje rozszerzone atrybuty, a `scp -r` przenosi je razem
+z katalogiem. `git archive` ich **nie** tworzy — dlatego wdrożenia wykonywane wg tego playbooka są czyste.
+
+```bash
+# przy pakowaniu z Maca (jeśli kiedykolwiek zamiast `git archive`)
+COPYFILE_DISABLE=1 tar czf …
+
+# sprzątanie na hoście — wzorzec trafia wyłącznie w śmieci
+#   (`git ls-files | grep -E '(^|/)\._'` jest pusty, więc nic prawdziwego się pod niego nie łapie)
+ssh $HOST "cd /opt/pim && find . -name '._*' -type f -delete"
+```
+
+### 10. Dowodem dla zmiany w edge jest NOWE zachowanie, nie brak regresji (2026-08-19)
+
+Po restarcie Caddy'ego wszystkie istniejące hosty odpowiadały 200 — smoke „strona wstała" był zielony,
+a wdrożona funkcja martwa. Jedynym sygnałem była linia z logu:
+
+```bash
+ssh $HOST "docker logs pim-caddy-1 2>&1 | grep -oE '\"domains\":\[[^]]*\]' | tail -1"
+# przed:  ["www.harmonpim.pl","harmonpim.pl","app.harmonpim.pl","localhost"]
+# po:     [...,"*.app.harmonpim.pl"]     ← dopiero to znaczy, że blok został wczytany
+```
+
+Reguła ogólna: szukaj potwierdzenia **nowego** zachowania. Brak regresji w starym niczego nie dowodzi,
+bo stary blok konfiguracji działa niezależnie od tego, czy nowy w ogóle się wczytał.
+
+### 11. Sekret odrzucony przez narzędzie ≠ zły sekret (2026-08-19)
+
+`caddy-dns/cloudflare` do v0.2.3 walidował **kształt** tokenu po swojej stronie i odrzucał ważny token
+w nowym formacie (`cfut_`/`cfat_`) komunikatem „API token appears invalid" — brzmiącym jak literówka.
+Zanim zaczniesz podejrzewać sekret, potwierdź go u wystawcy:
+
+```bash
+curl -s https://api.cloudflare.com/client/v4/user/tokens/verify -H "Authorization: Bearer $CF_API_TOKEN"
+```
+
+`"status":"active"` przy jednoczesnym „invalid" z narzędzia = niezgodność wersji, nie zły token.
+
 ## Co warto zmierzyć przy zmianach w uprawnieniach
 
 Przed i po, z tymi samymi zapytaniami — porównanie liczb jest szybsze i pewniejsze niż czytanie logów:
+
+**Policz też coś, co należy do KLIENTA, nie tylko sumy globalne.** Operator pyta „czy moje treści
+przeżyją", a suma 101951 obiektów tego nie rozstrzyga — rozstrzyga liczba per tenant, przed i po:
+
+```sql
+SELECT t.code, t.status, count(o.id) FROM tenants t
+LEFT JOIN objects o ON o.tenant_id = t.id GROUP BY 1, 2 ORDER BY 1;
+```
 
 ```sql
 -- czy ktoś stracił przypisanie
