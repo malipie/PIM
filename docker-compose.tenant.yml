@@ -349,6 +349,18 @@ services:
     volumes:
       - api_var:/app/var
       - api_jwt:/app/config/jwt
+    # Obraz jest wspólny z `api` i niesie HEALTHCHECK sondujący HTTP na :80.
+    # Worker HTTP nie serwuje, więc bez tego nadpisania świeci `unhealthy` od
+    # startu — a wtedy sygnał, po którym poznaje się awarię, pali się na stałe
+    # i realne padnięcie konsumenta staje się nieodróżnialne od normy.
+    # Wspólny stack ma tę sondę od dawna (docker-compose.yml); instancje
+    # tenantów jej nie odziedziczyły.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'messenger:consume' > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     networks:
       - internal
 
