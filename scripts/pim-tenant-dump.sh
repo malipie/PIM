@@ -25,6 +25,7 @@ MIN_DUMP_BYTES=1024
 
 code=""
 all=false
+env_file_override=""
 label="manual"
 tag=""
 keep=10
@@ -36,6 +37,10 @@ Zrzut logiczny bazy tenanta.
 Opcje:
   --code <kod>     Kod tenanta (albo --all).
   --all            Wszystkie instancje z plikami .env.tenant.*
+  --env-file <plik> Plik środowiska; domyślnie .env.tenant.<kod>. Potrzebne dla
+                   instancji, które nie trzymają go pod tą nazwą — na przykład
+                   platformowej (.env.platform).
+  --compose <plik> Plik Compose; domyślnie docker-compose.tenant.yml.
   --label <etyk.>  Podkatalog kopii; domyślnie manual (np. pre-deploy).
   --tag <tekst>    Znacznik w nazwie pliku, zwykle skrót commita.
   --keep <N>       Ile ostatnich kopii zachować w danej etykiecie; domyślnie 10.
@@ -47,6 +52,8 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --code) code="${2:-}"; shift 2 ;;
         --all) all=true; shift ;;
+        --env-file) env_file_override="${2:-}"; shift 2 ;;
+        --compose) COMPOSE_FILE="${2:-}"; shift 2 ;;
         --label) label="${2:-}"; shift 2 ;;
         --tag) tag="${2:-}"; shift 2 ;;
         --keep) keep="${2:-}"; shift 2 ;;
@@ -62,7 +69,7 @@ fi
 
 dump_one() {
     local tenant="$1"
-    local env_file=".env.tenant.${tenant}"
+    local env_file="${env_file_override:-.env.tenant.${tenant}}"
     local project="pim-${tenant}"
 
     if [ ! -f "$env_file" ]; then
