@@ -63,11 +63,24 @@ done
 [ -n "$tag" ] || tag="$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"
 
 # ── Lista instancji ─────────────────────────────────────────────────────────
+#
+# Instancja PLATFORMOWA jedzie razem z klientami, choć ma własny plik środowiska
+# i własny plik Compose. Wykrywanie po samym `.env.tenant.*` cicho ją pomijało:
+# wdrożenie meldowało sukces, klienci dostawali nowy kod, a panel operatora
+# i provisioner zostawały na starym — bez żadnego sygnału. Ta sama klasa
+# przeoczenia, co konfiguracja edge poza repozytorium (#2952).
 tenants=()
 if [ -n "$only" ]; then
-    [ -f ".env.tenant.${only}" ] || { echo "BŁĄD: brak .env.tenant.${only}." >&2; exit 2; }
+    if [ "$only" = platform ]; then
+        [ -f ".env.platform" ] || { echo "BŁĄD: brak .env.platform." >&2; exit 2; }
+    else
+        [ -f ".env.tenant.${only}" ] || { echo "BŁĄD: brak .env.tenant.${only}." >&2; exit 2; }
+    fi
     tenants=("$only")
 else
+    # Platforma PIERWSZA: prowadzi rejestr i zleca provisioning, więc ma być na
+    # nowym kodzie, zanim klienci zaczną się wdrażać.
+    [ -f ".env.platform" ] && tenants+=("platform")
     for f in .env.tenant.*; do
         [ -f "$f" ] || continue
         case "$f" in *.example) continue ;; esac
@@ -76,7 +89,7 @@ else
 fi
 
 if [ "${#tenants[@]}" -eq 0 ]; then
-    echo "Brak instancji do wdrożenia (żadnego pliku .env.tenant.*)." >&2
+    echo "Brak instancji do wdrożenia (ani .env.platform, ani .env.tenant.*)." >&2
     exit 2
 fi
 
@@ -102,8 +115,18 @@ deploy_one() {
     local tenant="$1"
     local env_file=".env.tenant.${tenant}"
     local project="pim-${tenant}"
+    local compose_file="$COMPOSE_FILE"
 
-    dc() { docker compose -p "$project" --env-file "$env_file" -f "$COMPOSE_FILE" "$@"; }
+    # Platforma ma własny plik Compose (mniejszy stack, za to z provisionerem)
+    # i własny plik środowiska. Poza tym przebieg jest identyczny, więc nie ma
+    # powodu na drugą funkcję, która zaraz rozjedzie się z tą.
+    if [ "$tenant" = platform ]; then
+        env_file=".env.platform"
+        project="pim-platform"
+        compose_file="docker-compose.platform.yml"
+    fi
+
+    dc() { docker compose -p "$project" --env-file "$env_file" -f "$compose_file" "$@"; }
 
     echo "── ${tenant} ──────────────────────────────────────────"
 
