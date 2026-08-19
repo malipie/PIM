@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Harmon PIM Dokumentacja</title>
+<meta name="description" content="Dokumentacja Harmon PIM: self-host, przewodnik po systemie, dokumentacja API i warunki licencji fair-code.">
+<meta property="og:title" content="Harmon PIM Dokumentacja">
+<meta property="og:description" content="Self-host, przewodnik po systemie, API i licencja Harmon PIM w jednym miejscu.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ffffff'/%3E%3Crect x='7.5' y='6' width='9' height='52' rx='4.5' fill='%230E1830'/%3E%3Crect x='21' y='24' width='9' height='19' rx='4.5' fill='%230E1830'/%3E%3Crect x='34.5' y='24' width='9' height='13' rx='4.5' fill='%23FF4F00'/%3E%3Crect x='48' y='24' width='9' height='34' rx='4.5' fill='%230E1830'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+<script>document.documentElement.lang='pl';</script>
+<style>
+html { scroll-behavior: smooth; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: #16233f; background: #ffffff; letter-spacing: -0.011em; font-feature-settings: "ss01", "cv11"; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+a { color: #bd3a08; text-decoration: none; }
+a:hover { color: #e64700; text-decoration: underline; }
+button { font-family: inherit; letter-spacing: -0.011em; }
+input { font-family: inherit; letter-spacing: -0.011em; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</helmet>
+<header data-screen-label="Nawigacja" style="position:sticky;top:0;z-index:60;background:rgba(255,255,255,.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid #e3e9f1">
+  <div style="max-width:1200px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;gap:24px">
+    <a href="Harmon PIM - Landing.dc.html" aria-label="Harmon PIM - strona główna" style="display:flex;align-items:center;gap:11px;text-decoration:none;flex-shrink:0">
+      <svg width="24" height="25" viewBox="7.5 6 49.5 52" aria-hidden="true" style="display:block"><rect x="7.5" y="6" width="9" height="52" rx="4.5" fill="#0E1830"></rect><rect x="21" y="24" width="9" height="19" rx="4.5" fill="#0E1830"></rect><rect x="34.5" y="24" width="9" height="13" rx="4.5" fill="#FF4F00"></rect><rect x="48" y="24" width="9" height="34" rx="4.5" fill="#0E1830"></rect></svg>
+      <span style="font-family:'Manrope',sans-serif;font-size:21px;font-weight:700;letter-spacing:0.025em;line-height:1;color:#0E1830;padding-bottom:1px">harmon</span>
+      <span style="font-family:'Manrope',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.18em;padding:3px 5px 3px 7px;border-radius:5px;background:#FF4F00;color:#ffffff">PIM</span>
+    </a>
+    <nav aria-label="Nawigacja główna" style="display:{{ navDisp }};align-items:center;gap:26px">
+      <div onMouseEnter="{{ openProd }}" onMouseLeave="{{ closeProd }}" style="position:relative;display:flex;align-items:center">
+        <button type="button" onClick="{{ toggleProd }}" aria-haspopup="true" aria-expanded="{{ prodExp }}" style="display:inline-flex;align-items:center;gap:6px;background:transparent;border:none;padding:0 0 2px;cursor:pointer;font-size:15px;font-weight:500;color:#2f405a;white-space:nowrap" style-hover="color:#16233f" style-focus="outline:none;color:#16233f;box-shadow:0 0 0 4px rgba(20,32,58,.08);border-radius:4px">
+          Produkt
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+        <sc-if value="{{ prodOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:100%;left:-14px;padding-top:16px;min-width:230px">
+            <div style="background:#ffffff;border:1px solid #e3e9f1;border-radius:14px;padding:8px;box-shadow:0 24px 48px -18px rgba(20,32,58,.22),0 2px 6px rgba(20,32,58,.06);display:flex;flex-direction:column;gap:2px">
+              <a href="Produkt.dc.html" onClick="{{ closeProd }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Przegląd produktu</a>
+              <a href="Funkcje.dc.html" onClick="{{ closeProd }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Funkcje</a>
+              <a href="Integracje.dc.html" onClick="{{ closeProd }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Integracje</a>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <a href="Wdrozenie.dc.html" style="font-size:15px;font-weight:500;color:#2f405a;text-decoration:none;white-space:nowrap" style-hover="color:#16233f;text-decoration:none">Wdrożenie PIM</a>
+      <a href="Cennik.dc.html" style="font-size:15px;font-weight:500;color:#2f405a;text-decoration:none;white-space:nowrap" style-hover="color:#16233f;text-decoration:none">Cennik</a>
+      <div onMouseEnter="{{ openZas }}" onMouseLeave="{{ closeZas }}" style="position:relative;display:flex;align-items:center">
+        <a href="Zasoby.dc.html" aria-current="page" aria-haspopup="true" aria-expanded="{{ zasExp }}" style="display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:600;color:#16233f;text-decoration:none;white-space:nowrap;border-bottom:2px solid #ff4f00;padding-bottom:2px" style-hover="color:#16233f;text-decoration:none">Zasoby <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></a>
+        <sc-if value="{{ zasOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:100%;left:-14px;padding-top:16px;min-width:230px">
+            <div style="background:#ffffff;border:1px solid #e3e9f1;border-radius:14px;padding:8px;box-shadow:0 24px 48px -18px rgba(20,32,58,.22),0 2px 6px rgba(20,32,58,.06);display:flex;flex-direction:column;gap:2px">
+              <a href="Zasoby.dc.html#selfhost" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Self-host Harmon</a>
+              <a href="Zasoby.dc.html#dokumentacja" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Dokumentacja</a>
+              <a href="Zasoby.dc.html#api" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Dokumentacja API</a>
+              <a href="Zasoby.dc.html#licencja" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Licencja</a>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <a href="Kontakt.dc.html" style="font-size:15px;font-weight:500;color:#2f405a;text-decoration:none;white-space:nowrap" style-hover="color:#16233f;text-decoration:none">Kontakt</a>
+    </nav>
+    <div style="display:{{ navDisp }};align-items:center;gap:12px">
+      <a href="#" style="background:#16233f;color:#ffffff;font-size:14px;font-weight:600;padding:10px 18px;border-radius:12px;text-decoration:none;transition:background .15s ease;white-space:nowrap" style-hover="background:#2f405a;color:#ffffff;text-decoration:none" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">Zaloguj się</a>
+      <button type="button" onClick="{{ openModal }}" style="background:#ff4f00;color:#ffffff;font-size:19px;font-weight:700;padding:10px 22px;border-radius:12px;border:none;cursor:pointer;transition:background .15s ease,transform .15s ease;white-space:nowrap" style-hover="background:#e64700;transform:translateY(-1px)" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.18)">Umów prezentację</button>
+    </div>
+    <button type="button" onClick="{{ toggleMenu }}" aria-label="Menu" aria-expanded="{{ menuOpen }}" style="display:{{ hamDisp }};align-items:center;justify-content:center;width:44px;height:44px;background:transparent;border:1px solid #e3e9f1;border-radius:12px;cursor:pointer" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16233f" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path></svg>
+    </button>
+  </div>
+  <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:100%;left:0;right:0;background:#ffffff;border-bottom:1px solid #e3e9f1;box-shadow:0 24px 48px -20px rgba(20,32,58,.08);padding:12px 24px 24px;display:flex;flex-direction:column">
+      <a href="Produkt.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px 10px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none">Produkt</a>
+      <div style="display:flex;flex-direction:column;padding:0 0 12px 14px;border-bottom:1px solid #eef2f7;border-left:2px solid #ffd0bd;margin-left:2px">
+        <a href="Produkt.dc.html" onClick="{{ closeMenu }}" style="padding:9px 0;font-size:15px;font-weight:500;color:#5b6b87;text-decoration:none">Przegląd produktu</a>
+        <a href="Funkcje.dc.html" onClick="{{ closeMenu }}" style="padding:9px 0;font-size:15px;font-weight:500;color:#5b6b87;text-decoration:none">Funkcje</a>
+        <a href="Integracje.dc.html" onClick="{{ closeMenu }}" style="padding:9px 0;font-size:15px;font-weight:500;color:#5b6b87;text-decoration:none">Integracje</a>
+      </div>
+      <a href="Wdrozenie.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none;border-bottom:1px solid #eef2f7">Wdrożenie PIM</a>
+      <a href="Cennik.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none;border-bottom:1px solid #eef2f7">Cennik</a>
+      <a href="Zasoby.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none;border-bottom:1px solid #eef2f7">Zasoby</a>
+      <a href="Kontakt.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none">Kontakt</a>
+      <button type="button" onClick="{{ openModal }}" style="margin-top:14px;background:#ff4f00;color:#ffffff;font-size:19px;font-weight:700;padding:14px 28px;border-radius:12px;border:none;cursor:pointer;width:100%">Umów darmową prezentację</button>
+    </div>
+  </sc-if>
+</header>
+
+<main id="top">
+
+<section data-screen-label="Docs hero" style="background:linear-gradient(180deg,#ffdcc9 0%,#fff1ec 55%);padding:72px 24px 88px">
+  <div style="max-width:900px;margin:0 auto;text-align:center">
+    <div data-reveal="0" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:18px;font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#bd3a08">
+      <a href="Harmon PIM - Landing.dc.html" style="color:#8a93a6;text-decoration:none" style-hover="color:#bd3a08;text-decoration:none">Start</a>
+      <span style="color:#c8d5e6">/</span>
+      <span>Zasoby</span>
+    </div>
+    <h1 data-reveal="0" style="margin:0;font-size:clamp(34px,4.6vw,58px);font-weight:800;letter-spacing:-0.04em;line-height:1.04;color:#16233f;text-wrap:balance">Harmon PIM Dokumentacja</h1>
+    <p data-reveal="1" style="margin:20px auto 0;max-width:700px;font-size:19px;line-height:1.55;color:#2f405a;text-wrap:pretty">Harmon PIM to system zarządzania informacją produktową, który łączy pracę zespołu z agentem AI i publikuje ten sam katalog do sklepu, ERP i kanałów sprzedaży.</p>
+    <form data-reveal="2" onSubmit="{{ noSubmit }}" style="margin:34px auto 0;max-width:540px;display:flex;align-items:center;gap:10px;background:#ffffff;border:1px solid #f2c9b5;border-radius:14px;padding:12px 14px;box-shadow:0 18px 40px -26px rgba(20,32,58,.4)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a93a6" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.2-3.2"></path></svg>
+      <input type="search" placeholder="Szukaj w dokumentacji" aria-label="Szukaj w dokumentacji" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-size:15.5px;color:#16233f">
+      <span style="flex-shrink:0;font-family:'Inter', system-ui, sans-serif;font-size:11px;font-weight:500;color:#8a93a6;border:1px solid #e3e9f1;border-radius:6px;padding:3px 7px">/</span>
+    </form>
+  </div>
+</section>
+
+<section data-screen-label="Sekcje docs" style="background:#ffffff;padding:80px 24px 40px">
+  <div style="max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px">
+    <a id="selfhost" href="#" data-reveal="0" style="scroll-margin-top:132px;display:flex;flex-direction:column;gap:12px;background:#f6f8fb;border:1px solid #e3e9f1;border-radius:20px;padding:28px 26px;text-decoration:none;transition:border-color .15s ease,transform .15s ease" style-hover="border-color:#ffb894;transform:translateY(-2px);text-decoration:none">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:#0e1830">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect><path d="M7 7.5h.01"></path><path d="M7 16.5h.01"></path></svg>
+      </span>
+      <span style="font-size:20px;font-weight:700;letter-spacing:-0.025em;color:#16233f">Self-host Harmon</span>
+      <span style="font-size:15px;font-weight:300;line-height:1.65;color:#55647f;text-wrap:pretty">Instalacja na własnej infrastrukturze, wymagania, aktualizacje i kopie zapasowe.</span>
+      <span style="margin-top:2px;font-family:'Inter', system-ui, sans-serif;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#bd3a08">Otwórz sekcję</span>
+    </a>
+    <a id="dokumentacja" href="#" data-reveal="1" style="scroll-margin-top:132px;display:flex;flex-direction:column;gap:12px;background:#f6f8fb;border:1px solid #e3e9f1;border-radius:20px;padding:28px 26px;text-decoration:none;transition:border-color .15s ease,transform .15s ease" style-hover="border-color:#ffb894;transform:translateY(-2px);text-decoration:none">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:#0e1830">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"></path><path d="M8 7.5h7"></path><path d="M8 11h5"></path></svg>
+      </span>
+      <span style="font-size:20px;font-weight:700;letter-spacing:-0.025em;color:#16233f">Dokumentacja</span>
+      <span style="font-size:15px;font-weight:300;line-height:1.65;color:#55647f;text-wrap:pretty">Struktura danych, atrybuty, warianty, kanały, workflow akceptacji i praca z agentem.</span>
+      <span style="margin-top:2px;font-family:'Inter', system-ui, sans-serif;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#bd3a08">Otwórz sekcję</span>
+    </a>
+    <a id="api" href="#" data-reveal="2" style="scroll-margin-top:132px;display:flex;flex-direction:column;gap:12px;background:#f6f8fb;border:1px solid #e3e9f1;border-radius:20px;padding:28px 26px;text-decoration:none;transition:border-color .15s ease,transform .15s ease" style-hover="border-color:#ffb894;transform:translateY(-2px);text-decoration:none">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:#0e1830">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 17-5-5 5-5"></path><path d="m15 7 5 5-5 5"></path></svg>
+      </span>
+      <span style="font-size:20px;font-weight:700;letter-spacing:-0.025em;color:#16233f">Dokumentacja API</span>
+      <span style="font-size:15px;font-weight:300;line-height:1.65;color:#55647f;text-wrap:pretty">REST API, autoryzacja, webhooki i limity - wszystko, czego potrzebuje integrator.</span>
+      <span style="margin-top:2px;font-family:'Inter', system-ui, sans-serif;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#bd3a08">Otwórz sekcję</span>
+    </a>
+    <a id="licencja" href="#" data-reveal="3" style="scroll-margin-top:132px;display:flex;flex-direction:column;gap:12px;background:#f6f8fb;border:1px solid #e3e9f1;border-radius:20px;padding:28px 26px;text-decoration:none;transition:border-color .15s ease,transform .15s ease" style-hover="border-color:#ffb894;transform:translateY(-2px);text-decoration:none">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:#0e1830">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.4 3.2 7.9 8 9 4.8-1.1 8-4.6 8-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
+      </span>
+      <span style="font-size:20px;font-weight:700;letter-spacing:-0.025em;color:#16233f">Licencja</span>
+      <span style="font-size:15px;font-weight:300;line-height:1.65;color:#55647f;text-wrap:pretty">Warunki licencji, co wolno w self-hoście i jak wygląda korzystanie komercyjne.</span>
+      <span style="margin-top:2px;font-family:'Inter', system-ui, sans-serif;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#bd3a08">Otwórz sekcję</span>
+    </a>
+  </div>
+</section>
+
+</main>
+<footer data-screen-label="Stopka" style="background:#ffffff;border-top:1px solid #e3e9f1;padding:56px 24px 40px">
+  <div style="max-width:1200px;margin:0 auto">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:40px 32px">
+      <div>
+        <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#16233f">Produkt</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <a href="Produkt.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Przegląd produktu</a>
+          <a href="Funkcje.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Funkcje</a>
+          <a href="Integracje.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Integracje</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#16233f">Zasoby</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <a href="Zasoby.dc.html#selfhost" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Self-host Harmon</a>
+          <a href="Zasoby.dc.html#dokumentacja" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Dokumentacja</a>
+          <a href="Zasoby.dc.html#api" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Dokumentacja API</a>
+          <a href="Zasoby.dc.html#licencja" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Licencja</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#16233f">Firma</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <a href="Wdrozenie.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Wdrożenie PIM</a>
+          <a href="Cennik.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Cennik</a>
+          <a href="Kontakt.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Kontakt</a>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:56px;padding-top:28px;border-top:1px solid #e3e9f1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <svg width="19" height="20" viewBox="7.5 6 49.5 52" aria-hidden="true" style="display:block;flex-shrink:0"><rect x="7.5" y="6" width="9" height="52" rx="4.5" fill="#0E1830"></rect><rect x="21" y="24" width="9" height="19" rx="4.5" fill="#0E1830"></rect><rect x="34.5" y="24" width="9" height="13" rx="4.5" fill="#FF4F00"></rect><rect x="48" y="24" width="9" height="34" rx="4.5" fill="#0E1830"></rect></svg>
+        <span style="font-family:'Manrope',sans-serif;font-size:16px;font-weight:700;letter-spacing:0.025em;color:#0E1830">harmon</span>
+        <span style="font-size:14px;color:#2f405a">Harmon - PIM, który myśli i działa.</span>
+      </div>
+      <span style="font-size:13px;color:#5b6b87">© 2026 Harmon PIM. Wszystkie prawa zastrzeżone.</span>
+    </div>
+  </div>
+</footer>
+<sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+  <dc-import name="Formularz-demo" on-close="{{ closeModal }}" hint-size="100%,100%"></dc-import>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;animacje&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Zachowanie&quot;}}">
+class Component extends DCLogic {
+  state = { prod: false, zas: false, modal: false, menu: false, mobile: false };
+  componentDidMount() {
+    this._touts = [];
+    this._rm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this._anim = (this.props.animacje ?? true) && !this._rm;
+    this._mq = window.matchMedia("(max-width: 1120px)");
+    this._setM = () => this.setState({ mobile: this._mq.matches, menu: false });
+    this._mq.addEventListener("change", this._setM);
+    if (this._mq.matches) this.setState({ mobile: true });
+    this._kd = (e) => { if (e.key === "Escape") this.setState({ prod: false, zas: false, modal: false, menu: false }); };
+    window.addEventListener("keydown", this._kd);
+    this.initReveal();
+  }
+  componentWillUnmount() {
+    this._mq.removeEventListener("change", this._setM);
+    window.removeEventListener("keydown", this._kd);
+    window.removeEventListener("scroll", this._rv);
+    window.removeEventListener("resize", this._rv);
+    (this._touts || []).forEach(clearTimeout);
+    document.body.style.overflow = "";
+  }
+  componentDidUpdate() {
+    const want = this.state.modal ? "hidden" : "";
+    if (document.body.style.overflow !== want) document.body.style.overflow = want;
+  }
+  initReveal() {
+    const els = Array.from(document.querySelectorAll("[data-reveal]"));
+    if (!els.length) return;
+    if (!this._anim) { els.forEach((el) => { el.style.opacity = "1"; el.style.transform = "none"; }); return; }
+    els.forEach((el) => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(10px)";
+      el.style.transition = "opacity .45s ease, transform .45s ease";
+      el.style.transitionDelay = (parseInt(el.getAttribute("data-reveal"), 10) || 0) * 70 + "ms";
+    });
+    this._pending = els;
+    const show = (el) => { el.style.opacity = "1"; el.style.transform = "none"; };
+    this._rv = () => {
+      if (!this._pending || !this._pending.length) return;
+      const h = window.innerHeight || 800;
+      this._pending = this._pending.filter((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.top < h - 24 && r.bottom > -80) { show(el); return false; }
+        return true;
+      });
+    };
+    window.addEventListener("scroll", this._rv, { passive: true });
+    window.addEventListener("resize", this._rv);
+    this._rv();
+    requestAnimationFrame(() => requestAnimationFrame(this._rv));
+    const T = (ms, fn) => this._touts.push(setTimeout(fn, ms));
+    T(120, this._rv);
+    T(700, this._rv);
+    T(1600, () => { (this._pending || []).forEach((el) => { const r = el.getBoundingClientRect(); if (r.top < (window.innerHeight || 800) * 1.2) show(el); }); this._rv(); });
+  }
+  renderVals() {
+    const s = this.state;
+    return {
+      navDisp: s.mobile ? "none" : "flex",
+      hamDisp: s.mobile ? "inline-flex" : "none",
+      menuOpen: s.menu && s.mobile,
+      toggleMenu: () => this.setState({ menu: !this.state.menu }),
+      closeMenu: () => this.setState({ menu: false }),
+      prodOpen: s.prod,
+      zasOpen: s.zas,
+      zasExp: s.zas ? "true" : "false",
+      openZas: () => this.setState({ zas: true, prod: false }),
+      closeZas: () => this.setState({ zas: false }),
+      prodExp: s.prod ? "true" : "false",
+      openProd: () => this.setState({ prod: true, zas: false }),
+      closeProd: () => this.setState({ prod: false }),
+      toggleProd: () => this.setState({ prod: !this.state.prod }),
+      modalOpen: s.modal,
+      noSubmit: (e) => e.preventDefault(),
+      openModal: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ modal: true, menu: false }); },
+      closeModal: () => this.setState({ modal: false })
+    };
+  }
+}
+
+</script>
+</body>
+</html>

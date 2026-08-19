@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Cennik - self-host za 0 zł albo chmura od 1 000 zł | Harmon PIM</title>
+<meta name="description" content="Cennik Harmon PIM: self-host za 0 zł, chmura od 1 000 zł/mies., Cloud Pro do 20 000 SKU, Enterprise na wycenę. Płacisz za wielkość katalogu, nie za użytkowników.">
+<meta property="og:title" content="Harmon PIM - cennik">
+<meta property="og:description" content="Self-host za 0 zł albo chmura w Polsce. Użytkownicy zawsze bez limitu.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ffffff'/%3E%3Crect x='7.5' y='6' width='9' height='52' rx='4.5' fill='%230E1830'/%3E%3Crect x='21' y='24' width='9' height='19' rx='4.5' fill='%230E1830'/%3E%3Crect x='34.5' y='24' width='9' height='13' rx='4.5' fill='%23FF4F00'/%3E%3Crect x='48' y='24' width='9' height='34' rx='4.5' fill='%230E1830'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+<script>document.documentElement.lang='pl';</script>
+<style>
+html { scroll-behavior: smooth; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', system-ui, sans-serif; color: #16233f; background: #ffffff; letter-spacing: -0.011em; font-feature-settings: "ss01", "cv11"; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+a { color: #bd3a08; text-decoration: none; }
+a:hover { color: #e64700; text-decoration: underline; }
+button { font-family: inherit; letter-spacing: -0.011em; }
+input, select { font-family: inherit; letter-spacing: -0.011em; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</helmet>
+<header data-screen-label="Nawigacja" style="position:sticky;top:0;z-index:60;background:rgba(255,255,255,.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid #e3e9f1">
+  <div style="max-width:1200px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;gap:24px">
+    <a href="Harmon PIM - Landing.dc.html" aria-label="Harmon PIM - strona główna" style="display:flex;align-items:center;gap:11px;text-decoration:none;flex-shrink:0">
+      <svg width="24" height="25" viewBox="7.5 6 49.5 52" aria-hidden="true" style="display:block"><rect x="7.5" y="6" width="9" height="52" rx="4.5" fill="#0E1830"></rect><rect x="21" y="24" width="9" height="19" rx="4.5" fill="#0E1830"></rect><rect x="34.5" y="24" width="9" height="13" rx="4.5" fill="#FF4F00"></rect><rect x="48" y="24" width="9" height="34" rx="4.5" fill="#0E1830"></rect></svg>
+      <span style="font-family:'Manrope',sans-serif;font-size:21px;font-weight:700;letter-spacing:0.025em;line-height:1;color:#0E1830;padding-bottom:1px">harmon</span>
+      <span style="font-family:'Manrope',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.18em;padding:3px 5px 3px 7px;border-radius:5px;background:#FF4F00;color:#ffffff">PIM</span>
+    </a>
+    <nav aria-label="Nawigacja główna" style="display:{{ navDisp }};align-items:center;gap:26px">
+      <div onMouseEnter="{{ openProd }}" onMouseLeave="{{ closeProd }}" style="position:relative;display:flex;align-items:center">
+        <button type="button" onClick="{{ toggleProd }}" aria-haspopup="true" aria-expanded="{{ prodExp }}" style="display:inline-flex;align-items:center;gap:6px;background:transparent;border:none;padding:0 0 2px;cursor:pointer;font-size:15px;font-weight:500;color:#2f405a;white-space:nowrap;border-bottom:2px solid transparent" style-hover="color:#16233f" style-focus="outline:none;color:#16233f;box-shadow:0 0 0 4px rgba(20,32,58,.08);border-radius:4px">
+          Produkt
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+        <sc-if value="{{ prodOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:100%;left:-14px;padding-top:16px;min-width:230px">
+            <div style="background:#ffffff;border:1px solid #e3e9f1;border-radius:14px;padding:8px;box-shadow:0 24px 48px -18px rgba(20,32,58,.22),0 2px 6px rgba(20,32,58,.06);display:flex;flex-direction:column;gap:2px">
+              <a href="Produkt.dc.html" onClick="{{ closeProd }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Przegląd produktu</a>
+              <a href="Funkcje.dc.html" onClick="{{ closeProd }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Funkcje</a>
+              <a href="Integracje.dc.html" onClick="{{ closeProd }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Integracje</a>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <a href="Wdrozenie.dc.html" style="font-size:15px;font-weight:500;color:#2f405a;text-decoration:none;white-space:nowrap" style-hover="color:#16233f;text-decoration:none">Wdrożenie PIM</a>
+      <a href="Cennik.dc.html" aria-current="page" style="font-size:15px;font-weight:600;color:#16233f;text-decoration:none;white-space:nowrap;border-bottom:2px solid #ff4f00;padding-bottom:2px" style-hover="color:#16233f;text-decoration:none">Cennik</a>
+      <div onMouseEnter="{{ openZas }}" onMouseLeave="{{ closeZas }}" style="position:relative;display:flex;align-items:center">
+        <a href="Zasoby.dc.html" aria-haspopup="true" aria-expanded="{{ zasExp }}" style="display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:500;color:#2f405a;text-decoration:none;white-space:nowrap" style-hover="color:#16233f;text-decoration:none">Zasoby <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></a>
+        <sc-if value="{{ zasOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:100%;left:-14px;padding-top:16px;min-width:230px">
+            <div style="background:#ffffff;border:1px solid #e3e9f1;border-radius:14px;padding:8px;box-shadow:0 24px 48px -18px rgba(20,32,58,.22),0 2px 6px rgba(20,32,58,.06);display:flex;flex-direction:column;gap:2px">
+              <a href="Zasoby.dc.html#selfhost" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Self-host Harmon</a>
+              <a href="Zasoby.dc.html#dokumentacja" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Dokumentacja</a>
+              <a href="Zasoby.dc.html#api" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Dokumentacja API</a>
+              <a href="Zasoby.dc.html#licencja" onClick="{{ closeZas }}" style="padding:11px 12px;border-radius:10px;font-size:14.5px;font-weight:500;color:#2f405a;text-decoration:none" style-hover="background:#f6f8fb;color:#16233f;text-decoration:none">Licencja</a>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <a href="Kontakt.dc.html" style="font-size:15px;font-weight:500;color:#2f405a;text-decoration:none;white-space:nowrap" style-hover="color:#16233f;text-decoration:none">Kontakt</a>
+    </nav>
+    <div style="display:{{ navDisp }};align-items:center;gap:12px">
+      <a href="#" style="background:#16233f;color:#ffffff;font-size:14px;font-weight:600;padding:10px 18px;border-radius:12px;text-decoration:none;transition:background .15s ease;white-space:nowrap" style-hover="background:#2f405a;color:#ffffff;text-decoration:none" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">Zaloguj się</a>
+      <button type="button" onClick="{{ openModal }}" style="background:#ff4f00;color:#ffffff;font-size:19px;font-weight:700;padding:10px 22px;border-radius:12px;border:none;cursor:pointer;transition:background .15s ease,transform .15s ease;white-space:nowrap" style-hover="background:#e64700;transform:translateY(-1px)" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.18)">Umów prezentację</button>
+    </div>
+    <button type="button" onClick="{{ toggleMenu }}" aria-label="Menu" aria-expanded="{{ menuOpen }}" style="display:{{ hamDisp }};align-items:center;justify-content:center;width:44px;height:44px;background:transparent;border:1px solid #e3e9f1;border-radius:12px;cursor:pointer" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16233f" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path></svg>
+    </button>
+  </div>
+  <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:100%;left:0;right:0;background:#ffffff;border-bottom:1px solid #e3e9f1;box-shadow:0 24px 48px -20px rgba(20,32,58,.08);padding:12px 24px 24px;display:flex;flex-direction:column">
+      <a href="Produkt.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px 10px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none">Produkt</a>
+      <div style="display:flex;flex-direction:column;padding:0 0 12px 14px;border-bottom:1px solid #eef2f7;border-left:2px solid #ffd0bd;margin-left:2px">
+        <a href="Produkt.dc.html" onClick="{{ closeMenu }}" style="padding:9px 0;font-size:15px;font-weight:500;color:#5b6b87;text-decoration:none">Przegląd produktu</a>
+        <a href="Funkcje.dc.html" onClick="{{ closeMenu }}" style="padding:9px 0;font-size:15px;font-weight:500;color:#5b6b87;text-decoration:none">Funkcje</a>
+        <a href="Integracje.dc.html" onClick="{{ closeMenu }}" style="padding:9px 0;font-size:15px;font-weight:500;color:#5b6b87;text-decoration:none">Integracje</a>
+      </div>
+      <a href="Wdrozenie.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none;border-bottom:1px solid #eef2f7">Wdrożenie PIM</a>
+      <a href="Cennik.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none;border-bottom:1px solid #eef2f7">Cennik</a>
+      <a href="Zasoby.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none">Zasoby</a>
+      <a href="Kontakt.dc.html" onClick="{{ closeMenu }}" style="padding:14px 2px;font-size:16px;font-weight:600;color:#16233f;text-decoration:none;border-bottom:1px solid #eef2f7">Kontakt</a>
+      <button type="button" onClick="{{ openModal }}" style="margin-top:14px;background:#ff4f00;color:#ffffff;font-size:19px;font-weight:700;padding:14px 28px;border-radius:12px;border:none;cursor:pointer;width:100%">Umów darmową prezentację</button>
+    </div>
+  </sc-if>
+</header>
+<main id="top">
+<section data-screen-label="Cennik - hero" style="background:#ffffff;padding:64px 24px 56px">
+  <div style="max-width:860px;margin:0 auto;text-align:center">
+    <div data-reveal="0" style="display:flex;align-items:center;justify-content:center;gap:10px;font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#bd3a08">
+      <a href="Harmon PIM - Landing.dc.html" style="color:#8a93a6;text-decoration:none" style-hover="color:#bd3a08;text-decoration:none">Start</a>
+      <span style="color:#c8d5e6">/</span>
+      <span>Cennik</span>
+    </div>
+    <h1 data-reveal="1" style="margin:16px 0 0;font-size:clamp(32px,4.2vw,54px);font-weight:800;letter-spacing:-0.04em;line-height:1.04;color:#16233f;text-wrap:balance">Prosty cennik. Zero gwiazdek.</h1>
+  </div>
+</section>
+
+<section data-screen-label="Plany" style="background:#f6f8fb;border-radius:clamp(44px,8vw,130px) clamp(44px,8vw,130px) 0 0;padding:104px 24px 120px">
+  <div style="max-width:1200px;margin:0 auto">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:20px;align-items:stretch">
+      <div data-reveal="0" style="background:#ffffff;border:1px solid #e3e9f1;border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:22px;box-shadow:0 1px 0 rgba(20,32,58,.04),0 1px 2px rgba(20,32,58,.04),0 12px 30px -12px rgba(20,32,58,.06)">
+        <div>
+          <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#5b6b87">Self-Host</div>
+          <div style="margin-top:12px;font-family:'Inter', system-ui, sans-serif;font-size:44px;font-weight:300;color:#16233f;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-0.02em">0 zł</div>
+          <p style="margin:14px 0 0;font-size:14px;font-weight:300;line-height:1.65;color:#55647f;text-wrap:pretty">self-host, licencja fair-code, kluczowe funkcje niezbędne do efektywnego zarządzania katalogiem</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">instalacja na Twoim serwerze</span></div>
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">bez limitu SKU</span></div>
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">dokumentacja online</span></div>
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c8d5e6" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg><span style="font-size:14px;line-height:1.5;color:#8a93a6">utrzymanie i serwery</span></div>
+        </div>
+        <a href="#selfhost" style="margin-top:auto;display:block;text-align:center;border:1px solid #16233f;color:#16233f;font-size:15px;font-weight:600;padding:12px 20px;border-radius:12px;text-decoration:none;transition:background .15s ease" style-hover="background:rgba(22,35,63,.05);color:#16233f;text-decoration:none" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">Jak działa self-host</a>
+      </div>
+
+      <div data-reveal="1" style="background:#ffffff;border:1px solid #e3e9f1;border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:22px;box-shadow:0 1px 0 rgba(20,32,58,.04),0 1px 2px rgba(20,32,58,.04),0 12px 30px -12px rgba(20,32,58,.06)">
+        <div>
+          <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#5b6b87">Cloud</div>
+          <div style="margin-top:12px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap"><span style="font-family:'Inter', system-ui, sans-serif;font-size:44px;font-weight:300;color:#16233f;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-0.02em">1 000 zł</span><span style="font-family:'Inter', system-ui, sans-serif;font-weight:400;font-size:14px;color:#5b6b87">/netto mies.</span></div>
+          <p style="margin:14px 0 0;font-size:14px;font-weight:300;line-height:1.65;color:#55647f;text-wrap:pretty">do 5 000 SKU</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">nasza chmura</span></div>
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">aktualizacje i kopie po naszej stronie</span></div>
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">wsparcie po polsku</span></div>
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">szybki proces wdrożenia</span></div>
+        </div>
+        <button type="button" onClick="{{ openModal }}" style="margin-top:auto;border:1px solid #16233f;background:transparent;color:#16233f;font-size:15px;font-weight:600;padding:12px 20px;border-radius:12px;cursor:pointer;transition:background .15s ease" style-hover="background:rgba(22,35,63,.05)" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">Umów prezentację</button>
+      </div>
+
+      <div data-reveal="2" style="position:relative;background:#0e1830;border:1px solid #0e1830;border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:22px;box-shadow:0 24px 60px -20px rgba(20,32,58,.28)">
+        <span style="position:absolute;top:-13px;left:28px;display:inline-flex;padding:4px 12px;border-radius:999px;font-family:'Inter', system-ui, sans-serif;font-size:11px;font-weight:500;letter-spacing:0.08em;background:#ff4f00;color:#ffffff">REKOMENDOWANY</span>
+        <div>
+          <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#ff6d33">Cloud Pro</div>
+          <div style="margin-top:12px;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap"><span style="font-family:'Inter', system-ui, sans-serif;font-size:44px;font-weight:300;color:#ffffff;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-0.02em">3 000 zł</span><span style="font-family:'Inter', system-ui, sans-serif;font-weight:400;font-size:14px;color:rgba(255,255,255,.6)">/netto mies.</span></div>
+          <p style="margin:14px 0 0;font-size:14px;font-weight:300;line-height:1.65;color:rgba(255,255,255,.72);text-wrap:pretty">do 20 000 SKU</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:rgba(255,255,255,.86)">wszystko z planu Cloud</span></div>
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:rgba(255,255,255,.86)">większy limit działań agenta</span></div>
+        </div>
+        <button type="button" onClick="{{ openModal }}" style="margin-top:auto;background:#ff4f00;color:#ffffff;font-size:15px;font-weight:700;padding:13px 20px;border-radius:12px;border:none;cursor:pointer;transition:background .15s ease,transform .15s ease" style-hover="background:#e64700;transform:translateY(-1px)" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.24)">Umów prezentację</button>
+      </div>
+
+      <div data-reveal="3" style="background:#ffffff;border:1px solid #e3e9f1;border-radius:18px;padding:28px;display:flex;flex-direction:column;gap:22px;box-shadow:0 1px 0 rgba(20,32,58,.04),0 1px 2px rgba(20,32,58,.04),0 12px 30px -12px rgba(20,32,58,.06)">
+        <div>
+          <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#5b6b87">Enterprise</div>
+          <div style="margin-top:12px;font-family:'Inter', system-ui, sans-serif;font-size:44px;font-weight:300;color:#16233f;line-height:1;letter-spacing:-0.02em">wycena</div>
+          <p style="margin:14px 0 0;font-size:14px;font-weight:300;line-height:1.65;color:#55647f;text-wrap:pretty">self-host lub nasza chmura, wszystkie funkcje, podwyższone SLA, indywidualne funkcje szyte na miarę</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">katalog bez ograniczeń SKU</span></div>
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">gwarantowany czas reakcji</span></div>
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">funkcje rozwijane pod Twój proces</span></div>
+          <div style="display:flex;gap:9px;align-items:flex-start"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:14px;line-height:1.5;color:#2f405a">dedykowany zespół wdrożeniowy</span></div>
+        </div>
+        <button type="button" onClick="{{ openModal }}" style="margin-top:auto;border:1px solid #16233f;background:transparent;color:#16233f;font-size:15px;font-weight:600;padding:12px 20px;border-radius:12px;cursor:pointer;transition:background .15s ease" style-hover="background:rgba(22,35,63,.05)" style-focus="outline:none;box-shadow:0 0 0 4px rgba(20,32,58,.08)">Poproś o wycenę</button>
+      </div>
+    </div>
+
+    <div data-reveal="1" style="margin-top:52px;background:#ffffff;border:1px solid #e3e9f1;border-radius:18px;padding:30px 32px">
+      <div style="font-family:'Inter', system-ui, sans-serif;font-size:11px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:#bd3a08">W każdym planie</div>
+      <div style="margin-top:22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px 28px">
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Dashboard z podsumowaniem managerskim</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Zarządzanie produktami</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Edycja „a'la" Excel</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Akcje zbiorcze</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Zaawansowane filtry</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Generator wariantów</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Kompletność produktów</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Własne typy obiektów</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Kilkanaście typów atrybutów z walidacją</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Kanały i wersje językowe</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Export i import definicji atrybutów i obiektów</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">DAM - zarządzanie multimediami</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Importy z mapowaniem kolumn</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Eksporty: Excel, CSV, XML</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Konfigurator API</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Konfigurator XML</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff4f00" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:15px;line-height:1.5;color:#2f405a">Użytkownicy, role i uprawnienia</span></div>
+      </div>
+    </div>
+
+    <div data-reveal="2" style="margin-top:18px;background:#0e1830;background-image:radial-gradient(520px 380px at 88% -20%,#1d2c47,rgba(29,44,71,0));border-radius:18px;padding:30px 32px;box-shadow:0 30px 70px -34px rgba(14,24,48,.5)">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap">
+        <div style="font-family:'Inter', system-ui, sans-serif;font-size:11px;font-weight:500;letter-spacing:0.14em;text-transform:uppercase;color:#ff8a4c">Dodatkowo w Cloud i Enterprise</div>
+        <span style="font-family:'Inter', system-ui, sans-serif;font-variant-numeric:tabular-nums;font-weight:500;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:rgba(255,255,255,.45)">4 funkcje</span>
+      </div>
+      <div style="margin-top:22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px">
+        <div style="display:flex;flex-direction:column;gap:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:17px 18px">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="flex-shrink:0;width:7px;height:7px;border-radius:999px;background:#ff4f00"></span>
+            <span style="font-size:15.5px;font-weight:600;letter-spacing:-0.015em;color:#ffffff">Agent AI do zarządzania PIM-em</span>
+          </div>
+          <p style="margin:0;font-size:14px;font-weight:300;line-height:1.6;color:rgba(255,255,255,.7);text-wrap:pretty">Opisujesz, co ma się stać, agent przygotowuje plan i czeka na akceptację.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:17px 18px">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="flex-shrink:0;width:7px;height:7px;border-radius:999px;background:#ff4f00"></span>
+            <span style="font-size:15.5px;font-weight:600;letter-spacing:-0.015em;color:#ffffff">Tworzenie treści za pomocą AI</span>
+          </div>
+          <p style="margin:0;font-size:14px;font-weight:300;line-height:1.6;color:rgba(255,255,255,.7);text-wrap:pretty">Opisy, tytuły i teksty SEO na podstawie danych, które już masz w kartotece.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:17px 18px">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="flex-shrink:0;width:7px;height:7px;border-radius:999px;background:#ff4f00"></span>
+            <span style="font-size:15.5px;font-weight:600;letter-spacing:-0.015em;color:#ffffff">Web to Print</span>
+          </div>
+          <p style="margin:0;font-size:14px;font-weight:300;line-height:1.6;color:rgba(255,255,255,.7);text-wrap:pretty">Katalogi PDF generowane wprost z danych produktowych.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:17px 18px">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="flex-shrink:0;width:7px;height:7px;border-radius:999px;background:#ff4f00"></span>
+            <span style="font-size:15.5px;font-weight:600;letter-spacing:-0.015em;color:#ffffff">Workflow akceptacji</span>
+          </div>
+          <p style="margin:0;font-size:14px;font-weight:300;line-height:1.6;color:rgba(255,255,255,.7);text-wrap:pretty">Własne etapy akceptacji z osobami odpowiedzialnymi za każdy z nich.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="selfhost" data-screen-label="Chmura albo self-host" style="background:#0e1830;background-image:radial-gradient(720px 620px at 12% -6%,#1d2c47,rgba(29,44,71,0));border-radius:clamp(44px,8vw,130px);position:relative;z-index:1;margin-top:-72px;padding:144px 24px 128px;scroll-margin-top:70px">
+  <div style="max-width:1200px;margin:0 auto">
+    <div data-reveal="0" style="max-width:860px">
+      <h2 style="margin:16px 0 0;font-size:clamp(30px,3.6vw,44px);font-weight:800;letter-spacing:-0.035em;line-height:1.08;color:#ffffff;text-wrap:pretty">Chmura u nas albo instalacja u Ciebie.</h2>
+      <p style="margin:18px 0 0;font-size:19px;line-height:1.55;color:rgba(255,255,255,.8);text-wrap:pretty">Jeden produkt, dwa sposoby korzystania. W naszej chmurze jako SaaS albo On-Premise, uruchamiany u Ciebie.</p>
+    </div>
+    <div style="margin-top:52px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:24px;align-items:stretch">
+      <div data-reveal="0" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:32px;display:flex;flex-direction:column;gap:22px">
+        <div>
+          <h3 style="margin:0;font-size:26px;font-weight:700;letter-spacing:-0.025em;color:#ffffff">Chmura Harmon</h3>
+          <p style="margin:8px 0 0;font-size:14.5px;line-height:1.5;color:rgba(255,255,255,.6)">Płacisz za to, żeby nie myśleć o utrzymaniu.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:13px">
+          <div style="display:flex;gap:11px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:16px;line-height:1.5;color:rgba(255,255,255,.86);text-wrap:pretty">Serwery, aktualizacje i kopie po naszej stronie</span></div>
+          <div style="display:flex;gap:11px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:16px;line-height:1.5;color:rgba(255,255,255,.86);text-wrap:pretty">Szybkie uruchomienie</span></div>
+          <div style="display:flex;gap:11px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:16px;line-height:1.5;color:rgba(255,255,255,.86);text-wrap:pretty">Wsparcie po polsku</span></div>
+        </div>
+      </div>
+      <div data-reveal="1" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:32px;display:flex;flex-direction:column;gap:22px">
+        <div>
+          <h3 style="margin:0;font-size:26px;font-weight:700;letter-spacing:-0.025em;color:#ffffff">Self-host</h3>
+          <p style="margin:8px 0 0;font-size:14.5px;line-height:1.5;color:rgba(255,255,255,.6)">Pobierasz i używasz. Licencja do użytku komercyjnego.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:13px">
+          <div style="display:flex;gap:11px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:16px;line-height:1.5;color:rgba(255,255,255,.86);text-wrap:pretty">Możliwość rozwoju za pomocą własnego zespołu IT</span></div>
+          <div style="display:flex;gap:11px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:16px;line-height:1.5;color:rgba(255,255,255,.86);text-wrap:pretty">Dostęp do dokumentacji online</span></div>
+          <div style="display:flex;gap:11px;align-items:flex-start"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff8a4c" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0;margin-top:3px"><path d="M20 6 9 17l-5-5"></path></svg><span style="font-size:16px;line-height:1.5;color:rgba(255,255,255,.86);text-wrap:pretty">Utrzymanie i serwery po Twojej stronie</span></div>
+        </div>
+      </div>
+    </div>
+    <div data-reveal="2" style="margin-top:32px;background:#ff4f00;border:1px solid #ff6a24;border-radius:18px;padding:32px 34px;box-shadow:0 26px 60px -24px rgba(255,79,0,.55)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+        <h3 style="margin:0;font-size:21px;font-weight:700;letter-spacing:-0.02em;color:#ffffff">Na czym polega różnica?</h3>
+      </div>
+      <p style="margin:14px 0 0;font-size:16.5px;line-height:1.6;color:rgba(255,255,255,.92);text-wrap:pretty">W wersji chmurowej to my zajmujemy się utrzymaniem, bezpieczeństwem, rozwojem i aktualizacjami. W wersji self-hosted otrzymujesz ogrom funkcjonalności zupełnie za darmo, jednak serwery oraz utrzymanie są po Twojej stronie.</p>
+    </div>
+    <div data-reveal="3" style="margin-top:36px;display:flex;justify-content:center;align-items:center;gap:14px 18px;flex-wrap:wrap">
+      <button type="button" onClick="{{ openModal }}" style="background:#ffffff;color:#16233f;font-size:19px;font-weight:700;padding:15px 30px;border-radius:12px;border:none;cursor:pointer;transition:background .15s ease,transform .15s ease" style-hover="background:#f1f4f9;transform:translateY(-1px)" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,255,255,.22)">Umów darmową prezentację</button>
+    </div>
+  </div>
+</section>
+
+<sc-if value="{{ pokazFaq }}" hint-placeholder-val="{{ true }}">
+  <div aria-hidden="true" style="height:220px;margin:-110px 0;background:#ffdcc9"></div>
+  <section data-screen-label="FAQ cennik" style="background:linear-gradient(180deg,#ffdcc9 0%,#fff1ec 55%);border-radius:clamp(44px,8vw,130px) clamp(44px,8vw,130px) 0 0;margin-top:-72px;padding:144px 24px 120px">
+    <div style="max-width:720px;margin:0 auto">
+      <h2 data-reveal="0" style="margin:0;font-size:clamp(30px,3.6vw,44px);font-weight:800;letter-spacing:-0.035em;line-height:1.08;color:#16233f;text-align:center;text-wrap:balance">Pytania o cennik</h2>
+      <div style="margin-top:44px;display:flex;flex-direction:column;gap:12px">
+        <div data-reveal="0" style="background:#ffffff;border:1px solid #f2d9cc;border-radius:16px;overflow:hidden">
+          <button type="button" onClick="{{ fq0t }}" aria-expanded="{{ fq0exp }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;text-align:left;background:transparent;border:none;padding:22px 24px;cursor:pointer;font-size:17.5px;font-weight:600;color:#16233f" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.12)">
+            <span>Czym self-host różni się od chmury?</span>
+            <span style="font-family:'Inter', system-ui, sans-serif;font-variant-numeric:tabular-nums;font-size:20px;font-weight:300;color:#bd3a08;flex-shrink:0">{{ fq0sign }}</span>
+          </button>
+          <sc-if value="{{ fq0open }}">
+            <p style="margin:0;padding:0 24px 22px;font-size:15.5px;line-height:1.65;color:#5b6b87;text-wrap:pretty">Praca z katalogiem jest ta sama: model danych, edycja a'la Excel, akcje zbiorcze, filtry, DAM, feedy i API. W chmurze dochodzą funkcje AI, Web to Print i workflow akceptacji, a utrzymanie, aktualizacje i wsparcie są po naszej stronie.</p>
+          </sc-if>
+        </div>
+        <div data-reveal="1" style="background:#ffffff;border:1px solid #f2d9cc;border-radius:16px;overflow:hidden">
+          <button type="button" onClick="{{ fq1t }}" aria-expanded="{{ fq1exp }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;text-align:left;background:transparent;border:none;padding:22px 24px;cursor:pointer;font-size:17.5px;font-weight:600;color:#16233f" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.12)">
+            <span>Co, jeśli przekroczę limit SKU?</span>
+            <span style="font-family:'Inter', system-ui, sans-serif;font-variant-numeric:tabular-nums;font-size:20px;font-weight:300;color:#bd3a08;flex-shrink:0">{{ fq1sign }}</span>
+          </button>
+          <sc-if value="{{ fq1open }}">
+            <p style="margin:0;padding:0 24px 22px;font-size:15.5px;line-height:1.65;color:#5b6b87;text-wrap:pretty">Nic nie przestaje działać z dnia na dzień. Odzywamy się, ustalamy nowy plan i zmieniamy go od kolejnego okresu - bez opłat karnych i bez blokowania katalogu.</p>
+          </sc-if>
+        </div>
+        <div data-reveal="2" style="background:#ffffff;border:1px solid #f2d9cc;border-radius:16px;overflow:hidden">
+          <button type="button" onClick="{{ fq2t }}" aria-expanded="{{ fq2exp }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;text-align:left;background:transparent;border:none;padding:22px 24px;cursor:pointer;font-size:17.5px;font-weight:600;color:#16233f" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.12)">
+            <span>Czy wdrożenie jest w cenie abonamentu?</span>
+            <span style="font-family:'Inter', system-ui, sans-serif;font-variant-numeric:tabular-nums;font-size:20px;font-weight:300;color:#bd3a08;flex-shrink:0">{{ fq2sign }}</span>
+          </button>
+          <sc-if value="{{ fq2open }}">
+            <p style="margin:0;padding:0 24px 22px;font-size:15.5px;line-height:1.65;color:#5b6b87;text-wrap:pretty">Wdrożenie wyceniamy osobno, bo jego zakres zależy od Waszego katalogu i liczby integracji. Po rozmowie wiesz, co robimy my, co robicie sami i ile to kosztuje.</p>
+          </sc-if>
+        </div>
+        <div data-reveal="3" style="background:#ffffff;border:1px solid #f2d9cc;border-radius:16px;overflow:hidden">
+          <button type="button" onClick="{{ fq3t }}" aria-expanded="{{ fq3exp }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;text-align:left;background:transparent;border:none;padding:22px 24px;cursor:pointer;font-size:17.5px;font-weight:600;color:#16233f" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.12)">
+            <span>Co, jeśli po roku będziemy chcieli odejść?</span>
+            <span style="font-family:'Inter', system-ui, sans-serif;font-variant-numeric:tabular-nums;font-size:20px;font-weight:300;color:#bd3a08;flex-shrink:0">{{ fq3sign }}</span>
+          </button>
+          <sc-if value="{{ fq3open }}">
+            <p style="margin:0;padding:0 24px 22px;font-size:15.5px;line-height:1.65;color:#5b6b87;text-wrap:pretty">Dane i całą strukturę wyeksportujesz w każdej chwili: Excel, CSV, XML oraz definicje atrybutów i obiektów. Z chmury możesz też przejść na self-host i pracować dalej na własnym serwerze.</p>
+          </sc-if>
+        </div>
+      </div>
+      <div data-reveal="1" style="margin-top:40px;text-align:center">
+        <p style="margin:0;font-size:16px;line-height:1.6;color:#5b6b87">Nie ma tu Twojego pytania? <a href="Kontakt.dc.html" onClick="{{ openModal }}" style="font-weight:600">Napisz do nas</a> albo umów prezentację - odpowiemy konkretnie na Twoim katalogu.</p>
+      </div>
+    </div>
+  </section>
+</sc-if>
+
+<section data-screen-label="Domknięcie" style="position:relative;z-index:1;background:#0e1830;border-radius:0 0 clamp(44px,8vw,130px) clamp(44px,8vw,130px);padding:132px 24px;display:flex;align-items:center;min-height:560px;box-sizing:border-box;overflow:hidden">
+  <div style="max-width:900px;margin:0 auto;text-align:center;width:100%">
+    <h2 data-reveal="0" style="margin:0;font-size:clamp(30px,3.8vw,48px);font-weight:800;letter-spacing:-0.035em;line-height:1.06;color:#ffffff;text-wrap:balance">Policzmy to na Twoim katalogu.</h2>
+    <p data-reveal="1" style="margin:20px auto 0;max-width:600px;font-size:19px;line-height:1.55;color:rgba(255,255,255,.78);text-wrap:pretty">Powiedz, ile masz SKU i gdzie sprzedajesz - powiemy, który plan wystarczy i co dokładnie w nim jest.</p>
+    <div data-reveal="2" style="margin-top:36px;display:flex;justify-content:center;align-items:center;gap:14px 16px;flex-wrap:wrap">
+      <button type="button" onClick="{{ openModal }}" style="background:#ff4f00;color:#ffffff;font-size:19px;font-weight:700;padding:15px 30px;border-radius:12px;border:none;cursor:pointer;transition:background .15s ease,transform .15s ease" style-hover="background:#e64700;transform:translateY(-1px)" style-focus="outline:none;box-shadow:0 0 0 4px rgba(255,79,0,.24)">Umów darmową prezentację</button>
+    </div>
+  </div>
+</section>
+</main>
+<footer data-screen-label="Stopka" style="background:#ffffff;border-radius:clamp(44px,8vw,130px) clamp(44px,8vw,130px) 0 0;margin-top:-72px;padding:128px 24px 40px">
+  <div style="max-width:1200px;margin:0 auto">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:40px 32px">
+      <div>
+        <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#16233f">Produkt</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <a href="Produkt.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Przegląd produktu</a>
+          <a href="Funkcje.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Funkcje</a>
+          <a href="Integracje.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Integracje</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#16233f">Zasoby</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <a href="Zasoby.dc.html#selfhost" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Self-host Harmon</a>
+          <a href="Zasoby.dc.html#dokumentacja" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Dokumentacja</a>
+          <a href="Zasoby.dc.html#api" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Dokumentacja API</a>
+          <a href="Zasoby.dc.html#licencja" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Licencja</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:'Inter', system-ui, sans-serif;font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:0.08em;color:#16233f">Firma</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <a href="Wdrozenie.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Wdrożenie PIM</a>
+          <a href="Cennik.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Cennik</a>
+          <a href="Kontakt.dc.html" style="font-size:14px;color:#5b6b87" style-hover="color:#e64700">Kontakt</a>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:56px;padding-top:28px;border-top:1px solid #e3e9f1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <svg width="19" height="20" viewBox="7.5 6 49.5 52" aria-hidden="true" style="display:block;flex-shrink:0"><rect x="7.5" y="6" width="9" height="52" rx="4.5" fill="#0E1830"></rect><rect x="21" y="24" width="9" height="19" rx="4.5" fill="#0E1830"></rect><rect x="34.5" y="24" width="9" height="13" rx="4.5" fill="#FF4F00"></rect><rect x="48" y="24" width="9" height="34" rx="4.5" fill="#0E1830"></rect></svg>
+        <span style="font-family:'Manrope',sans-serif;font-size:16px;font-weight:700;letter-spacing:0.025em;color:#0E1830">harmon</span>
+        <span style="font-size:14px;color:#2f405a">Harmon - PIM, który myśli i działa.</span>
+      </div>
+      <span style="font-size:13px;color:#5b6b87">© 2026 Harmon PIM. Wszystkie prawa zastrzeżone.</span>
+    </div>
+  </div>
+</footer>
+<sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+  <dc-import name="Formularz-demo" on-close="{{ closeModal }}" hint-size="100%,100%"></dc-import>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;animacje&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Zachowanie&quot;},&quot;pokazFaq&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Zachowanie&quot;}}">
+class Component extends DCLogic {
+  state = { prod: false, zas: false, modal: false, sent: false, menu: false, mobile: false, faq: 0 };
+  componentDidMount() {
+    this._touts = [];
+    this._rm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this._anim = (this.props.animacje ?? true) && !this._rm;
+    this._mq = window.matchMedia("(max-width: 1120px)");
+    this._setM = () => this.setState({ mobile: this._mq.matches, menu: false });
+    this._mq.addEventListener("change", this._setM);
+    if (this._mq.matches) this.setState({ mobile: true });
+    this._kd = (e) => { if (e.key === "Escape") this.setState({ prod: false, zas: false, modal: false, menu: false }); };
+    window.addEventListener("keydown", this._kd);
+    this.initReveal();
+  }
+  componentWillUnmount() {
+    this._mq.removeEventListener("change", this._setM);
+    window.removeEventListener("keydown", this._kd);
+    window.removeEventListener("scroll", this._rv);
+    window.removeEventListener("resize", this._rv);
+    (this._touts || []).forEach(clearTimeout);
+    document.body.style.overflow = "";
+  }
+  componentDidUpdate() {
+    const want = this.state.modal ? "hidden" : "";
+    if (document.body.style.overflow !== want) document.body.style.overflow = want;
+  }
+  initReveal() {
+    const els = Array.from(document.querySelectorAll("[data-reveal]"));
+    if (!els.length) return;
+    if (!this._anim) { els.forEach((el) => { el.style.opacity = "1"; el.style.transform = "none"; }); return; }
+    els.forEach((el) => {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(10px)";
+      el.style.transition = "opacity .45s ease, transform .45s ease";
+      el.style.transitionDelay = (parseInt(el.getAttribute("data-reveal"), 10) || 0) * 70 + "ms";
+    });
+    this._pending = els;
+    const show = (el) => { el.style.opacity = "1"; el.style.transform = "none"; };
+    this._rv = () => {
+      if (!this._pending || !this._pending.length) return;
+      const h = window.innerHeight || 800;
+      this._pending = this._pending.filter((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.top < h - 24 && r.bottom > -80) { show(el); return false; }
+        return true;
+      });
+    };
+    window.addEventListener("scroll", this._rv, { passive: true });
+    window.addEventListener("resize", this._rv);
+    this._rv();
+    requestAnimationFrame(() => requestAnimationFrame(this._rv));
+    const T = (ms, fn) => this._touts.push(setTimeout(fn, ms));
+    T(120, this._rv);
+    T(700, this._rv);
+    T(1600, () => { (this._pending || []).forEach((el) => { const r = el.getBoundingClientRect(); if (r.top < (window.innerHeight || 800) * 1.2) show(el); }); this._rv(); });
+  }
+  renderVals() {
+    const s = this.state;
+    const vals = {};
+    for (let i = 0; i < 4; i++) {
+      const open = s.faq === i;
+      vals["fq" + i + "open"] = open;
+      vals["fq" + i + "exp"] = open;
+      vals["fq" + i + "sign"] = open ? "−" : "+";
+      vals["fq" + i + "t"] = () => this.setState({ faq: this.state.faq === i ? -1 : i });
+    }
+    return Object.assign(vals, {
+      prodOpen: s.prod,
+      zasOpen: s.zas,
+      zasExp: s.zas ? "true" : "false",
+      openZas: () => this.setState({ zas: true, prod: false }),
+      closeZas: () => this.setState({ zas: false }),
+      prodExp: s.prod ? "true" : "false",
+      openProd: () => this.setState({ prod: true, zas: false }),
+      closeProd: () => this.setState({ prod: false }),
+      toggleProd: () => this.setState({ prod: !this.state.prod }),
+      navDisp: s.mobile ? "none" : "flex",
+      hamDisp: s.mobile ? "inline-flex" : "none",
+      menuOpen: s.menu && s.mobile,
+      toggleMenu: () => this.setState({ menu: !this.state.menu }),
+      closeMenu: () => this.setState({ menu: false }),
+      pokazFaq: this.props.pokazFaq ?? true,
+      modalOpen: s.modal,
+      sent: s.sent,
+      notSent: !s.sent,
+      openModal: () => this.setState({ modal: true, sent: false, menu: false }),
+      closeModal: () => this.setState({ modal: false }),
+      overlayClick: (e) => { if (e.target === e.currentTarget) this.setState({ modal: false }); },
+      submitDemo: (e) => { e.preventDefault(); this.setState({ sent: true }); }
+    });
+  }
+}
+</script>
+</body>
+</html>

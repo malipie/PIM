@@ -1,0 +1,315 @@
+# PIM edge Caddy — PRODUCTION site (single-origin, same topology as dev).
+#
+# Mounted over /etc/caddy/Caddyfile by docker-compose.prod.yml. Differences
+# from the dev Caddyfile (docker/caddy/Caddyfile):
+#   - real domain from {$DOMAIN} with automatic Let's Encrypt TLS
+#     (no local_certs, no debug),
+#   - the SPA is the BUILT bundle served by file_server from /srv/admin
+#     (apps/admin/dist mounted read-only) — no Vite dev server,
+#   - /docs* serves the generated documentation site from /srv/docs
+#     (apps/docs/dist) with a docs-scoped CSP,
+#   - CSP script-src drops 'unsafe-inline'/'unsafe-eval' — the built
+#     admin bundle has one external module script, no inline, no eval
+#     (AUD-074).
+#
+# Route order (most specific handle wins):
+#   /.well-known/mercure → Mercure hub (SSE)
+#   /api/metrics         → 404 blackhole (#2729 — Prometheus scrapes api:80
+#                          over the internal network, never the edge)
+#   /api/*               → FrankenPHP / Symfony / API Platform
+#   /docs/*              → static docs site
+#   /*                   → static admin SPA (index.html fallback for the router)
+
+{
+    email {$ACME_EMAIL}
+}
+
+(common_security_prod) {
+    header {
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+        Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Resource-Policy "same-origin"
+        -Server
+        -X-Powered-By
+    }
+}
+
+# `localhost` rides along for the container healthcheck (base compose probes
+# https://localhost/api with --no-check-certificate); Caddy issues an internal
+# self-signed cert for it while {$DOMAIN} gets a real ACME certificate.
+# ─── Trasy jednej instancji PIM (epik TNT, #2856; routing dynamiczny #2908) ──
+#
+# Snippet przyjmuje dwa argumenty, żeby ten sam komplet tras obsługiwał stack
+# współdzielony i instancję dowolnego tenanta:
+#   {args[0]} — host kontenera api      (np. `api` albo `pim-acme-api`)
+#   {args[1]} — host kontenera mercure  (np. `mercure` albo `pim-acme-mercure`)
+#
+# Bundel SPA i dokumentacja są WSPÓLNE (są origin-relative, więc ten sam
+# artefakt obsługuje każdą subdomenę) — dlatego nie są parametryzowane.
+#
+# Od #2908 dołożenie tenanta nie wymaga NICZEGO w tym pliku: blok wildkardowy
+# niżej wyprowadza upstream z hosta. Snippet zostaje, bo obsługuje jedno
+# i drugie — stack współdzielony i każdą instancję.
+(pim_routes) {
+    import common_security_prod
+
+    # Mercure hub — must precede the /api* matcher.
+    handle /.well-known/mercure* {
+        reverse_proxy {args[1]}:80
+    }
+
+    # #2729 — metrics stay internal-only.
+    handle /api/metrics* {
+        respond 404
+    }
+
+    handle /api* {
+        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        # Edge backstop on request body size (IMP2-2.8): Caddy 150MB >
+        # php.ini post_max_size 110MB > application limit 100MB, so the
+        # readable RFC 7807 error from the app fires first on normal
+        # oversizes and the edge only stops extreme payloads.
+        request_body {
+            max_size 150MB
+        }
+        reverse_proxy {args[0]}:80
+    }
+
+    # Documentation site (user guides + API reference) — static build
+    # published by the docs pipeline into /srv/docs.
+    #
+    # VitePress emits the page-chunk hash map as an INLINE script
+    # (window.__VP_HASH_MAP__). Under the strict policy the browser blocked
+    # it, the client router could not resolve the chunk for a clicked page
+    # and in-site navigation silently died — direct URLs worked (server-
+    # rendered HTML), every menu link did not. Hence 'unsafe-inline' scoped
+    # to this subtree only; the docs are static, take no user input and
+    # carry no session.
+    handle_path /docs* {
+        header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+        root * /srv/docs
+        # {path}.html obsługuje czyste adresy z VitePressa (cleanUrls):
+        # /docs/selfhost serwuje selfhost.html. Bezpośrednie linki z .html
+        # dalej działają, bo pierwszy warunek trafia w plik.
+        try_files {path} {path}.html {path}/index.html
+        file_server
+    }
+
+    # Brakująca podstrona dokumentacji spadała na /index.html i wracała jako
+    # 200 ze stroną główną — mylące dla czytelnika i dla wyszukiwarek. Docs
+    # nie ma już fallbacku w try_files, więc file_server zgłasza błąd 404,
+    # a ten blok podaje wygenerowane przez VitePress 404.html z właściwym
+    # kodem. `handle_errors` musi stać na poziomie site'u (Caddy nie pozwala
+    # zagnieździć go w handle_path). Zasięg ograniczony matcherem: SPA ma
+    # własny fallback i nigdy tu nie trafia, a /api zwraca odpowiedzi z
+    # backendu, które nie są błędami Caddy'ego.
+    handle_errors {
+        @docs404 expression {err.status_code} == 404 && path('/docs/*')
+        handle @docs404 {
+            root * /srv/docs
+            rewrite * /404.html
+            file_server {
+                status 404
+            }
+        }
+    }
+
+    # Admin SPA — built bundle, client-side router fallback to index.html.
+    handle {
+        header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        root * /srv/admin
+        try_files {path} /index.html
+        file_server
+    }
+}
+
+# ─── Instancje ───────────────────────────────────────────────────────────────
+
+# Stary adres bez subdomeny — 301 na instancję `harmon` (migracja 2026-08-19).
+#
+# Po przeniesieniu tenantów na własne instancje pod tym adresem nie ma już
+# czego serwować: stack współdzielony jest wygaszony. Przekierowanie zostaje,
+# bo prowadzą tu zakładki operatora ORAZ linki w wysłanych zaproszeniach
+# i resetach hasła. Trwałe, z zachowaniem ścieżki i parametrów.
+#
+# Nie jest to alias, tylko przekierowanie — decyzja operatora z 2026-08-18
+# o jednym kanonicznym adresie na instancję.
+{$DOMAIN} {
+    import common_security_prod
+    redir https://harmon.{$DOMAIN}{uri} permanent
+}
+
+# ─── Instancja platformowa: panel operatora ─────────────────────────────────
+#
+# Blok JAWNY, choć `admin` pasowałby do wzorca wildkardowego niżej — i właśnie
+# dlatego jest konieczny. Wildcard wyprowadza upstream z nazwy hosta, więc
+# `admin.{$DOMAIN}` trafiłby do nieistniejącego `pim-admin-api`. Jawny blok
+# hosta wygrywa z wildcardem, co zamyka sprawę bez wyjątków w mapowaniu.
+#
+# `admin` jest też na liście nazw zastrzeżonych (TenantSubdomain, generator
+# środowiska, provisioner), więc żaden klient tego adresu nie zajmie.
+#
+# `localhost` jedzie razem z panelem, a nie ze stackiem współdzielonym:
+# healthcheck kontenera edge sonduje `https://localhost/api` i po wygaszeniu
+# wspólnego stacku uderzałby w upstream, którego nie ma — edge raportowałby
+# `unhealthy`, obsługując przy tym cały ruch bez zarzutu. Instancja platformowa
+# żyje tak długo jak edge, więc jest właściwym celem tej sondy.
+admin.{$DOMAIN}, localhost {
+    import pim_routes pim-platform-api pim-platform-mercure
+}
+
+# ─── Instancje tenantów — routing dynamiczny (epik TNT, #2908) ──────────────
+#
+# JEDEN blok obsługuje WSZYSTKICH klientów. Nowa instancja jest osiągalna od
+# razu po wstaniu kontenerów: bez wpisu w tym pliku, bez przeładowania
+# Caddy'ego, bez restartu. Wcześniej dołożenie klienta oznaczało ręczną edycję
+# konfiguracji edge — czyli krok, o którym łatwo zapomnieć, i przerwę w ruchu
+# pozostałych, gdy ktoś się w niej pomyli.
+#
+# ── Certyfikat ──────────────────────────────────────────────────────────────
+#
+# Jeden wildcard dla całej domeny, wyzwaniem DNS-01 (decyzja operatora,
+# 2026-08-18, komentarz do #2908). Wariant odrzucony: certyfikaty per host
+# z `on_demand_tls`, które wymagałyby endpointu `ask` odpowiadającego przy
+# każdym połączeniu TLS na pytanie „czy ten host istnieje" — komponentu
+# osiągalnego z edge, wymagającego odporności na sondowanie — oraz mieściły się
+# w limicie 50 certyfikatów/tydzień na domenę. Wildcard nie ma ani jednego,
+# ani drugiego problemu.
+#
+# Token Cloudflare: zawężony do JEDNEJ strefy, uprawnienie `Zone:DNS:Edit`,
+# podawany zmienną środowiskową (compose wymaga go bez wartości domyślnej).
+# Obraz z pluginem: docker/caddy/Dockerfile.
+#
+# ── Skąd wiadomo, do której instancji ───────────────────────────────────────
+#
+# Kod tenanta to pierwsza etykieta hosta, a nazwy kontenerów pochodzą z aliasów
+# sieciowych w docker-compose.tenant.yml — więc zgadzają się z kodem bez żadnej
+# dodatkowej konfiguracji. `map` z wyrażeniem regularnym, a nie `{labels.N}`:
+# indeks etykiety zależy od tego, ile członów ma {$DOMAIN}, więc zmiana domeny
+# po cichu przestawiłaby routing na sąsiedni człon.
+#
+# Wzorzec jest TEN SAM, co w App\Shared\Domain\TenantSubdomain, w skrypcie
+# provisioningu i w provisionerze. Rozjazd oznacza subdomenę, którą panel
+# przyjmie, a edge odrzuci.
+*.{$DOMAIN} {
+    tls {
+        dns cloudflare {env.CF_API_TOKEN}
+    }
+
+    map {host} {tenant} {
+        ~^([a-z0-9][a-z0-9-]{1,30}[a-z0-9])\.   ${1}
+        default ""
+    }
+
+    # Host o kształcie, który nie może być kodem tenanta (za krótki, wielkie
+    # litery, myślnik na skraju). Odpowiadamy 404, a NIE błędem TLS ani
+    # certyfikatem cudzego klienta — wildcard obsługuje TLS dla każdej nazwy
+    # w domenie, więc odmowa musi paść tutaj, w routingu.
+    #
+    # `handle` na tym samym poziomie co bloki ze snippetu, nie wokół nich:
+    # bloki `handle` wykluczają się wzajemnie i wygrywa pierwszy pasujący,
+    # a snippet zawiera `handle_errors`, którego Caddy nie pozwala zagnieździć
+    # wewnątrz `handle`.
+    @unknown vars {tenant} ""
+    handle @unknown {
+        import common_security_prod
+        respond 404
+    }
+
+    # Kod ma dobry kształt, ale instancji może nie być. Dla ŻĄDAŃ NAWIGACYJNYCH
+    # (przeglądarka prosi o HTML) sprawdzamy to, zanim wydamy powłokę SPA:
+    # bez tego nieistniejąca subdomena pokazywałaby ekran logowania instancji,
+    # której nie ma — bo bundel jest plikiem na edge i nikt po drodze nie pyta
+    # o klienta. Sonda to jedno wewnętrzne żądanie `GET /api` do instancji.
+    #
+    # Zawężone do nawigacji świadomie: zasoby statyczne (skrypty, style, obrazy)
+    # są wspólne dla wszystkich instancji, nie niosą tożsamości klienta i nie ma
+    # po co płacić za nie dodatkowym obiegiem do PHP. Do nich stosuje się blok
+    # SPA ze snippetu poniżej.
+    #
+    # Blok stoi PRZED importem, bo bloki `handle` wykluczają się wzajemnie
+    # i wygrywa pierwszy pasujący — trasy `/api`, `/docs` i huba zostają
+    # nietknięte, a podmieniony jest wyłącznie fallback SPA.
+    @spa_navigation {
+        not path /api* /docs* /.well-known/mercure*
+        header Accept *text/html*
+    }
+    handle @spa_navigation {
+        reverse_proxy pim-{tenant}-api:80 {
+            # Sondujemy tani, publiczny punkt wejścia API. Odpowiedź jest
+            # odrzucana — liczy się wyłącznie to, że instancja odpowiedziała.
+            rewrite /api
+
+            @alive status 200
+            handle_response @alive {
+                header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+                root * /srv/admin
+                try_files {path} /index.html
+                file_server
+            }
+        }
+    }
+
+    import pim_routes pim-{tenant}-api pim-{tenant}-mercure
+
+    # Kod ma właściwy kształt, ale kontenera nie ma: instancja nie istnieje,
+    # jest zawieszona (#2909) albo skasowana. Bez tego bloku wychodziłoby 502,
+    # które zdradza, że coś tam kiedyś było — i wygląda jak awaria zamiast jak
+    # brak zasobu.
+    #
+    # ŚWIADOMY KOMPROMIS: z poziomu edge „instancji nie ma" i „instancja padła"
+    # są nierozróżnialne — oba to nieudane połączenie z upstreamem. Awaria
+    # żywego klienta pokaże się więc jako 404, nie 502. Diagnostyka idzie przez
+    # `docker compose -p pim-<kod> ps` i alerty Prometheusa (#2866), które
+    # patrzą na instancje bezpośrednio, nie przez edge.
+    handle_errors {
+        @upstream_gone expression {err.status_code} == 502
+        handle @upstream_gone {
+            import common_security_prod
+            respond 404
+        }
+    }
+}
+
+# Stary adres bez subdomeny — 301 na instancję `harmon`.
+#
+# Po przeniesieniu pierwszego klienta na `harmon.{$DOMAIN}` adres bez
+# subdomeny musi dalej działać: prowadzą do niego zakładki operatora ORAZ
+# linki w już wysłanych zaproszeniach i resetach hasła. Przekierowanie jest
+# trwałe i zachowuje ścieżkę oraz query.
+#
+# UWAGA: włączyć DOPIERO po wystawieniu certyfikatu dla harmon.{$DOMAIN}
+# i potwierdzeniu logowania pod nowym adresem — inaczej odcina jedyną
+# działającą drogę do panelu.
+#
+#   {$DOMAIN} {
+#       import common_security_prod
+#       redir https://harmon.{$DOMAIN}{uri} permanent
+#   }
+
+# ----------------------------------------------------------------------------
+# Strona marketingowa harmonpim.pl (cutover 2026-08-07).
+#
+# Stack `harmon-www` (FrankenPHP) przestal publikowac porty 80/443 i dziala
+# jako backend w sieci `pim_default`. Ten blok terminuje TLS i przekazuje ruch
+# do niego, dzieki czemu cala logika strony zostaje nietknieta: PHP dla
+# mail.php, bramka hasłowa, wlasne CSP per-sciezka, cache i strona 404.
+#
+# Celowo NIE importuje `common_security_prod` — backend wysyla wlasne naglowki
+# bezpieczenstwa (w tym dwa rozne CSP: inny dla /wejscie.html), a naglowek
+# ustawiony na poziomie site'u w Caddy WYGRYWA z tym z backendu i po cichu by
+# je nadpisal (dokladnie ten mechanizm zepsul nawigacje /docs, PR #2781).
+# Dokladamy wylacznie HSTS, ktorego backend nie ustawia, bo do teraz chodzil
+# po samym HTTP.
+harmonpim.pl {
+    header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+    reverse_proxy harmon-www-www-1:80
+}
+
+www.harmonpim.pl {
+    redir https://harmonpim.pl{uri} permanent
+}

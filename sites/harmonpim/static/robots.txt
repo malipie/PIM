@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://harmonpim.pl/sitemap.xml

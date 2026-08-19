@@ -1,0 +1,14 @@
+{
+  "name": "harmon-www",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "serve": "node tools/serve.mjs",
+    "test": "node tools/test-interactions.mjs"
+  },
+  "devDependencies": {
+    "cheerio": "^1.2.0",
+    "puppeteer-core": "^25.5.0"
+  }
+}
