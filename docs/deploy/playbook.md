@@ -245,6 +245,25 @@ git ls-files docker/caddy/
 
 Rozjazd = zatrzymaj się i zdecyduj świadomie, zanim ogłosisz sukces. Stan docelowy: #2952.
 
+### 9b. `tar`/`scp` z macOS zostawia na hoście pliki `._*` (2026-08-19)
+
+Na produkcji leżało **91 plików `._*`** (AppleDouble — metadane macOS), najstarsze z pierwszych wdrożeń.
+Są bezczynne: nie są poprawnym PHP, a autoloading mapuje nazwy klas na nazwy plików, więc nikt ich nie
+ładuje. Szkodzą tylko przy porównywaniu drzewa „repo vs produkcja", bo produkcja ma wtedy więcej plików
+niż `git ls-files` i różnica wygląda na dryf kodu.
+
+Skąd się biorą: `tar` na macOS domyślnie pakuje rozszerzone atrybuty, a `scp -r` przenosi je razem
+z katalogiem. `git archive` ich **nie** tworzy — dlatego wdrożenia wykonywane wg tego playbooka są czyste.
+
+```bash
+# przy pakowaniu z Maca (jeśli kiedykolwiek zamiast `git archive`)
+COPYFILE_DISABLE=1 tar czf …
+
+# sprzątanie na hoście — wzorzec trafia wyłącznie w śmieci
+#   (`git ls-files | grep -E '(^|/)\._'` jest pusty, więc nic prawdziwego się pod niego nie łapie)
+ssh $HOST "cd /opt/pim && find . -name '._*' -type f -delete"
+```
+
 ### 10. Dowodem dla zmiany w edge jest NOWE zachowanie, nie brak regresji (2026-08-19)
 
 Po restarcie Caddy'ego wszystkie istniejące hosty odpowiadały 200 — smoke „strona wstała" był zielony,
