@@ -21,6 +21,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # #2949 — checkout + weryfikacja wersji + utworzenie release. Bez limitu obowiazuje domyslne 6 h GitHuba.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 

@@ -24,6 +24,8 @@ jobs:
   dependency-audit:
     name: Dependency audit (composer + pnpm)
     runs-on: ubuntu-latest
+    # #2949 — mierzone: ~30 s (composer + pnpm audit). Bez limitu obowiazuje domyslne 6 h GitHuba.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
