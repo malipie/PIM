@@ -243,7 +243,11 @@ ssh $HOST "docker inspect pim-caddy-1 --format '{{range .Mounts}}{{.Source}} -> 
 git ls-files docker/caddy/
 ```
 
-Rozjazd = zatrzymaj się i zdecyduj świadomie, zanim ogłosisz sukces. Stan docelowy: #2952.
+Rozjazd = zatrzymaj się i zdecyduj świadomie, zanim ogłosisz sukces.
+
+**Ten konkretny rozjazd jest już zamknięty** (#2952): `Caddyfile.site` i `docker-compose.site.yml`
+są w repozytorium i przy wdrożeniu 2026-08-19 plik w gicie był identyczny co do bajtu z tym, który
+serwuje produkcja. Sweep zostaje, bo pilnuje **następnego** takiego pliku, nie tego jednego.
 
 ### 9b. `tar`/`scp` z macOS zostawia na hoście pliki `._*` (2026-08-19)
 
