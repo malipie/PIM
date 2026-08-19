@@ -27,7 +27,14 @@ ARG CADDY_VERSION=2.10.0
 FROM caddy:${CADDY_VERSION}-builder-alpine AS builder
 
 # Wersja pluginu pinowana tak samo jak wszystko inne w lockfile'ach projektu.
-ARG CADDY_DNS_CLOUDFLARE_VERSION=v0.2.1
+#
+# MINIMUM to v0.2.4 — nie „najnowsza dla zasady". Plugin waliduje KSZTAŁT tokenu
+# po swojej stronie, a Cloudflare wystawia dziś tokeny z prefiksem (`cfut_` dla
+# użytkownika, `cfat_` dla konta). Wersje do v0.2.3 znały wyłącznie stary format
+# 35–50 znaków bez prefiksu i odrzucały token **ważny według API Cloudflare**
+# komunikatem „API token appears invalid". Objaw jest mylący: wygląda na literówkę
+# w sekrecie, a jest niezgodnością wersji. Znalezione przy wdrożeniu #2908.
+ARG CADDY_DNS_CLOUDFLARE_VERSION=v0.2.4
 
 RUN xcaddy build \
     --with github.com/caddy-dns/cloudflare@${CADDY_DNS_CLOUDFLARE_VERSION}
