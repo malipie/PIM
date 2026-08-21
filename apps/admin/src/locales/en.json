@@ -2136,6 +2136,10 @@
     },
     "errors": {
       "forbidden": "You do not have permission to view this section. Contact your administrator."
+    },
+    "selection": {
+      "capped_explained": "Selected {{limit}} of {{total}} — that is the most that can be selected at once. Narrow the filter to cover the rest.",
+      "all_matching_label": "selected across every page of the result"
     }
   },
   "api_configurator": {
