@@ -1323,6 +1323,11 @@ final class ImportRunHandler extends AbstractBatchHandler
         array &$mediaJobs,
         int $resumeFrom = 0,
     ): int {
+        $target = $session->getTargetObjectType();
+        $identityAttributeCode = null !== $target
+            ? $this->validator->identityAttributeCode($target, $session->getMatchAttributeCode())
+            : $session->getMatchAttributeCode();
+
         // Pass 1 — validate rows and gather match keys for the batch resolve.
         /** @var list<array{rowNumber: int, cells: array<string, string|null>, sku: ?string, errors: list<ValidationError>, rowOk: bool, resolvedValues: list<ResolvedImportValue>, matchKey: string, duplicateInFile: bool}> $prepared */
         $prepared = [];
@@ -1337,6 +1342,11 @@ final class ImportRunHandler extends AbstractBatchHandler
                 attributesByCode: $attributesByCode,
                 tenant: $tenant,
                 skuSeenInFile: $skuSeenInFile,
+                // #2943 — same identity rule the dry run applied, resolved from
+                // the run's own match attribute. Deriving it here rather than
+                // defaulting to `sku` is what keeps the async pass from
+                // rejecting rows the preview accepted.
+                identityAttributeCode: $identityAttributeCode,
             );
             $sku = $cells[$this->rowCells->skuColumnHeader($columnMapping)] ?? null;
             $blocking = array_values(array_filter(

@@ -18276,6 +18276,45 @@
                 "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
             }
         },
+        "/api/object_types/{id}/next-code": {
+            "get": {
+                "operationId": "api_object_types_id_next_code_get",
+                "tags": [
+                    "object_types"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api object types id next code",
+                "description": "Custom controller route.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "",
+                        "required": true,
+                        "deprecated": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "style": "simple",
+                        "explode": false
+                    }
+                ],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "object.add | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any"
+            }
+        },
         "/api/object_types/{id}/usage": {
             "get": {
                 "operationId": "api_object_types_id_usage_get",

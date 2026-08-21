@@ -4326,5 +4326,9 @@
       "report_ok": "Pasted {{applied}} cells"
     },
     "resize_column": "Resize column {{label}}"
+  },
+  "relation_create_field": {
+    "empty": "No objects of the related type yet — create one first.",
+    "empty_denied": "You do not have read access to the related object type."
   }
 }

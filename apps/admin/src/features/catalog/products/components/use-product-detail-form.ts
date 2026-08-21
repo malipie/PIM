@@ -1,10 +1,10 @@
 import { type UseQueryResult, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import { toast } from '@/components/ui/toast';
-import { httpErrorDetail, jsonFetch } from '@/lib/http';
+import { HttpError, httpErrorDetail, jsonFetch } from '@/lib/http';
 import { localizeAttributeMessage } from './attribute-validation-i18n';
 import {
   collectRelationCodes,
@@ -21,6 +21,28 @@ import type {
   ProductDetailMode,
   ProductLocale,
 } from './types';
+
+/**
+ * #2943 — next free identifier for an ObjectType, or null when the endpoint
+ * is unavailable. A failed suggestion must never block the form: the field
+ * simply stays empty and the operator types their own, which is exactly how
+ * it behaved before the prefill existed.
+ */
+async function nextCodeFor(objectTypeId: string): Promise<string | null> {
+  try {
+    const response = await jsonFetch<{ code?: string }>(
+      `/api/object_types/${objectTypeId}/next-code`,
+      { accept: 'application/json' },
+    );
+    return typeof response.code === 'string' && response.code !== '' ? response.code : null;
+  } catch {
+    return null;
+  }
+}
+
+function isConflict(error: unknown): boolean {
+  return error instanceof HttpError && error.status === 409;
+}
 
 interface UseProductDetailFormArgs {
   mode: ProductDetailMode;
@@ -89,6 +111,38 @@ export function useProductDetailForm({
   };
 
   const [dirtyFields, setDirtyFields] = useState<Record<string, unknown>>({});
+
+  /**
+   * #2943 — prefill the identifier with the next free number for this
+   * ObjectType. Operators of a custom module had no external number to copy
+   * and had to invent one per row before the form would save.
+   *
+   * Prefill, not reservation: the suggestion lands in the same dirty buffer
+   * a keystroke would, so typing over it is just editing. It is fetched once
+   * per ObjectType and only while the field is still untouched — re-running
+   * it after the operator has typed would overwrite their SKU.
+   *
+   * The guard is keyed by ObjectType rather than a boolean, and the result is
+   * NOT discarded on cleanup. Under StrictMode the effect runs, is cleaned up
+   * and runs again on mount: a boolean ref survives that, so the second run
+   * saw "already requested" and returned, while the first run's response was
+   * thrown away by its own cancel flag — the field stayed empty exactly on
+   * the pages where the id was known at first render (custom modules), and
+   * worked on /products/new only because its id arrives a tick later.
+   */
+  const prefilledFor = useRef<string | null>(null);
+  const suggestedCode = useRef<string | null>(null);
+  useEffect(() => {
+    if (mode !== 'create' || objectTypeId === null || prefilledFor.current === objectTypeId) return;
+    prefilledFor.current = objectTypeId;
+    void nextCodeFor(objectTypeId).then((code) => {
+      if (code === null) return;
+      suggestedCode.current = code;
+      setDirtyFields((prev) =>
+        typeof prev.sku === 'string' && prev.sku !== '' ? prev : { ...prev, sku: code },
+      );
+    });
+  }, [mode, objectTypeId]);
   // #1350 — codes of required attributes that blocked the last save.
   const [requiredErrors, setRequiredErrors] = useState<Set<string>>(new Set());
   // Codes of attributes rejected by the backend value validation (min/max,
@@ -239,11 +293,32 @@ export function useProductDetailForm({
         if (Object.keys(attributes).length > 0) body.attributes = attributes;
         // #1415 — poly-kind create: same processor as the /api/products
         // sugar path, kind comes from objectTypeId.
-        const created = await jsonFetch<{ id: string }>('/api/objects', {
-          method: 'POST',
-          contentType: 'application/ld+json',
-          body,
-        });
+        //
+        // #2943 — the suggested number is not reserved, so two operators
+        // creating at once can both be handed it. The loser gets 409; ask
+        // for a fresh number and try once more rather than making them
+        // re-enter the whole form. Only retried when the operator kept the
+        // suggestion — a hand-typed SKU colliding is theirs to resolve.
+        let created: { id: string };
+        try {
+          created = await jsonFetch<{ id: string }>('/api/objects', {
+            method: 'POST',
+            contentType: 'application/ld+json',
+            body,
+          });
+        } catch (error) {
+          const retryCode =
+            isConflict(error) && sku === suggestedCode.current
+              ? await nextCodeFor(objectTypeId)
+              : null;
+          if (retryCode === null) throw error;
+          body.code = retryCode;
+          created = await jsonFetch<{ id: string }>('/api/objects', {
+            method: 'POST',
+            contentType: 'application/ld+json',
+            body,
+          });
+        }
 
         const relationFailures: string[] = [];
         for (const [attrCode, targets] of Object.entries(relations)) {

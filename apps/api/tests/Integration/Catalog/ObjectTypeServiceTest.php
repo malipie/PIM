@@ -70,6 +70,25 @@ final class ObjectTypeServiceTest extends KernelTestCase
     }
 
     #[Test]
+    public function createPointsTheNewTypeAtTheNameAttribute(): void
+    {
+        // #2943 — without a label attribute every list, picker and object
+        // summary renders `objects.code`. The operator who typed a name into
+        // a new custom module saw "TW-001" and reported "the name does not
+        // save at all"; the value was stored, nothing displayed it.
+        $type = $this->serviceWithCustomEnabled(true)->create(
+            'tworcy',
+            ObjectKind::Custom,
+            ['pl' => 'Twórcy', 'en' => 'Creators'],
+        );
+
+        self::assertSame(
+            $this->someAttribute->getId()->toRfc4122(),
+            $type->getLabelAttribute()?->getId()->toRfc4122(),
+        );
+    }
+
+    #[Test]
     public function createCustomTypeIsBlockedWhenFeatureFlagDisabled(): void
     {
         $service = $this->serviceWithCustomEnabled(false);
@@ -260,6 +279,7 @@ final class ObjectTypeServiceTest extends KernelTestCase
             self::getContainer()->get(ObjectTypeAttributeRepositoryInterface::class),
             self::getContainer()->get(\App\Catalog\Domain\Repository\AttributeRepositoryInterface::class),
             self::getContainer()->get(\Doctrine\DBAL\Connection::class),
+            self::getContainer()->get(TenantContext::class),
             $flag,
         );
     }

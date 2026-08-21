@@ -4352,5 +4352,9 @@
       "report_ok": "Wklejono {{applied}} komórek"
     },
     "resize_column": "Zmień szerokość kolumny {{label}}"
+  },
+  "relation_create_field": {
+    "empty": "Brak obiektów powiązanego typu — najpierw jakiś utwórz.",
+    "empty_denied": "Brak uprawnień do odczytu powiązanego typu obiektów."
   }
 }

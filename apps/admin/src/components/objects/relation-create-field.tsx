@@ -34,12 +34,21 @@ import { useTranslation } from 'react-i18next';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
 import type { AttributeMeta } from '@/features/catalog/products/components/types';
+import { objectNameFromAttributes } from '@/lib/attributes-indexed';
 import { jsonFetch } from '@/lib/http';
 
 interface CandidateRow {
   id: string;
   code?: string;
   objectType?: { id?: string } | null;
+  attributesIndexed?: Record<string, unknown> | null;
+}
+
+interface CandidateResult {
+  rows: CandidateRow[];
+  /** Types whose collection came back as an error (403 for a role without read). */
+  deniedTypeCount: number;
+  typeCount: number;
 }
 
 interface ObjectsListResponse {
@@ -63,11 +72,11 @@ export function RelationCreateField({
   value,
   onChange,
 }: RelationCreateFieldProps): React.ReactElement {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const allowedTypeIds = attribute.relation_target_object_type_ids ?? [];
   const cardinality = attribute.relation_cardinality ?? 'many';
 
-  const candidatesQuery = useQuery<CandidateRow[]>({
+  const candidatesQuery = useQuery<CandidateResult>({
     queryKey: ['relation-candidates', allowedTypeIds.join(',')],
     queryFn: async () => {
       let typeIds = allowedTypeIds;
@@ -82,21 +91,33 @@ export function RelationCreateField({
 
       // A caller may legitimately lack read access to some of the types —
       // a 403 on one of them must narrow the list, not blank the picker.
+      //
+      // #2943 — but swallowing the refusal entirely made "you may not read
+      // this type" and "this type has no objects yet" render as the same
+      // blank picker, which is what the operator reported and could not
+      // diagnose. Count the refusals so the empty state can say which it is.
       const pages = await Promise.all(
         typeIds.map((typeId) =>
           jsonFetch<ObjectsListResponse>(
             `/api/objects?itemsPerPage=200&objectType=${encodeURIComponent(typeId)}`,
             { accept: 'application/ld+json' },
-          ).catch((): ObjectsListResponse => ({ member: [] })),
+          )
+            .then((page) => ({ page, denied: false }))
+            .catch(() => ({ page: { member: [] } as ObjectsListResponse, denied: true })),
         ),
       );
 
-      return pages.flatMap((page) => page.member ?? page['hydra:member'] ?? []);
+      return {
+        rows: pages.flatMap(({ page }) => page.member ?? page['hydra:member'] ?? []),
+        deniedTypeCount: pages.filter(({ denied }) => denied).length,
+        typeCount: typeIds.length,
+      };
     },
     staleTime: 30_000,
   });
 
-  const candidates = candidatesQuery.data ?? [];
+  const candidates = candidatesQuery.data?.rows ?? [];
+  const deniedTypeCount = candidatesQuery.data?.deniedTypeCount ?? 0;
   const filtered =
     allowedTypeIds.length === 0
       ? candidates
@@ -113,10 +134,29 @@ export function RelationCreateField({
     );
   }
 
+  // #2943 — the picker listed `code`, so a list of creators read "TW-001,
+  // TW-002". Both primitives search over `label`, so carrying the code in it
+  // keeps search-by-code working while the operator reads a name.
+  const labelFor = (row: CandidateRow): string => {
+    const name = objectNameFromAttributes(row.attributesIndexed, i18n.language);
+    const code = row.code ?? row.id;
+    return name === null ? code : `${name} — ${code}`;
+  };
+
+  const emptyText =
+    deniedTypeCount > 0
+      ? t('relation_create_field.empty_denied', {
+          defaultValue: 'Brak uprawnień do odczytu powiązanego typu obiektów.',
+        })
+      : t('relation_create_field.empty', {
+          defaultValue: 'Brak obiektów powiązanego typu — najpierw jakiś utwórz.',
+        });
+
   if (cardinality === 'one') {
     const options: ComboboxOption[] = filtered.map((row) => ({
       value: row.id,
-      label: row.code ?? row.id,
+      label: labelFor(row),
+      description: row.code,
     }));
     const currentValue = typeof value === 'string' && value !== '' ? value : null;
     return (
@@ -125,6 +165,7 @@ export function RelationCreateField({
         value={currentValue}
         onChange={(next) => onChange(next)}
         placeholder={t('relation_create_field.placeholder', { defaultValue: 'Wybierz…' })}
+        emptyText={emptyText}
         className="rounded-xl text-[13.5px]"
       />
     );
@@ -132,7 +173,7 @@ export function RelationCreateField({
 
   const options: MultiSelectOption[] = filtered.map((row) => ({
     value: row.id,
-    label: row.code ?? row.id,
+    label: labelFor(row),
   }));
   const currentValues = readMultiValue(value);
   return (
@@ -141,6 +182,7 @@ export function RelationCreateField({
       value={currentValues}
       onChange={(next) => onChange(next)}
       placeholder={t('relation_create_field.placeholder', { defaultValue: 'Wybierz…' })}
+      emptyText={emptyText}
       className="rounded-xl text-[13.5px]"
     />
   );

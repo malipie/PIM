@@ -17,6 +17,8 @@ use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeAttributeRepositoryInterface;
 use App\Catalog\Domain\Rule\CompareRule;
 use App\Catalog\Domain\Rule\CrossFieldRules;
+use App\Shared\Application\TenantContext;
+use App\Shared\Domain\Tenant;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -54,6 +56,7 @@ final readonly class ObjectTypeService
         private ObjectTypeAttributeRepositoryInterface $junctions,
         private AttributeRepositoryInterface $attributes,
         private Connection $connection,
+        private TenantContext $tenantContext,
         private bool $enableCustomObjectTypes,
     ) {
     }
@@ -94,6 +97,22 @@ final readonly class ObjectTypeService
         }
         if ($abstract) {
             $objectType->setAbstract(true);
+        }
+
+        // #2943 — a new ObjectType starts with no display label, so every
+        // list, picker and object summary falls back to `objects.code`. The
+        // operator who named their object "Stanisław Lem" then saw "TW-001"
+        // everywhere and reported it as "the name does not save at all" —
+        // the value WAS stored, nothing rendered it. Point the new type at
+        // the platform's `name` attribute, the same one the built-ins use
+        // ({@see BuiltInLabelAttributeSeeder}); the operator can repoint it
+        // to their own attribute later.
+        $tenant = $this->tenantContext->get();
+        if ($tenant instanceof Tenant) {
+            $nameAttribute = $this->attributes->findByCode(BuiltInLabelAttributeSeeder::CODE, $tenant);
+            if ($nameAttribute instanceof Attribute) {
+                $objectType->assignLabelAttribute($nameAttribute);
+            }
         }
 
         $this->em->persist($objectType);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Import;
 
+use App\Catalog\Contracts\Query\ObjectTypeAttributeCodesPort;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
@@ -55,6 +56,7 @@ final class ImportValidationServiceTest extends TestCase
             rowReader: new ImportRowReader(new EncodingDetector(), new DelimiterDetector()),
             compositeValueParser: new CompositeValueParser(),
             columnGrammar: $this->grammarWith(['pl', 'en']),
+            objectTypeAttributeCodes: new InMemoryObjectTypeAttributeCodes(['sku']),
         );
 
         $csv = "sku;name;price\nOK-1;Foo;9.99\nEXISTING-1;Bar;14.99\n;Anon;5\nDUP-1;Dup;1\nDUP-1;Dup again;2\nBAD-1;Has bad price;not-a-number\n";
@@ -110,6 +112,7 @@ final class ImportValidationServiceTest extends TestCase
             rowReader: new ImportRowReader(new EncodingDetector(), new DelimiterDetector()),
             compositeValueParser: new CompositeValueParser(),
             columnGrammar: $this->grammarWith(['pl', 'en']),
+            objectTypeAttributeCodes: new InMemoryObjectTypeAttributeCodes(['sku']),
         );
 
         // The exporter's own format: a system column (created_at), a
@@ -137,6 +140,97 @@ final class ImportValidationServiceTest extends TestCase
             self::assertSame(1, $result->successCount, 'Round-trip export row validates clean.');
             self::assertSame(0, $result->errorCount);
             self::assertSame([], $result->errors);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    #[Test]
+    public function customObjectTypeWithoutSkuValidatesWithoutMissingRequired(): void
+    {
+        // #2943 — a custom ObjectType ("Twórcy" in the report) models neither
+        // `sku` nor `name`. Requiring `sku` unconditionally failed every row
+        // on a column that type cannot have, and the operator had no way to
+        // satisfy it. The write path never needed it: `objects.code` falls
+        // back to `IMPORT-<row>`.
+        $tenant = new Tenant('demo', 'Demo');
+        $attributeRepo = new InMemoryAttributeRepository([
+            'pseudonim' => new Attribute('pseudonim', ['pl' => 'Pseudonim'], AttributeType::Text),
+        ]);
+
+        $tenantContext = new TenantContext();
+        $tenantContext->set($tenant);
+
+        $service = new ImportValidationService(
+            attributes: $attributeRepo,
+            catalogObjects: new InMemoryCatalogObjectRepository([]),
+            tenantContext: $tenantContext,
+            rowReader: new ImportRowReader(new EncodingDetector(), new DelimiterDetector()),
+            compositeValueParser: new CompositeValueParser(),
+            columnGrammar: $this->grammarWith(['pl', 'en']),
+            objectTypeAttributeCodes: new InMemoryObjectTypeAttributeCodes([]),
+        );
+
+        $csv = "pseudonim\nKowalski\nNowak\n";
+        $path = $this->writeTempCsv($csv);
+
+        try {
+            $result = $service->validate(
+                absolutePath: $path,
+                columnMapping: ['pseudonim' => 'pseudonim'],
+                target: new ObjectType('tworcy', ObjectKind::Custom, ['pl' => 'Twórcy']),
+            );
+
+            self::assertSame(2, $result->totalRows);
+            self::assertSame(2, $result->successCount);
+            self::assertSame(0, $result->errorCount);
+            $errorTypes = array_map(static fn ($e): string => $e->errorType->value, $result->errors);
+            self::assertNotContains(ImportErrorType::MissingRequired->value, $errorTypes);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    #[Test]
+    public function configuredMatchAttributeBecomesTheRequiredIdentityColumn(): void
+    {
+        // A run matching on EAN (ADR-0019 D1) cannot resolve a row without it,
+        // so that column — not `sku` — is what the row must carry.
+        $tenant = new Tenant('demo', 'Demo');
+        $attributeRepo = new InMemoryAttributeRepository([
+            'ean' => new Attribute('ean', ['en' => 'EAN'], AttributeType::Identifier),
+            'name' => new Attribute('name', ['en' => 'Name'], AttributeType::Text),
+        ]);
+
+        $tenantContext = new TenantContext();
+        $tenantContext->set($tenant);
+
+        $service = new ImportValidationService(
+            attributes: $attributeRepo,
+            catalogObjects: new InMemoryCatalogObjectRepository([]),
+            tenantContext: $tenantContext,
+            rowReader: new ImportRowReader(new EncodingDetector(), new DelimiterDetector()),
+            compositeValueParser: new CompositeValueParser(),
+            columnGrammar: $this->grammarWith(['pl', 'en']),
+            objectTypeAttributeCodes: new InMemoryObjectTypeAttributeCodes(['sku']),
+        );
+
+        $csv = "ean;name\n;Bez EAN\n5901234123457;Z EAN\n";
+        $path = $this->writeTempCsv($csv);
+
+        try {
+            $result = $service->validate(
+                absolutePath: $path,
+                columnMapping: ['ean' => 'ean', 'name' => 'name'],
+                target: new ObjectType('product', ObjectKind::Product, ['en' => 'Product']),
+                matchAttributeCode: 'ean',
+            );
+
+            self::assertSame(1, $result->errorCount, 'only the row without an EAN fails');
+            $errorTypes = array_map(static fn ($e): string => $e->errorType->value, $result->errors);
+            self::assertContains(ImportErrorType::MissingRequired->value, $errorTypes);
+            $columns = array_map(static fn ($e): ?string => $e->columnName, $result->errors);
+            self::assertContains('ean', $columns, 'the missing column named is the match attribute');
         } finally {
             @unlink($path);
         }
@@ -298,5 +392,23 @@ final class InMemoryCatalogObjectRepository implements CatalogObjectRepositoryIn
 
     public function remove(CatalogObject $object): void
     {
+    }
+}
+
+/**
+ * @internal
+ */
+final class InMemoryObjectTypeAttributeCodes implements ObjectTypeAttributeCodesPort
+{
+    /**
+     * @param list<string> $attachedCodes
+     */
+    public function __construct(private readonly array $attachedCodes)
+    {
+    }
+
+    public function forObjectType(Uuid $objectTypeId): array
+    {
+        return $this->attachedCodes;
     }
 }

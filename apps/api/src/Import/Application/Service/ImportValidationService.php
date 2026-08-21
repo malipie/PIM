@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Import\Application\Service;
 
+use App\Catalog\Contracts\Query\ObjectTypeAttributeCodesPort;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\ObjectType;
@@ -45,7 +46,38 @@ final readonly class ImportValidationService
         private ImportRowReader $rowReader,
         private CompositeValueParser $compositeValueParser,
         private ImportColumnGrammar $columnGrammar,
+        private ObjectTypeAttributeCodesPort $objectTypeAttributeCodes,
     ) {
+    }
+
+    /**
+     * #2943 — which column carries the row's identity, or null when the
+     * target models none.
+     *
+     * `sku` used to be required unconditionally. For a custom ObjectType that
+     * does not model it — the reported case was a "Twórcy" module — every row
+     * failed with `Missing required attribute "sku"` for a column the operator
+     * had no way to supply. The write path never needed it: `skuFrom()` falls
+     * back to `IMPORT-<row>` for `objects.code`, so only this check stood in
+     * the way.
+     *
+     * Resolution order:
+     *   1. the run's match attribute — that is the key rows are matched on,
+     *      so a row without it cannot be resolved (ADR-0019 D1);
+     *   2. `sku`, but only when the target actually models it — the same
+     *      junction the mapping step offers as targets, read across the BC
+     *      boundary through {@see ObjectTypeAttributeCodesPort};
+     *   3. nothing.
+     */
+    public function identityAttributeCode(ObjectType $target, ?string $matchAttributeCode): ?string
+    {
+        if (null !== $matchAttributeCode && '' !== $matchAttributeCode) {
+            return $matchAttributeCode;
+        }
+
+        $modelled = $this->objectTypeAttributeCodes->forObjectType($target->getId());
+
+        return \in_array(self::SKU_ATTRIBUTE_CODE, $modelled, true) ? self::SKU_ATTRIBUTE_CODE : null;
     }
 
     /**
@@ -58,6 +90,7 @@ final readonly class ImportValidationService
         ?FileEncoding $encodingOverride = null,
         ?string $delimiterOverride = null,
         ?int $maxRows = null,
+        ?string $matchAttributeCode = null,
     ): ValidationResult {
         $tenant = $this->tenantContext->get();
         if (!$tenant instanceof Tenant) {
@@ -65,6 +98,7 @@ final readonly class ImportValidationService
         }
 
         $attributesByCode = $this->loadAttributesByCode($tenant, $columnMapping);
+        $identityAttributeCode = $this->identityAttributeCode($target, $matchAttributeCode);
         $errors = [];
         $successCount = 0;
         $errorCount = 0;
@@ -92,6 +126,7 @@ final readonly class ImportValidationService
                 attributesByCode: $attributesByCode,
                 tenant: $tenant,
                 skuSeenInFile: $skuSeenInFile,
+                identityAttributeCode: $identityAttributeCode,
             );
 
             $blockingErrors = array_values(array_filter(
@@ -134,10 +169,13 @@ final readonly class ImportValidationService
      * the dry-run service performs, but the caller drives iteration and
      * decides what to do with the findings.
      *
-     * @param array<string, string|null> $cells            column_header → value
+     * @param array<string, string|null> $cells                 column_header → value
      * @param array<string, string>      $columnMapping
      * @param array<string, Attribute>   $attributesByCode
-     * @param array<string, int>         $skuSeenInFile    mutable; tracks duplicates within the file
+     * @param array<string, int>         $skuSeenInFile         mutable; tracks duplicates within the file
+     * @param ?string                    $identityAttributeCode column that must carry the row's
+     *                                                          identity, or null when the target
+     *                                                          models none ({@see self::identityAttributeCode})
      *
      * @return list<ValidationError>
      */
@@ -148,6 +186,7 @@ final readonly class ImportValidationService
         array $attributesByCode,
         Tenant $tenant,
         array &$skuSeenInFile,
+        ?string $identityAttributeCode = self::SKU_ATTRIBUTE_CODE,
     ): array {
         $errors = [];
 
@@ -260,9 +299,12 @@ final readonly class ImportValidationService
         // IMP2-1.4/1.5 (#1466/#1467, ADR-0019): required follows
         // Attribute::isRequired instead of a hardcoded sku+name pair —
         // custom ObjectTypes without a "name" attribute import fine, and
-        // modelling-defined required attributes are enforced. `sku` stays
-        // technically required (it is the objects.code / match key).
-        $requiredCodes = [self::SKU_ATTRIBUTE_CODE];
+        // modelling-defined required attributes are enforced.
+        //
+        // #2943 — the identity column is required only when the target models
+        // one. It used to be a hardcoded `sku`, which made every row of a
+        // custom ObjectType fail on a column that type does not have.
+        $requiredCodes = null !== $identityAttributeCode ? [$identityAttributeCode] : [];
         foreach ($attributesByCode as $attributeCode => $attribute) {
             if ($attribute->isRequired() && AttributeType::Boolean !== $attribute->getType()) {
                 $requiredCodes[] = $attributeCode;
