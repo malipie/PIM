@@ -362,6 +362,11 @@ export function useProductDetailForm({
           body: { attributes },
         });
         await productQuery.refetch();
+        // #2943 — refetching the object is not enough: the lists cache for 30s
+        // under their own keys, so returning after a rename showed the OLD
+        // name until a hard reload. Create and delete already dropped that
+        // cache; the edit path, the one an operator uses most, did not.
+        invalidateObjectLists();
         setDirtyFields({});
         toast.success(t('products.detail.save.success', { defaultValue: 'Zapisano zmiany' }));
         // #1351 — "Zapisz zmiany" keeps the row in edit mode; only
