@@ -159,6 +159,43 @@ final class ExportSessionTest extends TestCase
         $session->setTargetCount(-1);
     }
 
+    #[Test]
+    public function aDoneSessionWhoseFileNeverArrivedStopsClaimingSuccess(): void
+    {
+        // #2945 — the run counted every row and then failed to hand the file
+        // to storage. It used to stay `done`: a green row with a real count
+        // and a download button that answered "Pobieranie nie powiodło się".
+        $session = $this->makeSession();
+        $session->markRunning();
+        $session->markDone(10056, '/tmp/pim-export-async-abc.xlsx', 2044150);
+        $completedAt = $session->getCompletedAt();
+        $durationMs = $session->getDurationMs();
+
+        $session->markFileUnavailable('Plik eksportu nie trafił do magazynu — uruchom eksport ponownie.');
+
+        self::assertSame(ExportStatus::Error, $session->getStatus());
+        self::assertStringContainsString('uruchom eksport ponownie', (string) $session->getErrorMessage());
+        // A path into a worker's /tmp is unservable by any other container.
+        self::assertNull($session->getFilePath());
+        // The run really did happen: its count and timing are not rewritten.
+        self::assertSame(10056, $session->getSuccessCount());
+        self::assertSame($completedAt, $session->getCompletedAt());
+        self::assertSame($durationMs, $session->getDurationMs());
+    }
+
+    #[Test]
+    public function fileUnavailableAlsoCoversARunThatNeverReachedDone(): void
+    {
+        $session = $this->makeSession();
+        $session->markRunning();
+
+        $session->markFileUnavailable('storage down');
+
+        self::assertSame(ExportStatus::Error, $session->getStatus());
+        self::assertNull($session->getFilePath());
+        self::assertNotNull($session->getCompletedAt());
+    }
+
     private function makeSession(?Uuid $userId = null): ExportSession
     {
         return new ExportSession(

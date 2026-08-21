@@ -154,13 +154,22 @@ final class ExportJobHandler extends AbstractBatchHandler
             // The streaming runner may have cleared the EM (IMP2-2.6); reload so
             // the terminal markError flush operates on a managed entity.
             $session = $this->sessions->findById($message->exportSessionId) ?? $session;
-            // markError throws if the session has already transitioned to
-            // 'done' (e.g. runToFile completed but MinIO upload failed
-            // afterwards). In that case the rows are already in the temp
-            // file, but the user cannot download them — we keep the
-            // session as 'done' and just log the post-flight failure so
-            // the operator sees the smell without a 500 to the FE.
+            // #2945 — the run can finish every row and then fail to hand the
+            // file over to storage. This used to leave the session as a plain
+            // success, to avoid a 500 on the FE: the operator got a green row,
+            // a real row count, and a download button that answered "Pobieranie
+            // nie powiodło się" with nothing to explain it.
+            //
+            // A completed run whose artifact never arrived is not a successful
+            // export. Mark it so, and say why in the message the card shows —
+            // the rows can always be re-run, but only if someone knows to.
             if (ExportStatus::Done === $session->getStatus()) {
+                $session->markFileUnavailable(\sprintf(
+                    'Plik eksportu nie trafił do magazynu — uruchom eksport ponownie. Szczegóły: %s',
+                    $error->getMessage(),
+                ));
+                $this->sessions->save($session);
+                $this->progress->status($session);
                 $this->logger->error('Export job post-flight failure on already-done session', [
                     'session_id' => $session->getId()->toRfc4122(),
                     'error' => $error->getMessage(),
