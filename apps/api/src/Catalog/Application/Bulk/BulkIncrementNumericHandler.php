@@ -81,7 +81,17 @@ final class BulkIncrementNumericHandler extends AbstractBulkHandler
         // not as a bare scalar. Reading the slot directly (as this handler
         // did) made is_numeric() false for every row → the whole batch was
         // silently skipped as "not numeric". Read the scalar from the slot.
-        $oldScalar = \is_array($slot) ? ($slot['value'] ?? null) : $slot;
+        // #2946 — a price envelope is {amount, currency} (ADR-0019 /
+        // docs/api/jsonb-schemas.md), so the number lives under `amount`, not
+        // `value`. Reading only `value` made every price row "not numeric"
+        // and the whole batch was skipped with a warning nobody reads — the
+        // operator saw an action that ran and changed nothing.
+        $isPriceEnvelope = \is_array($slot) && \array_key_exists('amount', $slot);
+        $oldScalar = match (true) {
+            $isPriceEnvelope => $slot['amount'],
+            \is_array($slot) => $slot['value'] ?? null,
+            default => $slot,
+        };
 
         if (!is_numeric($oldScalar)) {
             ++$counters->skipped;
@@ -124,9 +134,17 @@ final class BulkIncrementNumericHandler extends AbstractBulkHandler
         }
 
         // Write the new scalar back INTO the envelope, preserving the rest
-        // of the slot (e.g. provenance). The `+` union keeps 'value' from
-        // the left operand and any other keys from the existing slot.
-        $newSlot = \is_array($slot) ? ['value' => $newScalar] + $slot : ['value' => $newScalar];
+        // of the slot (e.g. provenance, and the price's currency). The `+`
+        // union keeps the recomputed key from the left operand and every
+        // other key from the existing slot.
+        if ($isPriceEnvelope) {
+            // Money keeps its scale: a 10% rise on 299.00 is 328.90, not
+            // 328.90000000000003. Two decimals unless the stored amount
+            // already carried more.
+            $newSlot = ['amount' => round($newScalar, self::scaleOf($oldScalar))] + $slot;
+        } else {
+            $newSlot = \is_array($slot) ? ['value' => $newScalar] + $slot : ['value' => $newScalar];
+        }
         $indexed[$this->attrCode] = $newSlot;
         $object->updateAttributeIndex($indexed);
         $object->markTouchedByBulkSession($session->getId());
@@ -140,6 +158,22 @@ final class BulkIncrementNumericHandler extends AbstractBulkHandler
             null,
         ));
         ++$counters->success;
+    }
+
+    /**
+     * Decimal places to keep for a money amount: what the stored value used,
+     * floored at 2 so a whole-number price does not lose its grosze.
+     */
+    private static function scaleOf(mixed $amount): int
+    {
+        $decimals = 0;
+        $text = \is_scalar($amount) ? (string) $amount : '';
+        $dot = strpos($text, '.');
+        if (false !== $dot) {
+            $decimals = \strlen($text) - $dot - 1;
+        }
+
+        return max(2, min($decimals, 6));
     }
 
     private function safeDivide(float $a, float $b): ?float

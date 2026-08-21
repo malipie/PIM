@@ -273,7 +273,12 @@ export function BulkWizard({ open, selectedIds, onClose, onApplied }: BulkWizard
                     // stara wartość (np. string) nie wpadła w bool/select input.
                     setNewValue(picked?.type === 'multiselect' ? [] : '');
                   }}
-                  allowedTypes={mode === 'increment_numeric' ? ['number', 'metric'] : undefined}
+                  // #2946 — `price` belongs here: raising a whole selection by
+                  // 10% is the reason this action exists. The handler keeps the
+                  // currency and the amount's scale.
+                  allowedTypes={
+                    mode === 'increment_numeric' ? ['number', 'metric', 'price'] : undefined
+                  }
                 />
               </div>
               {(mode === 'set_attribute' || mode === 'append_value' || mode === 'remove_value') && (
