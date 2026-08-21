@@ -337,10 +337,19 @@ services:
       # samą konfigurację bundla — niedopasowane hasło wywróciłoby boot.
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?JWT_PASSPHRASE jest wymagany.}
       WORKFLOW_CUSTOM_DEFINITIONS: ${WORKFLOW_CUSTOM_DEFINITIONS:-true}
+    # `async` MUSI tu być. Jest podpięty pod `doctrine://…queue_name=async`
+    # (patrz MESSENGER_TRANSPORT_DSN wyżej), więc bez konsumenta wiadomości
+    # nie giną — **zalegają w nieskończoność**. Miniatury multimediów były
+    # tylko widocznym objawem (#2944): `AssetThumbnailsRequested` jedzie
+    # właśnie tym transportem, a operator zobaczył grid pełen połamanych
+    # obrazków przy `thumbnails_status=pending` i kolejce rosnącej po każdym
+    # uploadzie. Tam trafia znacznie więcej pracy niż miniatury, więc brak
+    # konsumenta cicho wstrzymuje ją całą.
     command:
       - "php"
       - "bin/console"
       - "messenger:consume"
+      - "async"
       - "import"
       - "scheduler_maintenance"
       - "--time-limit=3600"

@@ -280,7 +280,10 @@ services:
     # always picks up the new code; it clears only APP_CACHE_DIR
     # (/app/var/cache-worker), never the api's tree, so it cannot corrupt live
     # requests (the reason the old boot clear was removed — GOLIVE #2179).
-    command: sh -c "php bin/console cache:clear --no-warmup && php bin/console messenger:consume import scheduler_maintenance scheduler_integration_sync --time-limit=3600 --memory-limit=256M"
+    # `async` pierwszy — bez niego transport ma DSN, ale nie ma konsumenta,
+    # a wiadomości (m.in. miniatury multimediów) zalegają zamiast się wykonać.
+    # Ten sam brak wywrócił miniatury na instancjach tenantów (#2944).
+    command: sh -c "php bin/console cache:clear --no-warmup && php bin/console messenger:consume async import scheduler_maintenance scheduler_integration_sync --time-limit=3600 --memory-limit=256M"
     environment:
       APP_ENV: ${APP_ENV:-dev}
       # WFL-P5-01 - the bulk change_status handler resolves the workflow
