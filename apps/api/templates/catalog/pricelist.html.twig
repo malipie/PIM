@@ -98,11 +98,6 @@
             font-weight: 700;
             white-space: nowrap;
         }
-        .pricelist td.availability {
-            width: 110px;
-            font-size: 9.5px;
-            color: #7d838c;
-        }
     </style>
 </head>
 <body>
@@ -121,7 +116,6 @@
                 <th>{{ l.sku|default('SKU') }}</th>
                 <th>{{ l.name|default('Name') }}</th>
                 <th class="col-price">{{ l.price|default('Price') }}</th>
-                <th>{{ l.availability|default('Availability') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -130,7 +124,6 @@
                     <td class="sku">{{ product.sku|default('') }}</td>
                     <td class="name">{{ product.name|default('') }}</td>
                     <td class="price">{{ product.price|default('') }}</td>
-                    <td class="availability">{{ product.availability|default('') }}</td>
                 </tr>
             {% endfor %}
         </tbody>

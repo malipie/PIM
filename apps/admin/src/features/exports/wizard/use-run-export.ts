@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { HttpError, jsonFetch, rawFetch } from '@/lib/http';
 
-import type { WizardState } from './types';
+import type { ExportFormat, WizardState } from './types';
 
 interface RunResultAsync {
   kind: 'async';
@@ -22,6 +22,20 @@ export type RunResult = RunResultAsync | RunResultSync;
  * doing `err instanceof Error` (which then reported the untranslated 'unknown'
  * fallback instead of the reason).
  */
+/**
+ * Content types that count as "the file the operator asked for", per format.
+ * Anything else on a 2xx is an error body wearing an ok status.
+ */
+const DOWNLOADABLE_CONTENT_TYPES: Record<ExportFormat, string[]> = {
+  xlsx: ['spreadsheetml.sheet', 'application/octet-stream'],
+  csv: ['text/csv', 'application/octet-stream'],
+  xml: ['application/xml', 'text/xml', 'application/octet-stream'],
+};
+
+export function isDownloadableContentType(format: ExportFormat, contentType: string): boolean {
+  return DOWNLOADABLE_CONTENT_TYPES[format].some((type) => contentType.includes(type));
+}
+
 export class RunError extends Error {
   readonly status: number;
   readonly detail: string;
@@ -75,7 +89,9 @@ export function useRunExport() {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          accept: 'application/json, application/octet-stream, text/csv',
+          // #2945 — XML belongs here too; asking for a format the Accept
+          // header excludes is how content negotiation surprises start.
+          accept: 'application/json, application/octet-stream, text/csv, application/xml',
         },
         body: JSON.stringify(buildExportPayload(state)),
       });
@@ -97,21 +113,24 @@ export function useRunExport() {
         return { kind: 'async', sessionId: body.id };
       }
 
-      // Guard: a 2xx response whose body is NOT a spreadsheet/CSV/binary is an
+      // Guard: a 2xx response whose body is not the file we asked for is an
       // error leaking through with an ok-ish status (e.g. a PHP fatal-error
       // dump rendered as text/html when the export OOMs). Without this check we
       // would download that error text as `pim-export.xlsx` and the user gets a
       // "corrupt file". Surface it as a RunError so StepSummary toasts instead.
-      const DOWNLOADABLE_CONTENT_TYPES = [
-        'spreadsheetml.sheet',
-        'text/csv',
-        'application/octet-stream',
-      ];
-      if (!DOWNLOADABLE_CONTENT_TYPES.some((type) => contentType.includes(type))) {
+      //
+      // #2945 — the allow-list used to be a flat xlsx/csv/binary triple, so an
+      // XML export (`application/xml; charset=utf-8`) tripped it and the
+      // operator was shown the first 300 characters of their own, perfectly
+      // valid file as an error. Keyed by the requested format now: fail-closed
+      // is right, but the list has to know what it asked for, and a new format
+      // that forgets to register here fails loudly on its first run rather
+      // than silently rejecting every file.
+      if (!isDownloadableContentType(state.format, contentType)) {
         const text = await response.text();
         throw new RunError(
           response.status,
-          text.slice(0, 300) || `Unexpected response content-type: ${contentType}`,
+          `${text.slice(0, 300)} (content-type: ${contentType})`.trim(),
         );
       }
 

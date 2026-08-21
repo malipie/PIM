@@ -66,7 +66,8 @@ final class PricelistTemplateRenderTest extends KernelTestCase
         // Localised column headings.
         self::assertStringContainsString('Nazwa', $html);
         self::assertStringContainsString('Cena', $html);
-        self::assertStringContainsString('Dostępność', $html);
+        // #2945 — the availability column is gone from the price list.
+        self::assertStringNotContainsString('Dostępność', $html);
         // Rows.
         self::assertStringContainsString('Wiertarka X1', $html);
         self::assertStringContainsString('349,00 zł', $html);
