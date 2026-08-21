@@ -1,5 +1,5 @@
-import { type UseQueryResult, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { type UseQueryResult, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
@@ -113,36 +113,28 @@ export function useProductDetailForm({
   const [dirtyFields, setDirtyFields] = useState<Record<string, unknown>>({});
 
   /**
-   * #2943 — prefill the identifier with the next free number for this
-   * ObjectType. Operators of a custom module had no external number to copy
-   * and had to invent one per row before the form would save.
+   * #2943 — the next free identifier for this ObjectType. Operators of a
+   * custom module had no external number to copy and had to invent one per
+   * row before the form would save.
    *
-   * Prefill, not reservation: the suggestion lands in the same dirty buffer
-   * a keystroke would, so typing over it is just editing. It is fetched once
-   * per ObjectType and only while the field is still untouched — re-running
-   * it after the operator has typed would overwrite their SKU.
+   * A suggestion, not a reservation, and deliberately NOT copied into the
+   * dirty buffer: the field renders it while untouched and a keystroke
+   * simply sets `dirtyFields.sku` over it, so "did the operator accept the
+   * suggestion" stays answerable at save time without tracking edits.
    *
-   * The guard is keyed by ObjectType rather than a boolean, and the result is
-   * NOT discarded on cleanup. Under StrictMode the effect runs, is cleaned up
-   * and runs again on mount: a boolean ref survives that, so the second run
-   * saw "already requested" and returned, while the first run's response was
-   * thrown away by its own cancel flag — the field stayed empty exactly on
-   * the pages where the id was known at first render (custom modules), and
-   * worked on /products/new only because its id arrives a tick later.
+   * ADR-0021 — a `useQuery`, not `jsonFetch` in a `useEffect`: a read that
+   * bypasses the query cache is invisible to invalidation, and the effect
+   * version also lost its result under StrictMode's mount/cleanup/mount.
    */
-  const prefilledFor = useRef<string | null>(null);
-  const suggestedCode = useRef<string | null>(null);
-  useEffect(() => {
-    if (mode !== 'create' || objectTypeId === null || prefilledFor.current === objectTypeId) return;
-    prefilledFor.current = objectTypeId;
-    void nextCodeFor(objectTypeId).then((code) => {
-      if (code === null) return;
-      suggestedCode.current = code;
-      setDirtyFields((prev) =>
-        typeof prev.sku === 'string' && prev.sku !== '' ? prev : { ...prev, sku: code },
-      );
-    });
-  }, [mode, objectTypeId]);
+  const nextCodeQuery = useQuery({
+    queryKey: ['object-type-next-code', objectTypeId],
+    enabled: mode === 'create' && objectTypeId !== null,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    queryFn: () => nextCodeFor(objectTypeId ?? ''),
+  });
+  const suggestedCode = nextCodeQuery.data ?? null;
   // #1350 — codes of required attributes that blocked the last save.
   const [requiredErrors, setRequiredErrors] = useState<Set<string>>(new Set());
   // Codes of attributes rejected by the backend value validation (min/max,
@@ -241,7 +233,7 @@ export function useProductDetailForm({
     setIsSaving(true);
     try {
       if (mode === 'create') {
-        const skuRaw = dirtyFields.sku ?? dirtyFields.code ?? '';
+        const skuRaw = dirtyFields.sku ?? dirtyFields.code ?? suggestedCode ?? '';
         const sku = typeof skuRaw === 'string' ? skuRaw.trim() : '';
         if (sku === '') {
           // #1415 — the system identifier is labelled "ID" for every
@@ -308,9 +300,7 @@ export function useProductDetailForm({
           });
         } catch (error) {
           const retryCode =
-            isConflict(error) && sku === suggestedCode.current
-              ? await nextCodeFor(objectTypeId)
-              : null;
+            isConflict(error) && sku === suggestedCode ? await nextCodeFor(objectTypeId) : null;
           if (retryCode === null) throw error;
           body.code = retryCode;
           created = await jsonFetch<{ id: string }>('/api/objects', {
@@ -441,6 +431,8 @@ export function useProductDetailForm({
 
   return {
     dirtyFields,
+    // #2943 — rendered in the ID field while the operator has not typed.
+    suggestedCode,
     requiredErrors,
     validationErrors,
     expandedGroups,
