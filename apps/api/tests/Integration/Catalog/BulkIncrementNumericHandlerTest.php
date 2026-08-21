@@ -82,6 +82,65 @@ final class BulkIncrementNumericHandlerTest extends KernelTestCase
         self::assertSame('manual', $provenance, 'the arithmetic must preserve the slot envelope');
     }
 
+    #[Test]
+    public function priceEnvelopeIsIncrementedKeepingCurrencyAndScale(): void
+    {
+        // #2946 — a price is {amount, currency}, so the number is under
+        // `amount`. Reading only `value` made every price row "not numeric":
+        // the action ran, reported success, and changed nothing.
+        [$em, $type] = $this->fixture();
+
+        $priced = new CatalogObject($type, 'PRICE-ENV-1');
+        $priced->updateAttributeIndex([
+            'price' => ['amount' => 299.00, 'currency' => 'PLN', 'provenance' => 'manual'],
+        ]);
+        $em->persist($priced);
+        $em->flush();
+
+        $session = new BulkSession(
+            'increment_numeric',
+            [$priced->getId()->toRfc4122()],
+            ['attr' => 'price', 'operator' => '*', 'operand' => 1.1],
+            null,
+        );
+        $em->persist($session);
+        $em->flush();
+
+        $result = $this->handler()->handle($session, 'price', '*', 1.1);
+
+        self::assertSame(1, $result['success'], 'a price row must no longer be skipped');
+        self::assertSame(0, $result['skipped']);
+
+        $em->clear();
+        $conn = $em->getConnection();
+
+        // 10% on 299.00 is 328.90 — not 328.90000000000003.
+        $amount = $conn->fetchOne(
+            "SELECT attributes_indexed->'price'->>'amount' FROM objects WHERE code = :c",
+            ['c' => 'PRICE-ENV-1'],
+        );
+        self::assertSame('328.9', (string) (\is_scalar($amount) ? $amount : ''));
+
+        // Currency and provenance ride along untouched.
+        $currency = $conn->fetchOne(
+            "SELECT attributes_indexed->'price'->>'currency' FROM objects WHERE code = :c",
+            ['c' => 'PRICE-ENV-1'],
+        );
+        self::assertSame('PLN', $currency);
+        $provenance = $conn->fetchOne(
+            "SELECT attributes_indexed->'price'->>'provenance' FROM objects WHERE code = :c",
+            ['c' => 'PRICE-ENV-1'],
+        );
+        self::assertSame('manual', $provenance);
+
+        // The scalar `value` key is NOT invented on a price envelope.
+        $value = $conn->fetchOne(
+            "SELECT attributes_indexed->'price'->>'value' FROM objects WHERE code = :c",
+            ['c' => 'PRICE-ENV-1'],
+        );
+        self::assertNull($value === false ? null : $value);
+    }
+
     /**
      * @return array{0: EntityManagerInterface, 1: ObjectType}
      */
