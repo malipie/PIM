@@ -1502,7 +1502,11 @@
       "open_full": "Open full page",
       "url_copied": "URL copied",
       "copy_url": "Copy URL"
-    }
+    },
+    "delete_error": "Failed to delete the file.",
+    "delete_confirm_title": "Delete “{{name}}”?",
+    "delete_confirm_body": "The file disappears from the library and from every object using it. This cannot be undone.",
+    "delete_confirm_button": "Delete file"
   },
   "channels": {
     "list_title": "Channels",

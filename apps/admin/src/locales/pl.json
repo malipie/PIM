@@ -1516,7 +1516,11 @@
       "open_full": "Otwórz pełną stronę",
       "url_copied": "URL skopiowany",
       "copy_url": "Kopiuj URL"
-    }
+    },
+    "delete_error": "Nie udało się usunąć pliku.",
+    "delete_confirm_title": "Usunąć „{{name}}”?",
+    "delete_confirm_body": "Plik zniknie z biblioteki i z obiektów, w których jest użyty. Operacja jest nieodwracalna.",
+    "delete_confirm_button": "Usuń plik"
   },
   "channels": {
     "list_title": "Kanały",

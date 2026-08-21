@@ -13,6 +13,7 @@ use League\Flysystem\FilesystemOperator;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\HttpFoundation\File\File;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
 
@@ -48,6 +49,67 @@ final class AssetUploaderTest extends KernelTestCase
         @unlink($tmpPath);
     }
 
+    #[Test]
+    public function browserUploadKeepsTheOperatorsFilenameAndAProperExtension(): void
+    {
+        // #2944 — `UploadedFile::getFilename()` is PHP's *temporary* name
+        // (`phpA1b2C3`), not the operator's. Storing it made the media
+        // library a wall of `phpntte2rm1nkbqe` and wrote every object to
+        // `original.bin`; imports looked fine because they pass a real name.
+        $tenant = $this->createTenant('demo');
+        $this->tenantContext()->set($tenant);
+
+        $tmpPath = $this->writeTempFile(self::onePixelGif());
+
+        $asset = $this->uploader()->upload(new UploadedFile(
+            path: $tmpPath,
+            originalName: 'Zdjęcie produktu.GIF',
+            mimeType: 'image/gif',
+            test: true,
+        ));
+
+        self::assertSame('Zdjęcie produktu.GIF', $asset->getOriginalFilename());
+        // The client name is display-only; the path takes a sniffed,
+        // character-reduced extension instead.
+        self::assertStringEndsWith('/original.gif', $asset->getStoragePath());
+        self::assertStringNotContainsString('Zdjęcie', $asset->getStoragePath());
+        // The default code is slugged from the operator's name, not php's.
+        self::assertStringStartsWith('zdjecie-produktu', $asset->getCode());
+
+        @unlink($tmpPath);
+    }
+
+    #[Test]
+    public function aTraversalAttemptInTheClientNameNeverReachesThePath(): void
+    {
+        $tenant = $this->createTenant('demo');
+        $this->tenantContext()->set($tenant);
+
+        $tmpPath = $this->writeTempFile(self::onePixelGif());
+
+        $asset = $this->uploader()->upload(new UploadedFile(
+            path: $tmpPath,
+            originalName: '../../etc/passwd.gif',
+            mimeType: 'image/gif',
+            test: true,
+        ));
+
+        self::assertSame('passwd.gif', $asset->getOriginalFilename());
+        self::assertStringNotContainsString('..', $asset->getStoragePath());
+        self::assertStringEndsWith('/original.gif', $asset->getStoragePath());
+
+        @unlink($tmpPath);
+    }
+
+    /** Smallest valid GIF — enough for `guessExtension()` to sniff image/gif. */
+    private static function onePixelGif(): string
+    {
+        $bytes = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', true);
+        self::assertNotFalse($bytes);
+
+        return $bytes;
+    }
+
     private function uploader(): AssetUploader
     {
         return self::getContainer()->get(AssetUploader::class);
@@ -70,6 +132,12 @@ final class AssetUploaderTest extends KernelTestCase
         $tenant = new Tenant($code, ucfirst($code).' Tenant');
         $em->persist($tenant);
         $em->flush();
+
+        // An image upload dispatches AssetThumbnailsRequested, whose handler
+        // syncs the asset into the catalogue and therefore needs the built-in
+        // Asset ObjectType. `sync://` runs it inline, so the seed has to
+        // happen before the first upload rather than lazily.
+        self::getContainer()->get(\App\Catalog\Application\BuiltInObjectTypeSeeder::class)->seed($tenant);
 
         return $tenant;
     }
