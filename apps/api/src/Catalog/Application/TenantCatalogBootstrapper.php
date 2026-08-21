@@ -12,9 +12,11 @@ use App\Shared\Domain\Tenant;
  *
  * The order matters and is the same one `AppFixtures` has always used:
  * ObjectTypes first because everything below attaches to them, then the
- * platform-owned system attributes, then the Product relation attributes
- * (ADR-014 / #894 — they need the Product type to exist), then the default
- * sidebar layout (VIEW-08 / #427), which references the types by id.
+ * platform-owned system attributes, then the `name` display label (#2942 —
+ * it points at the types seeded in step 1), then the Product relation
+ * attributes (ADR-014 / #894 — they need the Product type to exist), then
+ * the default sidebar layout (VIEW-08 / #427), which references the types
+ * by id.
  *
  * Extracted so provisioning and fixtures cannot drift: before this, the
  * chain lived only inside `AppFixtures::load`, and
@@ -27,6 +29,7 @@ final readonly class TenantCatalogBootstrapper implements TenantCatalogBootstrap
     public function __construct(
         private BuiltInObjectTypeSeeder $objectTypes,
         private BuiltInSystemAttributesSeeder $systemAttributes,
+        private BuiltInLabelAttributeSeeder $labelAttribute,
         private BuiltInProductRelationAttributesSeeder $relationAttributes,
         private DefaultMenuSeeder $defaultMenu,
     ) {
@@ -38,6 +41,11 @@ final readonly class TenantCatalogBootstrapper implements TenantCatalogBootstrap
         // Platform-owned Attribute rows only — visibility stays explicit
         // modeling configuration, no AttributeGroup is auto-attached.
         $this->systemAttributes->seed($tenant);
+        // #2942 — `name` is the display label the category tree, the object
+        // summary and the categories export all read. Without it a
+        // panel-provisioned tenant silently dropped every name an operator
+        // typed, because unknown attribute codes are discarded on write.
+        $this->labelAttribute->seed($tenant);
         // ADR-014 / MOD-02 (#894) — the five built-in `relation` attributes
         // on Product plus the "Powiązania" group that hosts them.
         $this->relationAttributes->seed($tenant);

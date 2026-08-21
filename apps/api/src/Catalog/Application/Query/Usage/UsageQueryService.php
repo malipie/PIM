@@ -61,6 +61,22 @@ final readonly class UsageQueryService
     }
 
     /**
+     * Uncached variant for destructive write guards. A delete decision must
+     * never depend on a read-model entry that may remain stale until its TTL.
+     *
+     * @return array{
+     *     groups: list<array{id: string, code: string, label: array<string, string>}>,
+     *     objectTypes: list<array{id: string, code: string, kind: string}>,
+     *     categories: list<array{id: string, path: string|null}>,
+     *     instanceCount: int
+     * }
+     */
+    public function forAttributeFresh(Attribute $attribute): array
+    {
+        return $this->loadAttributeUsage($attribute);
+    }
+
+    /**
      * @return array{
      *     directlyAttachedTo: array{
      *         objectTypes: list<array{id: string, code: string, kind: string}>,

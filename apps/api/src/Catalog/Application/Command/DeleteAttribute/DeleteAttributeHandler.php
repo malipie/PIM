@@ -63,7 +63,7 @@ final readonly class DeleteAttributeHandler
             ));
         }
 
-        $usage = $this->usageQueryService->forAttribute($attribute);
+        $usage = $this->usageQueryService->forAttributeFresh($attribute);
         $objectTypeCount = \count($usage['objectTypes']);
         $groupCount = \count($usage['groups']);
         $categoryCount = \count($usage['categories']);
@@ -85,8 +85,8 @@ final readonly class DeleteAttributeHandler
         try {
             $this->repository->remove($attribute);
         } catch (ForeignKeyConstraintViolationException) {
-            // Safety-net: usage cache (60s TTL) may have been stale and a new
-            // attachment/value slipped in between the pre-check and remove.
+            // Safety-net: a new attachment/value may have been created between
+            // the fresh pre-check and remove.
             throw $this->inUseConflict($attribute->getCode(), $objectTypeCount, $groupCount, $categoryCount);
         }
     }

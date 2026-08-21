@@ -7,8 +7,10 @@ namespace App\Catalog\Infrastructure\Doctrine\EventListener;
 use App\Catalog\Application\Query\GetObjectFormSchema\GetObjectFormSchemaHandler;
 use App\Catalog\Application\Query\Usage\UsageQueryService;
 use App\Catalog\Domain\Entity\AttributeGroupAttribute;
+use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\CategoryAttributeGroup;
 use App\Catalog\Domain\Entity\ObjectCategory;
+use App\Catalog\Domain\Entity\ObjectTypeAttribute;
 use App\Catalog\Domain\Entity\ObjectTypeAttributeGroup;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\Event\PostFlushEventArgs;
@@ -60,6 +62,11 @@ final class ObjectFormSchemaCacheInvalidator
      */
     private array $perTypeTags = [];
 
+    /**
+     * @var array<string, true>
+     */
+    private array $usageTags = [];
+
     private bool $globalInvalidate = false;
 
     public function __construct(
@@ -69,7 +76,9 @@ final class ObjectFormSchemaCacheInvalidator
 
     public function postPersist(PostPersistEventArgs $event): void
     {
-        $this->collect($event->getObject());
+        $entity = $event->getObject();
+        $this->collect($entity);
+        $this->collectCatalogObjectUsage($entity);
     }
 
     public function postUpdate(PostUpdateEventArgs $event): void
@@ -79,12 +88,14 @@ final class ObjectFormSchemaCacheInvalidator
 
     public function postRemove(PostRemoveEventArgs $event): void
     {
-        $this->collect($event->getObject());
+        $entity = $event->getObject();
+        $this->collect($entity);
+        $this->collectCatalogObjectUsage($entity);
     }
 
     public function postFlush(PostFlushEventArgs $event): void
     {
-        if (!$this->globalInvalidate && [] === $this->perTypeTags) {
+        if (!$this->globalInvalidate && [] === $this->perTypeTags && [] === $this->usageTags) {
             return;
         }
 
@@ -100,9 +111,13 @@ final class ObjectFormSchemaCacheInvalidator
             $tags[] = GetObjectFormSchemaHandler::CACHE_TAG.'.object_type.'.$typeId;
             $tags[] = UsageQueryService::CACHE_TAG.'.object_type.'.$typeId;
         }
+        foreach (array_keys($this->usageTags) as $tag) {
+            $tags[] = $tag;
+        }
 
         $this->globalInvalidate = false;
         $this->perTypeTags = [];
+        $this->usageTags = [];
 
         if ([] !== $tags) {
             $this->modelingCache->invalidateTags(array_unique($tags));
@@ -113,6 +128,15 @@ final class ObjectFormSchemaCacheInvalidator
     {
         if ($entity instanceof ObjectTypeAttributeGroup) {
             $this->perTypeTags[$entity->getObjectType()->getId()->toRfc4122()] = true;
+
+            return;
+        }
+
+        if ($entity instanceof ObjectTypeAttribute) {
+            $typeId = $entity->getObjectType()->getId()->toRfc4122();
+            $attributeId = $entity->getAttribute()->getId()->toRfc4122();
+            $this->perTypeTags[$typeId] = true;
+            $this->usageTags[UsageQueryService::CACHE_TAG.'.attribute.'.$attributeId] = true;
 
             return;
         }
@@ -141,5 +165,15 @@ final class ObjectFormSchemaCacheInvalidator
             $product = $entity->getProduct();
             $this->perTypeTags[$product->getObjectType()->getId()->toRfc4122()] = true;
         }
+    }
+
+    private function collectCatalogObjectUsage(object $entity): void
+    {
+        if (!$entity instanceof CatalogObject) {
+            return;
+        }
+
+        $typeId = $entity->getObjectType()->getId()->toRfc4122();
+        $this->usageTags[UsageQueryService::CACHE_TAG.'.object_type.'.$typeId] = true;
     }
 }

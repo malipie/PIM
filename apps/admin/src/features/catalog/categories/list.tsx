@@ -4,7 +4,7 @@ import { FolderTree, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router';
-
+import { CategoryDangerZone } from '@/components/modeling/category-danger-zone';
 import {
   buildCategoryTree,
   CategoryTree,
@@ -187,6 +187,14 @@ export function CategoriesTreePage() {
     void queryClient.invalidateQueries({ queryKey: ['categories'] });
   };
 
+  const handleDeleted = () => {
+    invalidate({ resource: 'categories', invalidates: ['list', 'detail'] });
+    void queryClient.invalidateQueries({ queryKey: ['categories'] });
+    const next = new URLSearchParams(searchParams);
+    next.delete('selected');
+    setSearchParams(next, { replace: true });
+  };
+
   const handleSelect = (id: string) => {
     const next = new URLSearchParams(searchParams);
     next.set('selected', id);
@@ -245,6 +253,7 @@ export function CategoriesTreePage() {
               locale={i18n.language}
               tree={tree}
               onMoveRequest={() => setMoveOpen(true)}
+              onDeleted={handleDeleted}
             />
           ) : (
             <Card className="p-12">
@@ -280,6 +289,7 @@ function CategoryDetailPanel({
   locale,
   tree,
   onMoveRequest,
+  onDeleted,
 }: {
   categoryId: string;
   targetObjectTypeId: string;
@@ -287,6 +297,7 @@ function CategoryDetailPanel({
   locale: string;
   tree: CategoryTreeNode[];
   onMoveRequest: () => void;
+  onDeleted: () => void;
 }) {
   const { t } = useTranslation();
   const [declareOpen, setDeclareOpen] = useState(false);
@@ -566,6 +577,12 @@ function CategoryDetailPanel({
       </Card>
 
       <CategoryProductsCard categoryId={categoryId} />
+
+      <CategoryDangerZone
+        categoryId={categoryId}
+        categoryLabel={node?.label ?? node?.code ?? ''}
+        onDeleted={onDeleted}
+      />
 
       <p className="text-xs text-muted-foreground">
         <Link to={`/modeling/categories/${categoryId}`} className="underline">

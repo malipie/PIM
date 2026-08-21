@@ -25,16 +25,75 @@ interface HydraResource {
 }
 
 const API_BASE = '/api';
+const UNPAGINATED_PAGE_SIZE = 200;
+
+async function fetchCollection(
+  resource: string,
+  query: Record<string, string | number | undefined>,
+): Promise<HydraCollection<HydraResource>> {
+  return jsonFetch<HydraCollection<HydraResource>>(`${API_BASE}/${resource}`, { query });
+}
+
+/**
+ * #2942 — `pagination: { mode: 'off' }` means "give me the collection", but
+ * Refine still fills `currentPage: 1, pageSize: 10` on such a query and this
+ * provider forwarded them, so the caller got one short page and no way to
+ * tell. Ask for a large page instead and walk the rest.
+ *
+ * The walk is bounded twice over: by the page count derived from
+ * `totalItems`, and by a per-page identity check. The second bound matters
+ * because several collections here are cursor-paginated (`id[lt]`), where a
+ * future server-side change could start ignoring `page` — a walk that kept
+ * re-reading page 1 would otherwise fill the list with duplicates rather
+ * than fail visibly.
+ */
+async function fetchCompleteCollection(
+  resource: string,
+  query: Record<string, string | number | undefined>,
+): Promise<HydraCollection<HydraResource>> {
+  const first = await fetchCollection(resource, {
+    ...query,
+    page: 1,
+    itemsPerPage: UNPAGINATED_PAGE_SIZE,
+  });
+  const members = [...(first.member ?? [])];
+  const totalItems = first.totalItems ?? members.length;
+  const actualPageSize = members.length;
+
+  if (actualPageSize === 0 || members.length >= totalItems) {
+    return { member: members, totalItems };
+  }
+
+  const seen = new Set(members.map(memberKey));
+  const pageCount = Math.ceil(totalItems / actualPageSize);
+  for (let page = 2; page <= pageCount; page += 1) {
+    const next = await fetchCollection(resource, {
+      ...query,
+      page,
+      itemsPerPage: UNPAGINATED_PAGE_SIZE,
+    });
+    const fresh = (next.member ?? []).filter((member) => !seen.has(memberKey(member)));
+    if (fresh.length === 0) break;
+    for (const member of fresh) seen.add(memberKey(member));
+    members.push(...fresh);
+  }
+
+  return { member: members, totalItems };
+}
+
+function memberKey(member: HydraResource): string {
+  return member['@id'] ?? member.id ?? JSON.stringify(member);
+}
 
 export const dataProvider: DataProvider = {
   getApiUrl: () => API_BASE,
 
   async getList({ resource, pagination, filters }) {
     const query: Record<string, string | number | undefined> = {};
-    if (pagination?.currentPage) {
+    if (pagination?.mode !== 'off' && pagination?.currentPage) {
       query.page = pagination.currentPage;
     }
-    if (pagination?.pageSize) {
+    if (pagination?.mode !== 'off' && pagination?.pageSize) {
       // API Platform reads `itemsPerPage` per the Hydra pagination
       // extension. Without this the BE always returned the default
       // page size (30) regardless of the operator's selection in the
@@ -56,9 +115,10 @@ export const dataProvider: DataProvider = {
         }
       }
     }
-    const data = await jsonFetch<HydraCollection<HydraResource>>(`${API_BASE}/${resource}`, {
-      query,
-    });
+    const data =
+      pagination?.mode === 'off'
+        ? await fetchCompleteCollection(resource, query)
+        : await fetchCollection(resource, query);
     return {
       data: (data.member ?? []) as never[],
       total: data.totalItems ?? 0,

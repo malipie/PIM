@@ -2,14 +2,15 @@ import { useOne } from '@refinedev/core';
 import { ArrowLeft, FolderTree, Pencil } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import { AuditLogIndicator } from '@/components/modeling/audit-log-indicator';
 import { BuiltInLockBadge } from '@/components/modeling/built-in-lock-badge';
+import { CategoryDangerZone } from '@/components/modeling/category-danger-zone';
+import { categoryLabelFromAttributes } from '@/components/modeling/category-tree';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { unwrapAttributesIndexed } from '@/lib/attributes-indexed';
 import { HttpError, jsonFetch } from '@/lib/http';
 
 interface CategoryDetail {
@@ -24,6 +25,7 @@ interface CategoryDetail {
 
 export function CategoryShowPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const params = useParams<{ id: string }>();
   const id = params.id ?? '';
   const { result, query } = useOne<CategoryDetail>({
@@ -43,8 +45,12 @@ export function CategoryShowPage() {
   }
 
   const category = result;
-  const attrs = unwrapAttributesIndexed(category.attributesIndexed);
-  const name = typeof attrs.name === 'string' ? attrs.name : category.code;
+  // #2942 — `name` is a localizable attribute, so its reading can be a
+  // `{pl, en}` map rather than a plain string. Testing for `string` alone
+  // dropped straight through to the code, which is the same "the name I
+  // typed turned into ksiazki" the tree used to show. Share the tree's
+  // resolver so both surfaces agree on what a category is called.
+  const name = categoryLabelFromAttributes(category.attributesIndexed) ?? category.code;
 
   const startEdit = () => {
     setDraftName(name);
@@ -153,6 +159,12 @@ export function CategoryShowPage() {
       </div>
 
       <EffectiveAttributesPreview categoryId={category.id} />
+
+      <CategoryDangerZone
+        categoryId={category.id}
+        categoryLabel={name}
+        onDeleted={() => navigate('/modeling/categories')}
+      />
     </div>
   );
 }

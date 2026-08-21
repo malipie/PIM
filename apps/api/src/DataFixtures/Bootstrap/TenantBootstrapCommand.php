@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace App\DataFixtures\Bootstrap;
 
-use App\Catalog\Application\BuiltInObjectTypeSeeder;
-use App\Catalog\Application\BuiltInProductRelationAttributesSeeder;
 use App\Catalog\Application\BuiltInSmartFilterPresetsSeeder;
-use App\Catalog\Application\BuiltInSystemAttributesSeeder;
-use App\Catalog\Application\DefaultMenuSeeder;
+use App\Catalog\Contracts\Service\TenantCatalogBootstrap;
 use App\Channel\Domain\Entity\Locale;
 use App\Channel\Domain\Entity\TenantLocale;
 use App\Identity\Application\PrdPermissionSeeder;
@@ -70,10 +67,7 @@ final class TenantBootstrapCommand extends Command
         private readonly RoleRepositoryInterface $roleRepository,
         private readonly PermissionRepositoryInterface $permissionRepository,
         private readonly SeedTenantPrdRolesService $tenantPrdRolesSeeder,
-        private readonly BuiltInObjectTypeSeeder $builtInSeeder,
-        private readonly BuiltInSystemAttributesSeeder $systemAttributesSeeder,
-        private readonly BuiltInProductRelationAttributesSeeder $productRelationAttributesSeeder,
-        private readonly DefaultMenuSeeder $defaultMenuSeeder,
+        private readonly TenantCatalogBootstrap $tenantCatalogBootstrap,
         private readonly BuiltInSmartFilterPresetsSeeder $smartFilterPresetsSeeder,
         #[Autowire('%kernel.project_dir%')]
         private readonly string $projectDir,
@@ -192,12 +186,12 @@ final class TenantBootstrapCommand extends Command
             $io->text(\sprintf('Tenant "%s" already exists — reusing.', $code));
         }
 
-        // 3. Per-tenant built-in baseline (each seeder is idempotent; same
-        //    sequence as the dev fixtures).
-        $this->builtInSeeder->seed($tenant);
-        $this->systemAttributesSeeder->seed($tenant);
-        $this->productRelationAttributesSeeder->seed($tenant);
-        $this->defaultMenuSeeder->seed($tenant);
+        // 3. Per-tenant built-in baseline. #2942 — this used to repeat the
+        //    seeder chain by hand and drifted from `TenantCatalogBootstrapper`
+        //    the moment a step was added there (the `name` label attribute was
+        //    exactly such a step). Call the shared bootstrap instead, so a
+        //    CLI-provisioned tenant and a panel-provisioned one cannot differ.
+        $this->tenantCatalogBootstrap->bootstrap($tenant);
         $this->tenantPrdRolesSeeder->seed($tenant);
         $this->smartFilterPresetsSeeder->seed();
 

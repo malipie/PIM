@@ -7,6 +7,7 @@ namespace App\Tests\Api\Identity;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Identity\Application\RbacSeeder;
 use App\Identity\Domain\Entity\User;
@@ -99,6 +100,47 @@ final class TenantProvisioningBootstrapTest extends ApiTestCase
             self::assertNotNull(
                 $objectTypes->findBuiltInByKind($kind, $tenant),
                 \sprintf('a provisioned tenant must own the built-in %s type', $kind->value),
+            );
+        }
+    }
+
+    #[Test]
+    public function aProvisionedTenantCanNameItsObjects(): void
+    {
+        // #2942 — `name` was seeded only by the demo catalogue, so a tenant
+        // provisioned from the panel had no attribute under that code. Writes
+        // silently dropped it (unknown codes are discarded by design), the
+        // denormalised index stayed empty and the category tree rendered the
+        // raw snake_case code where the operator had typed a name.
+        $client = $this->operatorClient();
+
+        $client->request('POST', '/api/admin/tenants', [
+            'headers' => ['content-type' => 'application/json'],
+            'body' => json_encode([
+                'code' => self::NEW_TENANT_CODE,
+                'name' => 'Freshly Provisioned',
+                'owner_email' => 'owner@freshly-provisioned.localhost',
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        self::assertResponseStatusCodeSame(201);
+
+        $tenant = self::getContainer()->get(TenantRepositoryInterface::class)->findByCode(self::NEW_TENANT_CODE);
+        self::assertInstanceOf(Tenant::class, $tenant);
+
+        $name = self::getContainer()->get(AttributeRepositoryInterface::class)->findByCode('name', $tenant);
+        self::assertNotNull($name, 'a provisioned tenant must own the `name` display attribute');
+        self::assertFalse($name->isRequired(), '`name` must not start rejecting writes that omit it');
+        self::assertFalse($name->isSystem(), '`name` belongs in the operator-editable attribute library');
+
+        $objectTypes = self::getContainer()->get(ObjectTypeRepositoryInterface::class);
+        foreach ([ObjectKind::Product, ObjectKind::Category, ObjectKind::Asset] as $kind) {
+            $type = $objectTypes->findBuiltInByKind($kind, $tenant);
+            self::assertNotNull($type);
+            self::assertSame(
+                $name->getId()->toRfc4122(),
+                $type->getLabelAttribute()?->getId()->toRfc4122(),
+                \sprintf('%s must display through `name`', $kind->value),
             );
         }
     }
