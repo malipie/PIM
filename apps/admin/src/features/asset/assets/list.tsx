@@ -8,6 +8,7 @@ import {
   List as ListIcon,
   Loader2,
   Search,
+  Trash2,
   Upload,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -18,11 +19,13 @@ import {
   type PageSize,
   PaginationBar,
 } from '@/components/catalog/pagination-bar';
+import { PermissionGate } from '@/components/identity';
 import { usePageActions } from '@/layout/page-actions-context';
 import type { DuplicateAssetError, UploadAssetResult } from '@/lib/asset-upload';
 import { useDebouncedCallback } from '@/lib/use-debounced-callback';
 import { cn } from '@/lib/utils';
 import { AssetBulkActionsBar } from './AssetBulkActionsBar';
+import { AssetDeleteDialog } from './AssetDeleteDialog';
 import { AssetDrawer } from './AssetDrawer';
 import { AssetDuplicateDialog } from './AssetDuplicateDialog';
 import { AssetUploadModal } from './AssetUploadModal';
@@ -81,6 +84,7 @@ export function AssetsListPage() {
   // skeleton and the files-header count to the DESTINATION layout.
   const [targetCount, setTargetCount] = useState<number | null>(null);
   const [drawerAsset, setDrawerAsset] = useState<AssetMeta | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<AssetMeta | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(readInitialPageSize);
@@ -426,6 +430,7 @@ export function AssetsListPage() {
                   selected={selected.has(asset.id)}
                   onToggle={() => toggleSelect(asset.id)}
                   onOpen={() => setDrawerAsset(asset)}
+                  onDelete={() => setPendingDelete(asset)}
                 />
               </li>
             ))}
@@ -513,6 +518,12 @@ export function AssetsListPage() {
 
       <AssetDrawer asset={drawerAsset} onClose={() => setDrawerAsset(null)} onDeleted={refresh} />
 
+      <AssetDeleteDialog
+        asset={pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onDeleted={refresh}
+      />
+
       <AssetUploadModal
         open={uploadOpen}
         onClose={() => setUploadOpen(false)}
@@ -538,9 +549,20 @@ interface AssetCardProps {
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
+  onDelete: () => void;
 }
 
-function AssetCard({ asset, selected, onToggle, onOpen }: AssetCardProps) {
+/**
+ * #2944 — the tile carries its own delete.
+ *
+ * Deleting was reachable before, but only after discovering that a tile can
+ * be selected (a checkbox that only appears on hover) or that clicking opens
+ * a drawer with the action inside. The operator reported the feature as
+ * missing, which is the accurate description of an affordance nobody finds.
+ * Gated on the same permission as the bulk bar, so a role without it sees
+ * no dead control.
+ */
+function AssetCard({ asset, selected, onToggle, onOpen, onDelete }: AssetCardProps) {
   return (
     <div
       className={cn(
@@ -591,6 +613,20 @@ function AssetCard({ asset, selected, onToggle, onOpen }: AssetCardProps) {
       >
         <Check className="size-3.5" />
       </button>
+      <PermissionGate anyOf={['asset.delete', 'multimedia.delete']}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          aria-label={`${asset.filename} — usuń`}
+          title={asset.filename}
+          className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-md border border-zinc-200 bg-white/80 text-transparent transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 group-hover:text-zinc-500"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
+      </PermissionGate>
     </div>
   );
 }

@@ -15,11 +15,13 @@ use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemOperator;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\File\File;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\String\Slugger\SluggerInterface;
 use Symfony\Component\Uid\Uuid;
 use Throwable;
 
+use const PATHINFO_EXTENSION;
 use const PATHINFO_FILENAME;
 
 /**
@@ -45,6 +47,13 @@ use const PATHINFO_FILENAME;
  *
  * The smoke-test CLI (`pim:asset:upload`) calls this same path, so any
  * regression manifests in both surfaces.
+ *
+ * #2944 — a browser upload arrives as an {@see UploadedFile}, whose
+ * `getFilename()`/`getExtension()` describe PHP's *temporary* file, not the
+ * operator's. Reading those stored `phpA1b2C3` as the original name and wrote
+ * every object to `original.bin`; imported assets looked fine because
+ * {@see AssetIngestor} passes a real name. The client name is display-only
+ * and never reaches the storage path — see `storageExtension()`.
  */
 final readonly class AssetUploader
 {
@@ -81,11 +90,11 @@ final readonly class AssetUploader
             throw new DuplicateAssetException($existing->getId(), $existing->getCode());
         }
 
-        $resolvedCode = $this->resolveCode($code, $file, $tenant);
+        $originalFilename = self::clientFilename($file);
+        $resolvedCode = $this->resolveCode($code, $originalFilename, $tenant);
 
         $assetId = Uuid::v7();
-        $rawExtension = $file->getExtension();
-        $extension = '' !== $rawExtension ? $rawExtension : 'bin';
+        $extension = self::storageExtension($file, $originalFilename);
         $storagePath = \sprintf(
             '%s/%s/original.%s',
             $tenant->getId()->toRfc4122(),
@@ -115,7 +124,7 @@ final readonly class AssetUploader
 
         $asset = new Asset(
             code: $resolvedCode,
-            originalFilename: $file->getFilename(),
+            originalFilename: $originalFilename,
             mimeType: $mimeType,
             size: $size,
             storagePath: $storagePath,
@@ -204,13 +213,57 @@ final readonly class AssetUploader
         return $this->assetsStorage->read($asset->getStoragePath());
     }
 
-    private function resolveCode(?string $code, File $file, \App\Shared\Domain\Tenant $tenant): string
+    /**
+     * #2944 — the name the operator sees. For a browser upload that is the
+     * client-supplied name; for the ingestor and the CLI the file on disk
+     * already carries a meaningful one.
+     *
+     * Untrusted by definition: it is stored and displayed, never used to
+     * build a path.
+     */
+    private static function clientFilename(File $file): string
+    {
+        $name = $file instanceof UploadedFile ? $file->getClientOriginalName() : $file->getFilename();
+        $name = trim(str_replace(["\0", "\r", "\n"], '', $name));
+        // Defeat directory traversal at the source even though the value is
+        // display-only: a name that reaches a template or a download header
+        // must not read as a path.
+        $name = basename($name);
+
+        return '' !== $name ? $name : 'upload';
+    }
+
+    /**
+     * Extension for the storage path. Derived from the sniffed MIME type
+     * first — the client's extension is a hint, not evidence — and reduced
+     * to a conservative character set before it can reach a path.
+     */
+    private static function storageExtension(File $file, string $originalFilename): string
+    {
+        $fromMime = $file->guessExtension();
+        if (\is_string($fromMime) && '' !== $fromMime) {
+            return self::safeExtension($fromMime);
+        }
+
+        $fromName = pathinfo($originalFilename, PATHINFO_EXTENSION);
+
+        return '' !== $fromName ? self::safeExtension($fromName) : 'bin';
+    }
+
+    private static function safeExtension(string $extension): string
+    {
+        $safe = strtolower(preg_replace('/[^A-Za-z0-9]/', '', $extension) ?? '');
+
+        return '' !== $safe ? substr($safe, 0, 8) : 'bin';
+    }
+
+    private function resolveCode(?string $code, string $originalFilename, \App\Shared\Domain\Tenant $tenant): string
     {
         if (null !== $code && '' !== trim($code)) {
             return $code;
         }
 
-        $base = pathinfo($file->getFilename(), PATHINFO_FILENAME);
+        $base = pathinfo($originalFilename, PATHINFO_FILENAME);
         $slug = strtolower((string) $this->slugger->slug($base));
         if ('' === $slug) {
             $slug = 'asset';
