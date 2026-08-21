@@ -370,8 +370,19 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    # Worker MUSI być w sieci wspólnej, nie tylko wewnętrznej: MinIO żyje
+    # w stacku `pim` (alias `minio` w `pim_default`), a worker czyta z niego
+    # oryginały, żeby wygenerować miniatury. Bez tego api zapisuje plik
+    # poprawnie (jest w obu sieciach), a worker odbija się o
+    # `Connection refused for URI http://minio:9000/...` i oznacza asset jako
+    # `thumbnails_status=failed` — grid multimediów pełen połamanych obrazków
+    # przy zdrowej kolejce i zdrowym uploadzie (#2944).
+    #
+    # Bez aliasu: worker nawiązuje połączenia wychodzące, nikt się do niego
+    # nie łączy po nazwie.
     networks:
-      - internal
+      internal:
+      edge:
 
 networks:
   # Sieć wewnętrzna tenanta — prefiksowana nazwą projektu, więc baza jednego
