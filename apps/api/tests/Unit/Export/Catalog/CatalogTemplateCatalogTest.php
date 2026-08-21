@@ -34,16 +34,19 @@ final class CatalogTemplateCatalogTest extends TestCase
     }
 
     #[Test]
-    public function pricelistExposesFourSlotsWithDefaultMappings(): void
+    public function pricelistExposesThreeSlotsWithoutAvailability(): void
     {
         $template = new CatalogTemplateCatalog()->get(CatalogTemplateKind::Pricelist);
 
         self::assertSame(CatalogTemplateKind::Pricelist, $template->kind);
         self::assertSame('catalog/pricelist.html.twig', $template->twig);
-        self::assertSame(['sku', 'name', 'price', 'availability'], $template->slotNames());
-        self::assertCount(4, $template->defaultMappings);
+        // #2945 — availability dropped at the operator's request. Pinned on
+        // the slot list, not only the template: a slot offered in the mapping
+        // step but rendered nowhere is worse than no slot at all.
+        self::assertSame(['sku', 'name', 'price'], $template->slotNames());
+        self::assertCount(3, $template->defaultMappings);
         self::assertContains(['slot' => 'price', 'source' => 'price'], $template->defaultMappings);
-        self::assertContains(['slot' => 'availability', 'source' => 'in_stock'], $template->defaultMappings);
+        self::assertNotContains(['slot' => 'availability', 'source' => 'in_stock'], $template->defaultMappings);
     }
 
     #[Test]

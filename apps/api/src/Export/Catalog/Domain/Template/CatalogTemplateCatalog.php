@@ -62,16 +62,17 @@ final class CatalogTemplateCatalog
             ['slot' => 'sku', 'label' => 'SKU', 'format' => 'text'],
             ['slot' => 'name', 'label' => 'Product name', 'format' => 'text'],
             ['slot' => 'price', 'label' => 'Price', 'format' => 'text'],
-            ['slot' => 'availability', 'label' => 'Availability', 'format' => 'text'],
         ];
 
+        // #2945 — the `availability` column is gone at the operator's
+        // request: a printed price list carries prices, and stock read off
+        // a PDF is stale the moment it leaves the printer. Dropped from the
+        // slot list too, not just the template, so the mapping step stops
+        // offering a column that renders nowhere.
         $defaultMappings = [
             ['slot' => 'sku', 'source' => 'sku'],
             ['slot' => 'name', 'source' => 'name'],
             ['slot' => 'price', 'source' => 'price'],
-            // The demo/default schema signals availability with the boolean
-            // `in_stock` attribute; remappable per profile like every slot.
-            ['slot' => 'availability', 'source' => 'in_stock'],
         ];
 
         return new CatalogTemplate(CatalogTemplateKind::Pricelist, 'catalog/pricelist.html.twig', $slots, $defaultMappings);
