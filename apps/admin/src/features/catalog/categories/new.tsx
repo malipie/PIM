@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 
+import { categoryLabelFromAttributes } from '@/components/modeling/category-tree';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -240,6 +241,7 @@ export function CategoryCreatePage() {
                 .sort((a, b) => (a.path ?? a.code).localeCompare(b.path ?? b.code))
                 .map((p) => (
                   <option key={p.id} value={p.id}>
+                    {categoryLabelFromAttributes(p.attributesIndexed) ?? p.code} —{' '}
                     {p.path ?? p.code}
                   </option>
                 ))}

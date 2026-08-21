@@ -101,6 +101,70 @@ final class CategoryMoveImpactApiTest extends CatalogApiTestCase
         }
     }
 
+    #[Test]
+    public function deleteLeafCategoryWithoutAssignmentsSucceeds(): void
+    {
+        $client = $this->authenticatedClient();
+        $category = $this->createCategory($client, 'delete_leaf');
+
+        $response = $client->request('DELETE', "/api/categories/{$category}");
+
+        self::assertSame(204, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function categoryUsageCountsAssignedProducts(): void
+    {
+        // #2942 — the panel reported 0 products for a category full of them:
+        // the counter read `objects.parent_id`, which is the ltree hierarchy
+        // pointer, not category membership. Products join through the
+        // `object_categories` junction.
+        $client = $this->authenticatedClient();
+        $category = $this->createCategory($client, 'usage_assigned');
+        $this->assignProductTo($category);
+
+        $usage = $client->request('GET', "/api/categories/{$category}/usage", [
+            'headers' => ['accept' => 'application/json'],
+        ]);
+
+        self::assertSame(1, $usage->toArray()['instanceCount'] ?? null);
+    }
+
+    #[Test]
+    public function deleteCategoryWithAssignedProductDetachesItRatherThanRefusing(): void
+    {
+        // PCAT-03 (#476) is deliberate: removing a category cascades its
+        // assignments away and `PrimaryCategoryRepairListener` promotes the
+        // next one to primary. Pinned here because #2942 asked the UI to warn
+        // about this — the operator must see what a delete will detach, and
+        // this is the behaviour the warning describes.
+        $client = $this->authenticatedClient();
+        $category = $this->createCategory($client, 'delete_assigned');
+        $this->assignProductTo($category);
+
+        $response = $client->request('DELETE', "/api/categories/{$category}");
+
+        self::assertSame(204, $response->getStatusCode());
+        $assignmentCount = $this->em()->getConnection()->fetchOne(
+            'SELECT COUNT(*) FROM object_categories WHERE category_id = CAST(:id AS uuid)',
+            ['id' => $category],
+        );
+        self::assertTrue(\is_int($assignmentCount) || \is_string($assignmentCount));
+        self::assertSame(0, (int) $assignmentCount);
+    }
+
+    #[Test]
+    public function deleteCategoryWithDescendantReturns409(): void
+    {
+        $client = $this->authenticatedClient();
+        $root = $this->createCategory($client, 'delete_root');
+        $this->createCategoryUnder($client, 'delete_child', $root);
+
+        $response = $client->request('DELETE', "/api/categories/{$root}");
+
+        self::assertSame(409, $response->getStatusCode());
+    }
+
     /**
      * Dispatched async message classes, or null when the async transport is the
      * `sync://` alias (`.env.test`) where nothing is collectable. CI overrides

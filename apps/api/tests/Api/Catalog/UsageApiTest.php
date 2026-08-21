@@ -140,6 +140,31 @@ final class UsageApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function objectTypeUsageIsInvalidatedImmediatelyAfterInstanceRemoval(): void
+    {
+        $tenant = $this->em()->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
+        \assert($tenant instanceof Tenant);
+        self::getContainer()->get(TenantContext::class)->set($tenant);
+
+        $object = new CatalogObject($this->product, 'SKU-USAGE-CACHE');
+        $this->em()->persist($object);
+        $this->em()->flush();
+
+        $client = $this->authenticatedClient();
+        $primed = $client->request('GET', '/api/object_types/'.$this->product->getId()->toRfc4122().'/usage');
+        self::assertSame(3, $primed->toArray()['instanceCount'] ?? null);
+
+        self::getContainer()->get(TenantContext::class)->set($tenant);
+        $managedObject = $this->em()->find(CatalogObject::class, $object->getId());
+        \assert($managedObject instanceof CatalogObject);
+        $this->em()->remove($managedObject);
+        $this->em()->flush();
+
+        $fresh = $client->request('GET', '/api/object_types/'.$this->product->getId()->toRfc4122().'/usage');
+        self::assertSame(2, $fresh->toArray()['instanceCount'] ?? null);
+    }
+
+    #[Test]
     public function unauthenticatedAccessReturns401(): void
     {
         $client = static::createClient();

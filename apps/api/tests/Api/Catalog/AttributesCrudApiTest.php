@@ -8,6 +8,7 @@ use App\Catalog\Application\BuiltInSystemAttributesSeeder;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
+use App\Catalog\Domain\Repository\ObjectTypeAttributeRepositoryInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use PHPUnit\Framework\Attributes\Test;
@@ -225,6 +226,32 @@ final class AttributesCrudApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function deleteImmediatelyAfterDetachIgnoresPrimedUsageCache(): void
+    {
+        $id = $this->seedAttribute('instant_delete', AttributeType::Text);
+        $this->attachAttributeToProductType($id);
+        $client = $this->authenticatedClient();
+
+        $usage = $client->request('GET', '/api/attributes/'.$id->toRfc4122().'/usage');
+        self::assertSame(200, $usage->getStatusCode());
+        $objectTypes = $usage->toArray()['objectTypes'] ?? null;
+        self::assertIsArray($objectTypes);
+        self::assertCount(1, $objectTypes);
+
+        $attribute = self::getContainer()->get(AttributeRepositoryInterface::class)->findById($id);
+        \assert($attribute instanceof Attribute);
+        $junctionRepository = self::getContainer()->get(ObjectTypeAttributeRepositoryInterface::class);
+        $junctions = $junctionRepository->findByAttribute($attribute);
+        self::assertCount(1, $junctions);
+        $junctionRepository->remove($junctions[0]);
+
+        $response = $client->request('DELETE', '/api/attributes/'.$id->toRfc4122());
+
+        self::assertSame(204, $response->getStatusCode());
+        self::assertNull(self::getContainer()->get(AttributeRepositoryInterface::class)->findById($id));
+    }
+
+    #[Test]
     public function postWithAttachToGroupsCreatesJunctionRows(): void
     {
         $client = $this->authenticatedClient();
@@ -319,7 +346,7 @@ final class AttributesCrudApiTest extends CatalogApiTestCase
 
         $junction = new \App\Catalog\Domain\Entity\ObjectTypeAttribute($objectType, $attribute);
         self::getContainer()
-            ->get(\App\Catalog\Domain\Repository\ObjectTypeAttributeRepositoryInterface::class)
+            ->get(ObjectTypeAttributeRepositoryInterface::class)
             ->save($junction);
     }
 }

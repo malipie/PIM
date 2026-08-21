@@ -323,7 +323,7 @@ export function buildCategoryTree(
   const nodes: CategoryTreeNode[] = rows.map((row) => {
     const path = row.path ?? row.code;
     const segments = path.split('.').filter((s) => s.length > 0);
-    const label = labelFromAttributes(row.attributesIndexed) ?? row.code;
+    const label = categoryLabelFromAttributes(row.attributesIndexed) ?? row.code;
     return {
       id: row.id,
       code: row.code,
@@ -357,7 +357,9 @@ export function buildCategoryTree(
   return roots;
 }
 
-function labelFromAttributes(attrs: Record<string, unknown> | null | undefined): string | null {
+export function categoryLabelFromAttributes(
+  attrs: Record<string, unknown> | null | undefined,
+): string | null {
   const name = unwrapAttributesIndexed(attrs).name;
   if (typeof name === 'string') return name;
   if (typeof name === 'object' && name !== null) {

@@ -26,7 +26,7 @@ use Symfony\Component\Uid\Uuid;
  * Response shape:
  *   {
  *     "categoryId": "...",
- *     "instanceCount": 4,         // objects with parent_id = this
+ *     "instanceCount": 4,         // objects assigned through object_categories
  *     "descendantCount": 6,       // categories with path <@ this.path (excl. self)
  *     "declaredFor": [
  *       { "targetObjectTypeKind": "service", "groupCount": 2 },
@@ -69,7 +69,7 @@ final class CategoryUsageController
         $thisPath = $category->getPath();
 
         $instanceCount = self::toInt($this->connection->fetchOne(
-            'SELECT COUNT(*) FROM objects WHERE parent_id = CAST(:id AS uuid)',
+            'SELECT COUNT(DISTINCT object_id) FROM object_categories WHERE category_id = CAST(:id AS uuid)',
             ['id' => $thisId],
         ));
 
