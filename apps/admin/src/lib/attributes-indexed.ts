@@ -43,3 +43,32 @@ export function unwrapAttributesIndexed(
   }
   return out;
 }
+
+/**
+ * #2943 — an object's human name for pickers, lists and summaries.
+ *
+ * `name` may arrive as a plain string or, when the attribute is localizable
+ * and the reading was written per locale, as a `{pl, en}` map. Both shapes
+ * come out of the same `attributes_indexed` envelope, so callers that tested
+ * only for `string` fell through to the technical code — which is how a
+ * relation picker ended up listing `TW-001` instead of `Stanisław Lem`.
+ *
+ * Returns null when there is no usable reading, so the caller decides what
+ * to fall back to (usually `code`).
+ */
+export function objectNameFromAttributes(
+  raw: Record<string, unknown> | null | undefined,
+  locale?: string,
+): string | null {
+  const name = unwrapAttributesIndexed(raw).name;
+  if (typeof name === 'string') return name.trim() === '' ? null : name;
+  if (typeof name === 'object' && name !== null && !Array.isArray(name)) {
+    const byLocale = name as Record<string, unknown>;
+    const preferred = locale === undefined ? undefined : byLocale[locale.split('-')[0] ?? locale];
+    const candidates = [preferred, byLocale.pl, byLocale.en, ...Object.values(byLocale)];
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && candidate.trim() !== '') return candidate;
+    }
+  }
+  return null;
+}

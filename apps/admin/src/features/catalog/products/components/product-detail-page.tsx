@@ -183,6 +183,7 @@ export function ProductDetailPage({
   // create/edit save, cancel and delete mutations live in this hook.
   const {
     dirtyFields,
+    suggestedCode,
     requiredErrors,
     validationErrors,
     expandedGroups,
@@ -389,7 +390,10 @@ export function ProductDetailPage({
     mode === 'create'
       ? typeof dirtyFields.sku === 'string'
         ? dirtyFields.sku
-        : ''
+        : // #2943 — the suggested next number shows until the operator types
+          // over it. Rendering it straight from the query rather than seeding
+          // the dirty buffer keeps "untouched" distinguishable from "typed".
+          (suggestedCode ?? '')
       : (product?.code ?? '');
   // The header name <Input> is controlled by `nameValue`, so it must reflect
   // unsaved edits — read `dirtyFields.name` first (the user's keystrokes),

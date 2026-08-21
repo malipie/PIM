@@ -149,6 +149,7 @@ final class CustomKindFeatureFlagApiTest extends CatalogApiTestCase
             self::getContainer()->get(ObjectTypeAttributeRepositoryInterface::class),
             self::getContainer()->get(\App\Catalog\Domain\Repository\AttributeRepositoryInterface::class),
             self::getContainer()->get(\Doctrine\DBAL\Connection::class),
+            self::getContainer()->get(TenantContext::class),
             $flag,
         );
     }
