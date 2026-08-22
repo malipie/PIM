@@ -9,6 +9,8 @@ use App\Identity\Application\CurrentTenantProvider;
 use App\Identity\Domain\Entity\AuditLog;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Repository\AuditLogRepositoryInterface;
+use App\Shared\Application\TenantContext;
+use App\Shared\Domain\Tenant;
 use DateTimeImmutable;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -44,6 +46,23 @@ use Symfony\Component\Uid\Uuid;
  * Messenger is a profiling-driven follow-up (Phase 6 #720). The dh-auditor
  * bundle already runs sync DB writes per request without issue.
  *
+ * Tenant attribution (#2976) reads {@see TenantContext} first and falls
+ * back to {@see CurrentTenantProvider}. The two can diverge, and the
+ * divergence is not cosmetic: `audit_logs` runs under FORCE ROW LEVEL
+ * SECURITY, and the GUC the policy reads is set by
+ * {@see \App\Identity\Infrastructure\Doctrine\RlsContextListener} from
+ * TenantContext — not from the principal. A route that binds the tenant
+ * without a principal (the signed, session-less
+ * {@see \App\Export\Catalog\Presentation\Controller\CatalogPullController}
+ * and its feed counterpart) therefore produced a row with `tenant_id =
+ * NULL` while the GUC named a tenant, which the WITH CHECK clause rejects:
+ * `new row violates row-level security policy for table "audit_logs"` —
+ * a 500 on every catalog PDF pull. Sourcing the row from the same place
+ * as the GUC makes the two agree by construction. The provider fallback
+ * covers flows that authenticate WITHIN the request (login), where the
+ * context is still empty at kernel.response but the GUC is empty too, so
+ * the pre-context-safe policy lets the row through.
+ *
  * old_value / new_value payloads are NOT populated here — they require
  * Doctrine entity-change diffing, which is the `dh-auditor` bundle's
  * existing job for domain entities. This listener captures the
@@ -56,6 +75,7 @@ final readonly class AuditLogListener
         private AuditLogRepositoryInterface $repository,
         private Security $security,
         private CurrentTenantProvider $tenantProvider,
+        private TenantContext $tenantContext,
         private AuditLogRequestMapper $mapper,
     ) {
     }
@@ -84,7 +104,7 @@ final readonly class AuditLogListener
 
         $entry = new AuditLog(
             id: Uuid::v7(),
-            tenantId: $this->tenantProvider->getCurrent()?->getId(),
+            tenantId: $this->resolveTenant()?->getId(),
             userId: $userId,
             superAdminId: null,
             action: $request->getMethod(),
@@ -101,5 +121,19 @@ final readonly class AuditLogListener
         );
 
         $this->repository->save($entry);
+    }
+
+    /**
+     * The tenant the request actually ran under — the same source the RLS
+     * GUC is set from, so the audit row can never contradict the policy.
+     */
+    private function resolveTenant(): ?Tenant
+    {
+        $bound = $this->tenantContext->get();
+        if ($bound instanceof Tenant) {
+            return $bound;
+        }
+
+        return $this->tenantProvider->getCurrent();
     }
 }
