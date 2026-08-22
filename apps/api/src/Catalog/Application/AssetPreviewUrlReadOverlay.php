@@ -24,7 +24,8 @@ use const PHP_URL_QUERY;
  *
  * The signed URL keeps the `<img src>` flow working: the browser sends
  * no Bearer header, but the query-string signature authorises the
- * preview endpoint. The signature is only ever handed to a caller who
+ * preview endpoint. It also carries the owning tenant (#2975) so the
+ * anonymous request can establish the RLS scope the asset lookup needs. The signature is only ever handed to a caller who
  * has already passed RBAC on the catalog read surface.
  *
  * Idempotent + defensive: only values shaped like an asset preview path
@@ -52,14 +53,16 @@ final readonly class AssetPreviewUrlReadOverlay
 
         // `previewUrl` is stored as a bare string, but tolerate the
         // envelope `{value: …}` shape some writers use.
+        $tenantId = $object->getTenant()?->getId()->toRfc4122();
+
         if (\is_string($value)) {
-            $signed = $this->signPath($value, $object->getId()->toRfc4122());
+            $signed = $this->signPath($value, $object->getId()->toRfc4122(), $tenantId);
             if (null === $signed) {
                 return $object;
             }
             $indexed[self::PREVIEW_KEY] = $signed;
         } elseif (\is_array($value) && isset($value['value']) && \is_string($value['value'])) {
-            $signed = $this->signPath($value['value'], $object->getId()->toRfc4122());
+            $signed = $this->signPath($value['value'], $object->getId()->toRfc4122(), $tenantId);
             if (null === $signed) {
                 return $object;
             }
@@ -80,7 +83,7 @@ final readonly class AssetPreviewUrlReadOverlay
      * null (caller keeps the original) when the value is not a preview
      * path or already carries a signature.
      */
-    private function signPath(string $path, string $assetId): ?string
+    private function signPath(string $path, string $assetId, ?string $tenantId): ?string
     {
         if (!str_contains($path, '/api/assets/') || !str_contains($path, '/preview')) {
             return null;
@@ -98,6 +101,6 @@ final readonly class AssetPreviewUrlReadOverlay
             $variant = \is_string($candidate) && '' !== $candidate ? $candidate : null;
         }
 
-        return $this->signer->sign($assetId, $variant);
+        return $this->signer->sign($assetId, $variant, $tenantId);
     }
 }
