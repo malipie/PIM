@@ -345,6 +345,28 @@ class ExportSession extends AggregateRoot implements TenantScoped
         $this->durationMs = ($this->completedAt->getTimestamp() - $this->startedAt->getTimestamp()) * 1000;
     }
 
+    /**
+     * #2945 — the run produced every row but the artifact never reached
+     * storage, so there is nothing to download.
+     *
+     * A separate transition from {@see markError} because `done` is a legal
+     * starting point here: the rows ARE counted and the duration IS real.
+     * What failed is the hand-off of the file. Leaving such a session as a
+     * plain success — which is what the handler used to do, to avoid a 500 —
+     * gives the operator a green row with a dead download button and no way
+     * to tell why. The file path is cleared along with it: a path into a
+     * worker's `/tmp` is not something any other container can serve.
+     */
+    public function markFileUnavailable(string $message): void
+    {
+        $this->ensureTransitionable([ExportStatus::Pending, ExportStatus::Running, ExportStatus::Done]);
+        $this->status = ExportStatus::Error->value;
+        $this->errorMessage = $message;
+        $this->filePath = null;
+        $this->completedAt ??= new DateTimeImmutable();
+        $this->durationMs ??= ($this->completedAt->getTimestamp() - $this->startedAt->getTimestamp()) * 1000;
+    }
+
     public function isSelfOwnedBy(Uuid $userId): bool
     {
         return $this->userId->equals($userId);

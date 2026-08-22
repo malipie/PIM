@@ -7,6 +7,7 @@ import { CategoryPickerDialog } from '@/components/catalog/category-picker-dialo
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { objectNameFromAttributes } from '@/lib/attributes-indexed';
 import { HttpError, jsonFetch } from '@/lib/http';
 import { cn } from '@/lib/utils';
 
@@ -78,9 +79,16 @@ interface ReverseResponse {
   reverseRelations: ReverseGroupPayload[];
 }
 
+interface PickerCandidate {
+  id: string;
+  code: string;
+  objectType?: { id: string } | null;
+  attributesIndexed?: Record<string, unknown> | null;
+}
+
 interface ObjectsListResponse {
-  'hydra:member'?: Array<{ id: string; code: string; objectType?: { id: string } | null }>;
-  member?: Array<{ id: string; code: string; objectType?: { id: string } | null }>;
+  'hydra:member'?: PickerCandidate[];
+  member?: PickerCandidate[];
 }
 
 interface AttributeFull extends RelationAttribute {
@@ -535,18 +543,38 @@ function ObjectPickerDialog({
     return () => clearTimeout(timer);
   }, [query]);
 
-  const candidatesQuery = useQuery<ObjectsListResponse>({
+  // #2944 — this used to ask the UNSCOPED collection for 50 rows and filter
+  // them down to the allowed ObjectType in the browser. On a catalogue with
+  // 1300 products the first 50 rows are 50 products, so a picker for a custom
+  // module ("Twórcy") showed "Brak dopasowań" no matter what — the candidates
+  // existed, they were simply never in the page that was fetched.
+  //
+  // One request per allowed type instead, which is also what the per-kind read
+  // gate authorises (#2881 made the same change in the create-form picker).
+  const candidatesQuery = useQuery<PickerCandidate[]>({
     queryKey: ['objects', 'picker', debounced, allowedObjectTypeIds.join(',')],
-    queryFn: () => {
-      const params = new URLSearchParams();
-      // #975 — `SkuFilter` reacts to `?sku=`, matching `code` via case-insensitive
-      // substring LIKE. Earlier `?code=` was silently ignored by AP4. Accept
-      // defaults to `application/ld+json` so the response carries the
-      // `member` envelope we read below; explicit `application/json` would
-      // hand back a raw array AP4 normalises differently.
-      if (debounced.length > 0) params.set('sku', debounced);
-      params.set('itemsPerPage', '50');
-      return jsonFetch<ObjectsListResponse>(`/api/objects?${params.toString()}`);
+    queryFn: async () => {
+      const fetchPage = (typeId: string | null): Promise<ObjectsListResponse> => {
+        const params = new URLSearchParams();
+        // #975 — `SkuFilter` reacts to `?sku=`, matching `code` via
+        // case-insensitive substring LIKE. Accept defaults to
+        // `application/ld+json` so the response carries the `member` envelope.
+        if (debounced.length > 0) params.set('sku', debounced);
+        params.set('itemsPerPage', '200');
+        if (typeId !== null) params.set('objectType', typeId);
+        return jsonFetch<ObjectsListResponse>(`/api/objects?${params.toString()}`).catch(
+          (): ObjectsListResponse => ({ member: [] }),
+        );
+      };
+
+      // An attribute with no declared targets really does mean "anything";
+      // there is no type to scope by, so the unscoped collection is correct.
+      const pages =
+        allowedObjectTypeIds.length === 0
+          ? [await fetchPage(null)]
+          : await Promise.all(allowedObjectTypeIds.map((id) => fetchPage(id)));
+
+      return pages.flatMap((page) => page['hydra:member'] ?? page.member ?? []);
     },
   });
 
@@ -568,14 +596,24 @@ function ObjectPickerDialog({
   const activeCreateType = allowedTypes.find((t) => t.id === createObjectTypeId) ?? null;
 
   const items = useMemo(() => {
-    const raw = candidatesQuery.data?.['hydra:member'] ?? candidatesQuery.data?.member ?? [];
+    const raw = candidatesQuery.data ?? [];
+    const needle = debounced.trim().toLowerCase();
     return raw.filter((item) => {
       if (excludedObjectIds.includes(item.id)) return false;
-      if (allowedObjectTypeIds.length === 0) return true;
-      const otId = item.objectType?.id;
-      return Boolean(otId && allowedObjectTypeIds.includes(otId));
+      if (allowedObjectTypeIds.length > 0) {
+        const otId = item.objectType?.id;
+        if (!otId || !allowedObjectTypeIds.includes(otId)) return false;
+      }
+      // #2944 — the server matches the code only; match the name here too, so
+      // an operator who knows the object as "Stanisław Lem" and not as
+      // "TW-001" can find it.
+      if (needle === '') return true;
+      if (item.code.toLowerCase().includes(needle)) return true;
+      return (
+        objectNameFromAttributes(item.attributesIndexed)?.toLowerCase().includes(needle) ?? false
+      );
     });
-  }, [candidatesQuery.data, allowedObjectTypeIds, excludedObjectIds]);
+  }, [candidatesQuery.data, allowedObjectTypeIds, excludedObjectIds, debounced]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -658,7 +696,7 @@ function ObjectPickerDialog({
         <DialogTitle>{t('relations.picker_title', { defaultValue: 'Wybierz obiekt' })}</DialogTitle>
         <DialogDescription>
           {t('relations.picker_desc', {
-            defaultValue: 'Wpisz kod obiektu — wyszukiwanie zawęża listę kandydatów.',
+            defaultValue: 'Wpisz nazwę lub kod — wyszukiwanie zawęża listę kandydatów.',
           })}
         </DialogDescription>
         {creating ? (
@@ -779,7 +817,9 @@ function ObjectPickerDialog({
               <Search className="size-4 text-muted-foreground" />
               <Input
                 autoFocus
-                placeholder={t('relations.picker_search', { defaultValue: 'Szukaj po kodzie…' })}
+                placeholder={t('relations.picker_search', {
+                  defaultValue: 'Szukaj po nazwie lub kodzie…',
+                })}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -803,7 +843,12 @@ function ObjectPickerDialog({
                       'hover:border-zinc-200 hover:bg-zinc-50',
                     )}
                   >
-                    <span className="font-mono text-sm">{item.code}</span>
+                    <span className="min-w-0 truncate text-sm">
+                      {objectNameFromAttributes(item.attributesIndexed) ?? item.code}
+                      <span className="ml-2 font-mono text-[11px] text-muted-foreground">
+                        {item.code}
+                      </span>
+                    </span>
                     <Plus className="size-4 text-muted-foreground" />
                   </button>
                 </li>
