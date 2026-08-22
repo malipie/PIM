@@ -81,7 +81,7 @@ final class AssetPreviewSignedUrlApiTest extends CatalogApiTestCase
 
         $signer = self::getContainer()->get(AssetPreviewUrlSigner::class);
         // Sign with an already-past expiration.
-        $signed = $signer->sign($asset, null, new DateTimeImmutable('-1 hour'));
+        $signed = $signer->sign($asset, null, null, new DateTimeImmutable('-1 hour'));
 
         $client = static::createClient();
         $client->request('GET', $signed);

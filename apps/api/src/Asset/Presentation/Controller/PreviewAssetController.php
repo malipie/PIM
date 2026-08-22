@@ -9,8 +9,14 @@ use App\Asset\Domain\Entity\AssetVariant;
 use App\Asset\Domain\Repository\AssetRepositoryInterface;
 use App\Asset\Domain\ThumbnailsStatus;
 use App\Identity\Contracts\Attribute\NoPermissionRequired;
+use App\Shared\Application\TenantContext;
+use App\Shared\Domain\Repository\TenantRepositoryInterface;
+use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
+use Doctrine\DBAL\Connection;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -42,10 +48,20 @@ use Symfony\Component\Uid\Uuid;
  * request is rejected with 403 before any row is loaded, closing the
  * pre-fix hole where id-knowledge alone streamed any tenant's bytes.
  *
- * The Doctrine `tenant` filter is left ENABLED: for an anonymous signed
- * request it contributes no constraint (no tenant context is set, so the
- * filter is a no-op), while an authenticated caller's tenant scopes the
- * lookup as defence in depth.
+ * Tenant scope (#2975): an anonymous signed request has no principal, so
+ * neither the Doctrine `tenant` filter nor — decisively — the Postgres
+ * `app.current_tenant` GUC gets a value. `assets` carries FORCE ROW LEVEL
+ * SECURITY with the strict policy `tenant_id = current_setting(…)::uuid`,
+ * so an unset GUC yields zero rows and every thumbnail answered 404 in
+ * production (dev never showed it: the non-prod APP_DEFAULT_TENANT_CODE
+ * fallback resolves a tenant for anonymous requests). The signed URL
+ * therefore carries the owning tenant ({@see AssetPreviewSigner::TENANT_PARAM}),
+ * and this controller establishes the RLS scope from it AFTER the signature
+ * verified — the same construction {@see \App\Export\Catalog\Presentation\Controller\CatalogPullController}
+ * uses. Because the value is covered by the HMAC it cannot be swapped for
+ * another tenant's id, so this is not a cross-tenant vector. An
+ * authenticated caller keeps its own tenant scope: the scope is only
+ * established when no tenant is in context.
  */
 final readonly class PreviewAssetController
 {
@@ -54,6 +70,10 @@ final readonly class PreviewAssetController
         private FilesystemOperator $assetsStorage,
         private AssetPreviewSigner $urlSigner,
         private RequestStack $requestStack,
+        private TenantRepositoryInterface $tenants,
+        private TenantContext $tenantContext,
+        private TenantFilterConfigurator $tenantFilter,
+        private Connection $connection,
     ) {
     }
 
@@ -67,6 +87,8 @@ final readonly class PreviewAssetController
             // id-knowledge alone never reaches (let alone streams) a row.
             throw new AccessDeniedHttpException('A valid, unexpired preview signature is required.');
         }
+
+        $this->scopeToSignedTenant($request);
 
         $assetId = Uuid::fromString($id);
         $asset = $this->assets->findById($assetId) ?? $this->assets->findByObjectId($assetId);
@@ -93,6 +115,43 @@ final readonly class PreviewAssetController
         $response->headers->set('cache-control', 'private, max-age=300');
 
         return $response;
+    }
+
+    /**
+     * Establishes the RLS scope from the tenant id carried inside the
+     * verified signature, so the asset lookup below sees rows at all.
+     *
+     * No-op when the request already runs under a resolved tenant (an
+     * authenticated caller keeps its own scope) or when the URL predates
+     * this parameter — such a URL is re-signed with the tenant on the next
+     * catalog read, so the gap closes on its own.
+     */
+    private function scopeToSignedTenant(Request $request): void
+    {
+        if ($this->tenantContext->get() instanceof Tenant) {
+            return;
+        }
+
+        $tenantId = $request->query->get(AssetPreviewSigner::TENANT_PARAM);
+        if (!\is_string($tenantId) || !Uuid::isValid($tenantId)) {
+            return;
+        }
+
+        $tenant = $this->tenants->findById(Uuid::fromString($tenantId));
+        if (!$tenant instanceof Tenant) {
+            return;
+        }
+
+        // tenant-safe: infrastructure (establishes the tenant_id the RLS policies read, taken from the HMAC-signed query string; this IS the tenant boundary the signature gates, not a bypass — mirrors CatalogPullController)
+        $this->connection->executeStatement(
+            "SELECT set_config('app.current_tenant', :tenant_id, false)",
+            ['tenant_id' => $tenant->getId()->toRfc4122()],
+        );
+        $this->tenantContext->set($tenant);
+        // Re-apply the Doctrine filter to the context we just set; without it
+        // the filter keeps whatever the previous request on this worker
+        // configured.
+        $this->tenantFilter->apply();
     }
 
     /**

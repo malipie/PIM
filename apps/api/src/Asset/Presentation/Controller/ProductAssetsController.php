@@ -175,7 +175,10 @@ final readonly class ProductAssetsController
             'folderCode' => $asset->getFolderCode(),
             // AUD-006 / #1576 — hand out a short-lived signed URL, never the
             // bare path, so the preview endpoint stays signature-gated.
-            'previewUrl' => $this->previewUrlSigner->sign($asset->getId()->toRfc4122()),
+            'previewUrl' => $this->previewUrlSigner->sign(
+                $asset->getId()->toRfc4122(),
+                tenantId: $asset->getTenant()?->getId()->toRfc4122(),
+            ),
         ];
     }
 }

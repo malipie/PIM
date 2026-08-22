@@ -10,6 +10,8 @@ use DateTimeImmutable;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\UriSigner;
 
+use const PHP_QUERY_RFC3986;
+
 /**
  * AUD-006 / #1576 — mints and verifies short-lived HMAC-signed preview
  * URLs for `GET /api/assets/{id}/preview`.
@@ -27,6 +29,16 @@ use Symfony\Component\HttpFoundation\UriSigner;
  * (the catalog read providers sign `previewUrl` per-request), and the
  * signature expires after {@see self::TTL}, so a leaked URL stops working
  * shortly after issuance instead of forever.
+ *
+ * The signed query string also carries the owning tenant
+ * ({@see AssetPreviewSigner::TENANT_PARAM}). An anonymous `<img>` request
+ * has no principal, so nothing would set the Postgres `app.current_tenant`
+ * GUC that the `assets` RLS policy reads — the row lookup would return
+ * zero rows and the endpoint would answer 404 for every thumbnail in
+ * production. The tenant id is not a secret (it already appears in the
+ * public catalog-pull URLs), and because it is covered by the HMAC it
+ * cannot be swapped for another tenant's: tampering invalidates the
+ * signature before any query runs.
  *
  * Signing/verification deliberately operate on the path + query string
  * only (never scheme/host) so a relative `previewUrl` persisted in
@@ -53,14 +65,17 @@ final readonly class AssetPreviewUrlSigner implements AssetPreviewSigner
     /**
      * Returns a signed, relative preview URL for the asset id (RFC-4122).
      *
-     * @param DateTimeImmutable|null $now test seam — when provided, the
-     *                                    expiration is computed as $now + TTL
-     *                                    so an expired URL can be produced
-     *                                    deterministically in tests
+     * @param string|null            $tenantId RFC-4122 id of the owning tenant,
+     *                                         carried inside the signature (see
+     *                                         the class docblock)
+     * @param DateTimeImmutable|null $now      test seam — when provided, the
+     *                                         expiration is computed as $now + TTL
+     *                                         so an expired URL can be produced
+     *                                         deterministically in tests
      */
-    public function sign(string $assetId, ?string $variant = null, ?DateTimeImmutable $now = null): string
+    public function sign(string $assetId, ?string $variant = null, ?string $tenantId = null, ?DateTimeImmutable $now = null): string
     {
-        $uri = $this->buildUri($assetId, $variant);
+        $uri = $this->buildUri($assetId, $variant, $tenantId);
         $expiration = ($now ?? new DateTimeImmutable())->add(new DateInterval(self::TTL));
 
         return $this->uriSigner->sign($uri, $expiration);
@@ -79,11 +94,19 @@ final readonly class AssetPreviewUrlSigner implements AssetPreviewSigner
         return $this->uriSigner->check($uri);
     }
 
-    private function buildUri(string $assetId, ?string $variant): string
+    private function buildUri(string $assetId, ?string $variant, ?string $tenantId): string
     {
-        $uri = \sprintf('/api/assets/%s/preview', $assetId);
+        $query = [];
         if (null !== $variant && '' !== $variant) {
-            $uri .= '?variant='.rawurlencode($variant);
+            $query['variant'] = $variant;
+        }
+        if (null !== $tenantId && '' !== $tenantId) {
+            $query[AssetPreviewSigner::TENANT_PARAM] = $tenantId;
+        }
+
+        $uri = \sprintf('/api/assets/%s/preview', $assetId);
+        if ([] !== $query) {
+            $uri .= '?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
         }
 
         return $uri;
