@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Identity\Infrastructure\Audit;
 
 use App\Identity\Application\Audit\AuditLogRequestMapper;
-use App\Identity\Application\CurrentTenantProvider;
+use App\Identity\Application\Audit\AuditTenantResolver;
 use App\Identity\Domain\Entity\AuditLog;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Repository\AuditLogRepositoryInterface;
-use App\Shared\Application\TenantContext;
-use App\Shared\Domain\Tenant;
 use DateTimeImmutable;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -74,8 +72,7 @@ final readonly class AuditLogListener
     public function __construct(
         private AuditLogRepositoryInterface $repository,
         private Security $security,
-        private CurrentTenantProvider $tenantProvider,
-        private TenantContext $tenantContext,
+        private AuditTenantResolver $auditTenant,
         private AuditLogRequestMapper $mapper,
     ) {
     }
@@ -104,7 +101,7 @@ final readonly class AuditLogListener
 
         $entry = new AuditLog(
             id: Uuid::v7(),
-            tenantId: $this->resolveTenant()?->getId(),
+            tenantId: $this->auditTenant->resolve()?->getId(),
             userId: $userId,
             superAdminId: null,
             action: $request->getMethod(),
@@ -121,19 +118,5 @@ final readonly class AuditLogListener
         );
 
         $this->repository->save($entry);
-    }
-
-    /**
-     * The tenant the request actually ran under — the same source the RLS
-     * GUC is set from, so the audit row can never contradict the policy.
-     */
-    private function resolveTenant(): ?Tenant
-    {
-        $bound = $this->tenantContext->get();
-        if ($bound instanceof Tenant) {
-            return $bound;
-        }
-
-        return $this->tenantProvider->getCurrent();
     }
 }
