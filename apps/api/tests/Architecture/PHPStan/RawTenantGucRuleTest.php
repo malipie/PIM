@@ -34,10 +34,15 @@ final class RawTenantGucRuleTest extends RuleTestCase
     public function flagsHandRolledWritesOfTheIsolationBoundary(): void
     {
         $this->analyse(
-            [__DIR__.'/Fixtures/RawTenantGucWriters.php'],
             [
-                [$this->messageFor(Fixtures\BadServiceWritingTenantGuc::class, 'app.current_tenant'), 27],
-                [$this->messageFor(Fixtures\BadServiceWritingSuperAdminGuc::class, 'app.is_super_admin'), 42],
+                __DIR__.'/Fixtures/BadServiceWritingTenantGuc.php',
+                __DIR__.'/Fixtures/BadServiceWritingSuperAdminGuc.php',
+                __DIR__.'/Fixtures/GoodServiceReadingTenantGuc.php',
+                __DIR__.'/Fixtures/GoodServiceWritingUnrelatedSetting.php',
+            ],
+            [
+                [$this->messageFor(Fixtures\BadServiceWritingTenantGuc::class, 'app.current_tenant'), 25],
+                [$this->messageFor(Fixtures\BadServiceWritingSuperAdminGuc::class, 'app.is_super_admin'), 22],
             ],
         );
     }

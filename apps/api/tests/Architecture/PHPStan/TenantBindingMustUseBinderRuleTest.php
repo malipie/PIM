@@ -34,10 +34,16 @@ final class TenantBindingMustUseBinderRuleTest extends RuleTestCase
     public function flagsACommandBindingTheContextWithoutTheBinder(): void
     {
         $this->analyse(
-            [__DIR__.'/Fixtures/TenantBindingCommands.php'],
             [
-                [$this->messageFor(Fixtures\BadCommandBindingContextDirectly::class, 'set', 'bind'), 32],
-                [$this->messageFor(Fixtures\BadCommandClearingContextDirectly::class, 'clear', 'release'), 48],
+                __DIR__.'/Fixtures/BadCommandBindingContextDirectly.php',
+                __DIR__.'/Fixtures/BadCommandClearingContextDirectly.php',
+                __DIR__.'/Fixtures/GoodCommandUsingBinder.php',
+                __DIR__.'/Fixtures/GoodCommandReadingContext.php',
+                __DIR__.'/Fixtures/GoodServiceBindingContextDirectly.php',
+            ],
+            [
+                [$this->messageFor(Fixtures\BadCommandBindingContextDirectly::class, 'set', 'bind'), 30],
+                [$this->messageFor(Fixtures\BadCommandClearingContextDirectly::class, 'clear', 'release'), 27],
             ],
         );
     }
