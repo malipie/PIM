@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Identity\Infrastructure\Audit;
 
 use App\Identity\Application\Audit\AuditLogRequestMapper;
+use App\Identity\Application\Audit\AuditTenantResolver;
 use App\Identity\Application\CurrentTenantProvider;
 use App\Identity\Domain\Entity\AuditLog;
 use App\Identity\Domain\Repository\AuditLogRepositoryInterface;
@@ -38,6 +39,11 @@ use Symfony\Component\Security\Core\User\UserInterface;
  * The RLS half cannot be reproduced here (the test connection owns the
  * tables and bypasses RLS), so this pins the mechanism: the row takes its
  * tenant from the same place the GUC does.
+ *
+ * #2978 follow-up: the resolution now lives in {@see AuditTenantResolver},
+ * shared by all three audit writers. The first fix only reached the HTTP
+ * listener, so `pim:agent:start` hit the identical rejection on production
+ * the moment console commands got a GUC at all.
  */
 final class AuditLogTenantAttributionTest extends TestCase
 {
@@ -142,7 +148,12 @@ final class AuditLogTenantAttributionTest extends TestCase
             'prod',
         );
 
-        $listener = new AuditLogListener($repository, $security, $provider, $context, new AuditLogRequestMapper());
+        $listener = new AuditLogListener(
+            $repository,
+            $security,
+            new AuditTenantResolver($context, $provider),
+            new AuditLogRequestMapper(),
+        );
 
         $request = Request::create('/api/catalogs/pull/019ffef5-f6e0-7816-ae16-8cb2d60ae3ad/tok.pdf');
         $request->attributes->set('_route', 'pim_catalogs_pull');

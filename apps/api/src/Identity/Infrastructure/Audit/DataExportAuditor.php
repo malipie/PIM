@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Infrastructure\Audit;
 
-use App\Identity\Application\CurrentTenantProvider;
+use App\Identity\Application\Audit\AuditTenantResolver;
 use App\Identity\Contracts\Audit\DataExportAuditor as DataExportAuditorContract;
 use App\Identity\Domain\Entity\AuditLog;
 use App\Identity\Domain\Entity\User;
@@ -31,7 +31,7 @@ final readonly class DataExportAuditor implements DataExportAuditorContract
     public function __construct(
         private AuditLogRepositoryInterface $repository,
         private Security $security,
-        private CurrentTenantProvider $tenantProvider,
+        private AuditTenantResolver $auditTenant,
         private RequestStack $requestStack,
     ) {
     }
@@ -44,7 +44,7 @@ final readonly class DataExportAuditor implements DataExportAuditorContract
 
         $entry = new AuditLog(
             id: Uuid::v7(),
-            tenantId: $this->tenantProvider->getCurrent()?->getId(),
+            tenantId: $this->auditTenant->resolve()?->getId(),
             userId: $userId,
             superAdminId: null,
             action: 'data_export',

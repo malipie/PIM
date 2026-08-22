@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Infrastructure\Audit;
 
-use App\Identity\Application\CurrentTenantProvider;
+use App\Identity\Application\Audit\AuditTenantResolver;
 use App\Identity\Contracts\Audit\AgentActionAuditor as AgentActionAuditorContract;
 use App\Identity\Domain\Entity\AuditLog;
 use App\Identity\Domain\Repository\AuditLogRepositoryInterface;
@@ -23,7 +23,7 @@ final readonly class AgentActionAuditor implements AgentActionAuditorContract
 {
     public function __construct(
         private AuditLogRepositoryInterface $repository,
-        private CurrentTenantProvider $tenantProvider,
+        private AuditTenantResolver $auditTenant,
         private RequestStack $requestStack,
     ) {
     }
@@ -34,7 +34,7 @@ final readonly class AgentActionAuditor implements AgentActionAuditorContract
 
         $entry = new AuditLog(
             id: Uuid::v7(),
-            tenantId: $this->tenantProvider->getCurrent()?->getId(),
+            tenantId: $this->auditTenant->resolve()?->getId(),
             userId: null !== $actorId ? Uuid::fromString($actorId) : null,
             superAdminId: null,
             action: $action,
