@@ -33,4 +33,20 @@ interface AttributeCatalogReader
      * the summary on hit, null on miss (unknown id OR cross-tenant id).
      */
     public function findOnTenant(Uuid $attributeId, Uuid $tenantId): ?AttributeSummary;
+
+    /**
+     * #2946 — option codes + labels for a select/multiselect attribute,
+     * ordered by position.
+     *
+     * The agent needs them to translate what an operator says ("Dla
+     * dziewczyn") into what a write accepts (the option code). Without it
+     * the only honest answer to "change gender to Dla dziewczyn" is to ask
+     * the operator to go and read the code out of the modeling screen.
+     *
+     * Empty for a non-option attribute or an unknown/cross-tenant id — the
+     * caller reads that as "nothing to choose from".
+     *
+     * @return list<array{code: string, label: array<string, string>}>
+     */
+    public function optionsFor(Uuid $attributeId, Uuid $tenantId): array;
 }

@@ -6,6 +6,7 @@ namespace App\Catalog\Application;
 
 use App\Catalog\Contracts\Query\AttributeSummary;
 use App\Catalog\Contracts\Service\AttributeCatalogReader;
+use App\Catalog\Domain\Repository\AttributeOptionRepositoryInterface;
 use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use Symfony\Component\Uid\Uuid;
@@ -25,6 +26,7 @@ final readonly class DoctrineAttributeCatalogReader implements AttributeCatalogR
 {
     public function __construct(
         private AttributeRepositoryInterface $attributes,
+        private AttributeOptionRepositoryInterface $options,
         private TenantRepositoryInterface $tenants,
     ) {
     }
@@ -85,5 +87,25 @@ final readonly class DoctrineAttributeCatalogReader implements AttributeCatalogR
             groupLabel: null === $group ? [] : $group->getLabel(),
             groupPosition: $group?->getPosition() ?? PHP_INT_MAX,
         );
+    }
+
+    public function optionsFor(Uuid $attributeId, Uuid $tenantId): array
+    {
+        $summary = $this->findOnTenant($attributeId, $tenantId);
+        if (null === $summary) {
+            return [];
+        }
+
+        $attribute = $this->attributes->findById($attributeId);
+        if (null === $attribute) {
+            return [];
+        }
+
+        $options = [];
+        foreach ($this->options->findByAttribute($attribute) as $option) {
+            $options[] = ['code' => $option->getCode(), 'label' => $option->getLabel()];
+        }
+
+        return $options;
     }
 }

@@ -2150,6 +2150,10 @@
     },
     "errors": {
       "forbidden": "Nie masz uprawnień do tej sekcji. Skontaktuj się z administratorem."
+    },
+    "selection": {
+      "capped_explained": "Zaznaczono {{limit}} z {{total}} — więcej nie można zaznaczyć naraz. Zawęź filtr, żeby objąć resztę.",
+      "all_matching_label": "zaznaczone we wszystkich stronach wyniku"
     }
   },
   "api_configurator": {

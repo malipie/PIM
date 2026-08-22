@@ -80,21 +80,31 @@ export function SelectionToolbar({
         </>
       ) : (
         <>
+          {/* #2945 — the capped state used to read "10 000 · wszystkie
+              pasujące do filtru zaznaczone (cross-page selection) · cap 10k".
+              Three problems at once: the number looked like the match count
+              rather than a ceiling, "cross-page selection" is developer
+              jargon in a Polish UI, and "cap 10k" says nothing about what the
+              operator can do next. Say the limit in words, with both numbers,
+              so "why did my 50 060 become 10 000" answers itself. */}
           <span className="text-[12.5px]">
-            <span className="text-white/60">
-              {t('products.selection.all_matching_label', {
-                defaultValue: 'wszystkie pasujące do filtru zaznaczone',
-              })}
-            </span>
-            <span className="text-white/40 ml-2 font-mono text-[11px]">(cross-page selection)</span>
+            {capped ? (
+              <span className="text-amber-300">
+                {t('products.selection.capped_explained', {
+                  defaultValue:
+                    'Zaznaczono {{limit}} z {{total}} — więcej nie można zaznaczyć naraz. Zawęź filtr, żeby objąć resztę.',
+                  limit: displayCount.toLocaleString('pl-PL'),
+                  total: (matchingCount || displayCount).toLocaleString('pl-PL'),
+                })}
+              </span>
+            ) : (
+              <span className="text-white/60">
+                {t('products.selection.all_matching_label', {
+                  defaultValue: 'zaznaczone we wszystkich stronach wyniku',
+                })}
+              </span>
+            )}
           </span>
-          {capped && (
-            <span className="text-[11px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">
-              {t('products.selection.capped', {
-                defaultValue: 'cap 10k',
-              })}
-            </span>
-          )}
         </>
       )}
       <button
