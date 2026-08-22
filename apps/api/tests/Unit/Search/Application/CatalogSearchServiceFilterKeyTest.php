@@ -9,7 +9,9 @@ use App\Identity\Application\CurrentTenantProvider;
 use App\Identity\Domain\Entity\User;
 use App\Search\Application\CatalogSearchService;
 use App\Search\Infrastructure\MeilisearchClientFactory;
+use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Doctrine\Repository\DoctrineTenantRepository;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
@@ -151,9 +153,9 @@ final class CatalogSearchServiceFilterKeyTest extends TestCase
         $factory = new MeilisearchClientFactory(null, null);
         $tenantProvider = new CurrentTenantProvider(
             new TokenStorage(),
-            $this->createStub(\App\Shared\Infrastructure\Doctrine\Repository\DoctrineTenantRepository::class),
+            $this->createStub(DoctrineTenantRepository::class),
         );
-        $service = new CatalogSearchService($factory, $tenantProvider);
+        $service = new CatalogSearchService($factory, $tenantProvider, new TenantContext());
 
         $result = $service->search(kind: ObjectKind::Product, query: 'anything');
 
@@ -173,12 +175,44 @@ final class CatalogSearchServiceFilterKeyTest extends TestCase
         // so CurrentTenantProvider short-circuits to $user->getTenant().
         $tenantProvider = new CurrentTenantProvider(
             $tokenStorage,
-            $this->createStub(\App\Shared\Infrastructure\Doctrine\Repository\DoctrineTenantRepository::class),
+            $this->createStub(DoctrineTenantRepository::class),
         );
 
         // url=null → create() throws LogicException, marking "reached Meili".
         $factory = new MeilisearchClientFactory(null, null);
 
-        return new CatalogSearchService($factory, $tenantProvider);
+        return new CatalogSearchService($factory, $tenantProvider, new TenantContext());
+    }
+
+    /**
+     * #2977 — a worker has no security token, so the tenant reaches the
+     * service only through {@see TenantContext}. Before the fix the
+     * service read the provider alone and answered a silent empty result
+     * for every worker-side search — the agent's "the catalog is empty"
+     * on a tenant with 7 products.
+     */
+    #[Test]
+    public function tenantBoundWithoutSecurityTokenScopesTheSearch(): void
+    {
+        $context = new TenantContext();
+        $context->set(new Tenant('demo', 'Demo Tenant'));
+
+        // No token → the provider yields null; only the bound context can
+        // scope this search.
+        $tenantProvider = new CurrentTenantProvider(
+            new TokenStorage(),
+            $this->createStub(DoctrineTenantRepository::class),
+        );
+        // url=null → create() throws, which the service reports as
+        // degraded. Reaching that branch at all proves the tenant gate was
+        // passed; an unscoped call returns the non-degraded empty result.
+        $service = new CatalogSearchService(new MeilisearchClientFactory(null, null), $tenantProvider, $context);
+
+        $result = $service->search(kind: ObjectKind::Product, query: 'anything');
+
+        self::assertTrue(
+            $result['degraded'],
+            'the search must reach the engine, not short-circuit on a missing tenant',
+        );
     }
 }

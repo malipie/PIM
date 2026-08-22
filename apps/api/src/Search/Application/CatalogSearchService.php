@@ -7,6 +7,7 @@ namespace App\Search\Application;
 use App\Catalog\Domain\ObjectKind;
 use App\Identity\Application\CurrentTenantProvider;
 use App\Search\Infrastructure\MeilisearchClientFactory;
+use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Meilisearch\MeiliFilterLiteral;
 use Psr\Log\LoggerInterface;
@@ -37,6 +38,7 @@ final readonly class CatalogSearchService
     public function __construct(
         private MeilisearchClientFactory $clientFactory,
         private CurrentTenantProvider $tenantProvider,
+        private TenantContext $tenantContext,
         ?LoggerInterface $logger = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -74,11 +76,21 @@ final readonly class CatalogSearchService
         // ULV-02 (#983) — custom kinds land in the consolidated `objects`
         // index alongside built-ins; no early-return skip anymore.
 
-        $tenant = $this->tenantProvider->getCurrent();
+        $tenant = $this->resolveTenant();
         if (!$tenant instanceof Tenant) {
             // No active tenant context — defence-in-depth: refuse to
             // hit the hub at all. Cross-tenant leak would break the
             // multi-tenant isolation contract.
+            //
+            // #2977 — log it. An unscoped call is indistinguishable from
+            // "no matches" at the call site, which is exactly how the
+            // agent came to report an empty catalog for hours; a warning
+            // here turns that into a one-line diagnosis.
+            $this->logger->warning('Catalog search ran without a tenant context; returning an empty result.', [
+                'kind' => $kind->value,
+                'query' => $query,
+            ]);
+
             return $this->emptyResult();
         }
 
@@ -205,6 +217,33 @@ final readonly class CatalogSearchService
             'processingTimeMs' => \is_numeric($rawProcessing) ? (int) $rawProcessing : 0,
             'degraded' => false,
         ];
+    }
+
+    /**
+     * The tenant this search is scoped to.
+     *
+     * {@see TenantContext} first, {@see CurrentTenantProvider} second
+     * (#2977). The provider derives the tenant from the security token
+     * alone, which exists only on an HTTP request. Symfony Messenger
+     * workers have no token — their tenant is rebound into TenantContext
+     * by {@see \App\Shared\Infrastructure\Messenger\TenantContextRebindingMiddleware}
+     * — so every worker-side search silently fell into the unscoped
+     * branch and returned zero hits. That is how the agent, whose loop
+     * runs in a worker, answered "the catalog is empty" for a tenant with
+     * 7 products and 55 indexed documents: `aggregate_count` returned 0
+     * and `search_catalog` returned nothing, with `degraded` false, so
+     * nothing looked broken. On an HTTP request the two sources agree by
+     * construction — RequestTenantSubscriber fills the context from the
+     * very same provider — so this changes nothing there.
+     */
+    private function resolveTenant(): ?Tenant
+    {
+        $bound = $this->tenantContext->get();
+        if ($bound instanceof Tenant) {
+            return $bound;
+        }
+
+        return $this->tenantProvider->getCurrent();
     }
 
     /**
