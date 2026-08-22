@@ -32,3 +32,21 @@ services:
         class: App\PHPStan\Rules\LegacyPermissionCodeRule
         tags:
             - phpstan.rules.rule
+    # #2978 — the tenant context lives in three places (TenantContext, the
+    # Doctrine filter, the Postgres GUC) and a console command binds none of
+    # them automatically. Twelve of nineteen tenant-binding commands set only
+    # TenantContext, so RLS saw no tenant: `pim:asset:upload` died on a policy
+    # violation and `pim:agent:start` reported "no BYOK key configured" for a
+    # tenant whose key was configured — the row was invisible, not absent.
+    -
+        class: App\PHPStan\Rules\TenantBindingMustUseBinderRule
+        tags:
+            - phpstan.rules.rule
+    # #2978 — the other half: the `set_config` pair that IS the isolation
+    # boundary may only be written by the three entry-point binders. Five
+    # commands and three controllers carried hand-rolled copies, and every
+    # command copy had drifted (none re-applied the Doctrine filter).
+    -
+        class: App\PHPStan\Rules\RawTenantGucRule
+        tags:
+            - phpstan.rules.rule

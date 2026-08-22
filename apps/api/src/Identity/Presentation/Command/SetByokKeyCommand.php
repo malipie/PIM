@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Identity\Presentation\Command;
 
 use App\Identity\Application\ByokKeyManager;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -33,7 +33,7 @@ final class SetByokKeyCommand extends Command
     public function __construct(
         private readonly ByokKeyManager $manager,
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
     ) {
         parent::__construct();
     }
@@ -66,7 +66,7 @@ final class SetByokKeyCommand extends Command
             return Command::FAILURE;
         }
 
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
 
         if (true === $input->getOption('disable')) {
             $this->manager->disable($tenant);

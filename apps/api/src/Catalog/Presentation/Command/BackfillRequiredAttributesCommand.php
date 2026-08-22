@@ -11,8 +11,8 @@ use App\Catalog\Domain\Entity\ObjectTypeAttribute;
 use App\Catalog\Domain\Entity\ObjectValue;
 use App\Catalog\Domain\Provenance;
 use App\Catalog\Domain\Repository\ObjectValueRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -59,7 +59,7 @@ final class BackfillRequiredAttributesCommand extends Command
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly ObjectValueRepositoryInterface $values,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
     ) {
         parent::__construct();
     }
@@ -112,7 +112,7 @@ final class BackfillRequiredAttributesCommand extends Command
         $refreshTenantContext = function () use ($tenantId): void {
             $managedTenant = $this->em->getReference(Tenant::class, $tenantId);
             \assert($managedTenant instanceof Tenant);
-            $this->tenantContext->set($managedTenant);
+            $this->tenantScope->bind($managedTenant);
         };
         $refreshTenantContext();
 

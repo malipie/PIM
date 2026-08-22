@@ -10,10 +10,9 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectValue;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectValueRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
-use Doctrine\DBAL\Connection;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -45,7 +44,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * Tenant scoping: FORCE RLS hides every `objects` / `object_values` row from
  * the application role until the `app.current_tenant` GUC is set, so the scan
- * runs per tenant — it binds {@see TenantContext} (TenantFilter) AND the
+ * runs per tenant — it binds {@see TenantScopeBinder} (context + filter + GUC) AND the
  * Postgres GUC (RLS), exactly like {@see \App\Shared\Infrastructure\Messenger\TenantRlsGucMiddleware}
  * does for workers. Omit `--tenant` to sweep every tenant (cron-friendly).
  *
@@ -66,10 +65,9 @@ final class DetectAttributesDriftCommand extends Command
 
     public function __construct(
         private readonly EntityManagerInterface $em,
-        private readonly Connection $connection,
         private readonly AttributesIndexedRebuilder $rebuilder,
         private readonly BulkContext $bulkContext,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly TenantRepositoryInterface $tenants,
         private readonly ObjectValueRepositoryInterface $objectValues,
     ) {
@@ -148,7 +146,7 @@ final class DetectAttributesDriftCommand extends Command
 
         try {
             foreach ($tenants as $tenant) {
-                $this->bindTenant($tenant);
+                $this->tenantScope->bind($tenant);
                 try {
                     foreach ($kinds as $kind) {
                         $io->section(\sprintf('tenant=%s, kind=%s', $tenant->getCode(), $kind->value));
@@ -177,7 +175,7 @@ final class DetectAttributesDriftCommand extends Command
                         }
                     }
                 } finally {
-                    $this->unbindTenant();
+                    $this->tenantScope->release();
                 }
             }
         } finally {
@@ -223,30 +221,6 @@ final class DetectAttributesDriftCommand extends Command
         }
 
         return $this->tenants->findAllOrderedByCode();
-    }
-
-    /**
-     * Bind the tenant on BOTH isolation layers so the scan sees the tenant's
-     * rows: the PHP-side {@see TenantContext} (TenantFilter) and the Postgres
-     * `app.current_tenant` GUC (FORCE RLS). Mirrors TenantRlsGucMiddleware.
-     */
-    private function bindTenant(Tenant $tenant): void
-    {
-        $this->tenantContext->set($tenant);
-        // tenant-safe: infrastructure (establishes the tenant_id RLS policies read in this CLI session; this IS the tenant boundary, not a bypass)
-        $this->connection->executeStatement(
-            "SELECT set_config('app.current_tenant', :tenant_id, false)",
-            ['tenant_id' => $tenant->getId()->toRfc4122()],
-        );
-        // tenant-safe: infrastructure (the maintenance CLI never runs as super-admin)
-        $this->connection->executeStatement("SELECT set_config('app.is_super_admin', 'false', false)");
-    }
-
-    private function unbindTenant(): void
-    {
-        $this->tenantContext->clear();
-        // tenant-safe: infrastructure (resets the RLS tenant marker so the next tenant in the sweep starts clean)
-        $this->connection->executeStatement("SELECT set_config('app.current_tenant', '', false)");
     }
 
     /**

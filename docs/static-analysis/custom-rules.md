@@ -114,6 +114,34 @@ Ten defekt naprawiano **pięć razy, ekran po ekranie** (#2841, #2849, #2852, #2
 
 **Kiedy zniknie:** gdy zniknie katalog legacy (migracja ról istniejących instalacji, osobny ticket). Do tego czasu to jest jedyna rzecz, która trzyma oba katalogi razem.
 
+### `TenantBindingMustUseBinderRule` (#2978)
+
+**Class:** `App\PHPStan\Rules\TenantBindingMustUseBinderRule`
+**Identifier:** `tenant.bindingWithoutScopeBinder`
+
+Komenda konsolowa nie może wiązać tenanta samym `TenantContext::set()` / `::clear()`.
+
+**Dlaczego:** „czyje dane obsługuję" żyje w trzech warstwach naraz — `TenantContext` (PHP), parametr filtra Doctrine i GUC `app.current_tenant`, który czyta każda polityka RLS. Żądanie HTTP i worker wiążą wszystkie trzy automatycznie; **komenda konsolowa nie wiąże żadnej**. Komenda ustawiająca sam `TenantContext` zostawia RLS bez tenanta, a aplikacja łączy się jako `pim_app` (NOBYPASSRLS) do tabel pod FORCE RLS — odczyt zwraca zero wierszy, zapis leci na politykę.
+
+Awaria bywa cicha w najgorszy sposób: `pim:asset:upload` przynajmniej wywalał się z `new row violates row-level security policy`, ale `pim:agent:start` raportował „no active Anthropic BYOK key is configured" dla tenanta, którego klucz był skonfigurowany i włączony. 12 z 19 komend wiążących tenanta miało ten defekt przed #2978.
+
+**Poprawnie:** `TenantScopeBinder::bind()` w `try`, `release()` w `finally`.
+
+**Czego reguła NIE zgłasza:** gołego `TenantContext::set()` poza komendą (w listenerze, middleware, handlerze importu GUC jest już ustawiony przez wejście) ani odczytu `get()`. Regułę, która zapala się na poprawnym kodzie, wycisza się w tydzień.
+
+### `RawTenantGucRule` (#2978)
+
+**Class:** `App\PHPStan\Rules\RawTenantGucRule`
+**Identifier:** `tenant.rawRlsSessionVariable`
+
+Literał `set_config('app.current_tenant', …)` / `('app.is_super_admin', …)` wolno pisać tylko klasom z listy `ALLOWED_CLASSES`.
+
+**Dlaczego:** ten statement **jest** granicą izolacji tenantów, więc kod, który go pisze, jest krytyczny bezpieczeństwowo i należy do jednego przeglądniętego miejsca na wejście. Przed #2978 pięć komend i trzy kontrolery miały własne kopie — i **każda kopia komendy zapomniała o `TenantFilterConfigurator::apply()`**, więc filtr Doctrine mógł trzymać poprzedniego tenanta, podczas gdy GUC wskazywał bieżącego. Kopia czterech linijek jest też kopią przeoczenia oryginału.
+
+**Lista dozwolonych** (rozszerzenie jej to świadoma decyzja, z komentarzem który wejście obsługuje): `RlsContextListener` (HTTP), `TenantRlsGucMiddleware` (worker), `TenantScopeBinder` (CLI + trasy podpisane), plus dwa wyjątki — `RlsTenantGuard` (#2156, re-asercja po reconnectcie) i `TenantPurger` (offboarding poza scope'em).
+
+**Czego reguła NIE zgłasza:** odczytu `current_setting(...)` (robią to diagnostyka i same polityki), innych zmiennych sesyjnych, oraz klas testowych `App\Tests\…Test` — te asercjują NA tej granicy i muszą móc pisać GUC wprost. Fixture'y pod `App\Tests\` nie kończące się na `Test` są sądzone jak kod produkcyjny, bo po to istnieją. `migrations/` jest poza `paths:` PHPStana.
+
 ## Deferred rules (follow-up tickets)
 
 ### Rule 2 — `FlushWithoutClearRule` (DEFERRED)

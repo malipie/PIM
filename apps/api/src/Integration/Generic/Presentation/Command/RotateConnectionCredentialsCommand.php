@@ -6,10 +6,9 @@ namespace App\Integration\Generic\Presentation\Command;
 
 use App\Integration\Generic\Application\ConnectionCredentialsCipher;
 use App\Integration\Generic\Domain\Repository\ConnectionRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
-use Doctrine\DBAL\Connection;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -30,7 +29,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *
  * Tenant scoping mirrors {@see DispatchDueSyncBindingsCommand}: FORCE RLS hides
  * `integration_connections` until the `app.current_tenant` GUC is set, so the
- * scan runs per tenant, binding both {@see TenantContext} (TenantFilter) and the
+ * scan runs per tenant, binding the tenant through {@see TenantScopeBinder} and the
  * Postgres GUC (RLS).
  */
 #[AsCommand(
@@ -40,8 +39,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 final class RotateConnectionCredentialsCommand extends Command
 {
     public function __construct(
-        private readonly Connection $connection,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly TenantRepositoryInterface $tenants,
         private readonly ConnectionRepositoryInterface $connections,
         private readonly ConnectionCredentialsCipher $cipher,
@@ -67,7 +65,7 @@ final class RotateConnectionCredentialsCommand extends Command
         $rotated = 0;
         $scanned = 0;
         foreach ($this->tenants->findAllOrderedByCode() as $tenant) {
-            $this->bindTenant($tenant);
+            $this->tenantScope->bind($tenant);
             try {
                 foreach ($this->connections->findByTenant($tenant) as $connection) {
                     ++$scanned;
@@ -85,7 +83,7 @@ final class RotateConnectionCredentialsCommand extends Command
                     }
                 }
             } finally {
-                $this->unbindTenant();
+                $this->tenantScope->release();
             }
         }
 
@@ -94,24 +92,5 @@ final class RotateConnectionCredentialsCommand extends Command
             : \sprintf('Rotated %d of %d connection(s) to the active key version.', $rotated, $scanned));
 
         return Command::SUCCESS;
-    }
-
-    private function bindTenant(Tenant $tenant): void
-    {
-        $this->tenantContext->set($tenant);
-        // tenant-safe: infrastructure (establishes the tenant_id RLS policies read in this CLI session; this IS the tenant boundary, not a bypass)
-        $this->connection->executeStatement(
-            "SELECT set_config('app.current_tenant', :tenant_id, false)",
-            ['tenant_id' => $tenant->getId()->toRfc4122()],
-        );
-        // tenant-safe: infrastructure (the rotation CLI never runs as super-admin)
-        $this->connection->executeStatement("SELECT set_config('app.is_super_admin', 'false', false)");
-    }
-
-    private function unbindTenant(): void
-    {
-        $this->tenantContext->clear();
-        // tenant-safe: infrastructure (resets the RLS tenant marker so the next tenant in the sweep starts clean)
-        $this->connection->executeStatement("SELECT set_config('app.current_tenant', '', false)");
     }
 }

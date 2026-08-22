@@ -10,11 +10,9 @@ use App\Export\Catalog\Application\Delivery\CatalogTokenService;
 use App\Export\Catalog\Domain\Entity\CatalogProfile;
 use App\Export\Catalog\Domain\Repository\CatalogProfileRepositoryInterface;
 use App\Identity\Contracts\Attribute\NoPermissionRequired;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
-use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
-use Doctrine\DBAL\Connection;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -47,9 +45,7 @@ final class CatalogPullController
         private readonly CatalogTokenService $tokens,
         private readonly CatalogCacheStorage $cache,
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantContext $tenantContext,
-        private readonly TenantFilterConfigurator $tenantFilter,
-        private readonly Connection $connection,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly RateLimiterFactoryInterface $catalogPullLimiter,
     ) {
     }
@@ -122,20 +118,10 @@ final class CatalogPullController
         if (!$tenant instanceof Tenant) {
             throw $this->notFound();
         }
-        // Establish the RLS scope from the URL before any TenantScoped query:
-        // the Postgres GUC (row-level security) + the Doctrine TenantFilter.
-        // tenant-safe: infrastructure (establishes the tenant_id RLS policies read from the URL path; this IS the tenant boundary the token then gates, not a bypass — mirrors RlsContextListener)
-        $this->connection->executeStatement(
-            "SELECT set_config('app.current_tenant', :tenant, false)",
-            ['tenant' => $tenantId->toRfc4122()],
-        );
-        $this->tenantContext->set($tenant);
-        // Re-apply the Doctrine tenant filter to the context we just set.
-        // Without this the filter keeps whatever the previous request on this
-        // worker configured — an enabled filter for tenant X would AND
-        // `tenant_id = X` into the token lookup below and turn a perfectly
-        // valid pull for tenant Y into a 404.
-        $this->tenantFilter->apply();
+        // One door for every entry point without a principal: binds
+        // TenantContext, the Doctrine filter and the Postgres RLS GUC
+        // together, so they cannot drift apart (#2978).
+        $this->tenantScope->bind($tenant);
     }
 
     private function stream(CatalogProfile $catalog, string $key, string $etag): StreamedResponse

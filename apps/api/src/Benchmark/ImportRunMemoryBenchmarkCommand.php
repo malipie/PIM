@@ -14,9 +14,9 @@ use App\Import\Application\Handler\ImportRunHandler;
 use App\Import\Domain\Entity\ImportSession;
 use App\Import\Domain\Enum\ImportMode;
 use App\Import\Domain\Repository\ImportSessionRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemOperator;
@@ -72,7 +72,7 @@ final class ImportRunMemoryBenchmarkCommand extends Command
         private readonly EntityManagerInterface $entityManager,
         private readonly Connection $connection,
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly ObjectTypeRepositoryInterface $objectTypes,
         private readonly ImportSessionRepositoryInterface $sessions,
         private readonly ImportRunHandler $runHandler,
@@ -119,7 +119,7 @@ final class ImportRunMemoryBenchmarkCommand extends Command
 
             return Command::INVALID;
         }
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
 
         $io->title(\sprintf('Import-run memory benchmark — %d rows × %d columns', $rows, $columns));
 
@@ -207,7 +207,7 @@ final class ImportRunMemoryBenchmarkCommand extends Command
         if (!$tenant instanceof Tenant) {
             throw new RuntimeException(\sprintf('Tenant "%s" disappeared mid-run.', $code));
         }
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
 
         return $tenant;
     }

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Agent\Presentation\Command;
 
 use App\Agent\Application\Proactive\ProactiveStewardScanner;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -31,7 +31,7 @@ final class ProactiveScanCommand extends Command
     public function __construct(
         private readonly ProactiveStewardScanner $scanner,
         private readonly EntityManagerInterface $entityManager,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly TenantFilterConfigurator $tenantFilter,
     ) {
         parent::__construct();
@@ -55,7 +55,7 @@ final class ProactiveScanCommand extends Command
 
             return Command::FAILURE;
         }
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
         $this->tenantFilter->apply();
 
         $stewardId = $input->getArgument('steward-user-id');

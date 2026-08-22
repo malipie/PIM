@@ -8,9 +8,9 @@ use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Repository\DoctrineTenantRepository;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -51,7 +51,7 @@ final class BulkImportBenchmarkCommand extends Command
         private readonly EntityManagerInterface $entityManager,
         private readonly DoctrineTenantRepository $tenantRepository,
         private readonly ObjectTypeRepositoryInterface $objectTypeRepository,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
     ) {
         parent::__construct();
     }
@@ -98,7 +98,7 @@ final class BulkImportBenchmarkCommand extends Command
         }
 
         $tenantId = $tenant->getId();
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
 
         $productType = $this->objectTypeRepository->findBuiltInByKind(ObjectKind::Product, $tenant);
         if (!$productType instanceof ObjectType) {
@@ -145,7 +145,7 @@ final class BulkImportBenchmarkCommand extends Command
                     // see managed instances (sekcja 3.10 architektury).
                     $tenant = $this->tenantRepository->find($tenantId);
                     \assert($tenant instanceof Tenant);
-                    $this->tenantContext->set($tenant);
+                    $this->tenantScope->bind($tenant);
                     $productType = $this->entityManager->find(ObjectType::class, $productTypeId);
                     \assert($productType instanceof ObjectType);
                 }

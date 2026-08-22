@@ -13,9 +13,9 @@ use App\Catalog\Domain\Entity\ObjectValue;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Provenance;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Repository\DoctrineTenantRepository;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -66,7 +66,7 @@ final class LoadTestSeedCommand extends Command
         private readonly EntityManagerInterface $entityManager,
         private readonly DoctrineTenantRepository $tenantRepository,
         private readonly ObjectTypeRepositoryInterface $objectTypeRepository,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
     ) {
         parent::__construct();
     }
@@ -118,7 +118,7 @@ final class LoadTestSeedCommand extends Command
             return Command::FAILURE;
         }
         $tenantId = $tenant->getId()->toRfc4122();
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
 
         if (true === $input->getOption('purge')) {
             return $this->purge($io, $tenantId);
@@ -322,7 +322,7 @@ final class LoadTestSeedCommand extends Command
     {
         $tenant = $this->tenantRepository->find($tenantId);
         \assert($tenant instanceof Tenant);
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
     }
 
     private function purge(SymfonyStyle $io, string $tenantId): int

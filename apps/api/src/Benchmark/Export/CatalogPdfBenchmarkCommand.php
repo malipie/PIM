@@ -17,10 +17,10 @@ use App\Export\Catalog\Domain\Template\CatalogTemplateCatalog;
 use App\Export\Catalog\Infrastructure\Renderer\DompdfRenderer;
 use App\Export\Contracts\CatalogProductScope;
 use App\Export\Contracts\CatalogProductValues;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
 use App\Shared\Infrastructure\Doctrine\RlsTenantGuard;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -68,7 +68,7 @@ final class CatalogPdfBenchmarkCommand extends Command
         private readonly CatalogTemplateCatalog $templates,
         private readonly ObjectTypeRepositoryInterface $objectTypes,
         private readonly EntityManagerInterface $entityManager,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly TenantFilterConfigurator $tenantFilter,
         private readonly RlsTenantGuard $rlsGuard,
         private readonly Environment $twig,
@@ -116,7 +116,7 @@ final class CatalogPdfBenchmarkCommand extends Command
 
             return Command::FAILURE;
         }
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
         $this->tenantFilter->apply();
         // CLI has no request listener — establish the RLS GUC explicitly, or
         // pim_app's row-level policies return zero rows on every domain table.

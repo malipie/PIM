@@ -6,9 +6,9 @@ namespace App\Tests\Unit\Shared\Infrastructure;
 
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
-use App\Shared\Infrastructure\Console\TenantConsoleBinder;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilter;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\Configuration;
 use Doctrine\ORM\EntityManagerInterface;
@@ -17,12 +17,14 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * #2466 — console maintenance commands must establish the same three-layer
- * tenant context the HTTP/worker paths do (TenantContext, Doctrine filter,
- * Postgres RLS GUC), otherwise RLS answers zero rows for `pim_app` and
- * pim:search:reindex / recalculate-completeness silently process nothing.
+ * #2466 / #2978 — every entry point without a principal (console commands and
+ * the signed, session-less routes) must establish the same three-layer tenant
+ * context the HTTP/worker paths do: TenantContext, the Doctrine filter and the
+ * Postgres RLS GUC. Miss one and RLS answers zero rows for `pim_app` — the
+ * shape that silently no-op'd pim:search:reindex, broke pim:asset:upload, and
+ * made pim:agent:start report a missing BYOK key that was there all along.
  */
-final class TenantConsoleBinderTest extends TestCase
+final class TenantScopeBinderTest extends TestCase
 {
     /** @var list<array{string, array<mixed>}> */
     private array $statements = [];
@@ -34,7 +36,7 @@ final class TenantConsoleBinderTest extends TestCase
         $context = new TenantContext();
         [$configurator, $filters] = $this->realConfigurator($context);
 
-        $binder = new TenantConsoleBinder($context, $configurator, $this->recordingConnection());
+        $binder = new TenantScopeBinder($context, $configurator, $this->recordingConnection());
         $binder->bind($tenant);
 
         self::assertSame($tenant, $context->get(), 'PHP-side TenantContext must carry the tenant');
@@ -54,12 +56,33 @@ final class TenantConsoleBinderTest extends TestCase
         $context->set($tenant);
         [$configurator] = $this->realConfigurator($context);
 
-        $binder = new TenantConsoleBinder($context, $configurator, $this->recordingConnection());
+        $binder = new TenantScopeBinder($context, $configurator, $this->recordingConnection());
         $binder->release();
 
         self::assertNull($context->get(), 'release must clear the PHP-side context');
         self::assertCount(1, $this->statements);
         self::assertStringContainsString("set_config('app.current_tenant', ''", $this->statements[0][0]);
+    }
+
+    /**
+     * #2978 — the signed preview route must not override an authenticated
+     * caller's own scope, so it asks before binding. Reading it through the
+     * binder keeps TenantContext out of the caller entirely.
+     */
+    #[Test]
+    public function isBoundReportsWhetherATenantIsAlreadyBound(): void
+    {
+        $context = new TenantContext();
+        [$configurator] = $this->realConfigurator($context);
+        $binder = new TenantScopeBinder($context, $configurator, $this->recordingConnection());
+
+        self::assertFalse($binder->isBound(), 'a fresh context carries no tenant');
+
+        $binder->bind(new Tenant('demo', 'Demo'));
+        self::assertTrue($binder->isBound());
+
+        $binder->release();
+        self::assertFalse($binder->isBound(), 'release must leave nothing bound');
     }
 
     /**
