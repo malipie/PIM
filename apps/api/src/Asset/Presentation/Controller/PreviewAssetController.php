@@ -9,11 +9,9 @@ use App\Asset\Domain\Entity\AssetVariant;
 use App\Asset\Domain\Repository\AssetRepositoryInterface;
 use App\Asset\Domain\ThumbnailsStatus;
 use App\Identity\Contracts\Attribute\NoPermissionRequired;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
-use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
-use Doctrine\DBAL\Connection;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
 use Symfony\Component\HttpFoundation\Request;
@@ -71,9 +69,7 @@ final readonly class PreviewAssetController
         private AssetPreviewSigner $urlSigner,
         private RequestStack $requestStack,
         private TenantRepositoryInterface $tenants,
-        private TenantContext $tenantContext,
-        private TenantFilterConfigurator $tenantFilter,
-        private Connection $connection,
+        private TenantScopeBinder $tenantScope,
     ) {
     }
 
@@ -128,7 +124,7 @@ final readonly class PreviewAssetController
      */
     private function scopeToSignedTenant(Request $request): void
     {
-        if ($this->tenantContext->get() instanceof Tenant) {
+        if ($this->tenantScope->isBound()) {
             return;
         }
 
@@ -142,16 +138,10 @@ final readonly class PreviewAssetController
             return;
         }
 
-        // tenant-safe: infrastructure (establishes the tenant_id the RLS policies read, taken from the HMAC-signed query string; this IS the tenant boundary the signature gates, not a bypass — mirrors CatalogPullController)
-        $this->connection->executeStatement(
-            "SELECT set_config('app.current_tenant', :tenant_id, false)",
-            ['tenant_id' => $tenant->getId()->toRfc4122()],
-        );
-        $this->tenantContext->set($tenant);
-        // Re-apply the Doctrine filter to the context we just set; without it
-        // the filter keeps whatever the previous request on this worker
-        // configured.
-        $this->tenantFilter->apply();
+        // One door for every entry point without a principal: binds
+        // TenantContext, the Doctrine filter and the Postgres RLS GUC
+        // together, so they cannot drift apart (#2978).
+        $this->tenantScope->bind($tenant);
     }
 
     /**

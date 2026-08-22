@@ -6,8 +6,8 @@ namespace App\Import\Presentation\Command;
 
 use App\Import\Domain\Repository\ImportUndoLogRepositoryInterface;
 use App\Import\Domain\Repository\StagedFileRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemException;
@@ -42,7 +42,7 @@ final class PurgeStagedFilesCommand extends Command
         private readonly StagedFileRepositoryInterface $stagedFiles,
         private readonly ImportUndoLogRepositoryInterface $undoLog,
         private readonly FilesystemOperator $importsStorage,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly EntityManagerInterface $entityManager,
     ) {
         parent::__construct();
@@ -67,7 +67,7 @@ final class PurgeStagedFilesCommand extends Command
         $failed = 0;
         $undoPurged = 0;
         foreach ($this->tenants->findAllOrderedByCode() as $tenant) {
-            $this->tenantContext->set($tenant);
+            $this->tenantScope->bind($tenant);
             $expired = $this->stagedFiles->findExpired($tenant, $cutoff);
             $removedThisTenant = false;
             foreach ($expired as $stagedFile) {

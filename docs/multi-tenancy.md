@@ -106,7 +106,19 @@ Co filter NIE łapie:
 
 ## RLS — kontrakt GUC i stan aktywacji
 
-**Kanon nazwy GUC: `app.current_tenant`** (plus `app.is_super_admin` dla break-glass bypass). To jedyna zmienna sesyjna jaką ustawia aplikacja — patrz [`RlsContextListener`](../apps/api/src/Identity/Infrastructure/Doctrine/RlsContextListener.php) (HTTP, `kernel.request`) i [`TenantRlsGucMiddleware`](../apps/api/src/Shared/Infrastructure/Messenger/TenantRlsGucMiddleware.php) (worker async). Każda polityka RLS w bazie MUSI czytać tę nazwę. Przykład polityki:
+**Kanon nazwy GUC: `app.current_tenant`** (plus `app.is_super_admin` dla break-glass bypass). To jedyna zmienna sesyjna jaką ustawia aplikacja. Każda polityka RLS w bazie MUSI czytać tę nazwę.
+
+**Trzy wejścia wiążą tenanta — i tylko one wolno pisać ten GUC** (#2978):
+
+| wejście | kto wiąże | automatycznie? |
+|---|---|---|
+| żądanie HTTP z principalem | [`RlsContextListener`](../apps/api/src/Identity/Infrastructure/Doctrine/RlsContextListener.php) (`kernel.request`) | tak |
+| worker Messengera | [`TenantRlsGucMiddleware`](../apps/api/src/Shared/Infrastructure/Messenger/TenantRlsGucMiddleware.php) | tak |
+| **komenda konsolowa** i **trasa podpisana bez sesji** | [`TenantScopeBinder`](../apps/api/src/Shared/Infrastructure/Tenant/TenantScopeBinder.php) | **nie — trzeba zawołać `bind()`** |
+
+Trzeci wiersz jest źródłem defektów. „Czyje dane" żyje w **trzech** warstwach naraz — `TenantContext` (PHP), parametr filtra Doctrine i GUC — a wejście bez principala nie ustawia żadnej z nich samo. `TenantScopeBinder::bind()` wiąże wszystkie trzy jednym wywołaniem, `release()` zwalnia. Dwa wyjątki na liście dozwolonych: [`RlsTenantGuard`](../apps/api/src/Shared/Infrastructure/Doctrine/RlsTenantGuard.php) (#2156 — re-asercja GUC-a po możliwym reconnectcie długowiecznego połączenia FrankenPHP) i [`TenantPurger`](../apps/api/src/Shared/Infrastructure/Maintenance/TenantPurger.php) (offboarding, działa poza jakimkolwiek scope'em).
+
+> **Dlaczego to jest pilnowane bramką, a nie konwencją (#2978):** 12 z 19 komend wiążących tenanta ustawiało sam `TenantContext`, więc RLS nie widział tenanta — `pim:asset:upload` padał na `new row violates row-level security policy`, a `pim:agent:start` raportował „no active Anthropic BYOK key is configured" dla tenanta, który klucz miał skonfigurowany i włączony (wiersz był niewidoczny, nie brakujący). Pięć kolejnych komend i trzy kontrolery miały własne, ręcznie przepisane kopie pary `set_config` — i **każda kopia komendy zapomniała o `TenantFilterConfigurator::apply()`**, więc filtr Doctrine mógł wskazywać innego tenanta niż GUC. Dwie reguły PHPStan (`TenantBindingMustUseBinderRule`, `RawTenantGucRule`) zamykają obie furtki — patrz [`docs/static-analysis/custom-rules.md`](static-analysis/custom-rules.md). Przykład polityki:
 
 ```sql
 CREATE POLICY tenant_isolation_select ON refresh_tokens FOR SELECT

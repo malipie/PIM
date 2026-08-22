@@ -7,10 +7,9 @@ namespace App\Catalog\Presentation\Command;
 use App\Catalog\Application\BuiltInObjectTypeSeeder;
 use App\Catalog\Contracts\Service\TenantCatalogBootstrap;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
-use Doctrine\DBAL\Connection;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -42,8 +41,7 @@ final class BootstrapTenantCatalogCommand extends Command
         private readonly ObjectTypeRepositoryInterface $objectTypes,
         private readonly TenantCatalogBootstrap $bootstrap,
         private readonly EntityManagerInterface $em,
-        private readonly TenantContext $tenantContext,
-        private readonly Connection $connection,
+        private readonly TenantScopeBinder $tenantScope,
     ) {
         parent::__construct();
     }
@@ -75,7 +73,7 @@ final class BootstrapTenantCatalogCommand extends Command
         $blocked = [];
         foreach ($tenants as $tenant) {
             $code = $tenant->getCode();
-            $this->bindTenant($tenant);
+            $this->tenantScope->bind($tenant);
 
             try {
                 $before = \count($this->objectTypes->findAllByTenant($tenant));
@@ -96,7 +94,7 @@ final class BootstrapTenantCatalogCommand extends Command
                     }
                 }
             } finally {
-                $this->unbindTenant();
+                $this->tenantScope->release();
             }
 
             $rows[] = [$code, $before, $dryRun ? '—' : $after];
@@ -119,31 +117,5 @@ final class BootstrapTenantCatalogCommand extends Command
         }
 
         return Command::SUCCESS;
-    }
-
-    /**
-     * Bind the tenant on BOTH isolation layers — the PHP-side TenantContext
-     * (TenantFilter) and the Postgres `app.current_tenant` GUC (FORCE RLS) —
-     * mirroring DetectAttributesDriftCommand. Without it the counts read as
-     * zero for every tenant, because a CLI session has no tenant bound and
-     * the filter hides everything.
-     */
-    private function bindTenant(Tenant $tenant): void
-    {
-        $this->tenantContext->set($tenant);
-        // tenant-safe: infrastructure (establishes the tenant_id RLS policies read in this CLI session; this IS the tenant boundary, not a bypass)
-        $this->connection->executeStatement(
-            "SELECT set_config('app.current_tenant', :tenant_id, false)",
-            ['tenant_id' => $tenant->getId()->toRfc4122()],
-        );
-        // tenant-safe: infrastructure (the maintenance CLI never runs as super-admin)
-        $this->connection->executeStatement("SELECT set_config('app.is_super_admin', 'false', false)");
-    }
-
-    private function unbindTenant(): void
-    {
-        $this->tenantContext->clear();
-        // tenant-safe: infrastructure (resets the RLS tenant marker so the next tenant in the sweep starts clean)
-        $this->connection->executeStatement("SELECT set_config('app.current_tenant', '', false)");
     }
 }

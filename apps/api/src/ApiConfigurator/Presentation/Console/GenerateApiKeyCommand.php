@@ -7,9 +7,9 @@ namespace App\ApiConfigurator\Presentation\Console;
 use App\ApiConfigurator\Application\ApiKeyGenerator;
 use App\ApiConfigurator\Domain\Entity\ApiKey;
 use App\ApiConfigurator\Domain\Repository\ApiKeyRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use DateTimeImmutable;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -50,7 +50,7 @@ final class GenerateApiKeyCommand extends Command
         private readonly ApiKeyGenerator $generator,
         private readonly ApiKeyRepositoryInterface $repository,
         private readonly TenantRepositoryInterface $tenantRepository,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
     ) {
         parent::__construct();
     }
@@ -120,7 +120,7 @@ final class GenerateApiKeyCommand extends Command
 
         // Bind the tenant context for the duration of the command so the
         // TenantAssignmentListener can stamp the key on persist.
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
 
         $generated = $this->generator->generate();
 

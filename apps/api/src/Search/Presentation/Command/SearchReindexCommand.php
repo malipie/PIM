@@ -10,7 +10,7 @@ use App\Search\Application\BulkCatalogObjectIndexer;
 use App\Search\Application\IndexSettingsTemplate;
 use App\Search\Infrastructure\MeilisearchClientFactory;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
-use App\Shared\Infrastructure\Console\TenantConsoleBinder;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\ProgressBar;
@@ -49,7 +49,7 @@ final class SearchReindexCommand extends Command
         private readonly BulkContext $bulkContext,
         private readonly MeilisearchClientFactory $clientFactory,
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantConsoleBinder $tenantBinder,
+        private readonly TenantScopeBinder $tenantBinder,
     ) {
         parent::__construct();
     }

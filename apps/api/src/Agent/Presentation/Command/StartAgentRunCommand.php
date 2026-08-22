@@ -6,8 +6,8 @@ namespace App\Agent\Presentation\Command;
 
 use App\Agent\Application\Run\AgentRunStarter;
 use App\Agent\Domain\AgentRunSurface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -31,7 +31,7 @@ final class StartAgentRunCommand extends Command
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly AgentRunStarter $starter,
     ) {
         parent::__construct();
@@ -57,7 +57,7 @@ final class StartAgentRunCommand extends Command
             return Command::FAILURE;
         }
 
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
 
         $run = $this->starter->start(
             $tenant,

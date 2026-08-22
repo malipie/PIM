@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Dashboard\Presentation\Command;
 
 use App\Dashboard\Application\Query\DashboardSummaryQuery;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -41,7 +41,7 @@ final class DashboardSnapshotCommand extends Command
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly DashboardSummaryQuery $query,
     ) {
         parent::__construct();
@@ -69,11 +69,7 @@ final class DashboardSnapshotCommand extends Command
             $tenantId = $tenant->getId()->toRfc4122();
 
             try {
-                $connection->executeStatement(
-                    "SELECT set_config('app.current_tenant', :t, false)",
-                    ['t' => $tenantId],
-                );
-                $this->tenantContext->set($tenant);
+                $this->tenantScope->bind($tenant);
 
                 $aggregates = $this->query->aggregates();
 
@@ -121,7 +117,7 @@ final class DashboardSnapshotCommand extends Command
                 );
                 ++$written;
             } finally {
-                $connection->executeStatement("SELECT set_config('app.current_tenant', '', false)");
+                $this->tenantScope->release();
             }
         }
 

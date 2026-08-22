@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Asset\Presentation\Command;
 
 use App\Asset\Application\AssetUploader;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Repository\DoctrineTenantRepository;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -34,7 +34,7 @@ final class AssetUploadCommand extends Command
     public function __construct(
         private readonly AssetUploader $uploader,
         private readonly DoctrineTenantRepository $tenants,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
     ) {
         parent::__construct();
     }
@@ -71,7 +71,7 @@ final class AssetUploadCommand extends Command
             return Command::FAILURE;
         }
 
-        $this->tenantContext->set($tenant);
+        $this->tenantScope->bind($tenant);
 
         $asset = $this->uploader->upload(new File($path), $code);
 

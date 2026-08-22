@@ -9,7 +9,7 @@ use App\Catalog\Application\BulkContext;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\ObjectKind;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
-use App\Shared\Infrastructure\Console\TenantConsoleBinder;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -41,7 +41,7 @@ final class RecalculateCompletenessCommand extends Command
         private readonly AttributesIndexedRebuilder $rebuilder,
         private readonly BulkContext $bulkContext,
         private readonly TenantRepositoryInterface $tenants,
-        private readonly TenantConsoleBinder $tenantBinder,
+        private readonly TenantScopeBinder $tenantBinder,
     ) {
         parent::__construct();
     }

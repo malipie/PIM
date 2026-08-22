@@ -6,12 +6,11 @@ namespace App\Integration\Generic\Presentation\Command;
 
 use App\Integration\Generic\Application\Schedule\SyncScheduleDispatcher;
 use App\Integration\Generic\Domain\Repository\SyncBindingRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
 use App\Shared\Domain\Tenant;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use DateTimeImmutable;
 use DateTimeZone;
-use Doctrine\DBAL\Connection;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -30,7 +29,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *
  * Tenant scoping: FORCE RLS hides `integration_sync_bindings` from the app role
  * until the `app.current_tenant` GUC is set, so the scan runs per tenant — it
- * binds {@see TenantContext} (TenantFilter) AND the Postgres GUC (RLS), exactly
+ * binds {@see TenantScopeBinder} (context + filter + GUC) AND the Postgres GUC (RLS), exactly
  * like {@see \App\Shared\Infrastructure\Messenger\TenantRlsGucMiddleware} does
  * for workers and like {@see \App\Catalog\Presentation\Command\DetectAttributesDriftCommand}.
  */
@@ -41,8 +40,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 final class DispatchDueSyncBindingsCommand extends Command
 {
     public function __construct(
-        private readonly Connection $connection,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly TenantRepositoryInterface $tenants,
         private readonly SyncBindingRepositoryInterface $bindings,
         private readonly SyncScheduleDispatcher $dispatcher,
@@ -57,42 +55,19 @@ final class DispatchDueSyncBindingsCommand extends Command
 
         $dispatched = 0;
         foreach ($this->tenants->findAllOrderedByCode() as $tenant) {
-            $this->bindTenant($tenant);
+            $this->tenantScope->bind($tenant);
             try {
                 foreach ($this->bindings->findDueForScheduling($now) as $binding) {
                     $this->dispatcher->dispatch($binding);
                     ++$dispatched;
                 }
             } finally {
-                $this->unbindTenant();
+                $this->tenantScope->release();
             }
         }
 
         $io->success(\sprintf('Dispatched %d due sync binding(s).', $dispatched));
 
         return Command::SUCCESS;
-    }
-
-    /**
-     * Bind the tenant on BOTH isolation layers: the PHP-side {@see TenantContext}
-     * (TenantFilter) and the Postgres `app.current_tenant` GUC (FORCE RLS).
-     */
-    private function bindTenant(Tenant $tenant): void
-    {
-        $this->tenantContext->set($tenant);
-        // tenant-safe: infrastructure (establishes the tenant_id RLS policies read in this CLI session; this IS the tenant boundary, not a bypass)
-        $this->connection->executeStatement(
-            "SELECT set_config('app.current_tenant', :tenant_id, false)",
-            ['tenant_id' => $tenant->getId()->toRfc4122()],
-        );
-        // tenant-safe: infrastructure (the scheduler CLI never runs as super-admin)
-        $this->connection->executeStatement("SELECT set_config('app.is_super_admin', 'false', false)");
-    }
-
-    private function unbindTenant(): void
-    {
-        $this->tenantContext->clear();
-        // tenant-safe: infrastructure (resets the RLS tenant marker so the next tenant in the sweep starts clean)
-        $this->connection->executeStatement("SELECT set_config('app.current_tenant', '', false)");
     }
 }

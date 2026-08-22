@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Export\Presentation\Command;
 
 use App\Export\Domain\Repository\ExportSessionRepositoryInterface;
-use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Repository\TenantRepositoryInterface;
+use App\Shared\Infrastructure\Tenant\TenantScopeBinder;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemException;
@@ -48,7 +48,7 @@ final class CleanupExportsCommand extends Command
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
         private readonly ExportSessionRepositoryInterface $sessions,
-        private readonly TenantContext $tenantContext,
+        private readonly TenantScopeBinder $tenantScope,
         private readonly FilesystemOperator $exportsStorage,
         private readonly EntityManagerInterface $entityManager,
         private readonly int $freeRetentionDays,
@@ -98,7 +98,7 @@ final class CleanupExportsCommand extends Command
                 continue;
             }
 
-            $this->tenantContext->set($tenant);
+            $this->tenantScope->bind($tenant);
             $stale = $this->sessions->findOlderThan($tenant, $cutoff);
             $removedThisTenant = false;
             foreach ($stale as $session) {
