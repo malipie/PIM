@@ -74,7 +74,7 @@ final class SearchReindexCommand extends Command
                 'purge',
                 null,
                 InputOption::VALUE_NONE,
-                'Delete every existing document from the targeted index before reindex. Use after pim:db:reset to drop orphans from previous tenants.',
+                'Delete existing documents for the targeted tenant(s) and kind before reindex. Use to drop orphaned search documents safely.',
             )
             ->addOption(
                 'tenant',
@@ -139,7 +139,7 @@ final class SearchReindexCommand extends Command
         ));
 
         if ($purge && !$dryRun) {
-            $this->purgeIndexes($kind, $io);
+            $this->purgeIndexes($kind, $targetTenants, $io);
         }
 
         $progress = new ProgressBar($output);
@@ -191,7 +191,10 @@ final class SearchReindexCommand extends Command
         return Command::SUCCESS;
     }
 
-    private function purgeIndexes(?ObjectKind $kind, SymfonyStyle $io): void
+    /**
+     * @param list<\App\Shared\Domain\Tenant> $targetTenants
+     */
+    private function purgeIndexes(?ObjectKind $kind, array $targetTenants, SymfonyStyle $io): void
     {
         try {
             $client = $this->clientFactory->create();
@@ -201,20 +204,35 @@ final class SearchReindexCommand extends Command
             return;
         }
 
-        // ULV-02 (#983) — single `objects` index. When `--kind=foo` is set
-        // we purge only documents of that kind via filter; full purge drops
-        // everything in the index.
+        // ULV-02 (#983) — all instances share one `objects` index. A global
+        // deleteAllDocuments() from one tenant's API would therefore erase
+        // every other instance until each one happened to reindex. Purge the
+        // resolved tenant scopes one by one; optional kind narrows each scope.
+        // This still removes orphaned documents because the delete happens by
+        // tenant filter before Postgres source rows are added back.
         $name = IndexSettingsTemplate::indexName();
-        try {
-            if (null === $kind) {
-                $client->index($name)->deleteAllDocuments();
-                $io->writeln(\sprintf('  purged all documents in: %s', $name));
-            } else {
-                $client->index($name)->deleteDocuments(['filter' => \sprintf('kind = "%s"', $kind->value)]);
-                $io->writeln(\sprintf('  purged kind=%s documents in: %s', $kind->value, $name));
+        foreach ($targetTenants as $tenant) {
+            $filter = \sprintf('tenantId = "%s"', $tenant->getId()->toRfc4122());
+            if ($kind instanceof ObjectKind) {
+                $filter .= \sprintf(' AND kind = "%s"', $kind->value);
             }
-        } catch (Throwable $e) {
-            $io->warning(\sprintf('Purge of "%s" failed: %s', $name, $e->getMessage()));
+
+            try {
+                $client->index($name)->deleteDocuments(['filter' => $filter]);
+                $io->writeln(\sprintf(
+                    '  purged tenant=%s%s documents in: %s',
+                    $tenant->getCode(),
+                    $kind instanceof ObjectKind ? ' kind='.$kind->value : '',
+                    $name,
+                ));
+            } catch (Throwable $e) {
+                $io->warning(\sprintf(
+                    'Purge of "%s" for tenant "%s" failed: %s',
+                    $name,
+                    $tenant->getCode(),
+                    $e->getMessage(),
+                ));
+            }
         }
     }
 }
