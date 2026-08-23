@@ -40,10 +40,15 @@ export function SelectionToolbar({
   const { t } = useTranslation();
   if (mode === 'none') return null;
 
-  const displayCount = mode === 'all-matching' ? (totalMatched ?? perPageCount) : perPageCount;
+  // In capped mode the primary number is what will actually be acted on, not
+  // the larger match total. This keeps toolbar → preflight → file comparable.
+  const displayCount = perPageCount;
 
   return (
-    <div className="rounded-2xl bg-zinc-900 text-white px-4 py-2.5 flex items-center gap-3">
+    <div
+      data-testid="selection-toolbar"
+      className="rounded-2xl bg-zinc-900 text-white px-4 py-2.5 flex items-center gap-3"
+    >
       <span className="h-6 px-2 rounded-md bg-white/10 text-[11.5px] tabular-nums font-mono font-semibold inline-flex items-center">
         {displayCount.toLocaleString('pl-PL')}
       </span>
@@ -94,7 +99,7 @@ export function SelectionToolbar({
                   defaultValue:
                     'Zaznaczono {{limit}} z {{total}} — więcej nie można zaznaczyć naraz. Zawęź filtr, żeby objąć resztę.',
                   limit: displayCount.toLocaleString('pl-PL'),
-                  total: (matchingCount || displayCount).toLocaleString('pl-PL'),
+                  total: (totalMatched ?? matchingCount).toLocaleString('pl-PL'),
                 })}
               </span>
             ) : (

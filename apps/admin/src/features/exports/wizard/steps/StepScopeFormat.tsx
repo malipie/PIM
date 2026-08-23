@@ -32,6 +32,7 @@ interface ProfileRow {
     locales?: string[] | null;
     channels?: string[] | null;
     default_target_scope?: string;
+    include_variants?: boolean;
     filter?: FilterDsl | null;
   };
 }
@@ -83,6 +84,7 @@ export function StepScopeFormat() {
     targetScope: state.targetScope,
     filterDsl: state.filterDsl,
     selectedIds: state.selectedIds,
+    includeVariants: state.includeVariants,
     enabled: state.entityType !== 'custom_module' || state.objectTypeId !== null,
   });
 
@@ -121,6 +123,7 @@ export function StepScopeFormat() {
       channels: profile.config.channels ?? null,
       filterDsl,
       targetScope: filterDsl === null ? 'all' : 'filter',
+      includeVariants: profile.config.include_variants ?? true,
     });
     filterState.setConditions([]);
     toast.success(t('exports.wizard.profile_loaded', { name: profile.name }));

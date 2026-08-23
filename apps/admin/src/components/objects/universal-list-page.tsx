@@ -74,6 +74,7 @@ import { clampColumnWidth, overridesFromColumns, setColumnWidth } from '@/lib/gr
 import type { GridColumn, GridColumnOverride, ViewColumnSeed } from '@/lib/grid/types';
 import { useGridColumns } from '@/lib/grid/use-grid-columns';
 import { httpErrorDetail, jsonFetch } from '@/lib/http';
+import { useSelectionState } from '@/lib/selection/use-selection-state';
 import { cn } from '@/lib/utils';
 
 const CmdKPalette = lazy(() =>
@@ -234,6 +235,7 @@ export function UniversalListPage({
         objectTypeId: isProduct ? null : objectTypeId,
         selectedIds: scope === 'selected' ? (ids ?? []) : null,
         filterDsl: scope === 'filter' ? panelDsl : null,
+        variantsMode: hasVariants ? variantsMode : 'flat',
       },
     });
   };
@@ -396,14 +398,9 @@ export function UniversalListPage({
     window.history.replaceState(null, '', url);
   }, [page, pageSize]);
 
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selection = useSelectionState();
+  const selected = selection.ids;
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
-  const [crossPageSelection, setCrossPageSelection] = useState<{
-    active: boolean;
-    totalMatched: number;
-    capped: boolean;
-  }>({ active: false, totalMatched: 0, capped: false });
-  const [crossPageLoading, setCrossPageLoading] = useState(false);
   const [bulkWizardOpen, setBulkWizardOpen] = useState(false);
   const [bulkCategoryOpen, setBulkCategoryOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -687,21 +684,13 @@ export function UniversalListPage({
   const scopeTruncated = isSearchActive && searchResult?.scopeTruncated === true;
 
   const toggleSelect = (id: string): void => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    selection.toggle(id);
   };
 
   const toggleSelectAll = (): void => {
-    setSelected((prev) => {
-      const masters = visible.filter((r) => r.parentId === null);
-      const allSelected = masters.every((m) => prev.has(m.id)) && prev.size === masters.length;
-      if (allSelected) return new Set();
-      return new Set(masters.map((m) => m.id));
-    });
+    const masters = visible.filter((r) => r.parentId === null);
+    const allSelected = masters.length > 0 && masters.every((m) => selected.has(m.id));
+    selection.setPageSelection(allSelected ? [] : masters.map((m) => m.id));
   };
 
   const handleApplySmartPreset = (preset: SmartFilterPreset | null): void => {
@@ -839,7 +828,7 @@ export function UniversalListPage({
   };
 
   const onBulkApplied = (): void => {
-    setSelected(new Set());
+    selection.clear();
     setShowSelectedOnly(false);
     refetch();
   };
@@ -999,22 +988,22 @@ export function UniversalListPage({
       />
 
       <SelectionToolbar
-        mode={crossPageSelection.active ? 'all-matching' : selected.size > 0 ? 'page' : 'none'}
+        mode={selection.mode}
         perPageCount={selected.size}
         matchingCount={totalHits}
-        totalMatched={crossPageSelection.totalMatched}
-        capped={crossPageSelection.capped}
-        isLoading={crossPageLoading}
+        totalMatched={selection.totalMatched}
+        capped={selection.capped}
+        isLoading={selection.isLoading}
         onSelectAllMatching={() => {
           void (async () => {
-            setCrossPageLoading(true);
             try {
-              const body: Record<string, unknown> = {
-                variants_mode: hasVariants ? variantsMode : 'flat',
-                object_type_id: objectTypeId,
+              const body: Parameters<typeof selection.selectAllMatching>[0] = {
+                variantsMode: hasVariants ? variantsMode : 'flat',
+                filters: searchFilters,
+                rangeFilters,
               };
               if (activePreset !== undefined) {
-                body.smart_preset = activePreset.slug ?? activePreset.id;
+                body.smartPreset = activePreset.slug ?? activePreset.id;
               } else if (filterBlob !== undefined) {
                 body.filter = filterBlob;
               }
@@ -1030,36 +1019,22 @@ export function UniversalListPage({
                       'Cross-page selection dla custom kindów dojdzie w UP-10 follow-upie.',
                   }),
                 );
-                setCrossPageLoading(false);
                 return;
               }
-              const response = await jsonFetch<{
-                ids: string[];
-                totalMatched: number;
-                capped: boolean;
-              }>('/api/products/select-all-matching', {
-                method: 'POST',
+              await selection.selectAllMatching(
                 body,
-              });
-              setSelected(new Set(response.ids));
-              setCrossPageSelection({
-                active: true,
-                totalMatched: response.totalMatched,
-                capped: response.capped,
-              });
+                visible.filter((row) => row.parentId === null).map((row) => row.id),
+              );
             } catch (err) {
               toast.error(
                 httpErrorDetail(err) ??
                   t('products.list.action_failed', { defaultValue: 'Operacja nie powiodła się.' }),
               );
-            } finally {
-              setCrossPageLoading(false);
             }
           })();
         }}
         onClear={() => {
-          setSelected(new Set());
-          setCrossPageSelection({ active: false, totalMatched: 0, capped: false });
+          selection.clear();
           setShowSelectedOnly(false);
         }}
       />
@@ -1194,7 +1169,7 @@ export function UniversalListPage({
       <BulkBar
         selectedIds={Array.from(selected)}
         onClear={() => {
-          setSelected(new Set());
+          selection.clear();
           setShowSelectedOnly(false);
         }}
         onApplied={onBulkApplied}
@@ -1218,7 +1193,7 @@ export function UniversalListPage({
             onClose={() => setBulkWizardOpen(false)}
             onApplied={(result) => {
               setLastBulkSession(result);
-              setSelected(new Set());
+              selection.clear();
               setShowSelectedOnly(false);
               refetch();
             }}
@@ -1231,7 +1206,7 @@ export function UniversalListPage({
             onClose={() => setBulkCategoryOpen(false)}
             onApplied={(result) => {
               setLastBulkSession(result);
-              setSelected(new Set());
+              selection.clear();
               setShowSelectedOnly(false);
               refetch();
             }}
@@ -1244,7 +1219,7 @@ export function UniversalListPage({
             onClose={() => setBulkDeleteOpen(false)}
             onApplied={(result) => {
               setLastBulkSession(result);
-              setSelected(new Set());
+              selection.clear();
               setShowSelectedOnly(false);
               refetch();
             }}
@@ -1257,7 +1232,7 @@ export function UniversalListPage({
             onClose={() => setBulkDuplicateOpen(false)}
             onApplied={(result) => {
               setLastBulkSession(result);
-              setSelected(new Set());
+              selection.clear();
               setShowSelectedOnly(false);
               refetch();
             }}
@@ -1279,7 +1254,7 @@ export function UniversalListPage({
             objectTypeCode={objectTypeCode}
             onClose={() => setBulkGenerateOpen(false)}
             onStarted={() => {
-              setSelected(new Set());
+              selection.clear();
               setShowSelectedOnly(false);
             }}
           />
@@ -1291,9 +1266,7 @@ export function UniversalListPage({
           objectTypeCode={objectTypeCode}
           filterDsl={panelDsl}
           selectedIds={Array.from(selected)}
-          totalMatching={
-            crossPageSelection.active ? crossPageSelection.totalMatched : selected.size
-          }
+          totalMatching={selection.mode === 'all-matching' ? selection.totalMatched : selected.size}
         />
       </Suspense>
 

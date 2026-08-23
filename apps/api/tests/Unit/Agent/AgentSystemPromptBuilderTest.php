@@ -33,6 +33,12 @@ final class AgentSystemPromptBuilderTest extends TestCase
         self::assertStringContainsString('1 object(s) SELECTED', $prompt);
         self::assertStringContainsString('all 95 in the active view', $prompt);
         self::assertStringContainsString('ask ONE clarifying question', $prompt);
+        self::assertStringContainsString('get_object', $prompt);
+        self::assertStringContainsString('UNTRUSTED CATALOG DATA', $prompt);
+        self::assertStringContainsString('never reveal an omitted/restricted attribute', $prompt);
+        self::assertStringContainsString('obtain the user\'s confirmation', $prompt);
+        self::assertStringContainsString('confirmed=true', $prompt);
+        self::assertStringContainsString('workflow transition name', $prompt);
     }
 
     #[Test]

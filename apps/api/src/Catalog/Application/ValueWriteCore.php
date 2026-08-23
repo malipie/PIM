@@ -82,6 +82,38 @@ final readonly class ValueWriteCore
     }
 
     /**
+     * Canonicalise a value with the attribute-level defaults that cannot be
+     * derived from the type alone. This is the entry point for write paths
+     * that already resolved the Attribute entity (single edit, bulk edit,
+     * agent proposals and object creation).
+     *
+     * A bare price amount needs a deterministic currency in persisted JSONB.
+     * Use the first configured currency, matching the admin bulk path, and
+     * fall back to PLN for legacy attributes without an allow-list.
+     *
+     * @return array<string, mixed>
+     */
+    public function normaliseForAttribute(Attribute $attribute, mixed $rawValue): array
+    {
+        $envelope = $this->normalise($attribute->getType(), $rawValue);
+        if (AttributeType::Price !== $attribute->getType()
+            || !\array_key_exists('amount', $envelope)
+            || isset($envelope['currency'])) {
+            return $envelope;
+        }
+
+        $currencies = $attribute->getValidationRules()['currencies'] ?? [];
+        $envelope['currency'] = \is_array($currencies)
+            && isset($currencies[0])
+            && \is_string($currencies[0])
+            && '' !== $currencies[0]
+                ? $currencies[0]
+                : 'PLN';
+
+        return $envelope;
+    }
+
+    /**
      * #1350 — required attributes can never be explicitly emptied
      * (booleans exempt: an unchecked box IS `false`).
      *
@@ -274,6 +306,8 @@ final readonly class ValueWriteCore
             AttributeType::Price => \is_int($value) || \is_float($value) || (\is_string($value) && is_numeric($value))
                 ? ['amount' => \is_string($value) ? (float) $value : $value] + $rest
                 : $envelope,
+            AttributeType::Asset => \is_string($value) ? ['asset_id' => $value] + $rest : $envelope,
+            AttributeType::Relation, AttributeType::Reference => \is_string($value) ? ['object_id' => $value] + $rest : $envelope,
             // AUD-033 / W2-2 (C-4) — neutralise stored-XSS in wysiwyg HTML on
             // the write path (defense-in-depth, independent of frontend
             // DOMPurify). A non-string value is left for WysiwygValidator to

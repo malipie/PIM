@@ -58,6 +58,93 @@ test('list selection enters the wizard with target_scope=selected', async ({ pag
   await expect(page.getByText(/Zaznaczone obiekty: 1|Selected objects: 1/)).toBeVisible();
 });
 
+test('selection toolbar, preflight and downloaded file use one tree scope', async ({ page }) => {
+  let preflightScope: { selected_object_ids?: string[]; include_variants?: boolean } | null = null;
+  let runScope: { selected_object_ids?: string[]; include_variants?: boolean } | null = null;
+  const cappedIds = Array.from(
+    { length: 10_000 },
+    (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+  );
+
+  // Simulate the 50,060-result production case. The server returns its capped
+  // id set while the hook must still prioritise every currently visible row.
+  await page.route('**/api/products/select-all-matching', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ids: cappedIds,
+        totalMatched: 50_060,
+        capped: true,
+        limit: 10_000,
+      }),
+    }),
+  );
+  await page.route('**/api/exports/preflight', async (route) => {
+    preflightScope = route.request().postDataJSON() as typeof preflightScope;
+    const count = preflightScope?.selected_object_ids?.length ?? 0;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        count,
+        mode: 'sync',
+        threshold: 100,
+        soft_cap: 100000,
+        exceeds_cap: false,
+      }),
+    });
+  });
+  await page.route('**/api/products/export', async (route) => {
+    runScope = route.request().postDataJSON() as typeof runScope;
+    const count = runScope?.selected_object_ids?.length ?? 0;
+    const rows = Array.from({ length: count }, (_, index) => `SKU-${index + 1}`);
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/csv; charset=utf-8',
+      headers: { 'content-disposition': 'attachment; filename="scope.csv"' },
+      body: ['sku', ...rows].join('\n'),
+    });
+  });
+
+  // Browser navigation resolves *.localhost without a host-file entry; the
+  // Node-side apiLogin helper does not on some local systems.
+  await loginAsAdmin(page);
+  await page.goto('/products');
+
+  const rows = page.locator('[data-testid^="products-grid-row-"]');
+  await expect(rows.nth(1)).toBeVisible({ timeout: 30_000 });
+  const visibleCheckboxes = rows.locator('input[type="checkbox"]');
+  await visibleCheckboxes.first().check();
+  await page.getByRole('button', { name: /zaznacz wszystkie|select all/i }).click();
+
+  await expect(visibleCheckboxes.nth(0)).toBeChecked();
+  await expect(visibleCheckboxes.nth(1)).toBeChecked();
+  await expect(page.getByTestId('selection-toolbar')).toContainText(/10[\s ]?000/);
+  await expect(page.getByTestId('selection-toolbar')).toContainText(/50[\s ]?060/);
+  await page.getByRole('button', { name: /^eksport$|^export$/i }).click();
+
+  await page.getByRole('button', { name: /dalej|next/i }).click();
+  await page.getByRole('radio', { name: /^CSV/i }).click();
+  await expect(page.getByTestId('preflight-badge')).toContainText(/10[\s ]?000/);
+  await page.getByRole('button', { name: /dalej|next/i }).click();
+  await page.getByRole('button', { name: /dalej|next/i }).click();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByTestId('run-export').click();
+  const download = await downloadPromise;
+  const stream = await download.createReadStream();
+  let file = '';
+  for await (const chunk of stream) file += chunk.toString();
+  const fileRows = file.trim().split('\n').slice(1);
+
+  expect(preflightScope?.include_variants).toBe(false);
+  expect(runScope?.include_variants).toBe(false);
+  expect(preflightScope?.selected_object_ids).toHaveLength(10_000);
+  expect(runScope?.selected_object_ids).toEqual(preflightScope?.selected_object_ids);
+  expect(fileRows).toHaveLength(preflightScope?.selected_object_ids?.length ?? 0);
+});
+
 test('exports wizard — async 202 redirects to sessions (mocked endpoint)', async ({ page }) => {
   await apiLogin(page);
 

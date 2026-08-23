@@ -13,9 +13,9 @@ describe('SelectionToolbar — capped selection', () => {
     render(
       <SelectionToolbar
         mode="all-matching"
-        perPageCount={50}
+        perPageCount={10000}
         matchingCount={50060}
-        totalMatched={10000}
+        totalMatched={50060}
         capped
         onSelectAllMatching={noop}
         onClear={noop}
@@ -38,7 +38,7 @@ describe('SelectionToolbar — capped selection', () => {
     render(
       <SelectionToolbar
         mode="all-matching"
-        perPageCount={50}
+        perPageCount={120}
         matchingCount={120}
         totalMatched={120}
         onSelectAllMatching={noop}

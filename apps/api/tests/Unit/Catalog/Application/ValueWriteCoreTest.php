@@ -66,7 +66,9 @@ final class ValueWriteCoreTest extends TestCase
         // already canonical; canonicalise() only rewrites legacy {value} wraps).
         yield 'metric object' => [AttributeType::Metric, ['value' => 5, 'unit' => 'kg'], ['value' => 5, 'unit' => 'kg']];
         yield 'asset object' => [AttributeType::Asset, ['asset_id' => 'a1'], ['asset_id' => 'a1']];
+        yield 'asset bare id' => [AttributeType::Asset, 'a1', ['asset_id' => 'a1']];
         yield 'relation object' => [AttributeType::Relation, ['object_id' => 'o1'], ['object_id' => 'o1']];
+        yield 'relation bare id' => [AttributeType::Relation, 'o1', ['object_id' => 'o1']];
         yield 'reference object' => [AttributeType::Reference, ['object_id' => 'o1'], ['object_id' => 'o1']];
     }
 }

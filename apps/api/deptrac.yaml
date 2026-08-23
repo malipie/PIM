@@ -749,8 +749,13 @@ parameters:
             - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\ObjectValue
         App\Export\Application\Sync\SyncExportRunner:
-            - App\Catalog\Application\Filter\FilterDslResolver
             - App\Catalog\Domain\Entity\CatalogObject
+            - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
+        # #2987 — the existing catalog-bound scope work moved out of the
+        # runner/controller into one shared resolver. Transfer their narrow
+        # baseline to its new owner; do not grant Export the whole layer.
+        App\Export\Application\Scope\ExportScopeResolver:
+            - App\Catalog\Application\Filter\FilterDslResolver
             - App\Catalog\Domain\Entity\ObjectType
             - App\Catalog\Domain\ObjectKind
             - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
@@ -785,11 +790,6 @@ parameters:
             # #2549 — outbound scope reuses the Catalog filter DSL compiler
             # (same Export → Catalog\Application\Filter reach as SyncExportRunner).
             - App\Catalog\Application\Filter\FilterDslResolver
-        App\Export\Presentation\Controller\ExportPreflightController:
-            - App\Catalog\Application\Filter\FilterDslResolver
-            - App\Catalog\Domain\Entity\ObjectType
-            - App\Catalog\Domain\ObjectKind
-            - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
         App\Export\Presentation\Support\ExportEntityTypeResolver:
             - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
         App\Identity\Infrastructure\Security\ImportProfileVoter:

@@ -11326,6 +11326,32 @@
                 "x-cortex-permission": "settings.tenant.manage"
             }
         },
+        "/api/agent/inbox": {
+            "get": {
+                "operationId": "api_agent_inbox_get",
+                "tags": [
+                    "agent"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api agent inbox",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "agent.approve_pending"
+            }
+        },
         "/api/agent/runs": {
             "get": {
                 "operationId": "api_agent_runs_get",

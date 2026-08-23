@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\Command\CreateCatalogObject;
 
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Provenance;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -41,6 +42,7 @@ final readonly class CreateCatalogObjectCommand
         public ?array $categoryIds = null,
         public ?Uuid $primaryCategoryId = null,
         public ?Uuid $categoryTargetObjectTypeId = null,
+        public Provenance $provenance = Provenance::Manual,
     ) {
     }
 }

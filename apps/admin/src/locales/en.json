@@ -50,6 +50,8 @@
     "aria_label": "Notifications",
     "title": "Recent activity",
     "empty": "No recent events.",
+    "agent_section": "Agent proposals",
+    "agent_pending": "{{count}} change(s) await approval",
     "workflow_section": "Workflow",
     "workflow_type": {
       "workflow": {
@@ -108,7 +110,9 @@
     "imports": "Imports",
     "exports": "Exports",
     "api_configurator": "API Configurator",
-    "xml_configurator": "XML Configurator"
+    "xml_configurator": "XML Configurator",
+    "agent_inbox": "Agent proposals",
+    "agent_inbox_pending": "{{count}} proposals pending"
   },
   "admin": {
     "tenants": {
@@ -4063,7 +4067,8 @@
       "send": "Send",
       "cancel": "Cancel run",
       "awaiting_approval": "Plan ready: {{count}} change(s) await your approval.",
-      "go_to_inbox": "Go to the approval inbox"
+      "go_to_inbox": "Go to the approval inbox",
+      "view_proposal": "View proposal →"
     },
     "status": {
       "planning": "Planning…",
@@ -4090,6 +4095,10 @@
       "rejected": "Rejected — catalog untouched.",
       "diff_title": "Change plan",
       "diff_scope": "{{shown}} of {{total}} plan rows · all-or-nothing",
+      "mode_overwrite": "Mode: overwrite existing values",
+      "mode_only_empty": "Mode: empty values only",
+      "object": "object",
+      "status": "status",
       "partial": "Partial (soon)",
       "partial_tooltip": "Partial approval is a hook — MVP approves the whole plan.",
       "schema_group": "group",
@@ -4100,6 +4109,7 @@
       "title": "Agent run history",
       "subtitle": "Your runs: status, scope, cost and \"Undo this operation\" for completed ones.",
       "go_inbox": "Approval inbox",
+      "view_proposal": "View proposal",
       "loading": "Loading…",
       "empty": "No runs yet — open the agent chat or Cmd+K.",
       "expand": "Run details",

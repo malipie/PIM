@@ -31,6 +31,16 @@ final class PendingChangesService implements PendingChangesPort
 {
     private const int CHUNK = 200;
 
+    /** @var list<string> canonical content keys from docs/api/jsonb-schemas.md §6 */
+    private const array VALUE_CONTENT_KEYS = [
+        'value',
+        'option_code',
+        'option_codes',
+        'amount',
+        'asset_id',
+        'object_id',
+    ];
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly TenantContext $tenantContext,
@@ -280,9 +290,19 @@ final class PendingChangesService implements PendingChangesPort
         }
 
         foreach (['before' => $draft->before, 'after' => $draft->after] as $side => $state) {
-            if (null !== $state && !\array_key_exists('value', $state)) {
+            if (null === $state) {
+                continue;
+            }
+            $hasContentKey = false;
+            foreach (self::VALUE_CONTENT_KEYS as $key) {
+                if (\array_key_exists($key, $state)) {
+                    $hasContentKey = true;
+                    break;
+                }
+            }
+            if (!$hasContentKey) {
                 throw new InvalidArgumentException(\sprintf(
-                    'Value-change draft %s state must be a value envelope with a "value" key (docs/api/jsonb-schemas.md); got keys: %s',
+                    'Value-change draft %s state must use a canonical value content key (docs/api/jsonb-schemas.md); got keys: %s',
                     $side,
                     implode(', ', array_keys($state)),
                 ));

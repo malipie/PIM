@@ -33,6 +33,8 @@ export interface WizardState {
   filterDsl: FilterDsl | null;
   selectedIds: string[] | null;
   targetScope: ExportTargetScope;
+  /** false when entered from a list in variants_mode=tree (masters only). */
+  includeVariants: boolean;
   columns: string[];
   locales: string[] | null;
   channels: string[] | null;
@@ -55,6 +57,7 @@ export type WizardAction =
   | { type: 'SET_PROFILE'; profileId: string | null }
   | { type: 'SET_FILTER'; filterDsl: FilterDsl | null; targetScope: ExportTargetScope }
   | { type: 'SET_SELECTED_IDS'; selectedIds: string[] | null }
+  | { type: 'SET_INCLUDE_VARIANTS'; includeVariants: boolean }
   | { type: 'SET_COLUMNS'; columns: string[] }
   | { type: 'SET_LOCALES'; locales: string[] | null }
   | { type: 'SET_CHANNELS'; channels: string[] | null }
@@ -67,6 +70,7 @@ export type WizardAction =
       selectedIds: string[] | null;
       filterDsl: FilterDsl | null;
       targetScope: ExportTargetScope;
+      includeVariants: boolean;
     }
   | {
       type: 'INIT_FROM_PROFILE';
@@ -80,6 +84,7 @@ export type WizardAction =
       channels: string[] | null;
       filterDsl: FilterDsl | null;
       targetScope: ExportTargetScope;
+      includeVariants: boolean;
     }
   | {
       type: 'APPLY_PROFILE';
@@ -91,6 +96,7 @@ export type WizardAction =
       channels: string[] | null;
       filterDsl: FilterDsl | null;
       targetScope: ExportTargetScope;
+      includeVariants: boolean;
     };
 
 export const WIZARD_STEP_COUNT = 4;
@@ -104,6 +110,7 @@ export const INITIAL_WIZARD_STATE: WizardState = {
   filterDsl: null,
   selectedIds: null,
   targetScope: 'all',
+  includeVariants: true,
   columns: [],
   locales: null,
   channels: null,

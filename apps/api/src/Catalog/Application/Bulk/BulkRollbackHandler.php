@@ -11,6 +11,8 @@ use App\Catalog\Domain\Entity\BulkSession;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface;
+use App\Workflow\Contracts\ActingUserContextInterface;
+use App\Workflow\Contracts\EditorialWorkflowProviderInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Uid\Uuid;
@@ -52,6 +54,8 @@ final class BulkRollbackHandler
         private readonly BulkContext $bulkContext,
         private readonly BulkReindexQueueInterface $reindexQueue,
         private readonly BulkRelationApplier $relationApplier,
+        private readonly EditorialWorkflowProviderInterface $workflows,
+        private readonly ActingUserContextInterface $actingUser,
     ) {
     }
 
@@ -68,6 +72,7 @@ final class BulkRollbackHandler
         }
 
         $this->bulkContext->setBulk(true, $session->getId());
+        $this->actingUser->set($session->getUserId());
         $restored = 0;
         try {
             $logs = $this->em->getRepository(BulkLog::class)
@@ -124,6 +129,8 @@ final class BulkRollbackHandler
                     ),
                     \in_array($action, ['add_category', 'remove_category', 'move_category'], true) => $this->revertCategoryAssignment($object, $log),
                     \in_array($action, ['publish_channels', 'unpublish_channels'], true) => $this->revertPublishedMap($object, $log),
+                    'change_status' === $action => $this->revertStatus($object, $log),
+                    'create_object' === $action => $this->removeCreatedObject($object, $log),
                     default => false,
                 };
 
@@ -149,10 +156,23 @@ final class BulkRollbackHandler
                 $this->em->flush();
             }
 
-            $this->reindexQueue->queueAll($session->getTargetObjectIds());
+            if ('create_object' === $action) {
+                $kinds = $payload['created_kinds'] ?? [];
+                if (\is_array($kinds)) {
+                    foreach ($kinds as $kind => $ids) {
+                        $objectKind = \is_string($kind) ? \App\Catalog\Domain\ObjectKind::tryFrom($kind) : null;
+                        if ($objectKind instanceof \App\Catalog\Domain\ObjectKind && \is_array($ids)) {
+                            $this->reindexQueue->queueAllDeleted(array_filter($ids, 'is_string'), $objectKind);
+                        }
+                    }
+                }
+            } else {
+                $this->reindexQueue->queueAll($session->getTargetObjectIds());
+            }
 
             return $restored;
         } finally {
+            $this->actingUser->set(null);
             $this->bulkContext->setBulk(false);
         }
     }
@@ -207,6 +227,49 @@ final class BulkRollbackHandler
             $indexed['published'] = $oldValue;
         }
         $object->updateAttributeIndex($indexed);
+
+        return true;
+    }
+
+    private function revertStatus(CatalogObject $object, BulkLog $log): bool
+    {
+        $oldStatus = $log->getOldValue();
+        if (!\is_string($oldStatus) || $oldStatus === $object->getStatus()) {
+            return false;
+        }
+        $workflow = $this->workflows->for($object, $object->getObjectType()->getId()->toRfc4122());
+        foreach ($workflow->getDefinition()->getTransitions() as $transition) {
+            if (!\in_array($object->getStatus(), $transition->getFroms(), true)
+                || !\in_array($oldStatus, $transition->getTos(), true)
+                || !$workflow->can($object, $transition->getName())) {
+                continue;
+            }
+            $workflow->apply($object, $transition->getName(), [
+                'bulk' => true,
+                'rollback' => true,
+                'special_flag' => 'AGENT_STATUS_ROLLBACK',
+            ]);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function removeCreatedObject(CatalogObject $object, BulkLog $log): bool
+    {
+        $snapshot = $log->getNewValue();
+        $createdVersion = \is_array($snapshot) && \is_int($snapshot['created_version'] ?? null)
+            ? $snapshot['created_version']
+            : null;
+        // Dataless-only-style boundary: never delete an object that changed
+        // after the approved creation. The operator can keep it or remove it
+        // explicitly after inspecting the newer data.
+        if (null === $createdVersion || $object->getVersion() !== $createdVersion) {
+            return false;
+        }
+
+        $this->catalogObjects->remove($object);
 
         return true;
     }

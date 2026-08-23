@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Agent\Application\Tool;
 
 use App\Catalog\Contracts\Command\BulkEditValuesPort;
+use App\Catalog\Contracts\Command\ValueEditProposal;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangeType;
 use Symfony\Component\Uid\Uuid;
@@ -37,6 +38,7 @@ final readonly class BulkEditValuesTool implements AgentToolInterface, ProvidesQ
             .'the proposal is materialized for human approval and you MUST report the returned counts to the user. '
             .'Selector precedence: explicit object_ids, else filter_dsl, else the operator\'s current SELECTION (selected_ids in the view context), else the active view filter. '
             .'When the view context has a non-empty selected_ids and the user did not clearly ask for the whole list, act on the SELECTION (omit object_ids and filter_dsl). '
+            .'Mode: overwrite means set/change/fix and is the default; only_empty is only for explicit fill-gaps/fill-empty requests. '
             .'Ground the selector with aggregate_count first.';
     }
 
@@ -69,7 +71,7 @@ final readonly class BulkEditValuesTool implements AgentToolInterface, ProvidesQ
                 'mode' => [
                     'type' => 'string',
                     'enum' => ['overwrite', 'only_empty'],
-                    'description' => 'overwrite replaces existing values; only_empty fills gaps only. Default: only_empty.',
+                    'description' => 'overwrite replaces existing values and is the default for set/change/fix; only_empty fills gaps only and must be chosen explicitly for fill-empty requests.',
                 ],
             ],
             'required' => ['changes'],
@@ -105,7 +107,7 @@ final readonly class BulkEditValuesTool implements AgentToolInterface, ProvidesQ
         /** @var array<string, mixed> $changes */
         $objectTypeCode = \is_string($arguments['object_type_code'] ?? null) ? $arguments['object_type_code'] : 'product';
         $modeRaw = $arguments['mode'] ?? null;
-        $mode = \in_array($modeRaw, ['overwrite', 'only_empty'], true) ? $modeRaw : 'only_empty';
+        $mode = \in_array($modeRaw, ['overwrite', 'only_empty'], true) ? $modeRaw : 'overwrite';
 
         [$selectedIds, $filterDslArray] = $this->resolveScope($arguments, $context);
 
@@ -132,8 +134,10 @@ final readonly class BulkEditValuesTool implements AgentToolInterface, ProvidesQ
                 'materialized_changes' => 0,
                 'affected_objects' => 0,
                 'skipped_existing' => $proposal->skippedExisting,
+                'skip_reasons' => $this->skipReasons($proposal),
                 'rejected' => $proposal->rejected,
-                'note' => 'Nothing was materialized - explain the rejections/selector to the user.',
+                'mode' => $mode,
+                'note' => 'Nothing was materialized. Report the exact skip_reasons and ask whether to retry with overwrite only when mode=only_empty skipped existing values.',
             ];
         }
 
@@ -142,8 +146,28 @@ final readonly class BulkEditValuesTool implements AgentToolInterface, ProvidesQ
             'affected_count' => $proposal->affectedObjects,
             'materialized_changes' => $proposal->materializedChanges,
             'skipped_existing' => $proposal->skippedExisting,
+            'skip_reasons' => $this->skipReasons($proposal),
             'rejected' => $proposal->rejected,
+            'mode' => $mode,
             'note' => 'Proposal awaits human approval in the inbox. Nothing is committed yet.',
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function skipReasons(ValueEditProposal $proposal): array
+    {
+        return [
+            'existing_values' => [
+                'count' => $proposal->skippedExisting,
+                'examples' => $proposal->skippedExistingExamples,
+            ],
+            'selector' => [
+                'matched_objects' => $proposal->selectorMatchedObjects,
+                'rejected_object_ids' => $proposal->selectorRejected,
+            ],
+            'permissions' => [
+                'rejected_attributes' => $proposal->permissionRejectedAttributes,
+            ],
         ];
     }
 

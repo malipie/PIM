@@ -130,6 +130,11 @@ services:
         arguments:
             $customDefinitionsEnabled: '%pim.workflow.custom_definitions%'
 
+    # #2984 — Catalog evaluates guards as the initiating user through the
+    # public Workflow seam; the mutable holder remains Workflow-owned.
+    App\Workflow\Contracts\ActingUserContextInterface:
+        alias: App\Workflow\Application\ActingUserContext
+
     # WFL-P5-03 (#2433) — the identity bootstrap carries runtime feature
     # flags so the SPA can hide the Settings -> Workflow section when the
     # deployment runs with custom definitions off.
@@ -254,6 +259,15 @@ services:
     # AGENT-P3-05 (#1965) — category-assignment-through-approval seam.
     App\Catalog\Contracts\Command\AssignCategoriesPort:
         alias: App\Catalog\Application\PendingChanges\AssignCategoriesMaterializer
+
+    # #2983/#2984 — agent read/create/status seams. Keep removable Agent
+    # tools pointed at Catalog contracts, with explicit production adapters.
+    App\Catalog\Contracts\Query\AgentObjectReadPort:
+        alias: App\Catalog\Application\Query\AgentObjectReader
+    App\Catalog\Contracts\Command\CreateObjectProposalPort:
+        alias: App\Catalog\Application\PendingChanges\CreateObjectMaterializer
+    App\Catalog\Contracts\Command\SetStatusProposalPort:
+        alias: App\Catalog\Application\PendingChanges\SetStatusMaterializer
 
     # AGENT-P3-06 (#1966) — export-as-action seam (no approval diff).
     App\Export\Contracts\ExportTriggerPort:

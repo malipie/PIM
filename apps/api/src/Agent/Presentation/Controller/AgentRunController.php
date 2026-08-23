@@ -8,6 +8,7 @@ use App\Agent\Application\AgentFeatureGuard;
 use App\Agent\Application\Approval\AgentApprovalService;
 use App\Agent\Application\Run\AgentRunStarter;
 use App\Agent\Application\Run\AgentTurnService;
+use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentMessage;
 use App\Agent\Domain\Entity\AgentRun;
@@ -129,6 +130,44 @@ final readonly class AgentRunController
         ]);
     }
 
+    /**
+     * #2982 — tenant-wide approval inbox. Unlike run history this is not
+     * owner-scoped: an approver must see proposals created by other users.
+     */
+    #[Route('/api/agent/inbox', name: 'pim_agent_pending_inbox', methods: ['GET'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    #[RequiresPermission(module: 'agent', action: 'approve_pending')]
+    public function inbox(Request $request): JsonResponse
+    {
+        $this->featureGuard->assertEnabled($this->tenant());
+        $page = max(1, $request->query->getInt('page', 1));
+        $perPage = min(100, max(1, $request->query->getInt('per_page', 100)));
+
+        $base = $this->entityManager->createQueryBuilder()
+            ->from(AgentRun::class, 'r')
+            ->where('r.status = :status')
+            ->setParameter('status', AgentRunStatus::AwaitingApproval->value);
+        $total = (int) (clone $base)
+            ->select('COUNT(r.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+        /** @var list<AgentRun> $runs */
+        $runs = $base
+            ->select('r')
+            ->orderBy('r.startedAt', 'ASC')
+            ->setFirstResult(($page - 1) * $perPage)
+            ->setMaxResults($perPage)
+            ->getQuery()
+            ->getResult();
+
+        return new JsonResponse([
+            'items' => array_map($this->serializeSummary(...), $runs),
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
+    }
+
     #[Route('/api/agent/runs/{id}', name: 'pim_agent_run_detail', methods: ['GET'], requirements: ['id' => '[0-9a-f-]{36}'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     #[RequiresPermission(module: 'agent', action: 'bulk_actions')]
@@ -221,6 +260,7 @@ final readonly class AgentRunController
                 'scope_channel' => $row->scopeChannel,
                 'before' => $row->before,
                 'after' => $row->after,
+                'meta' => $row->meta,
                 'provenance' => $row->provenance,
             ], $rows),
             'total' => $this->pendingChanges->countBatch($batchId),

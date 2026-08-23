@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FilterDsl } from '@/lib/filters/filter-dsl';
 import { jsonFetch } from '@/lib/http';
 
+import { buildExportScopePayload } from './export-scope-payload';
 import type { ExportEntityType, ExportTargetScope, PreflightResult } from './types';
 
 interface PreflightInput {
@@ -11,6 +12,7 @@ interface PreflightInput {
   targetScope: ExportTargetScope;
   filterDsl: FilterDsl | null;
   selectedIds: string[] | null;
+  includeVariants: boolean;
   /** Skip probing (e.g. custom_module without a chosen ObjectType). */
   enabled?: boolean;
 }
@@ -35,7 +37,15 @@ export function useExportPreflight(input: PreflightInput): PreflightState {
   });
   const seqRef = useRef(0);
 
-  const { entityType, objectTypeId, targetScope, filterDsl, selectedIds, enabled = true } = input;
+  const {
+    entityType,
+    objectTypeId,
+    targetScope,
+    filterDsl,
+    selectedIds,
+    includeVariants,
+    enabled = true,
+  } = input;
   const filterKey = JSON.stringify(filterDsl);
   const selectedKey = JSON.stringify(selectedIds);
 
@@ -50,11 +60,9 @@ export function useExportPreflight(input: PreflightInput): PreflightState {
     const timer = setTimeout(() => {
       const payload: Record<string, unknown> = {
         entity_type: entityType,
-        target_scope: targetScope,
+        ...buildExportScopePayload({ targetScope, filterDsl, selectedIds, includeVariants }),
       };
       if (objectTypeId !== null) payload.object_type_id = objectTypeId;
-      if (targetScope === 'filter' && filterDsl !== null) payload.filter = filterDsl;
-      if (targetScope === 'selected') payload.selected_object_ids = selectedIds ?? [];
 
       jsonFetch<PreflightResult>('/api/exports/preflight', {
         method: 'POST',
@@ -73,7 +81,7 @@ export function useExportPreflight(input: PreflightInput): PreflightState {
         });
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [entityType, objectTypeId, targetScope, filterKey, selectedKey, enabled]);
+  }, [entityType, objectTypeId, targetScope, filterKey, selectedKey, includeVariants, enabled]);
 
   return state;
 }
