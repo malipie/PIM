@@ -74,9 +74,15 @@ Assety: `mc mirror stary/acme-assets nowy/acme-assets` (analogicznie `-imports`,
 ### 4. Start na nowym hoście
 
 ```bash
-docker compose -p pim-acme --env-file .env.tenant.acme -f docker-compose.tenant.yml up -d
-docker compose -p pim-acme --env-file .env.tenant.acme -f docker-compose.tenant.yml \
-    exec -T api php bin/console cache:clear
+DC="docker compose -p pim-acme --env-file .env.tenant.acme -f docker-compose.tenant.yml"
+# Wolumen `api_var` przyjechał ze starego hosta, więc niesie CUDZY skompilowany
+# kontener DI. Czyścimy go, ZANIM wystartują procesy aplikacyjne — `exec
+# cache:clear` na działającym api/workerze kasuje pliki, które te procesy
+# ładują leniwie (#2991).
+$DC up -d database redis
+$DC run --rm --no-deps api    php bin/console cache:clear
+$DC run --rm --no-deps worker php bin/console cache:clear
+$DC up -d
 ```
 
 Reindeks wyszukiwarki (indeks nie był przenoszony) — zgodnie z bieżącą komendą
