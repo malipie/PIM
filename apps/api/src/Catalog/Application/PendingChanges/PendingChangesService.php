@@ -302,7 +302,7 @@ final class PendingChangesService implements PendingChangesPort
             }
             if (!$hasContentKey) {
                 throw new InvalidArgumentException(\sprintf(
-                    'Value-change draft %s state must use a canonical value content key (docs/api/jsonb-schemas.md); got keys: %s',
+                    'Value-change draft %s state must use a canonical value envelope content key (docs/api/jsonb-schemas.md); got keys: %s',
                     $side,
                     implode(', ', array_keys($state)),
                 ));
