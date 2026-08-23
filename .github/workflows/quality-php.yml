@@ -147,6 +147,14 @@ jobs:
         working-directory: .
         run: bash scripts/test-deploy-all.sh
 
+      # #2993 — retencja zrzutow sortowala po NAZWIE, a nazwa zaczyna sie od
+      # skrotu commita, wiec swiezy zrzut pre-deploy bywal kasowany sekundy po
+      # utworzeniu (wdrozenie 1075215c: trzy instancje, zero kopii, cisza).
+      # Kod, ktory KASUJE kopie zapasowe, ma wlasny test.
+      - name: Tenant dump retention (unit)
+        working-directory: .
+        run: bash scripts/test-tenant-dump.sh
+
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:

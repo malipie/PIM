@@ -38,8 +38,25 @@ przygotuj_drzewo() {
     mkdir -p "${dir}/scripts" "${dir}/bin"
     cp "$SKRYPT" "${dir}/scripts/pim-deploy-all.sh"
 
-    # Zrzut przed wdrożeniem — atrapa, ma tylko zwrócić 0.
-    printf '#!/usr/bin/env bash\nexit 0\n' > "${dir}/scripts/pim-tenant-dump.sh"
+    # Zrzut przed wdrożeniem — atrapa spełniająca kontrakt `--print-path`:
+    # tworzy plik i wypisuje jego ścieżkę. ATRAPA_ZRZUT_PUSTY odgrywa defekt
+    # z #2993 — kod wyjścia 0, a pliku nie ma (retencja skasowała go zaraz po
+    # utworzeniu).
+    cat > "${dir}/scripts/pim-tenant-dump.sh" <<'DUMP'
+#!/usr/bin/env bash
+kod=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --code) kod="${2:-}"; shift 2 ;;
+        *) shift ;;
+    esac
+done
+[ "${ATRAPA_ZRZUT_PUSTY:-0}" = "1" ] && exit 0
+mkdir -p backups/pre-deploy
+plik="backups/pre-deploy/${kod}-test.dump"
+head -c 2048 /dev/zero | tr '\0' 'x' > "$plik"
+printf '%s\n' "$plik"
+DUMP
     chmod +x "${dir}/scripts/pim-tenant-dump.sh"
 
     : > "${dir}/docker-compose.tenant.yml"
@@ -290,6 +307,34 @@ ATRAPA_LOGI='worker-1  | PHP Fatal error: Uncaught Error: Failed opening require
     uruchom "$tmp" --tag test --skip-dump || rc=$?
 [ "$rc" -eq 70 ] && ok "fatal z 'not found' w treści → kod 70" \
     || blad "fatal zjedzony przez filtr 4xx (kod ${rc})"
+rm -rf "$tmp"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 6. Krok 1 ufa PLIKOWI, nie kodowi wyjścia skryptu zrzutu (#2993)
+# ═══════════════════════════════════════════════════════════════════════════
+zaczyna "zrzut przed wdrożeniem"
+tmp="$(mktemp -d)"
+przygotuj_drzewo "$tmp" tenant
+rc=0; uruchom "$tmp" --tag test || rc=$?
+[ "$rc" -eq 0 ] && ok "istniejący plik zrzutu przepuszcza wdrożenie" \
+    || blad "wdrożenie z poprawnym zrzutem zwróciło ${rc} ($(cat "${tmp}/err.txt"))"
+grep -q 'kopia: backups/pre-deploy/acme-test.dump' "${tmp}/out.txt" \
+    && ok "ścieżka i rozmiar kopii wypisane w przebiegu" \
+    || blad "przebieg nie pokazuje, gdzie wylądowała kopia"
+rm -rf "$tmp"
+
+zaczyna "zrzut kończy się zerem, ale pliku nie ma"
+tmp="$(mktemp -d)"
+przygotuj_drzewo "$tmp" tenant
+rc=0
+ATRAPA_ZRZUT_PUSTY=1 uruchom "$tmp" --tag test || rc=$?
+[ "$rc" -eq 20 ] && ok "brak pliku kopii przerywa wdrożenie (kod 20)" \
+    || blad "wdrożenie ruszyło bez kopii (kod ${rc}) — dokładnie defekt #2993"
+if grep -q 'docker' "${tmp}/docker.log" 2>/dev/null; then
+    blad "wdrożenie zdążyło dotknąć dockera mimo braku kopii"
+else
+    ok "nic nie zostało zbudowane ani zmigrowane bez kopii"
+fi
 rm -rf "$tmp"
 
 # ═══════════════════════════════════════════════════════════════════════════

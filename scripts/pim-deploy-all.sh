@@ -202,11 +202,24 @@ deploy_one() {
         # `--env-file` i `--compose` przekazywane jawnie: instancja platformowa
         # nie trzyma środowiska pod nazwą `.env.tenant.<kod>`, więc bez tego
         # zrzut szukałby pliku, którego nie ma, i wdrożenie padało na kroku 1.
-        bash scripts/pim-tenant-dump.sh --code "$tenant" --label pre-deploy --tag "$tag" \
-            --env-file "$env_file" --compose "$compose_file" >/dev/null || {
+        #
+        # `--print-path` + sprawdzenie PLIKU, nie samego kodu wyjścia (#2993):
+        # przy wdrożeniu 1075215c skrypt zrzutu kończył się zerem, a kopia
+        # znikała chwilę później przez własną retencję. Krok meldował „zrzut
+        # przed wdrożeniem" na wszystkich trzech instancjach, a nie było ani
+        # jednego pliku. Kopia, której nie widać na dysku, nie istnieje.
+        local sciezka_zrzutu=""
+        sciezka_zrzutu="$(bash scripts/pim-tenant-dump.sh --code "$tenant" --label pre-deploy --tag "$tag" \
+            --env-file "$env_file" --compose "$compose_file" --print-path 2>/dev/null | tail -1)" || {
             echo "  BŁĄD: zrzut się nie powiódł — wdrożenie na ${tenant} PRZERWANE." >&2
             return 20
         }
+        if [ -z "$sciezka_zrzutu" ] || [ ! -s "$sciezka_zrzutu" ]; then
+            echo "  BŁĄD: zrzut nie zostawił pliku ('${sciezka_zrzutu}') — wdrożenie na ${tenant} PRZERWANE." >&2
+            echo "         Bez kopii nie ma czym cofnąć złej migracji (#2993)." >&2
+            return 20
+        fi
+        echo "        kopia: ${sciezka_zrzutu} ($(wc -c < "$sciezka_zrzutu" | tr -d ' ') B)"
     fi
 
     echo "  [2/7] build ${do_budowy}"

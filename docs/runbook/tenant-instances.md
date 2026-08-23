@@ -143,6 +143,13 @@ Cztery rzeczy, które łatwo pominąć, a każda kosztowała już czas:
 Przebieg zatrzymuje się na pierwszym błędzie — zła migracja ma zepsuć jednego
 klienta, nie wszystkich po kolei.
 
+**Kopia pre-deploy jest sprawdzana jako PLIK, nie jako kod wyjścia** (#2993).
+Krok 1 wypisuje ścieżkę i rozmiar zrzutu; brak pliku przerywa wdrożenie
+(kod 20), zanim cokolwiek zostanie zbudowane. Retencja zrzutów porządkuje
+kopie po **czasie**, nie po nazwie — nazwa zaczyna się od skrótu commita,
+więc sortowanie leksykograficzne kasowało świeżą kopię zaraz po utworzeniu
+(wdrożenie `1075215c`: trzy instancje, zero kopii, żadnego komunikatu).
+
 **Kody wyjścia:** `0` wdrożone i czysto · `70` **wdrożone, ale smoke ma
 zastrzeżenia** (niepusta lub niepoliczalna kolejka `failed`, błędy krytyczne
 w oknie wdrożenia) — kod jest na antenie, ale nie melduj „wszystko czyste",
