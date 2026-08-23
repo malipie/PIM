@@ -12,10 +12,14 @@ use App\Search\Application\BulkCatalogObjectIndexer;
 use App\Search\Application\IndexSettingsTemplate;
 use App\Search\Application\MeilisearchIndexProvisioner;
 use App\Search\Infrastructure\MeilisearchClientFactory;
+use App\Search\Presentation\Command\SearchReindexCommand;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Tests\Api\Catalog\CatalogApiTestCase;
+use Meilisearch\Exceptions\ApiException;
 use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Uid\Uuid;
 use Throwable;
 
 use const JSON_THROW_ON_ERROR;
@@ -69,6 +73,99 @@ final class SearchEndpointsApiTest extends CatalogApiTestCase
 
         self::assertArrayHasKey('hits', $body);
         self::assertGreaterThanOrEqual(2, $body['totalHits'] ?? 0);
+    }
+
+    /**
+     * #2986 — DELETE removed the PostgreSQL row but left its Meilisearch
+     * document behind, so aggregate_count reported 8 for a seven-product
+     * tenant. Exercise the ordinary single-object endpoint (not the already
+     * covered bulk/import rollback path) and assert the read model follows.
+     */
+    #[Test]
+    public function deletingOneObjectRemovesItsSearchDocument(): void
+    {
+        $object = $this->seedProduct('DELETE-GHOST-2986');
+        $this->forceReindex(ObjectKind::Product);
+
+        $client = $this->authenticatedClient();
+        $before = $client->request('GET', '/api/search/products?filter%5Bcode%5D=DELETE-GHOST-2986')->toArray();
+        self::assertSame(1, $before['totalHits'] ?? -1, 'precondition: document must exist in Meilisearch');
+
+        $client->request('DELETE', '/api/objects/'.$object->getId()->toRfc4122());
+        self::assertResponseStatusCodeSame(204);
+
+        // Meilisearch applies delete tasks asynchronously.
+        usleep(700_000);
+
+        $after = $this->authenticatedClient()->request('GET', '/api/search/products?filter%5Bcode%5D=DELETE-GHOST-2986')->toArray();
+        self::assertSame(0, $after['totalHits'] ?? -1, 'deleted objects must leave no ghost documents in search');
+    }
+
+    /**
+     * #2986 — every production instance shares the consolidated `objects`
+     * index. `--purge` used to delete a whole kind globally, so healing one
+     * tenant's ghost could temporarily erase search for every other tenant.
+     */
+    #[Test]
+    public function purgeReindexRemovesOnlyTheTargetTenantDocuments(): void
+    {
+        $tenant = $this->em()->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
+        \assert($tenant instanceof Tenant);
+
+        $targetId = Uuid::v7()->toRfc4122();
+        $foreignId = Uuid::v7()->toRfc4122();
+        $client = self::getContainer()->get(MeilisearchClientFactory::class)->create();
+        $index = $client->index(IndexSettingsTemplate::indexName());
+        $addition = $index->addDocuments([
+            [
+                'id' => $targetId,
+                'tenantId' => $tenant->getId()->toRfc4122(),
+                'kind' => ObjectKind::Product->value,
+                'code' => 'TARGET-GHOST-2986',
+            ],
+            [
+                'id' => $foreignId,
+                'tenantId' => Uuid::v7()->toRfc4122(),
+                'kind' => ObjectKind::Product->value,
+                'code' => 'FOREIGN-SURVIVES-2986',
+            ],
+        ], IndexSettingsTemplate::PRIMARY_KEY);
+        if (!\is_array($addition) || !\is_int($addition['taskUid'] ?? null)) {
+            self::fail('Meilisearch did not return a task id for fixture insertion.');
+        }
+        $client->waitForTask($addition['taskUid']);
+
+        try {
+            $tester = new CommandTester(self::getContainer()->get(SearchReindexCommand::class));
+            $tester->execute([
+                '--tenant' => self::TENANT_CODE,
+                '--kind' => ObjectKind::Product->value,
+                '--purge' => true,
+            ]);
+            $tester->assertCommandIsSuccessful();
+
+            $targetRemoved = false;
+            for ($attempt = 0; $attempt < 50; ++$attempt) {
+                try {
+                    $index->getDocument($targetId);
+                } catch (ApiException) {
+                    $targetRemoved = true;
+                    break;
+                }
+                usleep(100_000);
+            }
+
+            self::assertTrue($targetRemoved, 'target tenant orphan must be purged');
+            $foreignDocument = $index->getDocument($foreignId);
+            self::assertIsArray($foreignDocument);
+            self::assertSame('FOREIGN-SURVIVES-2986', $foreignDocument['code'] ?? null);
+        } finally {
+            $cleanup = $index->deleteDocuments([$targetId, $foreignId]);
+            if (!\is_int($cleanup['taskUid'] ?? null)) {
+                self::fail('Meilisearch did not return a task id for fixture cleanup.');
+            }
+            $client->waitForTask($cleanup['taskUid']);
+        }
     }
 
     #[Test]
@@ -398,7 +495,7 @@ final class SearchEndpointsApiTest extends CatalogApiTestCase
     /**
      * @param array<string, scalar> $attributes
      */
-    private function seedProduct(string $code, array $attributes = [], bool $enabled = true, ?int $completenessPct = null): void
+    private function seedProduct(string $code, array $attributes = [], bool $enabled = true, ?int $completenessPct = null): CatalogObject
     {
         $tenant = $this->em()->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
         \assert($tenant instanceof Tenant);
@@ -426,6 +523,8 @@ final class SearchEndpointsApiTest extends CatalogApiTestCase
             $object->recordCompleteness(['global' => $completenessPct]);
         }
         $repo->save($object);
+
+        return $object;
     }
 
     private function forceReindex(ObjectKind $kind): void
