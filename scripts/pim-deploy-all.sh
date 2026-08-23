@@ -305,16 +305,23 @@ deploy_one() {
     # ── Błędy krytyczne w oknie wdrożenia ───────────────────────────────────
     #
     # #2881: odmowa uprawnień loguje się jako `Uncaught PHP Exception
-    # AccessDeniedHttpException` — to normalna praca RBAC, nie awaria, więc
-    # jest odfiltrowana. Reszta (CRITICAL/EMERGENCY/Fatal/Uncaught) to sygnał,
-    # że coś w oknie wdrożenia padło, nawet jeśli usługi są teraz zdrowe.
+    # AccessDeniedHttpException` — to normalna praca RBAC, nie awaria. Tak samo
+    # loguje się KAŻDY błąd 4xx (404 od bota, 405, 422 z walidacji), bo Symfony
+    # ma dla nich jedno zdanie w logu i różni je tylko nazwa klasy wyjątku.
+    # Gdyby przechodziły, kod 70 zapalałby się na każdym wdrożeniu instancji
+    # z publicznym ruchem — a ostrzeżenie, które świeci zawsze, nie znaczy nic.
+    # Wykluczenie jest WRAŻLIWE NA WIELKOŚĆ LITER (nazwy klas), więc „Fatal
+    # error: … not found" nadal jest łapane. Reszta
+    # (CRITICAL/EMERGENCY/Fatal/Uncaught) to sygnał, że coś w oknie wdrożenia
+    # padło, nawet jeśli usługi są teraz zdrowe.
     local krytyczne logi_okna
+    local klasy_4xx='AccessDenied|NotFound|MethodNotAllowed|BadRequest|Unauthorized|Conflict|UnprocessableEntity|UnsupportedMediaType|NotAcceptable|TooManyRequests|PreconditionFailed'
     # shellcheck disable=SC2086 # jw.
     logi_okna="${logi_sprzed_odtworzenia}
 $(dc logs --no-color --since "$okno_od" $aplikacyjne 2>/dev/null || true)"
     krytyczne="$(printf '%s' "$logi_okna" \
         | grep -iE 'critical|emergency|fatal|uncaught' \
-        | grep -vi 'AccessDenied' \
+        | grep -vE "$klasy_4xx" \
         | head -20 || true)"
     if [ -n "$krytyczne" ]; then
         echo "  UWAGA: błędy krytyczne w logach od ${okno_od}:" >&2

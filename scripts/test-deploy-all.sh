@@ -265,15 +265,31 @@ grep -q 'błędy krytyczne' "${tmp}/err.txt" && ok "ostrzeżenie cytuje logi" \
     || blad "brak ostrzeżenia o błędach krytycznych"
 rm -rf "$tmp"
 
-zaczyna "odmowa uprawnień nie jest awarią"
+zaczyna "błąd 4xx nie jest awarią"
 tmp="$(mktemp -d)"
 przygotuj_drzewo "$tmp" tenant
 rc=0
 # #2881 — RBAC loguje odmowę jako `Uncaught PHP Exception AccessDenied…`.
-ATRAPA_LOGI='api-1  | [warning] Uncaught PHP Exception AccessDeniedHttpException: "Access Denied."' \
+# 404 od pierwszego lepszego bota wygląda w logu identycznie; gdyby oba
+# podnosiły ostrzeżenie, kod 70 świeciłby po każdym wdrożeniu i przestałby
+# cokolwiek znaczyć.
+ATRAPA_LOGI='api-1  | [warning] Uncaught PHP Exception AccessDeniedHttpException: "Access Denied."
+api-1  | [warning] Uncaught PHP Exception NotFoundHttpException: "No route found for GET /wp-login.php"' \
     uruchom "$tmp" --tag test --skip-dump || rc=$?
-[ "$rc" -eq 0 ] && ok "sama odmowa RBAC nie podnosi ostrzeżenia" \
-    || blad "odmowa uprawnień policzona jako awaria (kod ${rc})"
+[ "$rc" -eq 0 ] && ok "odmowa RBAC i 404 nie podnoszą ostrzeżenia" \
+    || blad "błąd 4xx policzony jako awaria (kod ${rc})"
+rm -rf "$tmp"
+
+# Wykluczenie 4xx nie może zjeść prawdziwego fatala, który przypadkiem mówi
+# „not found" — stąd wykluczenie wrażliwe na wielkość liter (nazwy klas).
+zaczyna "fatal mówiący 'not found' nadal jest awarią"
+tmp="$(mktemp -d)"
+przygotuj_drzewo "$tmp" tenant
+rc=0
+ATRAPA_LOGI='worker-1  | PHP Fatal error: Uncaught Error: Failed opening required /app/var/cache/prod/ContainerX/getFooService.php (include_path=...): file not found' \
+    uruchom "$tmp" --tag test --skip-dump || rc=$?
+[ "$rc" -eq 70 ] && ok "fatal z 'not found' w treści → kod 70" \
+    || blad "fatal zjedzony przez filtr 4xx (kod ${rc})"
 rm -rf "$tmp"
 
 # ═══════════════════════════════════════════════════════════════════════════
