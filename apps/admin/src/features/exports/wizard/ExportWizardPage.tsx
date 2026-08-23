@@ -43,6 +43,7 @@ interface ProfilePayload {
     channels?: string[] | null;
     filter?: FilterDsl | null;
     default_target_scope?: string;
+    include_variants?: boolean;
   };
 }
 
@@ -67,6 +68,7 @@ function WizardContent() {
       objectTypeId?: string | null;
       selectedIds?: string[] | null;
       filterDsl?: import('@/lib/filters/filter-dsl').FilterDsl | null;
+      variantsMode?: 'tree' | 'flat';
     } | null;
     if (!listState?.entityType) return;
     initialisedRef.current = true;
@@ -83,6 +85,7 @@ function WizardContent() {
       selectedIds: targetScope === 'selected' ? (listState.selectedIds ?? []) : null,
       filterDsl: targetScope === 'filter' ? (listState.filterDsl ?? null) : null,
       targetScope,
+      includeVariants: listState.variantsMode !== 'tree',
     });
   }, [scopeParam, location.state, dispatch]);
 
@@ -110,6 +113,7 @@ function WizardContent() {
           channels: profile.config.channels ?? null,
           filterDsl,
           targetScope: filterDsl === null ? 'all' : 'filter',
+          includeVariants: profile.config.include_variants ?? true,
         });
       })
       .catch(() => {

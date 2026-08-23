@@ -7,6 +7,7 @@ namespace App\Tests\Api\Export;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Channel\Domain\Entity\Channel;
 use App\Shared\Domain\Tenant;
 use App\Tests\Api\Catalog\CatalogApiTestCase;
@@ -214,17 +215,66 @@ final class ExportPreflightApiTest extends CatalogApiTestCase
     }
 
     #[Test]
-    public function countsUniqueSelectedIds(): void
+    public function selectedTreeScopeMatchesPreflightAndFinalFile(): void
     {
-        $id = '019eae00-0000-7000-8000-000000000001';
+        $tenant = $this->tenant();
+        $type = self::getContainer()->get(ObjectTypeRepositoryInterface::class)
+            ->findBuiltInByKind(ObjectKind::Product, $tenant);
+        \assert($type instanceof ObjectType);
+
+        $first = new CatalogObject($type, 'SCOPE-MASTER-1');
+        $first->assignTenant($tenant);
+        $second = new CatalogObject($type, 'SCOPE-MASTER-2');
+        $second->assignTenant($tenant);
+        $variant = new CatalogObject($type, 'SCOPE-VARIANT-1');
+        $variant->assignTenant($tenant);
+        $variant->assignParent($first);
+        $this->em()->persist($first);
+        $this->em()->persist($second);
+        $this->em()->persist($variant);
+        $this->em()->flush();
+
+        $selectedIds = [
+            $first->getId()->toRfc4122(),
+            $first->getId()->toRfc4122(),
+            $second->getId()->toRfc4122(),
+        ];
         $body = $this->preflight([
             'entity_type' => 'product',
             'target_scope' => 'selected',
-            'selected_ids' => [$id, $id, '019eae00-0000-7000-8000-000000000002'],
+            'selected_object_ids' => $selectedIds,
+            'include_variants' => false,
         ]);
 
         self::assertSame(2, $body['count']);
         self::assertSame('sync', $body['mode']);
+
+        $response = $this->authenticatedClient()->request('POST', '/api/products/export', [
+            'json' => [
+                'entity_type' => 'product',
+                'format' => 'xml',
+                'target_scope' => 'selected',
+                'selected_columns' => ['sku'],
+                'selected_object_ids' => $selectedIds,
+                'include_variants' => false,
+            ],
+        ]);
+        self::assertSame(200, $response->getStatusCode());
+
+        // BinaryFileResponse deletes its temp file after the test kernel sends
+        // it, so assert the persisted runner counters (the same values used by
+        // session history) rather than trying to reopen the deleted body.
+        $run = $this->em()->getConnection()->fetchAssociative(
+            'SELECT target_count, success_count FROM export_sessions ORDER BY started_at DESC LIMIT 1',
+        );
+        self::assertIsArray($run);
+        self::assertIsInt($body['count']);
+        $targetCount = $run['target_count'];
+        $successCount = $run['success_count'];
+        self::assertTrue(\is_int($targetCount) || \is_string($targetCount));
+        self::assertTrue(\is_int($successCount) || \is_string($successCount));
+        self::assertSame($body['count'], (int) $targetCount);
+        self::assertSame($body['count'], (int) $successCount, 'preflight scope must equal rows written to the file');
     }
 
     #[Test]

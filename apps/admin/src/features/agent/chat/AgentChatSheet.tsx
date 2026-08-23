@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Send, Sparkles, StopCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +16,7 @@ import {
   sendAgentMessage,
   startAgentRun,
 } from '@/features/agent/api';
+import { AGENT_PENDING_QUERY_KEY } from '@/features/agent/hooks/useAgentPendingProposals';
 import { useAgentRunStream } from '@/features/agent/hooks/useAgentRunStream';
 import { httpErrorDetail } from '@/lib/http';
 import { cn } from '@/lib/utils';
@@ -55,6 +57,7 @@ function blockText(message: AgentMessageDto): string {
  */
 export function AgentChatSheet() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [run, setRun] = useState<AgentRunDetail | null>(null);
@@ -119,6 +122,12 @@ export function AgentChatSheet() {
       setLivePhase(lastEvent.phase);
     }
   }, [lastEvent, runId, refresh]);
+
+  useEffect(() => {
+    if (run?.status === 'awaiting_approval') {
+      void queryClient.invalidateQueries({ queryKey: AGENT_PENDING_QUERY_KEY });
+    }
+  }, [run?.status, queryClient]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new messages only
   useEffect(() => {
@@ -248,11 +257,12 @@ export function AgentChatSheet() {
                 })}
               </p>
               <Link
-                to="/agent/inbox"
+                to={`/agent/inbox?run=${encodeURIComponent(run.id)}${run.pending_change_batch_id !== null ? `&batch=${encodeURIComponent(run.pending_change_batch_id)}` : ''}`}
                 className="mt-1 inline-block underline"
                 onClick={() => setOpen(false)}
+                data-testid="agent-chat-proposal-link"
               >
-                {t('agent.chat.go_to_inbox', { defaultValue: 'Przejdź do skrzynki akceptacji' })}
+                {t('agent.chat.view_proposal', { defaultValue: 'Zobacz propozycję →' })}
               </Link>
             </div>
           )}

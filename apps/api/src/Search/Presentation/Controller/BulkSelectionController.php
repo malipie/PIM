@@ -62,6 +62,7 @@ final class BulkSelectionController
 
         $query = \is_string($body['q'] ?? null) ? trim($body['q']) : '';
         $customFilterExpression = $this->resolveCustomFilter($body);
+        [$filters, $rangeFilters] = $this->resolveFlatFilters($body);
 
         // Mirror the list view's variant-tree gate: when the operator
         // sees only masters (`variants_mode=tree`, default in the FE),
@@ -87,8 +88,10 @@ final class BulkSelectionController
             $result = $this->searchService->search(
                 kind: ObjectKind::Product,
                 query: $query,
+                filters: $filters,
                 page: $page,
                 perPage: self::PAGE_SIZE,
+                rangeFilters: $rangeFilters,
                 customFilterExpression: $customFilterExpression,
             );
             // AUD-070 (#1614) — the search backend is down. Returning an empty
@@ -127,6 +130,58 @@ final class BulkSelectionController
             'capped' => \count($ids) < $totalMatched,
             'limit' => $limit,
         ]);
+    }
+
+    /**
+     * Mirror SearchController's scalar/list/range coercion so the list and
+     * select-all endpoint evaluate the same active search scope (#2987).
+     *
+     * @param array<string, mixed> $body
+     *
+     * @return array{array<string, scalar|list<scalar>>, array<string, array{gte?: float, lte?: float}>}
+     */
+    private function resolveFlatFilters(array $body): array
+    {
+        $filters = [];
+        $rawFilters = $body['filters'] ?? null;
+        if (\is_array($rawFilters)) {
+            foreach ($rawFilters as $key => $value) {
+                if (!\is_string($key)) {
+                    continue;
+                }
+                if (\is_scalar($value)) {
+                    $filters[$key] = $value;
+                    continue;
+                }
+                if (\is_array($value)) {
+                    /** @var list<scalar> $entries */
+                    $entries = array_values(array_filter($value, \is_scalar(...)));
+                    $filters[$key] = $entries;
+                }
+            }
+        }
+
+        $rangeFilters = [];
+        $rawRanges = $body['range_filters'] ?? null;
+        if (\is_array($rawRanges)) {
+            foreach ($rawRanges as $key => $value) {
+                if (!\is_string($key) || !\is_array($value)) {
+                    continue;
+                }
+                $range = [];
+                if (isset($value['gte']) && is_numeric($value['gte'])) {
+                    $range['gte'] = (float) $value['gte'];
+                }
+                if (isset($value['lte']) && is_numeric($value['lte'])) {
+                    $range['lte'] = (float) $value['lte'];
+                }
+                if ([] !== $range) {
+                    $rangeFilters[$key] = $range;
+                }
+            }
+        }
+
+        return [$filters, $rangeFilters];
     }
 
     /**

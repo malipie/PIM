@@ -1,6 +1,7 @@
 import { Check, Loader2, ShieldAlert, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router';
 import { ProvenanceBadge } from '@/components/provenance-badge';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
@@ -9,9 +10,9 @@ import {
   type AgentRunSummary,
   approveAgentRun,
   getAgentPlan,
-  listAgentRuns,
   rejectAgentRun,
 } from '@/features/agent/api';
+import { useAgentPendingProposals } from '@/features/agent/hooks/useAgentPendingProposals';
 import { httpErrorDetail } from '@/lib/http';
 
 function planLine(
@@ -27,12 +28,28 @@ function planLine(
         : t('agent.inbox.schema_attribute', { defaultValue: 'atrybut' });
     return `+ ${kind} ${row.attribute_code ?? '?'}`;
   }
+  if (row.change_type === 'object') {
+    const code = typeof row.after?.code === 'string' ? row.after.code : '?';
+    const objectType =
+      typeof row.after?.object_type_code === 'string' ? row.after.object_type_code : '?';
+    const attributes =
+      row.after?.attributes !== null && typeof row.after?.attributes === 'object'
+        ? JSON.stringify(row.after.attributes)
+        : '{}';
+    return `+ ${t('agent.inbox.object', { defaultValue: 'obiekt' })} ${code} · ${objectType} · ${attributes}`;
+  }
   // #2154 — lead with the product identity (SKU · name) so the operator
   // can tell WHICH product each diff row touches, not just the raw delta.
   const identity = objectIdentity(row);
   if (row.change_type === 'category') {
     const op = typeof row.after?.operation === 'string' ? row.after.operation : '?';
     return `${identity} · ${t('agent.inbox.categories', { defaultValue: 'kategorie' })}: ${op}`;
+  }
+  if (row.change_type === 'status') {
+    const before = typeof row.before?.status === 'string' ? row.before.status : '?';
+    const after = typeof row.after?.status === 'string' ? row.after.status : '?';
+    const transition = typeof row.after?.transition === 'string' ? row.after.transition : '?';
+    return `${identity} · ${t('agent.inbox.status', { defaultValue: 'status' })}: ${before} → ${after} (${transition})`;
   }
   return `${identity} · ${row.attribute_code ?? '?'}: ${beforeValue} → ${afterValue}`;
 }
@@ -56,6 +73,16 @@ function objectIdentity(row: AgentPlanRow): string {
   return row.target_object_id ?? '?';
 }
 
+function proposalMode(rows: AgentPlanRow[]): 'overwrite' | 'only_empty' | null {
+  for (const row of rows) {
+    const mode = row.meta?.mode;
+    if (mode === 'overwrite' || mode === 'only_empty') {
+      return mode;
+    }
+  }
+  return null;
+}
+
 /**
  * AGENT-P6-03 (#1976) — the single approval gate's UI (PRD §5.3): runs
  * awaiting approval with intent, scope, cost/tokens and provenance;
@@ -66,30 +93,22 @@ function objectIdentity(row: AgentPlanRow): string {
  */
 export function AgentInboxPage() {
   const { t } = useTranslation();
-  const [runs, setRuns] = useState<AgentRunSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [searchParams] = useSearchParams();
+  const pending = useAgentPendingProposals();
+  const runs = pending.items;
+  const loading = pending.isLoading;
   const [planFor, setPlanFor] = useState<AgentRunSummary | null>(null);
   const [planRows, setPlanRows] = useState<AgentPlanRow[]>([]);
   const [planTotal, setPlanTotal] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const handledDeepLink = useRef<string | null>(null);
+  const planMode = proposalMode(planRows);
 
   const reload = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await listAgentRuns(1, 100);
-      setRuns(response.items.filter((run) => run.status === 'awaiting_approval'));
-    } catch (error) {
-      toast.error(httpErrorDetail(error) ?? String(error));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    await pending.refetch();
+  }, [pending.refetch]);
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
-
-  const openPlan = async (run: AgentRunSummary) => {
+  const openPlan = useCallback(async (run: AgentRunSummary) => {
     setPlanFor(run);
     setPlanRows([]);
     try {
@@ -99,7 +118,29 @@ export function AgentInboxPage() {
     } catch (error) {
       toast.error(httpErrorDetail(error) ?? String(error));
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const runId = searchParams.get('run');
+    const batchId = searchParams.get('batch');
+    const key = `${runId ?? ''}:${batchId ?? ''}`;
+    if (loading || (runId === null && batchId === null) || handledDeepLink.current === key) {
+      return;
+    }
+    const run = runs.find(
+      (candidate) => candidate.id === runId || candidate.pending_change_batch_id === batchId,
+    );
+    if (run !== undefined) {
+      handledDeepLink.current = key;
+      void openPlan(run);
+    }
+  }, [loading, runs, searchParams, openPlan]);
+
+  useEffect(() => {
+    if (pending.error) {
+      toast.error(httpErrorDetail(pending.error) ?? String(pending.error));
+    }
+  }, [pending.error]);
 
   const decide = async (run: AgentRunSummary, decision: 'approve' | 'reject') => {
     setBusyId(run.id);
@@ -236,6 +277,15 @@ export function AgentInboxPage() {
                     total: planTotal,
                   })}
                 </div>
+                {planMode !== null ? (
+                  <div className="mt-1" data-testid="agent-inbox-mode">
+                    <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-700">
+                      {planMode === 'overwrite'
+                        ? t('agent.inbox.mode_overwrite')
+                        : t('agent.inbox.mode_only_empty')}
+                    </span>
+                  </div>
+                ) : null}
               </div>
               <button
                 type="button"

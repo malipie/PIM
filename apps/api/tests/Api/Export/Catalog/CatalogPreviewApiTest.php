@@ -97,6 +97,36 @@ final class CatalogPreviewApiTest extends CatalogApiTestCase
     }
 
     #[Test]
+    public function templateKindSelectsDistinctSheetAndGridArchetypes(): void
+    {
+        $this->seedProductsWithValues('<strong>Opis</strong>');
+        $client = $this->authenticatedClient();
+        $base = [
+            'object_type_id' => $this->objectTypeIdFor(ObjectKind::Product),
+            'field_mappings' => [
+                ['slot' => 'title', 'source' => ['kind' => 'attribute', 'ref' => 'name']],
+                ['slot' => 'sku', 'source' => ['kind' => 'attribute', 'ref' => 'sku']],
+            ],
+            'limit' => 2,
+        ];
+
+        $sheet = $client->request('POST', '/api/catalogs/preview', [
+            'json' => [...$base, 'template_kind' => 'sheet'],
+        ])->toArray(false)['html'] ?? null;
+        $grid = $client->request('POST', '/api/catalogs/preview', [
+            'json' => [...$base, 'template_kind' => 'grid'],
+        ])->toArray(false)['html'] ?? null;
+
+        self::assertIsString($sheet);
+        self::assertIsString($grid);
+        self::assertStringContainsString('class="sheet', $sheet, 'sheet renders one product data-sheet block');
+        self::assertStringNotContainsString('class="toc"', $sheet);
+        self::assertStringContainsString('class="toc"', $grid, 'grid renders its table of contents');
+        self::assertStringContainsString('class="grid"', $grid, 'grid renders the multi-card table');
+        self::assertNotSame(hash('sha256', $sheet), hash('sha256', $grid));
+    }
+
+    #[Test]
     public function missingTemplateKindIsA400(): void
     {
         $client = $this->authenticatedClient();

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { HttpError, jsonFetch, rawFetch } from '@/lib/http';
-
+import { buildExportScopePayload } from './export-scope-payload';
 import type { ExportFormat, WizardState } from './types';
 
 interface RunResultAsync {
@@ -53,18 +53,11 @@ export function buildExportPayload(state: WizardState): Record<string, unknown> 
   const payload: Record<string, unknown> = {
     entity_type: state.entityType,
     format: state.format,
-    target_scope: state.targetScope,
+    ...buildExportScopePayload(state),
     selected_columns: state.columns,
-    include_variants: true,
     source: state.source,
   };
   if (state.objectTypeId !== null) payload.object_type_id = state.objectTypeId;
-  if (state.targetScope === 'filter' && state.filterDsl !== null) {
-    payload.filter_snapshot = state.filterDsl;
-  }
-  if (state.targetScope === 'selected') {
-    payload.selected_object_ids = state.selectedIds ?? [];
-  }
   if (state.locales !== null) payload.locales = state.locales;
   if (state.channels !== null) payload.channels = state.channels;
   return payload;
@@ -166,7 +159,7 @@ export async function updateProfile(state: WizardState, name: string, id: string
         selected_columns: state.columns,
         locales: state.locales,
         channels: state.channels,
-        include_variants: true,
+        include_variants: state.includeVariants,
         default_target_scope: state.targetScope,
         filter: state.filterDsl,
       },
@@ -184,7 +177,7 @@ export async function saveProfile(state: WizardState, name: string): Promise<voi
       selected_columns: state.columns,
       locales: state.locales,
       channels: state.channels,
-      include_variants: true,
+      include_variants: state.includeVariants,
       default_target_scope: state.targetScope,
       filter: state.filterDsl,
     },

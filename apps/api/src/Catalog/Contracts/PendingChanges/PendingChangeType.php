@@ -11,10 +11,14 @@ namespace App\Catalog\Contracts\PendingChanges;
  *                  per docs/api/jsonb-schemas.md).
  *   - `Schema`   — a modeling operation (new/changed attribute or group).
  *   - `Category` — a category assignment (add/remove/move).
+ *   - `Object`   — creation of one catalog object and its initial values.
+ *   - `Status`   — a workflow transition on one or more objects.
  */
 enum PendingChangeType: string
 {
     case Value = 'value';
     case Schema = 'schema';
     case Category = 'category';
+    case Object = 'object';
+    case Status = 'status';
 }

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Catalog\Application\Bulk;
 
 use App\Catalog\Application\ValueWriteCore;
-use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
 use App\Shared\Application\TenantContext;
@@ -56,40 +55,11 @@ final readonly class BulkValueCanonicalizer
             return $rawValue;
         }
 
-        $envelope = $this->core->normalise($attribute->getType(), $rawValue);
-        $envelope = $this->fillPriceCurrency($attribute, $envelope);
+        $envelope = $this->core->normaliseForAttribute($attribute, $rawValue);
 
         // A single-key `{value: …}` (text/number/date/boolean) mirrors the
         // canonical cache slot; the typed shapes (price/select/multiselect)
         // already carry their own keys.
-        return $envelope;
-    }
-
-    /**
-     * A bare price amount normalises to `{amount: N}` with no currency; the
-     * canonical envelope needs one. Default to the attribute's first allowed
-     * currency (`validation_rules.currencies`), falling back to PLN.
-     *
-     * @param array<string, mixed> $envelope
-     *
-     * @return array<string, mixed>
-     */
-    private function fillPriceCurrency(Attribute $attribute, array $envelope): array
-    {
-        if (AttributeType::Price !== $attribute->getType()) {
-            return $envelope;
-        }
-        if (!\array_key_exists('amount', $envelope) || isset($envelope['currency'])) {
-            return $envelope;
-        }
-
-        $currencies = $attribute->getValidationRules()['currencies'] ?? [];
-        $default = \is_array($currencies) && isset($currencies[0]) && \is_string($currencies[0])
-            ? $currencies[0]
-            : 'PLN';
-
-        $envelope['currency'] = $default;
-
         return $envelope;
     }
 }

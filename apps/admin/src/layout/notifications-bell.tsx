@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAgentPendingProposals } from '@/features/agent/hooks/useAgentPendingProposals';
 
 import { useNotificationsInboxOptional } from './notifications-context';
 import { useNotifications } from './use-notifications';
@@ -31,7 +32,9 @@ export function NotificationsBell() {
   const inbox = useNotificationsInboxOptional();
   // WFL-P2-03 — persistent workflow notifications (survive reloads).
   const workflow = useWorkflowNotifications();
-  const totalUnread = unreadCount + (inbox?.unread ?? 0) + workflow.unreadCount;
+  const agentPending = useAgentPendingProposals();
+  const totalUnread =
+    unreadCount + (inbox?.unread ?? 0) + workflow.unreadCount + agentPending.count;
 
   return (
     <DropdownMenu
@@ -66,6 +69,34 @@ export function NotificationsBell() {
           {t('notifications.title', { defaultValue: 'Recent activity' })}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {agentPending.count > 0 && (
+          <>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">
+              {t('notifications.agent_section', { defaultValue: 'Propozycje agenta' })}
+            </DropdownMenuLabel>
+            {agentPending.items.slice(0, 6).map((run) => (
+              <DropdownMenuItem
+                key={run.id}
+                asChild
+                className="flex flex-col items-start gap-0.5 whitespace-normal"
+              >
+                <Link
+                  to={`/agent/inbox?run=${encodeURIComponent(run.id)}${run.pending_change_batch_id !== null ? `&batch=${encodeURIComponent(run.pending_change_batch_id)}` : ''}`}
+                  data-testid="notification-agent-proposal"
+                >
+                  <span className="text-sm font-medium text-purple-800">{run.intent}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t('notifications.agent_pending', {
+                      defaultValue: '{{count}} zmian czeka na akceptację',
+                      count: run.affected_count ?? 0,
+                    })}
+                  </span>
+                </Link>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+          </>
+        )}
         {workflow.entries.length > 0 && (
           <>
             <DropdownMenuLabel className="text-xs text-muted-foreground">
@@ -132,7 +163,8 @@ export function NotificationsBell() {
         )}
         {entries.length === 0 &&
         (inbox?.entries.length ?? 0) === 0 &&
-        workflow.entries.length === 0 ? (
+        workflow.entries.length === 0 &&
+        agentPending.count === 0 ? (
           <div className="px-3 py-6 text-center text-xs text-muted-foreground">
             {t('notifications.empty', { defaultValue: 'No recent events.' })}
           </div>

@@ -135,6 +135,7 @@ export function FeedWizardPage() {
     targetScope: filterState.dsl === null ? 'all' : 'filter',
     filterDsl: filterState.dsl,
     selectedIds: null,
+    includeVariants: true,
     enabled: stepId === 'scope',
   });
   const resultCount = preflight.result?.count ?? null;

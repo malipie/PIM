@@ -15,7 +15,8 @@ use Symfony\Component\Uid\Uuid;
 final readonly class ValueEditProposal
 {
     /**
-     * @param list<array{code: string, reason: string}> $rejected
+     * @param list<array{code: string, reason: string}>                                                                        $rejected
+     * @param list<array{object_id: string, object_code: string, attribute_code: string, current_value: array<string, mixed>}> $skippedExistingExamples
      */
     public function __construct(
         public Uuid $batchId,
@@ -23,6 +24,11 @@ final readonly class ValueEditProposal
         public int $materializedChanges,
         public int $skippedExisting,
         public array $rejected,
+        public array $skippedExistingExamples = [],
+        public int $selectorRejected = 0,
+        public int $selectorMatchedObjects = 0,
+        public int $permissionRejectedAttributes = 0,
+        public ?string $mode = null,
     ) {
     }
 }

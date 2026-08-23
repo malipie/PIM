@@ -35,12 +35,13 @@ test('inbox lists the plan, shows the diff and approves', async ({ page }) => {
   await loginAsAdmin(page);
 
   let approved = false;
-  await page.route(`**/api/agent/runs?*`, (route) =>
+  await page.route(`**/api/agent/inbox?*`, (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        items: [runSummary(approved ? 'done' : 'awaiting_approval')],
+        items: approved ? [] : [runSummary('awaiting_approval')],
+        total: approved ? 0 : 1,
         page: 1,
         per_page: 100,
       }),
@@ -80,12 +81,21 @@ test('inbox lists the plan, shows the diff and approves', async ({ page }) => {
     });
   });
 
-  await page.goto('/agent/inbox');
+  await page.goto('/dashboard');
+  await expect(page.getByTestId('nav-agent-inbox')).toBeVisible();
+  await expect(page.getByTestId('nav-agent-inbox-count')).toHaveText('1');
+  const navA11y = await new AxeBuilder({ page })
+    .include('[data-testid="nav-agent-inbox"]')
+    .analyze();
+  expect(
+    navA11y.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical'),
+  ).toEqual([]);
+  await page.getByTestId('nav-agent-inbox').click();
   await expect(page.getByTestId('agent-inbox-item')).toBeVisible();
   await expect(page.getByTestId('agent-inbox-item')).toContainText('1800');
   await expect(page.getByTestId('agent-inbox-item')).toContainText('0.009600');
 
-  await page.getByTestId('agent-inbox-show-diff').click();
+  await page.goto(`/agent/inbox?run=${RUN_ID}&batch=0197c3b0-0000-7000-8000-00000000beef`);
   await expect(page.getByTestId('agent-diff-modal')).toBeVisible();
   await expect(page.getByTestId('agent-diff-row')).toContainText('price: ∅ → 100');
 
@@ -96,5 +106,6 @@ test('inbox lists the plan, shows the diff and approves', async ({ page }) => {
 
   await page.getByTestId('agent-diff-approve').click();
   await expect(page.getByTestId('agent-inbox-empty')).toBeVisible();
+  await expect(page.getByTestId('nav-agent-inbox-count')).toHaveText('0');
   expect(approved).toBe(true);
 });

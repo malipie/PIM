@@ -6,9 +6,12 @@ namespace App\Catalog\Application\PendingChanges;
 
 use App\Catalog\Application\BatchValueWriter;
 use App\Catalog\Application\Bulk\BulkAddCategoryHandler;
+use App\Catalog\Application\Bulk\BulkChangeStatusHandler;
 use App\Catalog\Application\Bulk\BulkMoveCategoryHandler;
 use App\Catalog\Application\Bulk\BulkRemoveCategoryHandler;
 use App\Catalog\Application\BulkContext;
+use App\Catalog\Application\Command\CreateCatalogObject\CreateCatalogObjectCommand;
+use App\Catalog\Application\Command\CreateCatalogObject\CreateCatalogObjectHandler;
 use App\Catalog\Application\Message\ObjectValuesChangedMessage;
 use App\Catalog\Application\Reindex\BulkReindexQueueInterface;
 use App\Catalog\Contracts\Command\PendingBatchCommitPort;
@@ -20,10 +23,12 @@ use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\BulkLog;
 use App\Catalog\Domain\Entity\BulkSession;
 use App\Catalog\Domain\Entity\CatalogObject;
+use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Provenance;
 use App\Channel\Contracts\ChannelResolverInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
+use App\Workflow\Contracts\ActingUserContextInterface;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
@@ -76,6 +81,9 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
         private BulkAddCategoryHandler $addCategories,
         private BulkRemoveCategoryHandler $removeCategories,
         private BulkMoveCategoryHandler $moveCategories,
+        private BulkChangeStatusHandler $changeStatuses,
+        private CreateCatalogObjectHandler $createObjects,
+        private ActingUserContextInterface $actingUser,
         private ChannelResolverInterface $channelResolver,
     ) {
     }
@@ -101,11 +109,17 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
                 return PendingBatchCommitResult::nothingToCommit();
             }
 
-            [$perObject, $categoryBatch] = $this->collectAcceptedChanges($batchId);
-            if ([] !== $perObject && null !== $categoryBatch) {
-                throw new LogicException('Mixed value/category pending batches are not supported - materializers emit homogeneous batches.');
+            [$perObject, $categoryBatch, $objectBatch, $statusBatch] = $this->collectAcceptedChanges($batchId);
+            $families = array_filter([
+                [] !== $perObject,
+                null !== $categoryBatch,
+                [] !== $objectBatch,
+                null !== $statusBatch,
+            ]);
+            if (\count($families) > 1) {
+                throw new LogicException('Mixed pending-change families are not supported - materializers emit homogeneous batches.');
             }
-            if ([] === $perObject && null === $categoryBatch) {
+            if ([] === $families) {
                 $connection->rollBack();
 
                 return PendingBatchCommitResult::nothingToCommit();
@@ -113,6 +127,20 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
 
             if (null !== $categoryBatch) {
                 $result = $this->commitCategoryBatch($tenantId, $batchId, $approvedBy, $categoryBatch);
+                $connection->commit();
+
+                return $result;
+            }
+
+            if ([] !== $objectBatch) {
+                $result = $this->commitObjectBatch($tenantId, $batchId, $approvedBy, $objectBatch);
+                $connection->commit();
+
+                return $result;
+            }
+
+            if (null !== $statusBatch) {
+                $result = $this->commitStatusBatch($tenantId, $batchId, $approvedBy, $statusBatch);
                 $connection->commit();
 
                 return $result;
@@ -202,19 +230,26 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
      * status=accepted rows commit — a race that rejected/expired part of
      * the batch between accept() and here cannot leak rows in.
      *
-     * @return array{0: array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>, locale: ?string, channel: ?string}>>, 1: ?array{operation: string, categoryIds: list<string>, objectIds: list<string>}}
+     * @return array{
+     *   0: array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>, locale: ?string, channel: ?string}>>,
+     *   1: ?array{operation: string, categoryIds: list<string>, objectIds: list<string>},
+     *   2: list<array<string, mixed>>,
+     *   3: ?array{transition: string, objectIds: list<string>}
+     * }
      */
     private function collectAcceptedChanges(Uuid $batchId): array
     {
         $perObject = [];
         $categoryBatch = null;
+        $objectBatch = [];
+        $statusBatch = null;
 
         foreach ($this->pendingChanges->iterateBatch($batchId) as $view) {
-            if (PendingChangeStatus::Accepted !== $view->status || null === $view->targetObjectId) {
+            if (PendingChangeStatus::Accepted !== $view->status) {
                 continue;
             }
 
-            if (PendingChangeType::Value === $view->changeType && null !== $view->attributeCode && null !== $view->after) {
+            if (PendingChangeType::Value === $view->changeType && null !== $view->targetObjectId && null !== $view->attributeCode && null !== $view->after) {
                 $perObject[$view->targetObjectId->toRfc4122()][] = [
                     'code' => $view->attributeCode,
                     'before' => $view->before,
@@ -226,7 +261,7 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
                 continue;
             }
 
-            if (PendingChangeType::Category === $view->changeType && null !== $view->after) {
+            if (PendingChangeType::Category === $view->changeType && null !== $view->targetObjectId && null !== $view->after) {
                 $operation = $view->after['operation'] ?? null;
                 $categoryIds = $view->after['category_ids'] ?? null;
                 if (!\is_string($operation) || !\is_array($categoryIds)) {
@@ -242,10 +277,160 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
                     $categoryBatch = ['operation' => $operation, 'categoryIds' => $ids, 'objectIds' => []];
                 }
                 $categoryBatch['objectIds'][] = $view->targetObjectId->toRfc4122();
+                continue;
+            }
+
+            if (PendingChangeType::Object === $view->changeType && null !== $view->after) {
+                $objectBatch[] = $view->after;
+                continue;
+            }
+
+            if (PendingChangeType::Status === $view->changeType && null !== $view->targetObjectId && null !== $view->after) {
+                $transition = $view->after['transition'] ?? null;
+                if (!\is_string($transition) || '' === $transition) {
+                    continue;
+                }
+                if (null === $statusBatch) {
+                    $statusBatch = ['transition' => $transition, 'objectIds' => []];
+                } elseif ($statusBatch['transition'] !== $transition) {
+                    throw new LogicException('One status batch cannot contain different workflow transitions.');
+                }
+                $statusBatch['objectIds'][] = $view->targetObjectId->toRfc4122();
             }
         }
 
-        return [$perObject, $categoryBatch];
+        return [$perObject, $categoryBatch, $objectBatch, $statusBatch];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $batch
+     */
+    private function commitObjectBatch(string $tenantId, Uuid $batchId, Uuid $approvedBy, array $batch): PendingBatchCommitResult
+    {
+        $this->tenantContext->set($this->managedTenant($tenantId));
+        $createdIds = [];
+        $createdKinds = [];
+        $initialValueCount = 0;
+
+        foreach ($batch as $payload) {
+            $objectTypeId = $payload['object_type_id'] ?? null;
+            $code = $payload['code'] ?? null;
+            $kind = $payload['kind'] ?? null;
+            $attributes = $payload['attributes'] ?? [];
+            if (!\is_string($objectTypeId) || !Uuid::isValid($objectTypeId)
+                || !\is_string($code) || !\is_string($kind)
+                || !\is_array($attributes)) {
+                throw new LogicException('Malformed object-creation pending change.');
+            }
+            $expectedKind = ObjectKind::tryFrom($kind);
+            if (!$expectedKind instanceof ObjectKind) {
+                throw new LogicException(\sprintf('Unknown object kind "%s".', $kind));
+            }
+
+            $parentId = $this->optionalUuid($payload['parent_id'] ?? null);
+            $categoryIds = $this->uuidList($payload['category_ids'] ?? []);
+            $primaryCategoryId = $this->optionalUuid($payload['primary_category_id'] ?? null);
+            /** @var array<string, mixed> $attributes */
+            $createdId = ($this->createObjects)(new CreateCatalogObjectCommand(
+                objectTypeId: Uuid::fromString($objectTypeId),
+                code: $code,
+                expectedKind: $expectedKind,
+                parentId: $parentId,
+                attributes: $attributes,
+                categoryIds: [] === $categoryIds ? null : $categoryIds,
+                primaryCategoryId: $primaryCategoryId,
+                provenance: Provenance::Agent,
+            ));
+            $createdIds[] = $createdId->toRfc4122();
+            $createdKinds[$expectedKind->value][] = $createdId->toRfc4122();
+            $initialValueCount += \count($attributes);
+        }
+
+        $session = new BulkSession(
+            actionType: 'create_object',
+            targetObjectIds: $createdIds,
+            actionPayload: [
+                'pending_change_batch_id' => $batchId->toRfc4122(),
+                'created_kinds' => $createdKinds,
+            ],
+            userId: $approvedBy,
+            source: BulkSession::SOURCE_CMD_K_AGENT,
+        );
+        $this->entityManager->persist($session);
+        $this->entityManager->flush();
+        foreach ($createdIds as $createdId) {
+            $object = $this->entityManager->find(CatalogObject::class, $createdId);
+            $version = $object instanceof CatalogObject ? $object->getVersion() : null;
+            $this->entityManager->persist(new BulkLog(
+                $session->getId(),
+                Uuid::fromString($createdId),
+                oldValue: null,
+                newValue: ['created_version' => $version],
+                message: 'create_object',
+            ));
+        }
+        $session->complete(\count($createdIds), 0, 0);
+        $this->entityManager->flush();
+        $this->reindexQueue->queueAll($createdIds);
+
+        return new PendingBatchCommitResult($session->getId(), $initialValueCount, \count($createdIds), []);
+    }
+
+    /** @param array{transition: string, objectIds: list<string>} $batch */
+    private function commitStatusBatch(string $tenantId, Uuid $batchId, Uuid $approvedBy, array $batch): PendingBatchCommitResult
+    {
+        $this->tenantContext->set($this->managedTenant($tenantId));
+        $session = new BulkSession(
+            actionType: 'change_status',
+            targetObjectIds: $batch['objectIds'],
+            actionPayload: [
+                'transition' => $batch['transition'],
+                'pending_change_batch_id' => $batchId->toRfc4122(),
+            ],
+            userId: $approvedBy,
+            source: BulkSession::SOURCE_CMD_K_AGENT,
+        );
+        $this->entityManager->persist($session);
+        $this->entityManager->flush();
+
+        $this->actingUser->set($approvedBy);
+        try {
+            $counts = $this->changeStatuses->handle($session, $batch['transition'], null);
+        } finally {
+            $this->actingUser->set(null);
+        }
+
+        $issues = $counts['skipped'] > 0
+            ? [['objectId' => '', 'attributeCode' => '', 'message' => \sprintf('%d object(s) were blocked when the workflow guard was re-checked at commit.', $counts['skipped'])]]
+            : [];
+
+        return new PendingBatchCommitResult(
+            bulkSessionId: $session->getId(),
+            committedValues: $counts['success'],
+            objectsTouched: $counts['success'],
+            issues: $issues,
+        );
+    }
+
+    private function optionalUuid(mixed $value): ?Uuid
+    {
+        return \is_string($value) && Uuid::isValid($value) ? Uuid::fromString($value) : null;
+    }
+
+    /** @return list<Uuid> */
+    private function uuidList(mixed $values): array
+    {
+        if (!\is_array($values)) {
+            return [];
+        }
+        $ids = [];
+        foreach ($values as $value) {
+            if (\is_string($value) && Uuid::isValid($value)) {
+                $ids[] = Uuid::fromString($value);
+            }
+        }
+
+        return $ids;
     }
 
     /**

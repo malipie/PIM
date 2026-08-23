@@ -4,21 +4,19 @@ declare(strict_types=1);
 
 namespace App\Export\Presentation\Controller;
 
-use App\Catalog\Application\Filter\FilterDslResolver;
-use App\Catalog\Domain\Entity\ObjectType;
-use App\Catalog\Domain\ObjectKind;
-use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Channel\Contracts\ChannelResolverInterface;
 use App\Export\Application\Builder\ColumnResolver;
 use App\Export\Application\Builder\Structural\StructuralExportBuilderInterface;
+use App\Export\Application\Sync\SyncExportRunner;
+use App\Export\Domain\Entity\ExportSession;
 use App\Export\Domain\Enum\ExportEntityType;
+use App\Export\Domain\Enum\ExportFormat;
+use App\Export\Domain\Enum\ExportSource;
 use App\Export\Domain\Enum\ExportTargetScope;
 use App\Export\Presentation\Support\ExportEntityTypeResolver;
-use App\Export\Presentation\Support\ExportEntityTypeSelection;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
-use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -28,17 +26,16 @@ use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Uid\Uuid;
-use Throwable;
 
 /**
  * EXR-07 (#1383) — preflight count + sync/async routing contract.
  *
- * The wizard needs a cheap "how many rows will this export?" probe before
+ * The wizard needs an exact "how many rows will this export?" probe before
  * running, and the resulting sync-vs-async decision (so Krok 2/4 can show the
- * live counter + asynchronicity note). This endpoint runs a COUNT only — no
- * side effects — using the same FilterDSL the product list uses and the same
- * {@see SyncExportController::SYNC_THRESHOLD} constant the runner routes on
- * (single source of truth; the UI never hardcodes 100).
+ * live counter + asynchronicity note). For catalog objects this endpoint
+ * resolves the same immutable id plan as the runner — no side effects — and
+ * uses the same {@see SyncExportController::SYNC_THRESHOLD} constant the
+ * runner routes on (single source of truth; the UI never hardcodes 100).
  *
  * Scope (EXR-07): `product` and `custom_module`. Structural entity types
  * always export the full configuration set; their preflight count lands with
@@ -48,12 +45,10 @@ final class ExportPreflightController
 {
     public function __construct(
         private readonly ExportEntityTypeResolver $entityTypeResolver,
-        private readonly ObjectTypeRepositoryInterface $objectTypes,
-        private readonly FilterDslResolver $filterDsl,
-        private readonly Connection $connection,
         private readonly TenantContext $tenantContext,
         private readonly ColumnResolver $columnResolver,
         private readonly ChannelResolverInterface $channelResolver,
+        private readonly SyncExportRunner $runner,
         /** @var iterable<StructuralExportBuilderInterface> */
         #[AutowireIterator('app.export.structural_builder')]
         private readonly iterable $structuralBuilders = [],
@@ -89,12 +84,23 @@ final class ExportPreflightController
             // count comes from the matching structural builder.
             $count = $this->structuralCount($selection->entityType, $tenant);
         } else {
-            $objectType = $this->resolveObjectType($selection, $tenant);
-            $count = match ($scope) {
-                ExportTargetScope::Selected => $this->countSelected($payload),
-                ExportTargetScope::All => $this->countAll($tenant, $objectType),
-                ExportTargetScope::Filter => $this->countFilter($payload, $tenant, $objectType),
-            };
+            // #2987 — materialise the same immutable scope contract the run
+            // endpoint stores. SyncExportRunner delegates to ExportScopeResolver
+            // for both this count and the final file id plan.
+            $session = new ExportSession(
+                userId: Uuid::v7(),
+                source: ExportSource::CentralTab,
+                format: ExportFormat::Csv,
+                targetScope: $scope,
+                selectedColumns: [],
+                filterSnapshot: $this->parseFilter($payload),
+                selectedObjectIds: $this->parseSelectedIds($payload, $scope),
+                includeVariants: $this->parseIncludeVariants($payload),
+                entityType: $selection->entityType,
+                objectTypeId: $selection->objectTypeId,
+            );
+            $session->assignTenant($tenant);
+            $count = $this->runner->resolveTargetCount($session);
         }
 
         $mode = $count >= SyncExportController::SYNC_THRESHOLD ? 'async' : 'sync';
@@ -173,96 +179,6 @@ final class ExportPreflightController
         throw new UnprocessableEntityHttpException(sprintf('No structural builder for entity_type=%s.', $type->value));
     }
 
-    private function resolveObjectType(ExportEntityTypeSelection $selection, Tenant $tenant): ObjectType
-    {
-        if (ExportEntityType::Product === $selection->entityType) {
-            $builtIn = $this->objectTypes->findBuiltInByKind(ObjectKind::Product, $tenant);
-            if (null === $builtIn) {
-                throw new UnprocessableEntityHttpException('Built-in Product ObjectType is not seeded for this tenant.');
-            }
-
-            return $builtIn;
-        }
-
-        // custom_module — object_type_id already validated by the resolver.
-        $id = $selection->objectTypeId;
-        \assert($id instanceof Uuid);
-        $objectType = $this->objectTypes->findById($id);
-        \assert($objectType instanceof ObjectType);
-
-        return $objectType;
-    }
-
-    private function countAll(Tenant $tenant, ObjectType $objectType): int
-    {
-        return $this->runCount(
-            'SELECT COUNT(*) FROM objects co WHERE co.tenant_id = :tenant AND co.object_type_id = :otid',
-            ['tenant' => $tenant->getId()->toRfc4122(), 'otid' => $objectType->getId()->toRfc4122()],
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     */
-    private function countFilter(array $payload, Tenant $tenant, ObjectType $objectType): int
-    {
-        $dsl = $this->parseFilter($payload);
-        if (null === $dsl || [] === $dsl) {
-            return 0;
-        }
-        // AUD-031 / W2-3 (C-2): validate the DSL BEFORE compiling it to SQL,
-        // exactly like every other filter entry point (SmartFilterPresetController).
-        // FilterDslResolver builds parameter-free SQL by inlining escaped
-        // literals; until VIEW-10 moves it to PDO-bound parameters, validate()
-        // is the gate that rejects structurally-malicious or out-of-contract
-        // DSL (unknown operators, unsafe identifiers, oversized groups) up
-        // front (400) instead of letting it reach the COUNT query.
-        $this->filterDsl->validate($dsl);
-        $whereClause = $this->filterDsl->toCountSql($dsl);
-        if (null === $whereClause) {
-            throw new BadRequestHttpException('Invalid filter DSL.');
-        }
-
-        return $this->runCount(
-            'SELECT COUNT(*) FROM objects co WHERE co.tenant_id = :tenant AND co.object_type_id = :otid AND ('.$whereClause.')',
-            ['tenant' => $tenant->getId()->toRfc4122(), 'otid' => $objectType->getId()->toRfc4122()],
-        );
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     */
-    private function countSelected(array $payload): int
-    {
-        $value = $payload['selected_ids'] ?? null;
-        if (!\is_array($value)) {
-            throw new BadRequestHttpException('selected_ids must be an array when target_scope=selected.');
-        }
-        $ids = [];
-        foreach ($value as $id) {
-            if (!\is_string($id) || !Uuid::isValid($id)) {
-                throw new BadRequestHttpException('selected_ids must contain RFC 4122 UUID strings.');
-            }
-            $ids[$id] = true;
-        }
-
-        return \count($ids);
-    }
-
-    /**
-     * @param array<string, mixed> $params
-     */
-    private function runCount(string $sql, array $params): int
-    {
-        try {
-            $result = $this->connection->fetchOne($sql, $params);
-
-            return \is_numeric($result) ? (int) $result : 0;
-        } catch (Throwable $error) {
-            throw new BadRequestHttpException('Preflight count failed: '.$error->getMessage(), $error);
-        }
-    }
-
     /**
      * @param array<string, mixed> $payload
      */
@@ -287,22 +203,62 @@ final class ExportPreflightController
      */
     private function parseFilter(array $payload): ?array
     {
-        $value = $payload['filter'] ?? null;
+        // Same key as POST /api/products/export (#2987). Keep the legacy
+        // `filter` alias for saved clients while the wizard now sends only the
+        // canonical snapshot field.
+        $value = $payload['filter_snapshot'] ?? $payload['filter'] ?? null;
         if (null === $value) {
             return null;
         }
         if (!\is_array($value)) {
-            throw new BadRequestHttpException('filter must be a JSON object or null.');
+            throw new BadRequestHttpException('filter_snapshot must be a JSON object or null.');
         }
         $dsl = [];
         foreach ($value as $key => $val) {
             if (!\is_string($key)) {
-                throw new BadRequestHttpException('filter must be a JSON object (string keys).');
+                throw new BadRequestHttpException('filter_snapshot must be a JSON object (string keys).');
             }
             $dsl[$key] = $val;
         }
 
         return $dsl;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return list<string>|null
+     */
+    private function parseSelectedIds(array $payload, ExportTargetScope $scope): ?array
+    {
+        if (ExportTargetScope::Selected !== $scope) {
+            return null;
+        }
+        $value = $payload['selected_object_ids'] ?? null;
+        if (!\is_array($value) || [] === $value) {
+            throw new BadRequestHttpException('selected_object_ids must be a non-empty array when target_scope=selected.');
+        }
+
+        $ids = [];
+        foreach ($value as $id) {
+            if (!\is_string($id) || !Uuid::isValid($id)) {
+                throw new BadRequestHttpException('selected_object_ids must contain RFC 4122 UUID strings.');
+            }
+            $ids[$id] = true;
+        }
+
+        return array_keys($ids);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function parseIncludeVariants(array $payload): bool
+    {
+        $value = $payload['include_variants'] ?? true;
+        if (!\is_bool($value)) {
+            throw new BadRequestHttpException('include_variants must be boolean.');
+        }
+
+        return $value;
     }
 
     /**

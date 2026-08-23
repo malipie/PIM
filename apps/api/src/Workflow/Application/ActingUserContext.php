@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Workflow\Application;
 
+use App\Workflow\Contracts\ActingUserContextInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -18,7 +19,7 @@ use Symfony\Component\Uid\Uuid;
  * trusted system path (CLI, fixtures) — HTTP can never reach that
  * branch because every workflow endpoint requires authentication.
  */
-final class ActingUserContext
+final class ActingUserContext implements ActingUserContextInterface
 {
     private ?Uuid $userId = null;
 

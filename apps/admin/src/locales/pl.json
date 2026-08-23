@@ -50,6 +50,8 @@
     "aria_label": "Powiadomienia",
     "title": "Ostatnia aktywność",
     "empty": "Brak ostatnich zdarzeń.",
+    "agent_section": "Propozycje agenta",
+    "agent_pending": "{{count}} zmian czeka na akceptację",
     "workflow_section": "Workflow",
     "workflow_type": {
       "workflow": {
@@ -110,7 +112,9 @@
     "imports": "Importy",
     "exports": "Eksporty",
     "api_configurator": "Konfigurator API",
-    "xml_configurator": "Konfigurator XML"
+    "xml_configurator": "Konfigurator XML",
+    "agent_inbox": "Propozycje agenta",
+    "agent_inbox_pending": "{{count}} propozycji oczekuje"
   },
   "admin": {
     "tenants": {
@@ -4087,7 +4091,8 @@
       "send": "Wyślij",
       "cancel": "Anuluj run",
       "awaiting_approval": "Plan gotowy: {{count}} zmian czeka na Twoją akceptację.",
-      "go_to_inbox": "Przejdź do skrzynki akceptacji"
+      "go_to_inbox": "Przejdź do skrzynki akceptacji",
+      "view_proposal": "Zobacz propozycję →"
     },
     "status": {
       "planning": "Planuję…",
@@ -4114,6 +4119,10 @@
       "rejected": "Odrzucono — katalog bez zmian.",
       "diff_title": "Plan zmian",
       "diff_scope": "{{shown}} z {{total}} pozycji planu · all-or-nothing",
+      "mode_overwrite": "Tryb: nadpisywanie istniejących wartości",
+      "mode_only_empty": "Tryb: tylko puste wartości",
+      "object": "obiekt",
+      "status": "status",
       "partial": "Częściowo (wkrótce)",
       "partial_tooltip": "Częściowa akceptacja w przygotowaniu — MVP zatwierdza cały plan.",
       "schema_group": "grupa",
@@ -4124,6 +4133,7 @@
       "title": "Historia runów agenta",
       "subtitle": "Twoje runy: status, zakres, koszt i „Cofnij tę operację” dla zakończonych.",
       "go_inbox": "Skrzynka akceptacji",
+      "view_proposal": "Zobacz propozycję",
       "loading": "Wczytywanie…",
       "empty": "Jeszcze żadnych runów — otwórz czat agenta albo Cmd+K.",
       "expand": "Szczegóły runu",

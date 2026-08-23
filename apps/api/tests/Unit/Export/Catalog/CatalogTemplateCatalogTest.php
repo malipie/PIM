@@ -72,4 +72,18 @@ final class CatalogTemplateCatalogTest extends TestCase
         self::assertSame(CatalogTemplateKind::Pricelist, $all[1]->kind);
         self::assertSame(CatalogTemplateKind::Grid, $all[2]->kind);
     }
+
+    #[Test]
+    public function everyKindMapsToItsOwnTwigTemplate(): void
+    {
+        $catalog = new CatalogTemplateCatalog();
+        $paths = [];
+        foreach (CatalogTemplateKind::cases() as $kind) {
+            $template = $catalog->get($kind);
+            $paths[$kind->value] = $template->twig;
+            self::assertStringContainsString('/'.$kind->value.'.html.twig', '/'.$template->twig);
+        }
+
+        self::assertCount(\count(CatalogTemplateKind::cases()), array_unique($paths));
+    }
 }

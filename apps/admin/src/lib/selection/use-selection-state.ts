@@ -29,11 +29,14 @@ export interface SelectionState {
   error: Error | null;
 }
 
-interface SelectAllMatchingPayload {
+export interface SelectAllMatchingPayload {
   smartPreset?: string;
   filter?: string;
   q?: string;
   limit?: number;
+  variantsMode?: 'tree' | 'flat';
+  filters?: Record<string, string | string[]>;
+  rangeFilters?: Record<string, { gte?: number; lte?: number }>;
 }
 
 interface SelectAllMatchingResponse {
@@ -47,10 +50,13 @@ export interface UseSelectionStateResult extends SelectionState {
   toggle: (id: string) => void;
   setPageSelection: (ids: Iterable<string>) => void;
   clear: () => void;
-  selectAllMatching: (payload?: SelectAllMatchingPayload) => Promise<void>;
+  selectAllMatching: (
+    payload?: SelectAllMatchingPayload,
+    visibleIds?: Iterable<string>,
+  ) => Promise<void>;
 }
 
-export function useSelectionState(matchingCount: number): UseSelectionStateResult {
+export function useSelectionState(): UseSelectionStateResult {
   const [mode, setMode] = useState<SelectionMode>('none');
   const [ids, setIds] = useState<Set<string>>(new Set());
   const [totalMatched, setTotalMatched] = useState(0);
@@ -84,7 +90,10 @@ export function useSelectionState(matchingCount: number): UseSelectionStateResul
   }, []);
 
   const selectAllMatching = useCallback(
-    async (payload: SelectAllMatchingPayload = {}): Promise<void> => {
+    async (
+      payload: SelectAllMatchingPayload = {},
+      visibleIds: Iterable<string> = [],
+    ): Promise<void> => {
       setIsLoading(true);
       setError(null);
       try {
@@ -97,25 +106,38 @@ export function useSelectionState(matchingCount: number): UseSelectionStateResul
               filter: payload.filter,
               q: payload.q,
               limit: payload.limit ?? HARD_CAP,
+              variants_mode: payload.variantsMode ?? 'tree',
+              filters: payload.filters,
+              range_filters: payload.rangeFilters,
             },
           },
         );
-        setIds(new Set(response.ids));
+        // The current page is authoritative visible state. Put its ids first
+        // so an index refresh racing the selection request cannot leave the
+        // checkboxes the operator can see unchecked after escalation.
+        const resolved = new Set<string>();
+        for (const id of visibleIds) {
+          if (resolved.size >= response.limit) break;
+          resolved.add(id);
+        }
+        for (const id of response.ids) {
+          if (resolved.size >= response.limit) break;
+          resolved.add(id);
+        }
+        setIds(resolved);
         setTotalMatched(response.totalMatched);
-        setCapped(response.capped);
+        setCapped(response.capped || resolved.size < response.totalMatched);
         setMode('all-matching');
       } catch (e) {
-        setError(e instanceof Error ? e : new Error(String(e)));
+        const error = e instanceof Error ? e : new Error(String(e));
+        setError(error);
+        throw error;
       } finally {
         setIsLoading(false);
       }
     },
     [],
   );
-
-  // matchingCount is metadata for the toolbar — kept as a passthrough
-  // here so the hook signature stays stable when the caller refetches.
-  void matchingCount;
 
   return {
     mode,

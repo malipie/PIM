@@ -147,6 +147,16 @@ export function listAgentRuns(
   return jsonFetch(`/api/agent/runs`, { ...JSON_OPTS, query: { page, per_page: perPage } });
 }
 
+export function listPendingAgentRuns(
+  page = 1,
+  perPage = 100,
+): Promise<{ items: AgentRunSummary[]; total: number; page: number; per_page: number }> {
+  return jsonFetch('/api/agent/inbox', {
+    ...JSON_OPTS,
+    query: { page, per_page: perPage },
+  });
+}
+
 export function sendAgentMessage(id: string, message: string): Promise<AgentRunSummary> {
   return jsonFetch<AgentRunSummary>(`/api/agent/runs/${id}/messages`, {
     ...JSON_OPTS,
@@ -189,7 +199,7 @@ export function cancelAgentRun(id: string): Promise<AgentRunSummary> {
 
 export interface AgentPlanRow {
   id: string;
-  change_type: 'value' | 'schema' | 'category';
+  change_type: 'value' | 'schema' | 'category' | 'object' | 'status';
   status: string;
   target_object_id: string | null;
   target_object_code: string | null;
@@ -199,6 +209,7 @@ export interface AgentPlanRow {
   scope_channel: string | null;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
+  meta: Record<string, unknown> | null;
   provenance: string;
 }
 

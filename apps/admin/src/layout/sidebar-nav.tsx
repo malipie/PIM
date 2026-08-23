@@ -2,6 +2,7 @@ import {
   ArrowRight,
   Boxes,
   ChevronDown,
+  ClipboardCheck,
   Cog,
   FileLock2,
   FileText,
@@ -23,6 +24,7 @@ import { NavLink, useLocation } from 'react-router';
 
 import { BrandLogo } from '@/components/brand/brand-logo';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAgentPendingProposals } from '@/features/agent/hooks/useAgentPendingProposals';
 import {
   hasAnyPermission,
   hasFeature,
@@ -211,6 +213,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
   const { data, isError } = useEffectiveMenu();
   const { identity } = useIdentity();
   const { pathname } = useLocation();
+  const pendingAgent = useAgentPendingProposals();
 
   const rawItems: EffectiveMenuItem[] = data && !isError ? data.visible : FALLBACK_ITEMS;
   // #2881 — ObjectType entries are keyed by uuid, which the ref map cannot
@@ -536,7 +539,43 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
         <div className="px-3 pb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
           {t('nav.workspace_label', { defaultValue: 'Workspace' })}
         </div>
-        <div className="flex flex-col gap-0.5">{items.map(renderLeaf)}</div>
+        <div className="flex flex-col gap-0.5">
+          {items.map(renderLeaf)}
+          {pendingAgent.allowed ? (
+            <NavLink
+              to="/agent/inbox"
+              onClick={onNavigate}
+              className={leafLinkClass}
+              end={false}
+              data-testid="nav-agent-inbox"
+            >
+              {({ isActive }) => (
+                <>
+                  <ClipboardCheck
+                    className={cn('size-4', isActive ? 'text-white/90' : 'text-zinc-500')}
+                    aria-hidden
+                  />
+                  <span className="flex-1">
+                    {t('nav.agent_inbox', { defaultValue: 'Propozycje agenta' })}
+                  </span>
+                  <span
+                    className={cn(
+                      'num ml-auto min-w-5 rounded-full px-1.5 text-center font-mono text-[11px] font-semibold',
+                      isActive ? 'bg-white/15 text-white' : 'bg-purple-100 text-purple-800',
+                    )}
+                    title={t('nav.agent_inbox_pending', {
+                      defaultValue: '{{count}} propozycji oczekuje',
+                      count: pendingAgent.count,
+                    })}
+                    data-testid="nav-agent-inbox-count"
+                  >
+                    {formatNavCount(pendingAgent.count)}
+                  </span>
+                </>
+              )}
+            </NavLink>
+          ) : null}
+        </div>
 
         {/* #2830 — this link used to render for everyone and walked the
             caller into the four-step object-type wizard, which then failed

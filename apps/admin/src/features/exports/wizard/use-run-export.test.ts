@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { isDownloadableContentType } from './use-run-export';
+import { buildExportScopePayload } from './export-scope-payload';
+import { INITIAL_WIZARD_STATE } from './types';
+import { buildExportPayload, isDownloadableContentType } from './use-run-export';
 
 describe('isDownloadableContentType', () => {
   it('accepts the file each format actually returns', () => {
@@ -29,5 +31,24 @@ describe('isDownloadableContentType', () => {
     // ignored the request; downloading it as .xlsx produces a corrupt file.
     expect(isDownloadableContentType('xlsx', 'text/csv')).toBe(false);
     expect(isDownloadableContentType('csv', 'application/xml')).toBe(false);
+  });
+});
+
+describe('export scope contract', () => {
+  it('uses the same selected tree scope for preflight and file execution', () => {
+    const state = {
+      ...INITIAL_WIZARD_STATE,
+      targetScope: 'selected' as const,
+      selectedIds: ['019eae00-0000-7000-8000-000000000001'],
+      includeVariants: false,
+      columns: ['sku'],
+    };
+
+    expect(buildExportPayload(state)).toMatchObject(buildExportScopePayload(state));
+    expect(buildExportPayload(state)).toMatchObject({
+      target_scope: 'selected',
+      selected_object_ids: state.selectedIds,
+      include_variants: false,
+    });
   });
 });

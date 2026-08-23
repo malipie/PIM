@@ -144,7 +144,7 @@ final readonly class CreateCatalogObjectHandler
         $this->catalogObjects->save($object);
 
         if ([] !== $command->attributes) {
-            $this->attributesUpserter->upsert($object, $command->attributes);
+            $this->attributesUpserter->upsert($object, $command->attributes, $command->provenance);
         }
 
         // #891 / #1359 — atomic category assignment for any categorizable

@@ -1,4 +1,12 @@
-import { ChevronDown, ChevronRight, Loader2, MessageSquare, Undo2, X } from 'lucide-react';
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  MessageSquare,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
@@ -205,6 +213,17 @@ export function AgentHistoryPage() {
                   >
                     <MessageSquare className="mr-1 size-3.5" aria-hidden />
                     {t('agent.history.continue', { defaultValue: 'Kontynuuj w czacie' })}
+                  </Button>
+                )}
+                {run.status === 'awaiting_approval' && (
+                  <Button asChild variant="outline" size="sm">
+                    <Link
+                      to={`/agent/inbox?run=${encodeURIComponent(run.id)}${run.pending_change_batch_id !== null ? `&batch=${encodeURIComponent(run.pending_change_batch_id)}` : ''}`}
+                      data-testid="agent-history-proposal-link"
+                    >
+                      {t('agent.history.view_proposal', { defaultValue: 'Zobacz propozycję' })}
+                      <ArrowRight className="ml-1 size-3.5" aria-hidden />
+                    </Link>
                   </Button>
                 )}
                 {!isRunTerminal(run.status) && (

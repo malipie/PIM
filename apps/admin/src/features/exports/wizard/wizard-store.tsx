@@ -47,6 +47,8 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       };
     case 'SET_SELECTED_IDS':
       return { ...state, selectedIds: action.selectedIds, dirty: true };
+    case 'SET_INCLUDE_VARIANTS':
+      return { ...state, includeVariants: action.includeVariants, dirty: true };
     case 'SET_COLUMNS':
       return { ...state, columns: action.columns, dirty: true };
     case 'SET_LOCALES':
@@ -66,6 +68,7 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
         selectedIds: action.selectedIds,
         filterDsl: action.filterDsl,
         targetScope: action.targetScope,
+        includeVariants: action.includeVariants,
       };
     case 'INIT_FROM_PROFILE':
       return {
@@ -81,6 +84,7 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
         channels: action.channels,
         filterDsl: action.filterDsl,
         targetScope: action.targetScope,
+        includeVariants: action.includeVariants,
       };
     case 'APPLY_PROFILE':
       return {
@@ -93,6 +97,7 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
         channels: action.channels,
         filterDsl: action.filterDsl,
         targetScope: action.targetScope,
+        includeVariants: action.includeVariants,
         dirty: true,
       };
     default:

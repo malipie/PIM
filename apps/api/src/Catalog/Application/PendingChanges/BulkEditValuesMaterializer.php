@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\PendingChanges;
 
 use App\Catalog\Application\Filter\FilterDslResolver;
-use App\Catalog\Application\Validation\AttributeValueValidator;
+use App\Catalog\Application\ValueWriteCore;
 use App\Catalog\Contracts\Command\BulkEditValuesPort;
 use App\Catalog\Contracts\Command\ValueEditProposal;
 use App\Catalog\Contracts\PendingChanges\PendingChangeDraft;
@@ -22,7 +22,6 @@ use Generator;
 use InvalidArgumentException;
 use LogicException;
 use Symfony\Component\Uid\Uuid;
-use Throwable;
 
 /**
  * AGENT-P3-01 (#1961) — materializes a bulk value edit as pending
@@ -53,7 +52,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
         private EntityManagerInterface $entityManager,
         private TenantContext $tenantContext,
         private FilterDslResolver $filterResolver,
-        private AttributeValueValidator $valueValidator,
+        private AgentValueNormalizer $valueNormalizer,
         private UserScopedPermissionCheckerInterface $permissions,
         private PendingChangesPort $pendingChanges,
     ) {
@@ -88,11 +87,14 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
 
         [$validChanges, $rejected] = $this->screenChanges($tenant, $userId, $changes);
 
-        $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl, $selectedIds);
+        $selectorRejected = 0;
+        $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl, $selectedIds, $selectorRejected);
 
         $affectedObjects = 0;
         $materialized = 0;
         $skippedExisting = 0;
+        /** @var list<array{object_id: string, object_code: string, attribute_code: string, current_value: array<string, mixed>}> $skippedExistingExamples */
+        $skippedExistingExamples = [];
 
         if ([] !== $validChanges && [] !== $objectIds) {
             $drafts = $this->draftGenerator(
@@ -103,6 +105,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
                 $affectedObjects,
                 $materialized,
                 $skippedExisting,
+                $skippedExistingExamples,
             );
             $this->pendingChanges->materialize($batchId, Provenance::Agent->value, $drafts);
         }
@@ -113,6 +116,14 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
             materializedChanges: $materialized,
             skippedExisting: $skippedExisting,
             rejected: $rejected,
+            skippedExistingExamples: $skippedExistingExamples,
+            selectorRejected: $selectorRejected,
+            selectorMatchedObjects: \count($objectIds),
+            permissionRejectedAttributes: \count(array_filter(
+                $rejected,
+                static fn (array $item): bool => 'Attribute is outside your edit permissions.' === $item['reason'],
+            )),
+            mode: $mode,
         );
     }
 
@@ -160,9 +171,11 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
         // never errored — the operator cannot apply, so the object is left
         // untouched and counted here.
         $skipped = 0;
+        $selectorRejected = 0;
+        $objectIds = [];
 
         if ($attribute instanceof Attribute) {
-            $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl, $selectedIds);
+            $objectIds = $this->resolveObjectIds($tenant, $objectType, $filterDsl, $selectedIds, $selectorRejected);
             if ([] !== $objectIds) {
                 $drafts = $this->arithmeticDraftGenerator(
                     $tenant,
@@ -184,6 +197,13 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
             materializedChanges: $materialized,
             skippedExisting: $skipped,
             rejected: $rejected,
+            selectorRejected: $selectorRejected,
+            selectorMatchedObjects: \count($objectIds),
+            permissionRejectedAttributes: \count(array_filter(
+                $rejected,
+                static fn (array $item): bool => 'Attribute is outside your edit permissions.' === $item['reason'],
+            )),
+            mode: 'arithmetic',
         );
     }
 
@@ -193,7 +213,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
      *
      * @param array<string, mixed> $changes
      *
-     * @return array{0: array<string, array{value: mixed}>, 1: list<array{code: string, reason: string}>}
+     * @return array{0: array<string, array<string, mixed>>, 1: list<array{code: string, reason: string}>}
      */
     private function screenChanges(Tenant $tenant, Uuid $userId, array $changes): array
     {
@@ -218,15 +238,9 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
                 continue;
             }
 
-            $envelope = ['value' => $rawValue];
-            try {
-                $errors = $this->valueValidator->validate($attribute, $envelope);
-            } catch (Throwable $failure) {
-                $rejected[] = ['code' => $code, 'reason' => 'Validation failed: '.$failure->getMessage()];
-                continue;
-            }
-            if ([] !== $errors) {
-                $rejected[] = ['code' => $code, 'reason' => $errors[0]->message];
+            [$envelope, $error] = $this->valueNormalizer->normalise($attribute, $rawValue);
+            if (null === $envelope) {
+                $rejected[] = ['code' => $code, 'reason' => $error ?? 'Invalid value.'];
                 continue;
             }
 
@@ -249,8 +263,13 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
      *
      * @return list<string>
      */
-    private function resolveObjectIds(Tenant $tenant, ObjectType $objectType, array $filterDsl, ?array $selectedIds = null): array
-    {
+    private function resolveObjectIds(
+        Tenant $tenant,
+        ObjectType $objectType,
+        array $filterDsl,
+        ?array $selectedIds,
+        int &$selectorRejected,
+    ): array {
         $params = [
             'tenant' => $tenant->getId()->toRfc4122(),
             'otid' => $objectType->getId()->toRfc4122(),
@@ -259,6 +278,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
         $where = '';
 
         if (null !== $selectedIds) {
+            $requestedCount = \count($selectedIds);
             $clean = [];
             foreach ($selectedIds as $id) {
                 if (\is_string($id) && Uuid::isValid($id)) {
@@ -266,6 +286,8 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
                 }
             }
             if ([] === $clean) {
+                $selectorRejected = $requestedCount;
+
                 return [];
             }
             // Intersect the selection with tenant + type — never trust the
@@ -298,6 +320,10 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
             }
         }
 
+        if (null !== $selectedIds) {
+            $selectorRejected = max(0, \count($selectedIds) - \count($ids));
+        }
+
         return $ids;
     }
 
@@ -305,8 +331,9 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
      * Streams drafts without hydrating entities: before-values come from
      * the GLOBAL attributes_indexed reading, fetched per id-chunk.
      *
-     * @param list<string>                       $objectIds
-     * @param array<string, array{value: mixed}> $validChanges
+     * @param list<string>                                                                                                     $objectIds
+     * @param array<string, array<string, mixed>>                                                                              $validChanges
+     * @param list<array{object_id: string, object_code: string, attribute_code: string, current_value: array<string, mixed>}> $skippedExistingExamples
      *
      * @return Generator<PendingChangeDraft>
      */
@@ -318,6 +345,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
         int &$affectedObjects,
         int &$materialized,
         int &$skippedExisting,
+        array &$skippedExistingExamples,
     ): Generator {
         $connection = $this->entityManager->getConnection();
 
@@ -325,7 +353,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
             // tenant-safe: ids were selected under the tenant predicate above;
             // re-scope defensively anyway.
             $rows = $connection->fetchAllAssociative(
-                'SELECT co.id, co.attributes_indexed FROM objects co WHERE co.tenant_id = :tenant AND co.id IN (:ids)',
+                'SELECT co.id, co.code, co.attributes_indexed FROM objects co WHERE co.tenant_id = :tenant AND co.id IN (:ids)',
                 ['tenant' => $tenant->getId()->toRfc4122(), 'ids' => $chunk],
                 ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
             );
@@ -345,13 +373,18 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
                 foreach ($validChanges as $code => $afterEnvelope) {
                     /** @var array<string, mixed>|null $before */
                     $before = \is_array($indexed[$code] ?? null) ? $indexed[$code] : null;
-                    if (null !== $before && !\array_key_exists('value', $before)) {
-                        $before = ['value' => $before];
-                    }
 
-                    $beforeValue = null !== $before ? ($before['value'] ?? null) : null;
-                    if ('only_empty' === $mode && null !== $beforeValue && '' !== $beforeValue) {
+                    if ('only_empty' === $mode && null !== $before && !ValueWriteCore::isEmptyEnvelope($before)) {
                         ++$skippedExisting;
+                        if (\count($skippedExistingExamples) < 5) {
+                            $objectCode = \is_string($row['code'] ?? null) ? $row['code'] : $objectId;
+                            $skippedExistingExamples[] = [
+                                'object_id' => $objectId,
+                                'object_code' => $objectCode,
+                                'attribute_code' => $code,
+                                'current_value' => $before,
+                            ];
+                        }
                         continue;
                     }
 
@@ -364,6 +397,7 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
                         attributeCode: $code,
                         before: $before,
                         after: $afterEnvelope,
+                        meta: ['mode' => $mode],
                     );
                 }
                 if ($objectTouched) {
@@ -416,10 +450,8 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
 
                 /** @var array<string, mixed>|null $before */
                 $before = \is_array($indexed[$attrCode] ?? null) ? $indexed[$attrCode] : null;
-                if (null !== $before && !\array_key_exists('value', $before)) {
-                    $before = ['value' => $before];
-                }
-                $beforeValue = null !== $before ? ($before['value'] ?? null) : null;
+                $isPrice = null !== $before && \array_key_exists('amount', $before);
+                $beforeValue = null !== $before ? ($isPrice ? ($before['amount'] ?? null) : ($before['value'] ?? null)) : null;
                 if (!is_numeric($beforeValue)) {
                     ++$skipped;
                     continue;
@@ -439,7 +471,12 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
                     targetObjectId: Uuid::fromString($objectId),
                     attributeCode: $attrCode,
                     before: $before,
-                    after: ['value' => $result],
+                    after: $isPrice
+                        ? array_filter([
+                            'amount' => round($result, self::scaleOf($beforeValue)),
+                            'currency' => $before['currency'] ?? null,
+                        ], static fn (mixed $value): bool => null !== $value)
+                        : ['value' => $result],
                 );
             }
         }
@@ -455,5 +492,15 @@ final readonly class BulkEditValuesMaterializer implements BulkEditValuesPort
             '%' => 0.0 === $operand ? null : fmod($base, $operand),
             default => null,
         };
+    }
+
+    /** Decimal places to keep for money, floored at two and capped at six. */
+    private static function scaleOf(mixed $amount): int
+    {
+        $text = \is_scalar($amount) ? (string) $amount : '';
+        $dot = strpos($text, '.');
+        $decimals = false === $dot ? 0 : \strlen($text) - $dot - 1;
+
+        return max(2, min($decimals, 6));
     }
 }

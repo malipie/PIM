@@ -253,6 +253,44 @@ final class AgentRunsApiTest extends ApiTestCase
     }
 
     #[Test]
+    public function approvalInboxIsTenantWideAndOnlyListsPendingProposals(): void
+    {
+        $this->seedByokKey();
+        $em = $this->em();
+        $other = self::getContainer()->get(UserRepositoryInterface::class)->findByEmail(self::SECOND_EMAIL);
+        $admin = self::getContainer()->get(UserRepositoryInterface::class)->findByEmail(self::ADMIN_EMAIL);
+        \assert($other instanceof User);
+        \assert($admin instanceof User);
+
+        $pending = new \App\Agent\Domain\Entity\AgentRun(
+            $other->getId(),
+            \App\Agent\Domain\AgentRunSurface::Chat,
+            'proposal from another approver',
+        );
+        $pending->markAwaitingApproval(Uuid::v7(), 3);
+        $conversation = new \App\Agent\Domain\Entity\AgentRun(
+            $admin->getId(),
+            \App\Agent\Domain\AgentRunSurface::Chat,
+            'ordinary conversation',
+        );
+        $conversation->markAwaitingInput();
+        $em->persist($pending);
+        $em->persist($conversation);
+        $em->flush();
+
+        $response = $this->authenticatedClient()->request('GET', '/api/agent/inbox');
+        self::assertSame(200, $response->getStatusCode());
+        $body = $response->toArray(false);
+        self::assertSame(1, $body['total']);
+        self::assertIsArray($body['items']);
+        $items = $body['items'];
+        self::assertCount(1, $items);
+        self::assertIsArray($items[0]);
+        self::assertSame($pending->getId()->toRfc4122(), $items[0]['id']);
+        self::assertSame('awaiting_approval', $items[0]['status']);
+    }
+
+    #[Test]
     public function someoneElsesRunAnswers404(): void
     {
         $this->seedByokKey();

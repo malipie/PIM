@@ -24,6 +24,7 @@ use App\Agent\Domain\Entity\AgentRun;
 use App\Agent\Domain\Entity\ContentRecipe;
 use App\Agent\Infrastructure\Anthropic\AgentModelSelector;
 use App\Catalog\Application\Filter\FilterDslResolver;
+use App\Catalog\Application\PendingChanges\AgentValueNormalizer;
 use App\Catalog\Application\PendingChanges\BulkEditValuesMaterializer;
 use App\Catalog\Application\PendingChanges\ContentValueMaterializer;
 use App\Catalog\Application\Validation\AttributeValueValidator;
@@ -492,7 +493,7 @@ final class PromptInjectionRedTeamTest extends KernelTestCase
             $this->em(),
             self::getContainer()->get(TenantContext::class),
             self::getContainer()->get(FilterDslResolver::class),
-            self::getContainer()->get(AttributeValueValidator::class),
+            self::getContainer()->get(AgentValueNormalizer::class),
             $rbac,
             self::getContainer()->get(PendingChangesPort::class),
         );

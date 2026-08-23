@@ -51,8 +51,10 @@ export const ROUTE_PERMISSIONS: ReadonlyArray<readonly [string, readonly string[
   ['/publications', ['publications.view']],
   ['/workflow', ['workflow.view']],
 
-  // Agent surfaces — any agent capability is enough to see the inbox /
-  // history; the destructive actions carry their own checks.
+  // Agent surfaces — approval and personal history have distinct grants;
+  // the broader prefix remains the fallback for future agent pages.
+  ['/agent/inbox', ['agent.approve_pending']],
+  ['/agent/history', ['agent.bulk_actions']],
   ['/agent', ['agent.approve_pending', 'agent.bulk_actions', 'agent.schema_ops']],
 ];
 
