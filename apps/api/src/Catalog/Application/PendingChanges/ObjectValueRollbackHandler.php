@@ -74,6 +74,11 @@ final readonly class ObjectValueRollbackHandler implements BulkRollbackPort
             return $this->projectionRollback->rollback($session);
         }
 
+        $tenantId = $session->getTenant()?->getId();
+        if (!$tenantId instanceof Uuid) {
+            throw new LogicException('Cannot rebuild rolled-back values without the bulk session tenant.');
+        }
+
         set_time_limit(0);
 
         $restored = 0;
@@ -101,13 +106,13 @@ final readonly class ObjectValueRollbackHandler implements BulkRollbackPort
 
                 ++$chunk;
                 if ($chunk >= self::CHUNK) {
-                    $this->flushChunk($touchedIds);
+                    $this->flushChunk($touchedIds, $tenantId);
                     $chunk = 0;
                     $touchedIds = [];
                 }
             }
             if ($chunk > 0 || [] !== $touchedIds) {
-                $this->flushChunk($touchedIds);
+                $this->flushChunk($touchedIds, $tenantId);
             }
 
             $fresh = $this->entityManager->find(BulkSession::class, $bulkSessionId);
@@ -191,14 +196,17 @@ final readonly class ObjectValueRollbackHandler implements BulkRollbackPort
     /**
      * @param list<string> $touchedIds
      */
-    private function flushChunk(array $touchedIds): void
+    private function flushChunk(array $touchedIds, Uuid $tenantId): void
     {
         $this->entityManager->flush();
         $this->entityManager->clear();
 
         if ([] !== $touchedIds) {
             // Projection + Meilisearch rebuild from the restored canon.
-            $this->messageBus->dispatch(new ObjectValuesChangedMessage(array_values(array_unique($touchedIds))));
+            $this->messageBus->dispatch(new ObjectValuesChangedMessage(
+                array_values(array_unique($touchedIds)),
+                $tenantId,
+            ));
         }
     }
 }

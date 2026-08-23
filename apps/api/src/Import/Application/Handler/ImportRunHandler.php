@@ -691,9 +691,10 @@ final class ImportRunHandler extends AbstractBatchHandler
     /**
      * IMP2-2.6 — dispatch the async attributes_indexed rebuild + Meilisearch
      * reindex for every object the row phase created or actually changed, in id
-     * batches so a 50k import never ships one giant message. The TenantStamp
-     * lets the worker rebind the tenant before {@see RebuildAttributesIndexedHandler}
-     * runs. Cleared after dispatch so a re-run starts empty.
+     * batches so a 50k import never ships one giant message. The message
+     * carries its tenant so the worker can rebind before
+     * {@see RebuildAttributesIndexedHandler} runs. Cleared after dispatch so
+     * a re-run starts empty.
      */
     private function dispatchAttributesRebuild(Tenant $tenant): void
     {
@@ -703,8 +704,7 @@ final class ImportRunHandler extends AbstractBatchHandler
 
         foreach (array_chunk($this->bulkTouchedIds, self::REBUILD_DISPATCH_BATCH) as $batch) {
             $this->messageBus->dispatch(
-                new \App\Catalog\Application\Message\ObjectValuesChangedMessage($batch),
-                [new TenantStamp($tenant->getId())],
+                new \App\Catalog\Application\Message\ObjectValuesChangedMessage($batch, $tenant->getId()),
             );
         }
 

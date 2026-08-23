@@ -32,7 +32,7 @@ final class AttributesIndexedRebuildDeadLetterListenerTest extends TestCase
 
         $ids = [Uuid::v7()->toRfc4122(), Uuid::v7()->toRfc4122()];
         $event = new WorkerMessageFailedEvent(
-            new Envelope(new ObjectValuesChangedMessage($ids)),
+            new Envelope(new ObjectValuesChangedMessage($ids, Uuid::v7())),
             'async',
             new RuntimeException('version conflict exhausted'),
         );
@@ -53,7 +53,7 @@ final class AttributesIndexedRebuildDeadLetterListenerTest extends TestCase
         $listener = new AttributesIndexedRebuildDeadLetterListener($logger);
 
         $event = new WorkerMessageFailedEvent(
-            new Envelope(new ObjectValuesChangedMessage([Uuid::v7()->toRfc4122()])),
+            new Envelope(new ObjectValuesChangedMessage([Uuid::v7()->toRfc4122()], Uuid::v7())),
             'async',
             new RuntimeException('transient'),
         );

@@ -7,11 +7,13 @@ namespace App\Tests\Integration\Agent;
 use App\Agent\Application\Approval\AgentApprovalService;
 use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentRun;
+use App\Catalog\Application\Message\ObjectValuesChangedMessage;
 use App\Catalog\Contracts\PendingChanges\PendingChangeDraft;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangeType;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
+use App\Catalog\Domain\Entity\AttributeOption;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\ObjectKind;
@@ -22,6 +24,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\ConsumedByWorkerStamp;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Symfony\Component\Uid\Uuid;
@@ -51,7 +54,11 @@ final class AgentProvenanceProjectionTest extends KernelTestCase
 
         $type = new ObjectType('product', ObjectKind::Product, ['en' => 'Product']);
         $em->persist($type);
-        $em->persist(new Attribute('price', ['en' => 'Price'], AttributeType::Number));
+        $price = new Attribute('price', ['en' => 'Price'], AttributeType::Number);
+        $gender = new Attribute('gender', ['en' => 'Gender'], AttributeType::Select);
+        $em->persist($price);
+        $em->persist($gender);
+        $em->persist(new AttributeOption($gender, 'unisex', ['en' => 'Unisex']));
         $object = new CatalogObject($type, 'NOPRICE-1');
         $em->persist($object);
         $em->flush();
@@ -65,6 +72,13 @@ final class AgentProvenanceProjectionTest extends KernelTestCase
                 before: null,
                 after: ['value' => 100],
             ),
+            new PendingChangeDraft(
+                changeType: PendingChangeType::Value,
+                targetObjectId: $object->getId(),
+                attributeCode: 'gender',
+                before: null,
+                after: ['option_code' => 'unisex'],
+            ),
         ]);
 
         $managed = $em->find(Tenant::class, $tenant->getId()->toRfc4122());
@@ -72,7 +86,7 @@ final class AgentProvenanceProjectionTest extends KernelTestCase
         self::getContainer()->get(TenantContext::class)->set($managed);
 
         $run = new AgentRun(Uuid::v7(), AgentRunSurface::Chat, 'set missing prices to 100');
-        $run->markAwaitingApproval($batchId, 1);
+        $run->markAwaitingApproval($batchId, 2);
         $em->persist($run);
         $em->flush();
 
@@ -87,6 +101,8 @@ final class AgentProvenanceProjectionTest extends KernelTestCase
             ['c' => 'NOPRICE-1'],
         );
         self::assertIsString($indexed);
+        self::assertStringContainsString('"value": 100', $indexed);
+        self::assertStringContainsString('"option_code": "unisex"', $indexed);
         self::assertStringContainsString('"provenance": "agent"', $indexed);
         self::assertStringContainsString($run->getId()->toRfc4122(), $indexed, 'the slot must carry agent_run_id for the badge tooltip');
     }
@@ -115,7 +131,19 @@ final class AgentProvenanceProjectionTest extends KernelTestCase
         }
         $bus = self::getContainer()->get(MessageBusInterface::class);
         foreach ($transport->getSent() as $envelope) {
-            $bus->dispatch($envelope->getMessage(), [new ReceivedStamp('async')]);
+            $message = $envelope->getMessage();
+            self::assertInstanceOf(ObjectValuesChangedMessage::class, $message);
+            $tenant = self::getContainer()->get(TenantContext::class)->get();
+            self::assertInstanceOf(Tenant::class, $tenant);
+            self::assertTrue($tenant->getId()->equals($message->tenantId()));
+
+            // Simulate the production worker, including middleware that
+            // rejects async messages without a tenant source. Keeping the
+            // original envelope preserves the message's tenant payload.
+            $bus->dispatch($envelope, [
+                new ReceivedStamp('async'),
+                new ConsumedByWorkerStamp(),
+            ]);
         }
     }
 }
