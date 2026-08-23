@@ -77,7 +77,7 @@ final class RebuildAttributesIndexedOptimisticRetryTest extends CatalogApiTestCa
         $handler(new ObjectValuesChangedMessage(array_map(
             static fn (Uuid $id): string => $id->toRfc4122(),
             $ids,
-        )));
+        ), $tenant->getId()));
 
         // Every object rebuilt + flushed exactly once after the raw bump: 1
         // (seed) → 2 (raw) → 3 (rebuild). version=3 on the FIRST id proves the
@@ -174,7 +174,7 @@ final class RebuildAttributesIndexedOptimisticRetryTest extends CatalogApiTestCa
         try {
             // AUD-039 — exhausting retries must NOT return "successfully": it
             // throws so the async transport re-delivers + eventually dead-letters.
-            $handler(new ObjectValuesChangedMessage([$idString]));
+            $handler(new ObjectValuesChangedMessage([$idString], $tenant->getId()));
         } catch (AttributesIndexedRebuildFailedException $e) {
             $caught = $e;
         } finally {

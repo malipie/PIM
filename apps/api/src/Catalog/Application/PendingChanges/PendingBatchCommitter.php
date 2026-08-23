@@ -578,7 +578,14 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
 
             $this->entityManager->clear();
 
-            $this->messageBus->dispatch(new ObjectValuesChangedMessage($chunkIds));
+            // #2980 production regression: async workers have no HTTP
+            // principal to recover the tenant from. Carry it on the message
+            // itself so the worker can bind TenantContext + the RLS GUC before
+            // rebuilding attributes_indexed from the canonical values.
+            $this->messageBus->dispatch(new ObjectValuesChangedMessage(
+                $chunkIds,
+                Uuid::fromString($tenantId),
+            ));
         }
 
         return [$committedValues, $objectsTouched, $skipped, $issues];
