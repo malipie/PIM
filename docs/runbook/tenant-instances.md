@@ -116,23 +116,41 @@ bash scripts/pim-deploy-all.sh --dry-run          # sam plan
 ```
 
 Kolejność (zapis tego, czego nauczyła produkcja): zrzut → build → **migracje
-z nowego obrazu przed `up -d`** → `up -d` → `cache:clear` **osobno w `api`
-i w `worker`** → restart → smoke.
+z nowego obrazu przed wypuszczeniem kodu** → **stop** usług aplikacyjnych →
+`cache:clear` w **jednorazowym kontenerze**, osobno per usługa →
+`up -d --force-recreate` → smoke.
 
-Trzy rzeczy, które łatwo pominąć, a każda kosztowała już czas:
+Cztery rzeczy, które łatwo pominąć, a każda kosztowała już czas:
 
-- **Migracja idzie przed `up -d`.** „Ta partia nie ma migracji" bywa nieprawdą,
-  jeśli coś zmergowano po poprzednim wdrożeniu.
-- **`cache:clear` w workerze to osobne polecenie.** `api` używa
-  `/app/var/cache`, worker `/app/var/cache-worker`. Pominięcie oznacza
-  konsumenta startującego na kontenerze DI sprzed wdrożenia — objaw bywa
-  mylący (dead-letter zamiast prawdziwej przyczyny).
+- **Migracja idzie przed wypuszczeniem kodu.** „Ta partia nie ma migracji"
+  bywa nieprawdą, jeśli coś zmergowano po poprzednim wdrożeniu.
+- **Cache czyści się przy ZATRZYMANYCH usługach** (#2991). `cache:clear`
+  kasuje pliki skompilowanego kontenera DI, a FrankenPHP i konsument
+  Messengera ładują usługi leniwie — czyszczenie przez `exec` na działającym
+  procesie dawało CRITICAL `Failed opening required
+  …/getXxxService.php` i wiadomości lądujące w kolejce `failed`. Stąd
+  kolejność stop → clear (w `run --rm --no-deps`) → start i świadoma,
+  kilkunastosekundowa przerwa w obsłudze ruchu.
+- **`cache:clear` wykonuje się per usługa Symfony.** W stacku deweloperskim
+  worker ma własne `/app/var/cache-worker`, w stacku tenanta dzieli
+  `/app/var/cache` z `api`. Skrypt nie zgaduje — czyści każdą usługę osobno.
 - **Kolejka `failed` po wdrożeniu.** Wiadomości, które padły w oknie
-  wdrożenia, po naprawie **wykonają się ponownie**. Skrypt to raportuje;
-  przejrzyj `messenger:failed:show` zanim cokolwiek ponowisz.
+  wdrożenia, po naprawie **wykonają się ponownie**. Skrypt liczy je przez
+  `messenger:stats failed --format=json` (dawny grep po tabeli konsolowej
+  meldował „czysto" przy trzech wiadomościach — #2989) i przegląda logi
+  `api`/`worker` od chwili startu wdrożenia pod kątem CRITICAL/FATAL.
 
 Przebieg zatrzymuje się na pierwszym błędzie — zła migracja ma zepsuć jednego
 klienta, nie wszystkich po kolei.
+
+**Kody wyjścia:** `0` wdrożone i czysto · `70` **wdrożone, ale smoke ma
+zastrzeżenia** (niepusta lub niepoliczalna kolejka `failed`, błędy krytyczne
+w oknie wdrożenia) — kod jest na antenie, ale nie melduj „wszystko czyste",
+tylko przejrzyj wypisane ostrzeżenia · pozostałe = wdrożenie przerwane.
+
+Sam orkiestrator ma testy: `bash scripts/test-deploy-all.sh` odgrywa obie
+topologie na atrapie `docker` i pilnuje kolejności oraz kontraktu kodów
+wyjścia (bramka CI „Deploy orchestrator (unit)").
 
 ---
 

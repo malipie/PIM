@@ -138,6 +138,15 @@ jobs:
         working-directory: .
         run: bash scripts/lint-healthcheck-reaper.sh
 
+      # #2991 — orkiestrator wdrozen to jedyny kod, ktorego blad widac dopiero
+      # na produkcji klienta: `cache:clear` na dzialajacym procesie wywracal
+      # workery, a licznik kolejki failed parsowal tabele konsolowa i meldowal
+      # "czysto" przy trzech wiadomosciach. Test odgrywa oba stacki na atrapie
+      # dockera i pilnuje kolejnosci stop -> clear -> start.
+      - name: Deploy orchestrator (unit)
+        working-directory: .
+        run: bash scripts/test-deploy-all.sh
+
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
         with:

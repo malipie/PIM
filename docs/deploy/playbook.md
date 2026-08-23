@@ -46,10 +46,14 @@ bash scripts/pim-deploy-all.sh
 bash scripts/pim-deploy-all.sh --only harmon
 ```
 
-Orkiestrator dla **każdej** instancji robi: zrzut → build → migracje z nowego obrazu → `up -d` →
-`cache:clear` w api i worker → restart → smoke, i **przerywa na pierwszym błędzie**, nie ruszając
-pozostałych. To jest zamierzone: lepiej mieć trzech klientów na starym kodzie i jednego zepsutego
-niż wszystkich zepsutych.
+Orkiestrator dla **każdej** instancji robi: zrzut → build → migracje z nowego obrazu → **stop**
+usług aplikacyjnych → `cache:clear` w jednorazowym kontenerze → `up -d --force-recreate` → smoke,
+i **przerywa na pierwszym błędzie**, nie ruszając pozostałych. To jest zamierzone: lepiej mieć
+trzech klientów na starym kodzie i jednego zepsutego niż wszystkich zepsutych.
+
+Kod wyjścia `70` znaczy „wdrożone, ale smoke ma zastrzeżenia" — niepusta (albo niepoliczalna)
+kolejka `failed` lub błędy krytyczne w logach od chwili startu wdrożenia. Kod jest wtedy na
+antenie, ale przebieg **nie jest** czysty i nie wolno go tak raportować.
 
 Kroki 1–6 poniżej opisują, co orkiestrator robi pod spodem, i obowiązują, gdy wdrażasz ręcznie
 albo diagnozujesz przerwany przebieg.
@@ -112,16 +116,27 @@ Po migracji dotykającej uprawnień/ról: policz stan i porównaj z tym sprzed w
 ### 5. Nowy kod na antenie
 
 ```bash
-ssh $HOST "cd /opt/pim && $DC up -d api worker"
-ssh $HOST "cd /opt/pim && $DC exec -T api    php bin/console cache:clear"
-ssh $HOST "cd /opt/pim && $DC exec -T worker php bin/console cache:clear"
-ssh $HOST "cd /opt/pim && $DC restart api worker"
+ssh $HOST "cd /opt/pim && $DC stop api worker"
+ssh $HOST "cd /opt/pim && $DC run --rm --no-deps api    php bin/console cache:clear"
+ssh $HOST "cd /opt/pim && $DC run --rm --no-deps worker php bin/console cache:clear"
+ssh $HOST "cd /opt/pim && $DC up -d --force-recreate api worker"
 ```
 
-`cache:clear` w **obu** kontenerach — mają osobne katalogi cache (`/app/var/cache/prod` vs
+`cache:clear` w **obu** usługach — katalogi cache bywają osobne (`/app/var/cache/prod` vs
 `/app/var/cache-worker/prod`, sprawdzalne przez `debug:container --parameter=kernel.cache_dir`).
 Wyczyszczenie tylko w `api` zostawia workera na skompilowanym kontenerze DI sprzed zmiany, co objawia się
 później i w zupełnie innym miejscu.
+
+**Kolejność `stop` → `clear` → `up -d --force-recreate` jest istotą tego kroku (#2991).** Wariant
+sprzed 2026-08-23 czyścił cache przez `exec` na DZIAŁAJĄCYM procesie i dopiero potem restartował.
+`cache:clear` kasuje pliki skompilowanego kontenera DI, a FrankenPHP w trybie worker i konsument
+Messengera ładują usługi leniwie — w oknie między czyszczeniem a restartem workery `harmon`
+i `trzeci-tenant` zalogowały `CRITICAL Uncaught Error: Failed opening required
+/app/var/cache/prod/ContainerNfSihWw/getCatalogIndexFlushSubscriberService.php`. Restart naprawiał proces
+chwilę później, ale wiadomość przetwarzana w tym oknie szła do kolejki `failed` i po naprawie wykonywała
+się drugi raz. Przerwa w obsłudze ruchu jest ta sama co przy restarcie — nowa jest gwarancja, że nikt nie
+czyta skasowanego kontenera. `--force-recreate`, bo kontener zatrzymany w pierwszym poleceniu wstałby
+na swoim starym obrazie.
 
 Jeśli frontend się zmienił — przed tym krokiem `pnpm --filter admin build` i `rsync apps/admin/dist`.
 
@@ -181,9 +196,10 @@ W praktyce czekała `Version20260813100000` — merge poszedł **po** poprzednim
 **Wniosek:** pending migracje wynikają z różnicy `wdrożony_sha..main`, a nie z zawartości ostatniego PR-a.
 Krok 4 wykonuj bezwarunkowo; jeśli nie ma czego migrować, kosztuje ~10 s.
 
-### 3. Cache workera żyje własnym życiem
+### 3. Cache workera żyje własnym życiem — i nie wolno go czyścić pod działającym procesem
 
-Patrz krok 5. Osobne katalogi cache, osobny `cache:clear`.
+Patrz krok 5. Osobne wywołanie `cache:clear` per usługa, zawsze przy zatrzymanych kontenerach
+(#2991).
 
 ### 4. Limiter logowania blokuje powtarzane smoke'y
 

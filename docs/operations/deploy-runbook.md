@@ -4,7 +4,7 @@
 > Zakres: od czystego hosta do działającej instancji z danymi demo i smoke-testem.
 > **Wdrażasz kolejną zmianę na coś, co już działa? To nie ten plik** — patrz
 > [`docs/deploy/playbook.md`](../deploy/playbook.md) (kolejność „dane przed kodem", migracje z nowego
-> obrazu, `cache:clear` w obu kontenerach, pułapki z realnych wdrożeń).
+> obrazu, `cache:clear` w obu usługach przy zatrzymanych kontenerach, pułapki z realnych wdrożeń).
 > Powiązane: `.env.prod.example` (wszystkie zmienne), `docs/runbook/restore.md` (PITR),
 > `docs/runbook/disaster-recovery.md`, `docs/operations/secrets-runbook.md`.
 
@@ -134,11 +134,15 @@ docker compose ... exec -T api php bin/console pim:agent:seed-content-defaults
 
 - Rotacja sekretów: `docs/operations/secrets-runbook.md` + `credentials-rotation.md`.
 - Aktualizacje: `git fetch && git checkout <nowy-tag>` → `build api worker` →
-  `up -d` → **`exec api php bin/console cache:clear`** → `restart api worker` →
-  `doctrine:migrations:migrate` → smoke pkt 1-3.
+  `run --rm --no-deps api php bin/console doctrine:migrations:migrate` →
+  **`stop api worker`** → **`run --rm --no-deps api php bin/console cache:clear`**
+  (i to samo dla `worker`) → `up -d --force-recreate api worker` → smoke pkt 1-3.
+  Pełna, uzasadniona wersja tej kolejności: [`docs/deploy/playbook.md`](../deploy/playbook.md).
   `cache:clear` jest OBOWIĄZKOWY: `/app/var` to named volume, więc skompilowany
   kontener DI z poprzedniej wersji przesłania świeży cache z obrazu i nowy kod
   wywala się na starych sygnaturach serwisów (`TypeError: Argument #N`).
+  Wykonanie go przez `exec` na DZIAŁAJĄCYM kontenerze wywraca za to procesy,
+  które ładują usługi leniwie (#2991) — stąd `stop` przed czyszczeniem.
 - Skalowanie workerów: `up -d --scale worker=4`.
 - Retencja logów kontenerów: skonfiguruj `log-driver: json-file` z limitami w
   /etc/docker/daemon.json (`max-size=50m`, `max-file=5`) — RODO: logi zawierają e-maile.

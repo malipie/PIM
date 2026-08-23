@@ -293,10 +293,16 @@ services:
 
   # ─── Pula konsumentów Messengera ───────────────────────────────────────────
   #
-  # UWAGA: `kernel.cache_dir` workera to /app/var/cache-worker/prod, a api ma
-  # /app/var/cache/prod. `cache:clear` w kontenerze api NIE czyści cache'u
-  # workera — pominięcie tego kosztowało 40 minut przy wdrożeniu #2821.
-  # Orkiestrator wdrożeń (#2863) musi czyścić OBA.
+  # UWAGA (skorygowane w #2991): w TEJ topologii worker NIE ma APP_CACHE_DIR,
+  # więc dzieli z `api` katalog /app/var/cache/prod na wspólnym wolumenie
+  # `api_var` — inaczej niż stack deweloperski (docker-compose.yml), gdzie
+  # worker ma własne /app/var/cache-worker. Oba procesy są tu prod/APP_DEBUG=0,
+  # więc kompilują ten sam kontener DI i współdzielenie jest poprawne; nie jest
+  # poprawne CZYSZCZENIE go pod działającym procesem. `cache:clear` wykonany
+  # przez `exec` w którymkolwiek z nich kasował pliki, które drugi ładuje
+  # leniwie — stąd CRITICAL `Failed opening required …/getXxxService.php`
+  # w workerach przy wdrożeniu 2026-08-23. Orkiestrator (#2863) czyści cache
+  # dopiero po `stop`, w jednorazowym kontenerze (scripts/pim-deploy-all.sh).
   worker:
     image: "${PIM_API_IMAGE:?PIM_API_IMAGE jest wymagany — obraz zbudowany przez wdrożenie, np. pim-api:latest z produkcji. Wartość domyślna byłaby zgadywaniem, bo obraz deweloperski nie zawiera kodu (w dev przesłania go bind-mount), a instancja tenanta bind-mounta nie ma i wstałaby pusta.}"
     build:
