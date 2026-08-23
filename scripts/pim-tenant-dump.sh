@@ -14,6 +14,25 @@
 #   scripts/pim-tenant-dump.sh --code acme
 #   scripts/pim-tenant-dump.sh --code acme --label pre-deploy --tag 8f3c1a9
 #   scripts/pim-tenant-dump.sh --all --label pre-deploy --tag "$(git rev-parse --short HEAD)"
+#   scripts/pim-tenant-dump.sh --code acme --print-path   # tylko ścieżka na stdout
+#
+# ── Retencja liczy się CZASEM, nie nazwą (#2993) ────────────────────────────
+#
+# Do 1075215c retencja robiła `find … | sort -r | tail -n +N+1`, czyli
+# porządkowała po NAZWIE pliku. Nazwa to `<tenant>-<tag>-<stamp>.dump`, więc
+# o kolejności decydował **skrót commita**, a nie czas. Przy wdrożeniu
+# 1075215c skrót sortował się niżej niż wszystkie dziesięć zachowanych, więc
+# świeżo zrobiony zrzut pre-deploy trafiał na pozycję 11 i był kasowany
+# sekundy po utworzeniu — na wszystkich trzech instancjach naraz i w ciszy,
+# bo orkiestrator wdrożenia kierował wyjście tego skryptu do /dev/null.
+#
+# Trzy zabezpieczenia, każde niezależne od pozostałych:
+#   1. porządek po czasie modyfikacji (`ls -t`), nie po nazwie;
+#   2. zrzut utworzony w TYM przebiegu nie jest kandydatem do usunięcia,
+#      niezależnie od tego, co pokaże sortowanie;
+#   3. kandydat należący do tenanta o dłuższym kodzie z tym samym początkiem
+#      (`trzeci` vs `trzeci-tenant`) jest pomijany — glob `${tenant}-*` sam
+#      z siebie ich nie rozróżnia.
 
 set -euo pipefail
 
@@ -29,6 +48,7 @@ env_file_override=""
 label="manual"
 tag=""
 keep=10
+print_path=false
 
 usage() {
     cat <<'USAGE'
@@ -44,6 +64,10 @@ Opcje:
   --label <etyk.>  Podkatalog kopii; domyślnie manual (np. pre-deploy).
   --tag <tekst>    Znacznik w nazwie pliku, zwykle skrót commita.
   --keep <N>       Ile ostatnich kopii zachować w danej etykiecie; domyślnie 10.
+  --print-path     Na stdout wyłącznie ścieżka powstałego zrzutu (po jednej na
+                   linię przy --all); komunikaty dla człowieka idą na stderr.
+                   Kontrakt dla skryptów: `[ -s "$(… --print-path)" ]` zamiast
+                   parsowania tekstu.
   -h, --help       Ta pomoc.
 USAGE
 }
@@ -57,6 +81,7 @@ while [ $# -gt 0 ]; do
         --label) label="${2:-}"; shift 2 ;;
         --tag) tag="${2:-}"; shift 2 ;;
         --keep) keep="${2:-}"; shift 2 ;;
+        --print-path) print_path=true; shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Nieznana opcja: $1" >&2; usage >&2; exit 2 ;;
     esac
@@ -115,16 +140,85 @@ dump_one() {
         return 10
     fi
 
-    echo "OK [${tenant}]: ${path} (${size} B)"
+    komunikat "OK [${tenant}]: ${path} (${size} B)"
+    [ "$print_path" = true ] && printf '%s\n' "$path"
 
-    # Retencja: zostaw N najnowszych w tej etykiecie dla TEGO tenanta.
-    local surplus
-    surplus="$(find "$dir" -maxdepth 1 -name "${tenant}-*.dump" -type f | sort -r | tail -n +"$((keep + 1))" || true)"
-    if [ -n "$surplus" ]; then
-        echo "$surplus" | while read -r old; do
-            [ -n "$old" ] && rm -f "$old" && echo "   retencja: usunięto $(basename "$old")"
-        done
+    retencja "$dir" "$tenant" "$path"
+}
+
+# Wypisuje komunikat dla człowieka. Przy --print-path idzie na stderr, żeby
+# stdout niósł WYŁĄCZNIE ścieżki — wywołujący ma czytać kontrakt, nie tekst.
+komunikat() {
+    if [ "$print_path" = true ]; then
+        printf '%s\n' "$1" >&2
+    else
+        printf '%s\n' "$1"
     fi
+}
+
+# Kody instancji dłuższe od podanego, ale zaczynające się tak samo
+# (`trzeci` → `trzeci-tenant`). Ich zrzuty pasują do globa `${tenant}-*.dump`
+# i bez tej listy retencja jednego tenanta kasowałaby kopie drugiego.
+kody_kolidujace() {
+    local tenant="$1" f kod
+    for f in .env.platform .env.tenant.*; do
+        [ -f "$f" ] || continue
+        case "$f" in *.example) continue ;; esac
+        case "$f" in
+            .env.platform) kod="platform" ;;
+            *) kod="${f#.env.tenant.}" ;;
+        esac
+        [ "$kod" = "$tenant" ] && continue
+        case "$kod" in "${tenant}-"*) printf '%s\n' "$kod" ;; esac
+    done
+}
+
+# Zostawia `keep` najnowszych zrzutów TEGO tenanta w tej etykiecie.
+#
+# Porządek bierze się z `ls -t` (czas modyfikacji), bo nazwa zaczyna się od
+# skrótu commita i sortowana leksykograficznie kłamie o wieku pliku (#2993).
+retencja() {
+    local dir="$1" tenant="$2" swiezy="$3"
+    local kolidujace zachowane=0 kandydat baza obcy kod lista
+
+    kolidujace="$(kody_kolidujace "$tenant")"
+
+    # `ls -t` na globie: najnowsze pierwsze. Brak dopasowań kończy się pustą
+    # listą, nie błędem (kody tenantów nie zawierają spacji — patrz walidacja
+    # kodu w pim-tenant-new.sh).
+    lista="$(ls -t "$dir"/"${tenant}"-*.dump 2>/dev/null || true)"
+    [ -n "$lista" ] || return 0
+
+    while IFS= read -r kandydat; do
+        [ -n "$kandydat" ] || continue
+
+        # Zabezpieczenie 2: zrzut z tego przebiegu NIGDY nie jest kandydatem
+        # do usunięcia. Nawet gdyby sortowanie kiedykolwiek znowu skłamało,
+        # ta linia sama w sobie wyklucza powtórkę #2993.
+        if [ "$kandydat" = "$swiezy" ]; then
+            zachowane=$((zachowane + 1))
+            continue
+        fi
+
+        # Zabezpieczenie 3: to zrzut innego tenanta o dłuższym kodzie.
+        baza="$(basename "$kandydat")"
+        obcy=false
+        while IFS= read -r kod; do
+            [ -n "$kod" ] || continue
+            case "$baza" in "${kod}-"*) obcy=true ;; esac
+        done <<KOLIZJE
+${kolidujace}
+KOLIZJE
+        [ "$obcy" = true ] && continue
+
+        zachowane=$((zachowane + 1))
+        if [ "$zachowane" -gt "$keep" ]; then
+            rm -f "$kandydat"
+            komunikat "   retencja: usunięto ${baza}"
+        fi
+    done <<LISTA
+${lista}
+LISTA
 }
 
 failed=0
