@@ -109,7 +109,7 @@ export function DefinitionEditorPage() {
         const found = body.items.find((item) => item.id === id);
         if (found === undefined) {
           toast.error(
-            t('settings.workflow.not_found', { defaultValue: 'Nie znaleziono definicji.' }),
+            t('workflow.definitions.not_found', { defaultValue: 'Nie znaleziono definicji.' }),
           );
           void navigate('/workflow/definitions');
           return;
@@ -155,14 +155,16 @@ export function DefinitionEditorPage() {
         setEnabled(next);
         toast.success(
           next
-            ? t('settings.workflow.enabled_toast', { defaultValue: 'Definicja włączona.' })
-            : t('settings.workflow.disabled_toast', { defaultValue: 'Definicja wyłączona.' }),
+            ? t('workflow.definitions.enabled_toast', { defaultValue: 'Definicja włączona.' })
+            : t('workflow.definitions.disabled_toast', { defaultValue: 'Definicja wyłączona.' }),
         );
       })
       .catch((error: unknown) => {
         toast.error(
           httpErrorDetail(error) ??
-            t('settings.workflow.toggle_failed', { defaultValue: 'Nie udało się zmienić stanu.' }),
+            t('workflow.definitions.toggle_failed', {
+              defaultValue: 'Nie udało się zmienić stanu.',
+            }),
         );
       })
       .finally(() => setTogglingEnabled(false));
@@ -175,7 +177,7 @@ export function DefinitionEditorPage() {
         violationsByField(
           local.map((violation) => ({
             field: violation.field,
-            message: t(`settings.workflow.violation.${violation.message}`, {
+            message: t(`workflow.definitions.violation.${violation.message}`, {
               defaultValue: violation.message,
             }),
           })),
@@ -194,7 +196,7 @@ export function DefinitionEditorPage() {
       editing && id !== undefined ? updateDefinition(id, payload) : createDefinition(payload);
     request
       .then(() => {
-        toast.success(t('settings.workflow.saved', { defaultValue: 'Definicja zapisana.' }));
+        toast.success(t('workflow.definitions.saved', { defaultValue: 'Definicja zapisana.' }));
         void navigate('/workflow/definitions');
       })
       .catch((error: unknown) => {
@@ -202,14 +204,14 @@ export function DefinitionEditorPage() {
         if (violations.length > 0) {
           setErrors(violationsByField(violations));
           toast.error(
-            t('settings.workflow.invalid', {
+            t('workflow.definitions.invalid', {
               defaultValue: 'Definicja zawiera błędy — popraw pola.',
             }),
           );
         } else {
           toast.error(
             httpErrorDetail(error) ??
-              t('settings.workflow.save_failed', { defaultValue: 'Zapis nie powiódł się.' }),
+              t('workflow.definitions.save_failed', { defaultValue: 'Zapis nie powiódł się.' }),
           );
         }
       })
@@ -245,8 +247,8 @@ export function DefinitionEditorPage() {
         </Button>
         <h2 className="flex-1 text-[22px] font-semibold tracking-tight text-zinc-900">
           {editing
-            ? t('settings.workflow.edit_title', { defaultValue: 'Edytuj przepływ' })
-            : t('settings.workflow.new_title', { defaultValue: 'Nowy przepływ' })}
+            ? t('workflow.definitions.edit_title', { defaultValue: 'Edytuj przepływ' })
+            : t('workflow.definitions.new_title', { defaultValue: 'Nowy przepływ' })}
         </h2>
         {editing ? (
           <label className="flex items-center gap-2 text-[12px] font-medium text-zinc-600">
@@ -310,7 +312,7 @@ export function DefinitionEditorPage() {
               options={objectTypeOptions}
               value={draft.objectTypeId === '' ? null : draft.objectTypeId}
               onChange={(value) => setDraft({ ...draft, objectTypeId: value ?? '' })}
-              placeholder={t('settings.workflow.object_type_all', {
+              placeholder={t('workflow.definitions.object_type_all', {
                 defaultValue: 'Wszystkie typy',
               })}
             />

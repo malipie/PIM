@@ -39,18 +39,20 @@ export function DefinitionsListView() {
   const reviewerLabel = (definition: WorkflowDefinitionResource): string => {
     const reviewer = definition.reviewer;
     if (reviewer === null) {
-      return t('settings.workflow.reviewer_default', { defaultValue: 'Akceptant: domyślna rola' });
+      return t('workflow.definitions.reviewer_default', {
+        defaultValue: 'Akceptant: domyślna rola',
+      });
     }
     const directory = directoryQuery.data;
     if ('role_code' in reviewer) {
       const role = directory?.roles.find((candidate) => candidate.code === reviewer.role_code);
-      return t('settings.workflow.reviewer_role', {
+      return t('workflow.definitions.reviewer_role', {
         defaultValue: 'Akceptant: {{name}}',
         name: role?.name ?? reviewer.role_code,
       });
     }
     const user = directory?.users.find((candidate) => candidate.id === reviewer.user_id);
-    return t('settings.workflow.reviewer_user', {
+    return t('workflow.definitions.reviewer_user', {
       defaultValue: 'Akceptant: {{name}}',
       name: user?.display_name ?? user?.email ?? reviewer.user_id,
     });
@@ -74,15 +76,17 @@ export function DefinitionsListView() {
       .then(() => {
         toast.success(
           definition.enabled
-            ? t('settings.workflow.disabled_toast', { defaultValue: 'Definicja wyłączona.' })
-            : t('settings.workflow.enabled_toast', { defaultValue: 'Definicja włączona.' }),
+            ? t('workflow.definitions.disabled_toast', { defaultValue: 'Definicja wyłączona.' })
+            : t('workflow.definitions.enabled_toast', { defaultValue: 'Definicja włączona.' }),
         );
         reload();
       })
       .catch((error: unknown) => {
         toast.error(
           httpErrorDetail(error) ??
-            t('settings.workflow.toggle_failed', { defaultValue: 'Nie udało się zmienić stanu.' }),
+            t('workflow.definitions.toggle_failed', {
+              defaultValue: 'Nie udało się zmienić stanu.',
+            }),
         );
       })
       .finally(() => setBusyId(null));
@@ -93,10 +97,10 @@ export function DefinitionsListView() {
       <header className="flex items-start gap-4">
         <div className="flex-1 space-y-1">
           <h2 className="text-[22px] font-semibold tracking-tight text-zinc-900">
-            {t('settings.workflow.title', { defaultValue: 'Workflow — definicje' })}
+            {t('workflow.definitions.title', { defaultValue: 'Workflow — definicje' })}
           </h2>
           <p className="max-w-2xl text-[13px] text-zinc-500">
-            {t('settings.workflow.intro', {
+            {t('workflow.definitions.intro', {
               defaultValue:
                 'Własny proces edytorski per tenant: stany, przejścia, uprawnienia i bramki kompletności — bez deployu.',
             })}
@@ -108,15 +112,15 @@ export function DefinitionsListView() {
           className="bg-cta text-cta-foreground hover:bg-accent-hover"
         >
           <Plus className="mr-1 size-4" />
-          {t('settings.workflow.create_cta', { defaultValue: 'Nowy przepływ' })}
+          {t('workflow.definitions.create_cta', { defaultValue: 'Nowy przepływ' })}
         </Button>
       </header>
 
       {definitions.length === 0 && !loading ? (
         <EmptyState
           icon={<GitBranch className="size-6" />}
-          title={t('settings.workflow.empty_title', { defaultValue: 'Brak definicji' })}
-          description={t('settings.workflow.empty_body', {
+          title={t('workflow.definitions.empty_title', { defaultValue: 'Brak definicji' })}
+          description={t('workflow.definitions.empty_body', {
             defaultValue:
               'Dopóki nie włączysz własnego przepływu, obiekty idą wbudowaną ścieżką: szkic → przegląd → publikacja. Zacznij od gotowego szablonu.',
           })}
@@ -138,21 +142,21 @@ export function DefinitionsListView() {
                     variant={definition.enabled ? 'success' : 'queued'}
                     label={
                       definition.enabled
-                        ? t('settings.workflow.state_enabled', { defaultValue: 'Włączona' })
-                        : t('settings.workflow.state_disabled', { defaultValue: 'Wyłączona' })
+                        ? t('workflow.definitions.state_enabled', { defaultValue: 'Włączona' })
+                        : t('workflow.definitions.state_disabled', { defaultValue: 'Wyłączona' })
                     }
                   />
                 </div>
                 <p className="mt-0.5 text-[12.5px] text-zinc-500">
                   {definition.object_type_id === null
-                    ? t('settings.workflow.scope_global', {
+                    ? t('workflow.definitions.scope_global', {
                         defaultValue: 'Wszystkie typy obiektów',
                       })
-                    : t('settings.workflow.scope_object_type', {
+                    : t('workflow.definitions.scope_object_type', {
                         defaultValue: 'Jeden typ obiektu',
                       })}
                   {' · '}
-                  {t('settings.workflow.shape_summary', {
+                  {t('workflow.definitions.shape_summary', {
                     defaultValue: '{{places}} etapów · {{transitions}} akcji',
                     places: definition.places.length,
                     transitions: definition.transitions.length,
@@ -169,8 +173,8 @@ export function DefinitionsListView() {
                 data-testid={`definition-toggle-${definition.name}`}
               >
                 {definition.enabled
-                  ? t('settings.workflow.disable', { defaultValue: 'Wyłącz' })
-                  : t('settings.workflow.enable', { defaultValue: 'Włącz' })}
+                  ? t('workflow.definitions.disable', { defaultValue: 'Wyłącz' })
+                  : t('workflow.definitions.enable', { defaultValue: 'Włącz' })}
               </Button>
               <Button
                 variant="ghost"
