@@ -42,6 +42,7 @@ final readonly class CreateAttributesFromSchemaTool implements AgentToolInterfac
 
     public function __construct(
         private PendingChangesPort $pendingChanges,
+        private AttributeGroupIdentifierResolver $groupIdentifiers,
     ) {
     }
 
@@ -55,7 +56,8 @@ final readonly class CreateAttributesFromSchemaTool implements AgentToolInterfac
         return 'Propose creating attribute groups and attributes from a schema the user supplied. Nothing is created - '
             .'the proposal is materialized for human approval; report the plan (N groups, M attributes, type mapping) and the rejections. '
             .'Valid attribute types: '.implode(', ', self::VALID_TYPES).'. '
-            .'If a source type is ambiguous, ASK the user instead of guessing.';
+            .'If a source type is ambiguous, ASK the user instead of guessing. '
+            .'When the user names a group for an attribute, ALWAYS include it in that attribute\'s groups; exact group codes and exact localized labels are accepted.';
     }
 
     public function parametersSchema(): array
@@ -87,7 +89,7 @@ final readonly class CreateAttributesFromSchemaTool implements AgentToolInterfac
                             'code' => ['type' => 'string'],
                             'type' => ['type' => 'string', 'description' => 'One of the valid attribute types.'],
                             'label' => ['type' => 'object', 'description' => 'Locale map.'],
-                            'groups' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Group codes to attach to.'],
+                            'groups' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Exact group codes or localized labels to attach to. Never omit a group explicitly requested by the user.'],
                             'is_localizable' => ['type' => 'boolean'],
                             'is_scopable' => ['type' => 'boolean'],
                             'is_required' => ['type' => 'boolean'],
@@ -122,6 +124,8 @@ final readonly class CreateAttributesFromSchemaTool implements AgentToolInterfac
 
         $groups = \is_array($arguments['attribute_groups'] ?? null) ? $arguments['attribute_groups'] : [];
         $groupCount = 0;
+        /** @var list<array{code: string, label: array<string, string>}> $declaredGroups */
+        $declaredGroups = [];
         foreach ($groups as $group) {
             if (!\is_array($group)) {
                 continue;
@@ -134,9 +138,11 @@ final readonly class CreateAttributesFromSchemaTool implements AgentToolInterfac
             }
 
             $cells = ['code' => $code];
+            $cleanLabel = [];
             foreach ($label as $locale => $text) {
                 if (\is_string($locale) && \is_string($text)) {
                     $cells['label.'.$locale] = $text;
+                    $cleanLabel[$locale] = $text;
                 }
             }
             $description = \is_array($group['description'] ?? null) ? $group['description'] : [];
@@ -159,6 +165,7 @@ final readonly class CreateAttributesFromSchemaTool implements AgentToolInterfac
                 before: null,
                 after: ['schema_kind' => 'attribute_group', 'cells' => $cells],
             );
+            $declaredGroups[] = ['code' => $code, 'label' => $cleanLabel];
             ++$groupCount;
         }
 
@@ -186,12 +193,26 @@ final readonly class CreateAttributesFromSchemaTool implements AgentToolInterfac
                     $cells['label.'.$locale] = $text;
                 }
             }
-            $groupCodes = [];
+            $groupIdentifiers = [];
             $rawGroups = \is_array($attribute['groups'] ?? null) ? $attribute['groups'] : [];
-            foreach ($rawGroups as $groupCode) {
-                if (\is_string($groupCode) && '' !== $groupCode) {
-                    $groupCodes[] = $groupCode;
+            foreach ($rawGroups as $groupIdentifier) {
+                if (\is_string($groupIdentifier) && '' !== trim($groupIdentifier)) {
+                    $groupIdentifiers[] = $groupIdentifier;
                 }
+            }
+            $groupCodes = $groupIdentifiers;
+            if ([] !== $groupIdentifiers) {
+                $resolution = $this->groupIdentifiers->resolve($groupIdentifiers, $context->tenant->getId(), $declaredGroups);
+                if ([] !== $resolution['unresolved'] || [] !== $resolution['ambiguous']) {
+                    $rejected[] = [
+                        'code' => $code,
+                        'reason' => 'Every requested group must resolve to exactly one existing group. Retry this attribute with an exact group code or label.',
+                        'unresolved_groups' => $resolution['unresolved'],
+                        'ambiguous_groups' => $resolution['ambiguous'],
+                    ];
+                    continue;
+                }
+                $groupCodes = $resolution['codes'];
             }
             if ([] !== $groupCodes) {
                 $cells['groups'] = implode('|', $groupCodes);

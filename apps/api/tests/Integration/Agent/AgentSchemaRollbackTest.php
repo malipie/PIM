@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Agent;
 
 use App\Agent\Application\Approval\AgentApprovalService;
 use App\Agent\Application\Tool\AgentToolContext;
+use App\Agent\Application\Tool\AttributeGroupIdentifierResolver;
 use App\Agent\Application\Tool\CreateAttributesFromSchemaTool;
 use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\AgentRunSurface;
@@ -118,7 +119,10 @@ final class AgentSchemaRollbackTest extends KernelTestCase
 
     private function committedSchemaRun(EntityManagerInterface $em): AgentRun
     {
-        $tool = new CreateAttributesFromSchemaTool(self::getContainer()->get(PendingChangesPort::class));
+        $tool = new CreateAttributesFromSchemaTool(
+            self::getContainer()->get(PendingChangesPort::class),
+            self::getContainer()->get(AttributeGroupIdentifierResolver::class),
+        );
         $tenant = $this->managedTenant($em);
         $result = $tool->execute([
             'attribute_groups' => [

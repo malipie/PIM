@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Agent;
 
 use App\Agent\Application\Tool\AgentToolContext;
+use App\Agent\Application\Tool\AttributeGroupIdentifierResolver;
 use App\Agent\Application\Tool\CreateUpdateAttributeTool;
 use App\Agent\Application\Tool\ToolKind;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
+use App\Catalog\Contracts\Query\AttributeGroupSummary;
+use App\Catalog\Contracts\Service\AttributeGroupCatalogReader;
 use App\Shared\Domain\Tenant;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -24,7 +27,7 @@ final class CreateUpdateAttributeToolTest extends TestCase
     #[Test]
     public function metadataDeclaresASchemaToolGuardedByModeling(): void
     {
-        $tool = new CreateUpdateAttributeTool($this->pendingChanges());
+        $tool = $this->tool();
 
         self::assertSame('create_update_attribute', $tool->name());
         self::assertSame('modeling.attributes.add_edit', $tool->requiredPermission());
@@ -35,7 +38,7 @@ final class CreateUpdateAttributeToolTest extends TestCase
     #[Test]
     public function agrouplessAttributeWarnsItIsUnattached(): void
     {
-        $tool = new CreateUpdateAttributeTool($this->pendingChanges());
+        $tool = $this->tool();
 
         $result = $tool->execute(
             ['code' => 'test_from_block', 'type' => 'text', 'label' => ['pl' => 'Test']],
@@ -53,7 +56,7 @@ final class CreateUpdateAttributeToolTest extends TestCase
     #[Test]
     public function anAttributeWithGroupsDoesNotWarn(): void
     {
-        $tool = new CreateUpdateAttributeTool($this->pendingChanges());
+        $tool = $this->tool();
 
         $result = $tool->execute(
             ['code' => 'weight', 'type' => 'number', 'label' => ['pl' => 'Waga'], 'groups' => ['dimensions']],
@@ -66,9 +69,37 @@ final class CreateUpdateAttributeToolTest extends TestCase
         self::assertStringNotContainsStringIgnoringCase('will not appear on any product', $note);
     }
 
+    #[Test]
+    public function anUnknownGroupRejectsTheWholeProposal(): void
+    {
+        $result = $this->tool()->execute(
+            ['code' => 'price', 'type' => 'price', 'label' => ['pl' => 'Cena'], 'groups' => ['Nie istnieje']],
+            $this->context(),
+        );
+
+        self::assertArrayHasKey('error', $result);
+        self::assertArrayNotHasKey('pending_change_batch_id', $result);
+        self::assertSame(['Nie istnieje'], $result['unresolved_groups']);
+    }
+
     private function context(): AgentToolContext
     {
         return new AgentToolContext(Uuid::v7(), new Tenant('alpha', 'Alpha'), []);
+    }
+
+    private function tool(): CreateUpdateAttributeTool
+    {
+        $reader = new class implements AttributeGroupCatalogReader {
+            public function findAllByTenant(Uuid $tenantId): array
+            {
+                return [new AttributeGroupSummary(Uuid::v7(), $tenantId, 'dimensions', ['pl' => 'Wymiary'])];
+            }
+        };
+
+        return new CreateUpdateAttributeTool(
+            $this->pendingChanges(),
+            new AttributeGroupIdentifierResolver($reader),
+        );
     }
 
     private function pendingChanges(): PendingChangesPort

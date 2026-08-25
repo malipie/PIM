@@ -9,6 +9,7 @@ use App\Catalog\Application\Command\DeleteAttributeGroup\DeleteAttributeGroupCom
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangeStatus;
 use App\Catalog\Contracts\PendingChanges\PendingChangeType;
+use App\Catalog\Contracts\Service\AttributeGroupCatalogReader;
 use App\Import\Application\Service\Structural\AttributeGroupImportCreator;
 use App\Import\Application\Service\Structural\AttributeImportCreator;
 use App\Import\Application\Service\Structural\StructuralImportRowResult;
@@ -44,6 +45,7 @@ final readonly class AgentSchemaImportApplier implements SchemaImportPort
         private PendingChangesPort $pendingChanges,
         private AttributeGroupImportCreator $groupCreator,
         private AttributeImportCreator $attributeCreator,
+        private AttributeGroupCatalogReader $attributeGroups,
         private BulkOperationLock $bulkLock,
         private \Symfony\Component\Messenger\MessageBusInterface $commandBus,
     ) {
@@ -115,6 +117,12 @@ final readonly class AgentSchemaImportApplier implements SchemaImportPort
                 $tenant = $managed;
             }
 
+            // Agent proposals are atomic promises, unlike best-effort file
+            // imports. A missing group must abort before any attribute is
+            // created; silently warning here produced a successful run with
+            // an orphaned library attribute (#3014).
+            $this->assertReferencedGroupsExist($groupRows, $attributeRows, $tenant);
+
             $created = 0;
             $updated = 0;
             $failed = 0;
@@ -152,6 +160,41 @@ final readonly class AgentSchemaImportApplier implements SchemaImportPort
             throw $failure;
         } finally {
             $lock->release();
+        }
+    }
+
+    /**
+     * @param list<array{id: Uuid, cells: array<string, string|null>}> $groupRows
+     * @param list<array{id: Uuid, cells: array<string, string|null>}> $attributeRows
+     */
+    private function assertReferencedGroupsExist(array $groupRows, array $attributeRows, Tenant $tenant): void
+    {
+        $declaredCodes = [];
+        foreach ($groupRows as $row) {
+            $code = trim($row['cells']['code'] ?? '');
+            if ('' !== $code) {
+                $declaredCodes[$code] = true;
+            }
+        }
+        $existingCodes = [];
+        foreach ($this->attributeGroups->findAllByTenant($tenant->getId()) as $group) {
+            $existingCodes[$group->code] = true;
+        }
+
+        foreach ($attributeRows as $row) {
+            $attributeCode = trim($row['cells']['code'] ?? 'unknown');
+            foreach (MultiValueSplitter::split($row['cells']['groups'] ?? '') as $groupCode) {
+                if (isset($declaredCodes[$groupCode])) {
+                    continue;
+                }
+                if (!isset($existingCodes[$groupCode])) {
+                    throw new LogicException(\sprintf(
+                        'Attribute "%s" references unknown attribute group code "%s". The whole schema proposal was rolled back; use an exact group code or label and retry.',
+                        $attributeCode,
+                        $groupCode,
+                    ));
+                }
+            }
         }
     }
 

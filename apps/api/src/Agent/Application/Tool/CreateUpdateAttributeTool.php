@@ -31,6 +31,7 @@ final readonly class CreateUpdateAttributeTool implements AgentToolInterface, Pr
 
     public function __construct(
         private PendingChangesPort $pendingChanges,
+        private AttributeGroupIdentifierResolver $groupIdentifiers,
     ) {
     }
 
@@ -44,6 +45,7 @@ final readonly class CreateUpdateAttributeTool implements AgentToolInterface, Pr
         return 'Propose creating or updating a SINGLE attribute (upsert by code: an existing code is updated, a new one created). '
             .'Nothing changes until a human approves. Valid types: '.implode(', ', self::VALID_TYPES).'. '
             .'type is required when creating; omit it when only updating labels/flags of an existing attribute. '
+            .'When the user names a group, ALWAYS pass it in groups; exact group codes and exact localized labels are accepted and resolved server-side. '
             .'An attribute created without groups is a LIBRARY entry only - it will not appear on any product until the user attaches it to a group or object type in Modeling, so always tell the user this when you create an unattached attribute. '
             .'Deleting attributes is not available - tell the user to do that in the modeling UI.';
     }
@@ -56,7 +58,7 @@ final readonly class CreateUpdateAttributeTool implements AgentToolInterface, Pr
                 'code' => ['type' => 'string'],
                 'type' => ['type' => 'string', 'description' => 'Attribute type; required for create, omit for update-only.'],
                 'label' => ['type' => 'object', 'description' => 'Locale map, e.g. {"pl": "Waga", "en": "Weight"}.'],
-                'groups' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Group codes to attach to.'],
+                'groups' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Exact group codes or localized labels to attach to. Never omit a group explicitly requested by the user.'],
                 'is_localizable' => ['type' => 'boolean'],
                 'is_scopable' => ['type' => 'boolean'],
                 'is_required' => ['type' => 'boolean'],
@@ -112,12 +114,24 @@ final readonly class CreateUpdateAttributeTool implements AgentToolInterface, Pr
                 $cells['label.'.$locale] = $text;
             }
         }
-        $groupCodes = [];
+        $groupIdentifiers = [];
         $rawGroups = \is_array($arguments['groups'] ?? null) ? $arguments['groups'] : [];
-        foreach ($rawGroups as $groupCode) {
-            if (\is_string($groupCode) && '' !== $groupCode) {
-                $groupCodes[] = $groupCode;
+        foreach ($rawGroups as $groupIdentifier) {
+            if (\is_string($groupIdentifier) && '' !== trim($groupIdentifier)) {
+                $groupIdentifiers[] = $groupIdentifier;
             }
+        }
+        $groupCodes = $groupIdentifiers;
+        if ([] !== $groupIdentifiers) {
+            $resolution = $this->groupIdentifiers->resolve($groupIdentifiers, $context->tenant->getId());
+            if ([] !== $resolution['unresolved'] || [] !== $resolution['ambiguous']) {
+                return [
+                    'error' => 'Every requested attribute group must resolve to exactly one existing group. Use an exact code or label, then retry the complete attribute proposal.',
+                    'unresolved_groups' => $resolution['unresolved'],
+                    'ambiguous_groups' => $resolution['ambiguous'],
+                ];
+            }
+            $groupCodes = $resolution['codes'];
         }
         if ([] !== $groupCodes) {
             $cells['groups'] = implode('|', $groupCodes);
@@ -164,6 +178,7 @@ final readonly class CreateUpdateAttributeTool implements AgentToolInterface, Pr
             'affected_count' => 1,
             'code' => $code,
             'attached_to_groups' => [] !== $groupCodes,
+            'resolved_groups' => $groupCodes,
             'note' => $note,
         ];
     }

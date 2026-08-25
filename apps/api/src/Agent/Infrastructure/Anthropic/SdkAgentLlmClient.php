@@ -113,7 +113,16 @@ final readonly class SdkAgentLlmClient implements AgentLlmClientInterface, Strea
             if ($block instanceof TextBlock) {
                 $blocks[] = ['type' => 'text', 'text' => $block->text];
             } elseif ($block instanceof ToolUseBlock) {
-                $blocks[] = ['type' => 'tool_use', 'id' => $block->id, 'name' => $block->name, 'input' => $block->input];
+                // Stream accumulation can retain `input` as the raw JSON
+                // object. In that case Anthropic SDK deliberately unsets the
+                // typed property and requires ArrayAccess; reading
+                // `$block->input` throws "input property is overridden".
+                $blocks[] = [
+                    'type' => 'tool_use',
+                    'id' => $block->id,
+                    'name' => $block->name,
+                    'input' => $this->normalizeToolInput($block['input']),
+                ];
             }
         }
 
@@ -127,6 +136,40 @@ final readonly class SdkAgentLlmClient implements AgentLlmClientInterface, Strea
             durationMs: $durationMs,
             ttftMs: $ttftMs,
         );
+    }
+
+    /** @return array<string, mixed> */
+    private function normalizeToolInput(mixed $input): array
+    {
+        $normalized = $this->normalizeJsonValue($input);
+        if (!\is_array($normalized)) {
+            return [];
+        }
+
+        $object = [];
+        foreach ($normalized as $key => $value) {
+            if (\is_string($key)) {
+                $object[$key] = $value;
+            }
+        }
+
+        return $object;
+    }
+
+    private function normalizeJsonValue(mixed $value): mixed
+    {
+        if (\is_object($value)) {
+            $value = get_object_vars($value);
+        }
+        if (!\is_array($value)) {
+            return $value;
+        }
+
+        foreach ($value as $key => $nested) {
+            $value[$key] = $this->normalizeJsonValue($nested);
+        }
+
+        return $value;
     }
 
     /**
