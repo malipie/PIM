@@ -1,5 +1,5 @@
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
 
@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { toast } from '@/components/ui/toast';
 import { httpErrorDetail, jsonFetch } from '@/lib/http';
 import {
@@ -17,6 +16,7 @@ import {
   updateDefinition,
   type WorkflowDefinitionResource,
 } from '@/lib/workflow/definitions-api';
+
 import {
   type DefinitionDraft,
   draftFromResource,
@@ -26,7 +26,9 @@ import {
   violationsByField,
 } from './definition-form';
 import { EnabledDefinitionConfirmDialog } from './EnabledDefinitionConfirmDialog';
+import { PlacesSection } from './PlacesSection';
 import { ReviewerSection } from './ReviewerSection';
+import { TransitionsSection } from './TransitionsSection';
 
 interface PermissionsResponse {
   member?: Array<{ module: string; permissions: Array<{ code: string }> }>;
@@ -37,14 +39,22 @@ interface ObjectTypesResponse {
   member?: Array<{ id: string; code?: string; kind?: string }>;
 }
 
+const ADVANCED_STORAGE_KEY = 'pim.workflow.definitions.advanced';
+
 /**
  * WFL-P5-03 (#2433) — form-based definition editor (deliberately not a
- * canvas designer): places with pl/en labels and pill color, transitions
- * with from/to selects, a permission picker sourced from the permission
- * catalogue, comment-required and an optional completeness gate. Server
- * 422 violations render inline next to the offending field; editing an
- * ENABLED definition asks for confirmation because it governs live
- * objects the moment it saves.
+ * canvas designer).
+ *
+ * #3002 rewrote its language: stages carry the operator's own labels,
+ * transitions read as sentences, and permissions show as the people who
+ * hold them. Machine names and raw permission codes moved behind the
+ * advanced switch — they are our vocabulary, not the customer's. The
+ * sections live in their own files so this page stays an orchestrator
+ * (and stays under the admin max-lines guard).
+ *
+ * Server 422 violations still render inline next to the offending field;
+ * editing an ENABLED definition asks for confirmation because it governs
+ * live objects the moment it saves.
  */
 export function DefinitionEditorPage() {
   const { t } = useTranslation();
@@ -55,26 +65,25 @@ export function DefinitionEditorPage() {
   const [draft, setDraft] = useState<DefinitionDraft>(emptyDraft);
   const [original, setOriginal] = useState<WorkflowDefinitionResource | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [permissionOptions, setPermissionOptions] = useState<ComboboxOption[]>([]);
+  const [permissionCodes, setPermissionCodes] = useState<string[]>([]);
   const [objectTypeOptions, setObjectTypeOptions] = useState<ComboboxOption[]>([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(editing);
+  const [advanced, setAdvanced] = useState(readAdvanced);
 
   useEffect(() => {
     // The permission catalogue is gated user.admin — degrade to a plain
     // text input when the caller only holds workflow.manage_definitions.
     jsonFetch<PermissionsResponse>('/api/permissions')
       .then((body) => {
-        const options = (body.member ?? []).flatMap((group) =>
-          group.permissions.map((permission) => ({
-            value: permission.code,
-            label: permission.code,
-          })),
+        setPermissionCodes(
+          (body.member ?? []).flatMap((group) =>
+            group.permissions.map((permission) => permission.code),
+          ),
         );
-        setPermissionOptions(options);
       })
-      .catch(() => setPermissionOptions([]));
+      .catch(() => setPermissionCodes([]));
 
     jsonFetch<ObjectTypesResponse>('/api/object_types?itemsPerPage=200')
       .then((body) => {
@@ -105,20 +114,34 @@ export function DefinitionEditorPage() {
       .finally(() => setLoading(false));
   }, [editing, id, navigate, t]);
 
-  const placeOptions: ComboboxOption[] = useMemo(
-    () =>
-      draft.places
-        .filter((place) => place.name.trim() !== '')
-        .map((place) => ({ value: place.name.trim(), label: place.name.trim() })),
-    [draft.places],
-  );
+  const fieldError = useCallback((field: string) => errors[field], [errors]);
 
-  const fieldError = (field: string): string | undefined => errors[field];
+  const toggleAdvanced = () => {
+    setAdvanced((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(ADVANCED_STORAGE_KEY, next ? '1' : '0');
+      } catch {
+        // Private windows and blocked site data throw — the switch still
+        // works for this session, it just will not be remembered.
+      }
+      return next;
+    });
+  };
 
   const save = () => {
     const local = localViolations(draft);
     if (local.length > 0) {
-      setErrors(violationsByField(localMessages(local)));
+      setErrors(
+        violationsByField(
+          local.map((violation) => ({
+            field: violation.field,
+            message: t(`settings.workflow.violation.${violation.message}`, {
+              defaultValue: violation.message,
+            }),
+          })),
+        ),
+      );
       return;
     }
     if (original?.enabled === true && !confirmOpen) {
@@ -154,14 +177,6 @@ export function DefinitionEditorPage() {
       .finally(() => setSaving(false));
   };
 
-  const localMessages = (violations: ReturnType<typeof localViolations>) =>
-    violations.map((violation) => ({
-      field: violation.field,
-      message: t(`settings.workflow.violation.${violation.message}`, {
-        defaultValue: violation.message,
-      }),
-    }));
-
   if (loading) {
     return (
       <p className="px-1 py-6 text-[13px] text-zinc-500">
@@ -170,26 +185,28 @@ export function DefinitionEditorPage() {
     );
   }
 
-  const reviewerSection = (
-    <ReviewerSection
-      value={draft.reviewer}
-      onChange={(next) => setDraft({ ...draft, reviewer: next })}
-      error={fieldError('reviewer')}
-    />
-  );
-
   return (
     <div className="space-y-6" data-testid="workflow-definition-editor">
-      <header className="flex items-center gap-3">
+      <header className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => void navigate('/workflow/definitions')}>
           <ArrowLeft className="size-4" />
           <span className="sr-only">{t('common.back', { defaultValue: 'Wstecz' })}</span>
         </Button>
         <h2 className="flex-1 text-[22px] font-semibold tracking-tight text-zinc-900">
           {editing
-            ? t('settings.workflow.edit_title', { defaultValue: 'Edytuj definicję' })
-            : t('settings.workflow.new_title', { defaultValue: 'Nowa definicja' })}
+            ? t('settings.workflow.edit_title', { defaultValue: 'Edytuj przepływ' })
+            : t('settings.workflow.new_title', { defaultValue: 'Nowy przepływ' })}
         </h2>
+        <label className="flex items-center gap-2 text-[12px] text-zinc-500">
+          <input
+            type="checkbox"
+            className="size-4 rounded border-zinc-300"
+            checked={advanced}
+            onChange={toggleAdvanced}
+            data-testid="definition-advanced-toggle"
+          />
+          {t('workflow.definitions.advanced', { defaultValue: 'Tryb zaawansowany' })}
+        </label>
         <Button
           onClick={save}
           disabled={saving}
@@ -203,7 +220,7 @@ export function DefinitionEditorPage() {
       <section className="grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Label htmlFor="definition-name">
-            {t('settings.workflow.field_name', { defaultValue: 'Nazwa definicji' })}
+            {t('workflow.definitions.field_name', { defaultValue: 'Nazwa przepływu' })}
           </Label>
           <Input
             id="definition-name"
@@ -212,258 +229,50 @@ export function DefinitionEditorPage() {
             data-testid="definition-name"
             aria-invalid={fieldError('name') !== undefined}
           />
-          <FieldError message={fieldError('name')} />
+          {fieldError('name') === undefined ? null : (
+            <p className="mt-1 text-[12px] text-brick-600" role="alert">
+              {fieldError('name')}
+            </p>
+          )}
         </div>
         <div>
           <Label htmlFor="definition-object-type">
-            {t('settings.workflow.field_object_type', {
-              defaultValue: 'Typ obiektu (puste = wszystkie)',
-            })}
+            {t('workflow.definitions.field_object_type', { defaultValue: 'Dla czego obowiązuje' })}
           </Label>
-          <Combobox
-            options={objectTypeOptions}
-            value={draft.objectTypeId === '' ? null : draft.objectTypeId}
-            onChange={(value) => setDraft({ ...draft, objectTypeId: value ?? '' })}
-            placeholder={t('settings.workflow.object_type_all', { defaultValue: 'Wszystkie typy' })}
-          />
+          <div id="definition-object-type" data-testid="definition-object-type">
+            <Combobox
+              options={objectTypeOptions}
+              value={draft.objectTypeId === '' ? null : draft.objectTypeId}
+              onChange={(value) => setDraft({ ...draft, objectTypeId: value ?? '' })}
+              placeholder={t('settings.workflow.object_type_all', {
+                defaultValue: 'Wszystkie typy',
+              })}
+            />
+          </div>
         </div>
       </section>
 
-      <section className="space-y-3">
-        <div className="flex items-center gap-3">
-          <h3 className="flex-1 text-[15px] font-semibold text-zinc-900">
-            {t('settings.workflow.places_title', { defaultValue: 'Stany' })}
-          </h3>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setDraft({
-                ...draft,
-                places: [...draft.places, { name: '', labelPl: '', labelEn: '', color: '#71717a' }],
-              })
-            }
-            data-testid="place-add"
-          >
-            <Plus className="mr-1 size-3.5" />
-            {t('settings.workflow.place_add', { defaultValue: 'Dodaj stan' })}
-          </Button>
-        </div>
-        <FieldError message={fieldError('places')} />
-        <ul className="space-y-2">
-          {draft.places.map((place, index) => (
-            <li
-              // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional editor slots
-              key={index}
-              className="flex flex-wrap items-end gap-3 rounded-2xl border border-zinc-200 bg-white p-3"
-            >
-              <div className="w-44">
-                <Label htmlFor={`place-name-${index}`}>
-                  {t('settings.workflow.place_name', { defaultValue: 'Nazwa (snake_case)' })}
-                </Label>
-                <Input
-                  id={`place-name-${index}`}
-                  value={place.name}
-                  onChange={(event) => updatePlace(index, { name: event.target.value })}
-                  data-testid={`place-name-${index}`}
-                  aria-invalid={fieldError(`places[${index}].name`) !== undefined}
-                />
-                <FieldError message={fieldError(`places[${index}].name`)} />
-              </div>
-              <div className="w-40">
-                <Label htmlFor={`place-label-pl-${index}`}>
-                  {t('settings.workflow.place_label_pl', { defaultValue: 'Etykieta (pl)' })}
-                </Label>
-                <Input
-                  id={`place-label-pl-${index}`}
-                  value={place.labelPl}
-                  onChange={(event) => updatePlace(index, { labelPl: event.target.value })}
-                />
-              </div>
-              <div className="w-40">
-                <Label htmlFor={`place-label-en-${index}`}>
-                  {t('settings.workflow.place_label_en', { defaultValue: 'Etykieta (en)' })}
-                </Label>
-                <Input
-                  id={`place-label-en-${index}`}
-                  value={place.labelEn}
-                  onChange={(event) => updatePlace(index, { labelEn: event.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor={`place-color-${index}`}>
-                  {t('settings.workflow.place_color', { defaultValue: 'Kolor' })}
-                </Label>
-                <input
-                  id={`place-color-${index}`}
-                  type="color"
-                  className="block h-9 w-14 cursor-pointer rounded-md border border-zinc-200 bg-white p-1"
-                  value={place.color}
-                  onChange={(event) => updatePlace(index, { color: event.target.value })}
-                />
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="ml-auto"
-                disabled={place.name === 'draft'}
-                onClick={() =>
-                  setDraft({ ...draft, places: draft.places.filter((_, i) => i !== index) })
-                }
-                aria-label={t('settings.workflow.place_remove', { defaultValue: 'Usuń stan' })}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <PlacesSection
+        places={draft.places}
+        onChange={(places) => setDraft({ ...draft, places })}
+        advanced={advanced}
+        error={fieldError}
+      />
 
-      <section className="space-y-3">
-        <div className="flex items-center gap-3">
-          <h3 className="flex-1 text-[15px] font-semibold text-zinc-900">
-            {t('settings.workflow.transitions_title', { defaultValue: 'Przejścia' })}
-          </h3>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setDraft({
-                ...draft,
-                transitions: [
-                  ...draft.transitions,
-                  {
-                    name: '',
-                    from: [],
-                    to: '',
-                    permission: '',
-                    commentRequired: false,
-                    gatePct: '',
-                  },
-                ],
-              })
-            }
-            data-testid="transition-add"
-          >
-            <Plus className="mr-1 size-3.5" />
-            {t('settings.workflow.transition_add', { defaultValue: 'Dodaj przejście' })}
-          </Button>
-        </div>
-        <ul className="space-y-2">
-          {draft.transitions.map((transition, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional editor slots
-            <li key={index} className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-3">
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="w-52">
-                  <Label htmlFor={`transition-name-${index}`}>
-                    {t('settings.workflow.transition_name', { defaultValue: 'Nazwa (snake_case)' })}
-                  </Label>
-                  <Input
-                    id={`transition-name-${index}`}
-                    value={transition.name}
-                    onChange={(event) => updateTransition(index, { name: event.target.value })}
-                    data-testid={`transition-name-${index}`}
-                    aria-invalid={fieldError(`transitions[${index}].name`) !== undefined}
-                  />
-                  <FieldError message={fieldError(`transitions[${index}].name`)} />
-                </div>
-                <div className="w-56" data-testid={`transition-from-${index}`}>
-                  <Label>
-                    {t('settings.workflow.transition_from', { defaultValue: 'Ze stanów' })}
-                  </Label>
-                  <MultiSelect
-                    options={placeOptions}
-                    value={transition.from}
-                    onChange={(next) => updateTransition(index, { from: next })}
-                  />
-                  <FieldError message={fieldError(`transitions[${index}].from`)} />
-                </div>
-                <div className="w-48" data-testid={`transition-to-${index}`}>
-                  <Label>
-                    {t('settings.workflow.transition_to', { defaultValue: 'Do stanu' })}
-                  </Label>
-                  <Combobox
-                    options={placeOptions}
-                    value={transition.to === '' ? null : transition.to}
-                    onChange={(value) => updateTransition(index, { to: value ?? '' })}
-                  />
-                  <FieldError message={fieldError(`transitions[${index}].to`)} />
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="ml-auto"
-                  onClick={() =>
-                    setDraft({
-                      ...draft,
-                      transitions: draft.transitions.filter((_, i) => i !== index),
-                    })
-                  }
-                  aria-label={t('settings.workflow.transition_remove', {
-                    defaultValue: 'Usuń przejście',
-                  })}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="w-72">
-                  <Label>
-                    {t('settings.workflow.transition_permission', {
-                      defaultValue: 'Wymagane uprawnienie (opcjonalne)',
-                    })}
-                  </Label>
-                  {permissionOptions.length > 0 ? (
-                    <Combobox
-                      options={permissionOptions}
-                      value={transition.permission === '' ? null : transition.permission}
-                      onChange={(value) => updateTransition(index, { permission: value ?? '' })}
-                    />
-                  ) : (
-                    <Input
-                      value={transition.permission}
-                      onChange={(event) =>
-                        updateTransition(index, { permission: event.target.value })
-                      }
-                      placeholder="workflow.approve_reject"
-                    />
-                  )}
-                  <FieldError message={fieldError(`transitions[${index}].permission`)} />
-                </div>
-                <label className="flex h-9 items-center gap-2 text-[13px] text-zinc-700">
-                  <input
-                    type="checkbox"
-                    className="size-4 rounded border-zinc-300"
-                    checked={transition.commentRequired}
-                    onChange={(event) =>
-                      updateTransition(index, { commentRequired: event.target.checked })
-                    }
-                  />
-                  {t('settings.workflow.transition_comment_required', {
-                    defaultValue: 'Komentarz wymagany',
-                  })}
-                </label>
-                <div className="w-44">
-                  <Label htmlFor={`transition-gate-${index}`}>
-                    {t('settings.workflow.transition_gate', {
-                      defaultValue: 'Min. kompletność % (puste = brak)',
-                    })}
-                  </Label>
-                  <Input
-                    id={`transition-gate-${index}`}
-                    inputMode="numeric"
-                    value={transition.gatePct}
-                    onChange={(event) => updateTransition(index, { gatePct: event.target.value })}
-                  />
-                  <FieldError message={fieldError(`transitions[${index}].completeness_gate`)} />
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <TransitionsSection
+        transitions={draft.transitions}
+        places={draft.places}
+        permissionCodes={permissionCodes}
+        onChange={(transitions) => setDraft({ ...draft, transitions })}
+        advanced={advanced}
+        error={fieldError}
+      />
 
-      {reviewerSection}
+      <ReviewerSection
+        value={draft.reviewer}
+        onChange={(reviewer) => setDraft({ ...draft, reviewer })}
+        error={fieldError('reviewer')}
+      />
 
       <EnabledDefinitionConfirmDialog
         open={confirmOpen}
@@ -472,29 +281,12 @@ export function DefinitionEditorPage() {
       />
     </div>
   );
-
-  function updatePlace(index: number, patch: Partial<DefinitionDraft['places'][number]>) {
-    setDraft({
-      ...draft,
-      places: draft.places.map((place, i) => (i === index ? { ...place, ...patch } : place)),
-    });
-  }
-
-  function updateTransition(index: number, patch: Partial<DefinitionDraft['transitions'][number]>) {
-    setDraft({
-      ...draft,
-      transitions: draft.transitions.map((transition, i) =>
-        i === index ? { ...transition, ...patch } : transition,
-      ),
-    });
-  }
 }
 
-function FieldError({ message }: { message?: string }) {
-  if (message === undefined) return null;
-  return (
-    <p className="mt-1 text-[12px] text-red-600" role="alert">
-      {message}
-    </p>
-  );
+function readAdvanced(): boolean {
+  try {
+    return window.localStorage.getItem(ADVANCED_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
 }

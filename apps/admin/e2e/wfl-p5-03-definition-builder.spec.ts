@@ -5,8 +5,13 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, apiLogin, uniqueSku } from './helpers/auth
 
 /**
  * WFL-P5-03 (#2433) — the definition builder full cycle: create a custom
- * definition with a `translation` place in Settings → Workflow, enable
- * it, and see the new transition surface on a fresh product — no deploy.
+ * flow with a `translation` stage, enable it, and see the new transition
+ * surface on a fresh product — no deploy.
+ *
+ * #3002 — driven through the rewritten editor: the operator types stage
+ * LABELS and the machine name is derived from them, so raw names are
+ * reachable only behind the advanced switch, and the from/to pickers list
+ * labels rather than machine names.
  * The CI stack runs WORKFLOW_CUSTOM_DEFINITIONS=true; the definition is
  * disabled again in cleanup so the rest of the suite keeps the static
  * machine (with no enabled definition the provider falls back to YAML).
@@ -51,6 +56,10 @@ test('definition builder: custom place shows up on the product without a deploy'
 
     await page.getByTestId('definition-name').fill(definitionName);
 
+    // Raw machine names are advanced-only now — that is where the
+    // non-snake_case edge case still lives.
+    await page.getByTestId('definition-advanced-toggle').check();
+
     // Edge case: a non-snake_case place name surfaces an inline error.
     await page.getByTestId('place-add').click();
     await page.getByTestId('place-name-2').fill('Translation!');
@@ -60,12 +69,15 @@ test('definition builder: custom place shows up on the product without a deploy'
     // Fix the name, wire the transition draft -> translation.
     await page.getByTestId('place-name-2').fill('translation');
     await page.getByTestId('transition-add').click();
-    await page.getByTestId('transition-name-1').fill('to_translation');
+    await page.getByTestId('transition-label-1').fill('to_translation');
     // From: multi-select 'draft' (options render as buttons inside the
     // component root); To: combobox 'translation'.
     const fromSelect = page.getByTestId('transition-from-1');
     await fromSelect.locator('[role="button"]').click();
-    await fromSelect.getByRole('button', { name: 'draft', exact: true }).click();
+    // The pickers speak labels now: the starter draft's `draft` place is
+    // labelled "Szkic"; `translation` has no label, so it falls back to
+    // its machine name.
+    await fromSelect.getByRole('button', { name: 'Szkic', exact: true }).click();
     // Clicking the To trigger fires the outside-mousedown that closes the
     // still-open MultiSelect dropdown.
     const toSelect = page.getByTestId('transition-to-1');

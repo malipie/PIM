@@ -5,6 +5,8 @@ import type {
   WorkflowDefinitionResource,
 } from '@/lib/workflow/definitions-api';
 
+import { humanizeName } from './flow-vocabulary';
+
 /**
  * WFL-P5-03 (#2433) — pure editor-state <-> API-payload mapping for the
  * definition builder. Kept free of React so every rule is unit-testable:
@@ -16,16 +18,30 @@ export interface PlaceDraft {
   labelPl: string;
   labelEn: string;
   color: string;
+  /**
+   * #3002 — true once the place exists server-side. Renaming it would
+   * strand every object whose status carries the old name, so the editor
+   * derives the machine name from the label only while the row is new.
+   */
+  nameLocked: boolean;
 }
 
 export interface TransitionDraft {
   name: string;
+  /**
+   * #3002 — what the operator reads and types. The API stores no label
+   * for transitions, so this is editor-only state: canonical steps get
+   * their i18n label back on load, custom ones a humanised machine name.
+   */
+  label: string;
   from: string[];
   to: string;
   permission: string;
   commentRequired: boolean;
   /** Empty string = no completeness gate. */
   gatePct: string;
+  /** See {@see PlaceDraft.nameLocked} — plus: renaming breaks automation. */
+  nameLocked: boolean;
 }
 
 export interface DefinitionDraft {
@@ -68,17 +84,25 @@ export function emptyDraft(): DefinitionDraft {
     name: '',
     objectTypeId: '',
     places: [
-      { name: 'draft', labelPl: 'Szkic', labelEn: 'Draft', color: '#71717a' },
-      { name: 'published', labelPl: 'Opublikowany', labelEn: 'Published', color: '#16a34a' },
+      { name: 'draft', labelPl: 'Szkic', labelEn: 'Draft', color: '#71717a', nameLocked: true },
+      {
+        name: 'published',
+        labelPl: 'Opublikowany',
+        labelEn: 'Published',
+        color: '#16a34a',
+        nameLocked: true,
+      },
     ],
     transitions: [
       {
-        name: 'publish_direct',
+        name: 'publish',
+        label: 'Opublikuj',
         from: ['draft'],
         to: 'published',
         permission: '',
         commentRequired: false,
         gatePct: '',
+        nameLocked: true,
       },
     ],
     reviewer: '',
@@ -94,9 +118,12 @@ export function draftFromResource(resource: WorkflowDefinitionResource): Definit
       labelPl: place.label?.pl ?? '',
       labelEn: place.label?.en ?? '',
       color: place.color ?? '#71717a',
+      nameLocked: true,
     })),
     transitions: resource.transitions.map((transition) => ({
       name: transition.name,
+      label: humanizeName(transition.name),
+      nameLocked: true,
       from: Array.isArray(transition.from) ? transition.from : [transition.from],
       to: transition.to,
       permission: transition.permission ?? '',

@@ -31,7 +31,7 @@ describe('draftToPayload', () => {
     });
     expect(payload.places[1]).toEqual({ name: 'published', color: '#16a34a' });
     expect(payload.transitions[0]).toEqual({
-      name: 'publish_direct',
+      name: 'publish',
       from: ['draft'],
       to: 'published',
     });
@@ -48,7 +48,7 @@ describe('draftToPayload', () => {
     const transition = draftToPayload(draft).transitions[0];
 
     expect(transition).toEqual({
-      name: 'publish_direct',
+      name: 'publish',
       from: ['draft'],
       to: 'published',
       permission: 'workflow.approve_reject',
@@ -113,12 +113,21 @@ describe('localViolations', () => {
     const draft = emptyDraft();
     draft.name = '';
     draft.places = [
-      { name: 'Draft!', labelPl: '', labelEn: '', color: '' },
-      { name: 'review', labelPl: '', labelEn: '', color: '' },
-      { name: 'review', labelPl: '', labelEn: '', color: '' },
+      { name: 'Draft!', labelPl: '', labelEn: '', color: '', nameLocked: true },
+      { name: 'review', labelPl: '', labelEn: '', color: '', nameLocked: true },
+      { name: 'review', labelPl: '', labelEn: '', color: '', nameLocked: true },
     ];
     draft.transitions = [
-      { name: 'go', from: [], to: '', permission: '', commentRequired: false, gatePct: '150' },
+      {
+        name: 'go',
+        label: 'Go',
+        from: [],
+        to: '',
+        permission: '',
+        commentRequired: false,
+        gatePct: '150',
+        nameLocked: true,
+      },
     ];
 
     const fields = localViolations(draft).map((violation) => violation.field);
