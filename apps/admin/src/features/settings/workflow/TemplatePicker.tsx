@@ -35,7 +35,7 @@ const COPY: Record<TemplateId, { title: string; body: string }> = {
  * the editor supported is closed off by starting here.
  */
 export function TemplatePicker({ onPick, onBlank }: TemplatePickerProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const placeLabel = (name: string): string =>
     PLACE_BLOCKS.find((block) => block.name === name)?.labelPl ?? name;
@@ -64,7 +64,7 @@ export function TemplatePicker({ onPick, onBlank }: TemplatePickerProps) {
             <button
               key={template.id}
               type="button"
-              onClick={() => onPick(template.build())}
+              onClick={() => onPick(template.build(i18n.language))}
               data-testid={`definition-template-${template.id}`}
               className="focus-ring flex flex-col gap-2.5 rounded-2xl border border-zinc-200 bg-white p-4 text-left transition hover:border-zinc-300"
             >

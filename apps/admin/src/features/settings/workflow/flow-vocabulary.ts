@@ -162,6 +162,32 @@ export function isAdvancedPermission(code: string): boolean {
 }
 
 /**
+ * Canonical transition name -> the label people actually use. Mirrors the
+ * `workflow.transition.*` i18n keys the product card already renders, so
+ * a template does not hand the operator "Submit for review" on a Polish
+ * screen — the whole point of #3002 was to stop showing our vocabulary.
+ */
+const CANONICAL_LABELS: Record<string, { pl: string; en: string }> = {
+  submit_for_review: { pl: 'Zgłoś do przeglądu', en: 'Submit for review' },
+  publish: { pl: 'Opublikuj', en: 'Publish' },
+  approve: { pl: 'Zatwierdź', en: 'Approve' },
+  reject: { pl: 'Odrzuć', en: 'Reject' },
+  unpublish: { pl: 'Cofnij publikację', en: 'Unpublish' },
+  archive: { pl: 'Archiwizuj', en: 'Archive' },
+  restore: { pl: 'Przywróć', en: 'Restore' },
+};
+
+/**
+ * Label for a transition: the canonical wording when the engine knows the
+ * name, a humanised machine name otherwise.
+ */
+export function transitionLabel(name: string, lang: string): string {
+  const entry = CANONICAL_LABELS[name];
+  if (entry === undefined) return humanizeName(name);
+  return lang.startsWith('en') ? entry.en : entry.pl;
+}
+
+/**
  * Machine name -> readable label, for names that carry no stored label.
  * Transitions have no `label` field in the API (places do), so the editor
  * shows the i18n label for canonical steps and this humanised form for
