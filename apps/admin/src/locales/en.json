@@ -996,58 +996,6 @@
         }
       }
     },
-    "workflow": {
-      "title": "Workflow definitions",
-      "intro": "Tenant-specific editorial process: places, transitions, permissions and completeness gates — no deploy needed.",
-      "create_cta": "New definition",
-      "empty_title": "No definitions",
-      "empty_body": "Until you enable a custom definition, objects follow the built-in process (draft → review → published).",
-      "state_enabled": "Enabled",
-      "state_disabled": "Disabled",
-      "scope_global": "All object types",
-      "scope_object_type": "Single object type",
-      "shape_summary": "{{places}} places · {{transitions}} transitions",
-      "enable": "Enable",
-      "disable": "Disable",
-      "enabled_toast": "Definition enabled.",
-      "disabled_toast": "Definition disabled.",
-      "toggle_failed": "Could not change the state.",
-      "saved": "Definition saved.",
-      "invalid": "The definition has errors — fix the highlighted fields.",
-      "save_failed": "Saving failed.",
-      "not_found": "Definition not found.",
-      "edit_title": "Edit definition",
-      "new_title": "New definition",
-      "field_name": "Definition name",
-      "field_object_type": "Object type (empty = all)",
-      "object_type_all": "All types",
-      "places_title": "Places",
-      "place_add": "Add place",
-      "place_name": "Name (snake_case)",
-      "place_label_pl": "Label (pl)",
-      "place_label_en": "Label (en)",
-      "place_color": "Color",
-      "place_remove": "Remove place",
-      "transitions_title": "Transitions",
-      "transition_add": "Add transition",
-      "transition_name": "Name (snake_case)",
-      "transition_from": "From places",
-      "transition_to": "To place",
-      "transition_permission": "Required permission (optional)",
-      "transition_comment_required": "Comment required",
-      "transition_gate": "Min completeness % (empty = none)",
-      "transition_remove": "Remove transition",
-      "confirm_title": "This definition is enabled",
-      "confirm_body": "It governs live objects — saving changes the available transitions immediately. Continue?",
-      "confirm_cta": "Save anyway",
-      "violation": {
-        "required": "This field is required.",
-        "snake_case": "Use snake_case (letters, digits, underscores).",
-        "duplicate": "Duplicate name.",
-        "missing_draft": "The definition must contain the initial \"draft\" place.",
-        "pct_range": "Enter an integer between 0 and 100."
-      }
-    },
     "ai": {
       "shortcuts_aria": "Agent shortcuts"
     }
@@ -4321,7 +4269,137 @@
       "cancel": "Cancel",
       "completed": "Task completed",
       "cancelled": "Task cancelled"
-    }
+    },
+    "definitions": {
+      "preview": {
+        "narrative": {
+          "submit": "The editor fills in the data and submits the object for review.",
+          "submit_gate": "The editor fills in the data; the submit button unlocks at {{pct}}% completeness.",
+          "review_task": "The approver gets a task in “My tasks” and a notification.",
+          "reject": "After a rejection the author gets a “Fix” task with the approver's comment.",
+          "publish": "A published object flows into exports and sales channels.",
+          "empty": "This flow has no built-in step, so PIM will create no tasks and send no notifications in it."
+        },
+        "title": "Preview",
+        "subtitle": "Drawn from what is in the form right now.",
+        "narrative_title": "How this will work",
+        "readiness_title": "Readiness",
+        "all_good": "The flow holds together — every stage reachable, every action spelled out.",
+        "impact_enabled": "This flow is active — saving affects {{count}} objects.",
+        "impact_disabled": "This flow is disabled — {{count}} objects stay on the built-in flow until you enable it.",
+        "finding": {
+          "no_start": "The initial stage “Draft” is missing — every object starts there.",
+          "unreachable": "There is no way to reach: {{items}}. Add an action leading to that stage.",
+          "no_publish": "No path ends in publication — objects will never reach the channels.",
+          "incomplete": "Unfinished actions: {{items}} — a name or the stages are missing.",
+          "ungated": "No “who may” set for: {{items}}. Anyone who can see the object will do it.",
+          "custom": "Custom steps: {{items}}. PIM creates no task and no notification for them — watch them through the status filter."
+        },
+        "no_transitions": "Add the first action to see the path."
+      },
+      "transitions": {
+        "title": "Who can do what",
+        "subtitle": "Each row is one button people will see on the object.",
+        "add": "Add action",
+        "label": "Action name",
+        "label_placeholder": "e.g. Submit for review",
+        "moves_from": "moves from",
+        "moves_to": "to",
+        "who_can": "— may be done by",
+        "anyone": "Anyone who can see the object",
+        "remove": "Remove action",
+        "comment": "requires a comment",
+        "gate": "requires completeness",
+        "custom_warning": "This is your own step — PIM creates no task and sends no notification for it. Whoever holds this permission finds the objects through the status filter."
+      },
+      "template": {
+        "title": "What should the path to publication look like?",
+        "subtitle": "Pick the closest variant. You will fine-tune everything in a moment.",
+        "recommended": "recommended",
+        "custom_step_note": "The “Hand over for publication” step is custom — it creates no task; the publisher finds objects through the status filter.",
+        "blank": "Start from blank",
+        "no_approval": {
+          "title": "No approval",
+          "body": "The editor publishes on their own. For catalogues where nobody reviews anything."
+        },
+        "one_approval": {
+          "title": "One approval",
+          "body": "The editor submits, the approver accepts or sends it back with a comment. PIM's built-in process."
+        },
+        "approval_then_publish": {
+          "title": "Approval and publication apart",
+          "body": "The approver accepts the content; the person running integrations and exports releases it to the channels."
+        }
+      },
+      "reviewer_default": "Approver: default role",
+      "reviewer_role": "Approver: {{name}}",
+      "reviewer_user": "Approver: {{name}}",
+      "disabled_toast": "Flow disabled.",
+      "enabled_toast": "Flow enabled.",
+      "toggle_failed": "Could not change the state.",
+      "title": "Workflow — definitions",
+      "intro": "Your own editorial process per tenant: stages, actions, permissions and completeness gates — no deploy needed.",
+      "create_cta": "New flow",
+      "empty_title": "No flows yet",
+      "empty_body": "Until you enable your own flow, objects follow the built-in path: draft → review → published. Start from a template.",
+      "state_enabled": "Active",
+      "state_disabled": "Disabled",
+      "scope_global": "All object types",
+      "scope_object_type": "One object type",
+      "shape_summary": "{{places}} stages · {{transitions}} actions",
+      "disable": "Disable",
+      "enable": "Enable",
+      "confirm_title": "This flow is active",
+      "confirm_body": "This flow governs live objects — saving changes the available transitions immediately. Continue?",
+      "confirm_cta": "Save anyway",
+      "places": {
+        "title": "Stages",
+        "subtitle": "The statuses people see on the object and in list filters.",
+        "add": "Add stage",
+        "color": "Colour",
+        "label_pl": "Stage name",
+        "label_placeholder": "e.g. In review",
+        "label_en": "In English",
+        "start_badge": "start",
+        "published_badge": "visible in channels",
+        "machine_name": "Machine name",
+        "remove": "Remove stage",
+        "blocks": "Ready-made stages:"
+      },
+      "approver": {
+        "role_option": "{{name}} (role)",
+        "title": "Who gets the tasks",
+        "subtitle": "One approver for the whole flow. Handles Review and Unpublish request tasks.",
+        "label": "Approver — a role or a specific person",
+        "placeholder": "Default: the Approver role",
+        "hint": "This person or role sees the task in “My tasks” right after submission.",
+        "audience": "Who sees the task",
+        "default_role": "Role: Approver — the chosen recipient",
+        "approvers": "Everyone holding “Approve/Reject”",
+        "safety": "Safety net — a task never gets stuck when the chosen person is away.",
+        "footer": "A new recipient applies to new submissions. Current tasks stay with the present approver."
+      },
+      "not_found": "Flow not found.",
+      "saved": "Flow saved.",
+      "invalid": "The flow has errors — fix the marked fields.",
+      "save_failed": "Saving failed.",
+      "edit_title": "Edit flow",
+      "new_title": "New flow",
+      "active": "Active",
+      "inactive": "Disabled",
+      "advanced": "Advanced mode",
+      "field_name": "Flow name",
+      "field_object_type": "Applies to",
+      "object_type_all": "All types",
+      "violation": {
+        "required": "This field is required.",
+        "snake_case": "Use snake_case (letters, digits, underscores).",
+        "duplicate": "That name is already used.",
+        "missing_draft": "The flow must contain the initial stage “draft”.",
+        "pct_range": "Enter a whole number between 0 and 100."
+      }
+    },
+    "definitions_cta": "Flow definitions"
   },
   "grid": {
     "cell": {

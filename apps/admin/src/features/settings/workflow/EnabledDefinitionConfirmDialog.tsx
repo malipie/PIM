@@ -32,10 +32,10 @@ export function EnabledDefinitionConfirmDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {t('settings.workflow.confirm_title', { defaultValue: 'Definicja jest włączona' })}
+            {t('workflow.definitions.confirm_title', { defaultValue: 'Definicja jest włączona' })}
           </DialogTitle>
           <DialogDescription>
-            {t('settings.workflow.confirm_body', {
+            {t('workflow.definitions.confirm_body', {
               defaultValue:
                 'Ta definicja steruje żywymi obiektami — zapis zmienia dostępne przejścia od razu. Kontynuować?',
             })}
@@ -46,7 +46,7 @@ export function EnabledDefinitionConfirmDialog({
             {t('common.cancel', { defaultValue: 'Anuluj' })}
           </Button>
           <Button onClick={onConfirm} data-testid="definition-confirm-save">
-            {t('settings.workflow.confirm_cta', { defaultValue: 'Zapisz mimo to' })}
+            {t('workflow.definitions.confirm_cta', { defaultValue: 'Zapisz mimo to' })}
           </Button>
         </DialogFooter>
       </DialogContent>

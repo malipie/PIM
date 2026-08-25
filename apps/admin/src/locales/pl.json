@@ -1006,58 +1006,6 @@
         }
       }
     },
-    "workflow": {
-      "title": "Workflow — definicje",
-      "intro": "Własny proces edytorski per tenant: stany, przejścia, uprawnienia i bramki kompletności — bez deployu.",
-      "create_cta": "Nowa definicja",
-      "empty_title": "Brak definicji",
-      "empty_body": "Dopóki nie włączysz własnej definicji, obiekty przechodzą przez wbudowany proces (szkic → przegląd → publikacja).",
-      "state_enabled": "Włączona",
-      "state_disabled": "Wyłączona",
-      "scope_global": "Wszystkie typy obiektów",
-      "scope_object_type": "Jeden typ obiektu",
-      "shape_summary": "{{places}} stanów · {{transitions}} przejść",
-      "enable": "Włącz",
-      "disable": "Wyłącz",
-      "enabled_toast": "Definicja włączona.",
-      "disabled_toast": "Definicja wyłączona.",
-      "toggle_failed": "Nie udało się zmienić stanu.",
-      "saved": "Definicja zapisana.",
-      "invalid": "Definicja zawiera błędy — popraw pola.",
-      "save_failed": "Zapis nie powiódł się.",
-      "not_found": "Nie znaleziono definicji.",
-      "edit_title": "Edytuj definicję",
-      "new_title": "Nowa definicja",
-      "field_name": "Nazwa definicji",
-      "field_object_type": "Typ obiektu (puste = wszystkie)",
-      "object_type_all": "Wszystkie typy",
-      "places_title": "Stany",
-      "place_add": "Dodaj stan",
-      "place_name": "Nazwa (snake_case)",
-      "place_label_pl": "Etykieta (pl)",
-      "place_label_en": "Etykieta (en)",
-      "place_color": "Kolor",
-      "place_remove": "Usuń stan",
-      "transitions_title": "Przejścia",
-      "transition_add": "Dodaj przejście",
-      "transition_name": "Nazwa (snake_case)",
-      "transition_from": "Ze stanów",
-      "transition_to": "Do stanu",
-      "transition_permission": "Wymagane uprawnienie (opcjonalne)",
-      "transition_comment_required": "Komentarz wymagany",
-      "transition_gate": "Min. kompletność % (puste = brak)",
-      "transition_remove": "Usuń przejście",
-      "confirm_title": "Definicja jest włączona",
-      "confirm_body": "Ta definicja steruje żywymi obiektami — zapis zmienia dostępne przejścia od razu. Kontynuować?",
-      "confirm_cta": "Zapisz mimo to",
-      "violation": {
-        "required": "Pole wymagane.",
-        "snake_case": "Użyj snake_case (litery, cyfry, podkreślenia).",
-        "duplicate": "Nazwa się powtarza.",
-        "missing_draft": "Definicja musi zawierać stan początkowy „draft”.",
-        "pct_range": "Podaj liczbę całkowitą 0–100."
-      }
-    },
     "ai": {
       "shortcuts_aria": "Skróty agenta"
     }
@@ -4345,7 +4293,137 @@
       "cancel": "Anuluj",
       "completed": "Zadanie ukończone",
       "cancelled": "Zadanie anulowane"
-    }
+    },
+    "definitions": {
+      "preview": {
+        "narrative": {
+          "submit": "Wprowadzający wypełnia dane i zgłasza obiekt do przeglądu.",
+          "submit_gate": "Wprowadzający wypełnia dane; przycisk zgłoszenia odblokuje się przy kompletności {{pct}}%.",
+          "review_task": "Akceptant dostaje zadanie w „Moje zadania\" i powiadomienie.",
+          "reject": "Po odrzuceniu autor dostaje zadanie „Poprawka\" z komentarzem akceptanta.",
+          "publish": "Opublikowany obiekt trafia do eksportów i kanałów sprzedaży.",
+          "empty": "Ten przepływ nie ma żadnego wbudowanego kroku, więc PIM nie utworzy w nim zadań ani powiadomień."
+        },
+        "title": "Podgląd",
+        "subtitle": "Rysowany z tego, co masz teraz w formularzu.",
+        "narrative_title": "Jak to zadziała",
+        "readiness_title": "Gotowość",
+        "all_good": "Przepływ trzyma się kupy — każdy etap osiągalny, każda akcja opisana.",
+        "impact_enabled": "Definicja jest aktywna — zapis obejmie {{count}} obiektów.",
+        "impact_disabled": "Definicja jest wyłączona — {{count}} obiektów zostaje na wbudowanym przepływie, dopóki jej nie włączysz.",
+        "finding": {
+          "no_start": "Brakuje etapu początkowego „Szkic\" — od niego zaczyna każdy obiekt.",
+          "unreachable": "Nie da się dojść do: {{items}}. Dodaj akcję prowadzącą do tego etapu.",
+          "no_publish": "Żadna ścieżka nie kończy się publikacją — obiekt nigdy nie trafi do kanałów.",
+          "incomplete": "Niedokończone akcje: {{items}} — brakuje nazwy albo etapów.",
+          "ungated": "Bez wskazania „kto może\": {{items}}. Zrobi to każdy, kto widzi obiekt.",
+          "custom": "Własne kroki: {{items}}. PIM nie utworzy dla nich zadania ani powiadomienia — trzeba je pilnować filtrem statusu."
+        },
+        "no_transitions": "Dodaj pierwszą akcję, żeby zobaczyć ścieżkę."
+      },
+      "transitions": {
+        "title": "Kto co może zrobić",
+        "subtitle": "Każdy wiersz to jeden przycisk, który użytkownik zobaczy na produkcie.",
+        "add": "Dodaj akcję",
+        "label": "Nazwa akcji",
+        "label_placeholder": "np. Zgłoś do przeglądu",
+        "moves_from": "przenosi z",
+        "moves_to": "do",
+        "who_can": "— może",
+        "anyone": "Każdy, kto widzi produkt",
+        "remove": "Usuń akcję",
+        "comment": "wymaga komentarza",
+        "gate": "wymaga kompletności",
+        "custom_warning": "To Twój własny krok — PIM nie utworzy dla niego zadania ani powiadomienia. Osoba z tym uprawnieniem znajdzie produkty przez filtr statusu."
+      },
+      "template": {
+        "title": "Jak ma wyglądać droga do publikacji?",
+        "subtitle": "Wybierz najbliższy wariant. Wszystko doprecyzujesz za chwilę.",
+        "recommended": "polecany",
+        "custom_step_note": "Krok „Przekaż do publikacji\" jest własny — nie utworzy zadania, publikujący znajdzie obiekty przez filtr statusu.",
+        "blank": "Zacznij od pustego",
+        "no_approval": {
+          "title": "Bez akceptacji",
+          "body": "Redaktor publikuje sam. Dla katalogów, w których nikt nic nie sprawdza."
+        },
+        "one_approval": {
+          "title": "Jedna akceptacja",
+          "body": "Redaktor zgłasza, akceptant zatwierdza albo odsyła z komentarzem. Wbudowany proces PIM-a."
+        },
+        "approval_then_publish": {
+          "title": "Akceptacja i publikacja osobno",
+          "body": "Treść zatwierdza akceptant, do kanałów wypuszcza osoba od integracji i eksportów."
+        }
+      },
+      "reviewer_default": "Akceptant: domyślna rola",
+      "reviewer_role": "Akceptant: {{name}}",
+      "reviewer_user": "Akceptant: {{name}}",
+      "disabled_toast": "Definicja wyłączona.",
+      "enabled_toast": "Definicja włączona.",
+      "toggle_failed": "Nie udało się zmienić stanu.",
+      "title": "Workflow — definicje",
+      "intro": "Własny proces edytorski per tenant: stany, przejścia, uprawnienia i bramki kompletności — bez deployu.",
+      "create_cta": "Nowy przepływ",
+      "empty_title": "Brak definicji",
+      "empty_body": "Dopóki nie włączysz własnego przepływu, obiekty idą wbudowaną ścieżką: szkic → przegląd → publikacja. Zacznij od gotowego szablonu.",
+      "state_enabled": "Włączona",
+      "state_disabled": "Wyłączona",
+      "scope_global": "Wszystkie typy obiektów",
+      "scope_object_type": "Jeden typ obiektu",
+      "shape_summary": "{{places}} etapów · {{transitions}} akcji",
+      "disable": "Wyłącz",
+      "enable": "Włącz",
+      "confirm_title": "Definicja jest włączona",
+      "confirm_body": "Ta definicja steruje żywymi obiektami — zapis zmienia dostępne przejścia od razu. Kontynuować?",
+      "confirm_cta": "Zapisz mimo to",
+      "places": {
+        "title": "Etapy",
+        "subtitle": "Statusy, które zobaczy użytkownik na karcie produktu i w filtrach.",
+        "add": "Dodaj etap",
+        "color": "Kolor",
+        "label_pl": "Nazwa etapu",
+        "label_placeholder": "np. W przeglądzie",
+        "label_en": "Po angielsku",
+        "start_badge": "start",
+        "published_badge": "widoczny w kanałach",
+        "machine_name": "Nazwa techniczna",
+        "remove": "Usuń etap",
+        "blocks": "Gotowe etapy:"
+      },
+      "approver": {
+        "role_option": "{{name}} (rola)",
+        "title": "Kto dostaje zadania",
+        "subtitle": "Jeden akceptant na całą definicję. Obsługuje zadania Przegląd i Prośba o depublikację.",
+        "label": "Akceptant — rola albo konkretna osoba",
+        "placeholder": "Domyślnie: rola Akceptant",
+        "hint": "Ta osoba/rola zobaczy zadanie w „Moje zadania\" od razu po zgłoszeniu.",
+        "audience": "Zadanie zobaczą",
+        "default_role": "Rola: Akceptant — wskazany odbiorca",
+        "approvers": "Każdy z uprawnieniem „Zatwierdzanie/Odrzucanie\"",
+        "safety": "Bezpiecznik — zadanie nigdy nie utknie, gdy wskazana osoba jest niedostępna.",
+        "footer": "Zmiana odbiorcy zacznie obowiązywać dla nowych zgłoszeń. Bieżące zadania zostają u obecnego akceptanta."
+      },
+      "not_found": "Nie znaleziono definicji.",
+      "saved": "Definicja zapisana.",
+      "invalid": "Definicja zawiera błędy — popraw pola.",
+      "save_failed": "Zapis nie powiódł się.",
+      "edit_title": "Edytuj przepływ",
+      "new_title": "Nowy przepływ",
+      "active": "Aktywny",
+      "inactive": "Wyłączony",
+      "advanced": "Tryb zaawansowany",
+      "field_name": "Nazwa przepływu",
+      "field_object_type": "Dla czego obowiązuje",
+      "object_type_all": "Wszystkie typy",
+      "violation": {
+        "required": "Pole wymagane.",
+        "snake_case": "Użyj snake_case (litery, cyfry, podkreślenia).",
+        "duplicate": "Nazwa się powtarza.",
+        "missing_draft": "Definicja musi zawierać stan początkowy „draft”.",
+        "pct_range": "Podaj liczbę całkowitą 0–100."
+      }
+    },
+    "definitions_cta": "Definicje przepływów"
   },
   "grid": {
     "cell": {
