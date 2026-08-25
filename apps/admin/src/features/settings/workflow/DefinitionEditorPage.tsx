@@ -13,8 +13,8 @@ import {
   createDefinition,
   extractViolations,
   fetchDefinitions,
+  setDefinitionEnabled,
   updateDefinition,
-  type WorkflowDefinitionResource,
 } from '@/lib/workflow/definitions-api';
 
 import {
@@ -29,6 +29,7 @@ import { EnabledDefinitionConfirmDialog } from './EnabledDefinitionConfirmDialog
 import { FlowPreview } from './FlowPreview';
 import { PlacesSection } from './PlacesSection';
 import { ReviewerSection } from './ReviewerSection';
+import { TemplatePicker } from './TemplatePicker';
 import { TransitionsSection } from './TransitionsSection';
 
 interface PermissionsResponse {
@@ -64,7 +65,6 @@ export function DefinitionEditorPage() {
   const editing = id !== undefined;
 
   const [draft, setDraft] = useState<DefinitionDraft>(emptyDraft);
-  const [original, setOriginal] = useState<WorkflowDefinitionResource | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [permissionCodes, setPermissionCodes] = useState<string[]>([]);
   const [objectTypeOptions, setObjectTypeOptions] = useState<ComboboxOption[]>([]);
@@ -72,6 +72,11 @@ export function DefinitionEditorPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(editing);
   const [advanced, setAdvanced] = useState(readAdvanced);
+  // #3004 — a new definition starts with a question, not an empty form.
+  const [picking, setPicking] = useState(!editing);
+  const [enabled, setEnabled] = useState(false);
+  const [togglingEnabled, setTogglingEnabled] = useState(false);
+  const [pendingEnable, setPendingEnable] = useState(false);
 
   useEffect(() => {
     // The permission catalogue is gated user.admin — degrade to a plain
@@ -109,7 +114,7 @@ export function DefinitionEditorPage() {
           void navigate('/workflow/definitions');
           return;
         }
-        setOriginal(found);
+        setEnabled(found.enabled);
         setDraft(draftFromResource(found));
       })
       .finally(() => setLoading(false));
@@ -130,6 +135,39 @@ export function DefinitionEditorPage() {
     });
   };
 
+  /**
+   * #3004 — activation is its own decision. Saving used to flip the flag
+   * on the retired settings page, so an edit silently put a definition in
+   * charge of live objects.
+   */
+  const toggleEnabled = (next: boolean) => {
+    if (id === undefined) return;
+    if (next && !pendingEnable) {
+      setPendingEnable(true);
+      setConfirmOpen(true);
+      return;
+    }
+    setPendingEnable(false);
+    setConfirmOpen(false);
+    setTogglingEnabled(true);
+    setDefinitionEnabled(id, next)
+      .then(() => {
+        setEnabled(next);
+        toast.success(
+          next
+            ? t('settings.workflow.enabled_toast', { defaultValue: 'Definicja włączona.' })
+            : t('settings.workflow.disabled_toast', { defaultValue: 'Definicja wyłączona.' }),
+        );
+      })
+      .catch((error: unknown) => {
+        toast.error(
+          httpErrorDetail(error) ??
+            t('settings.workflow.toggle_failed', { defaultValue: 'Nie udało się zmienić stanu.' }),
+        );
+      })
+      .finally(() => setTogglingEnabled(false));
+  };
+
   const save = () => {
     const local = localViolations(draft);
     if (local.length > 0) {
@@ -145,7 +183,7 @@ export function DefinitionEditorPage() {
       );
       return;
     }
-    if (original?.enabled === true && !confirmOpen) {
+    if (enabled && !confirmOpen) {
       setConfirmOpen(true);
       return;
     }
@@ -186,6 +224,18 @@ export function DefinitionEditorPage() {
     );
   }
 
+  if (picking) {
+    return (
+      <TemplatePicker
+        onPick={(next) => {
+          setDraft(next);
+          setPicking(false);
+        }}
+        onBlank={() => setPicking(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6" data-testid="workflow-definition-editor">
       <header className="flex flex-wrap items-center gap-3">
@@ -198,6 +248,21 @@ export function DefinitionEditorPage() {
             ? t('settings.workflow.edit_title', { defaultValue: 'Edytuj przepływ' })
             : t('settings.workflow.new_title', { defaultValue: 'Nowy przepływ' })}
         </h2>
+        {editing ? (
+          <label className="flex items-center gap-2 text-[12px] font-medium text-zinc-600">
+            <input
+              type="checkbox"
+              className="size-4 rounded border-zinc-300"
+              checked={enabled}
+              disabled={togglingEnabled}
+              onChange={(event) => toggleEnabled(event.target.checked)}
+              data-testid="definition-enabled-toggle"
+            />
+            {enabled
+              ? t('workflow.definitions.active', { defaultValue: 'Aktywny' })
+              : t('workflow.definitions.inactive', { defaultValue: 'Wyłączony' })}
+          </label>
+        ) : null}
         <label className="flex items-center gap-2 text-[12px] text-zinc-500">
           <input
             type="checkbox"
@@ -278,13 +343,16 @@ export function DefinitionEditorPage() {
           />
         </div>
 
-        <FlowPreview draft={draft} enabled={original?.enabled === true} />
+        <FlowPreview draft={draft} enabled={enabled} />
       </div>
 
       <EnabledDefinitionConfirmDialog
         open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        onConfirm={save}
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open) setPendingEnable(false);
+        }}
+        onConfirm={() => (pendingEnable ? toggleEnabled(true) : save())}
       />
     </div>
   );
