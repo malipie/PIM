@@ -35,8 +35,22 @@ export function subdomainShapeError(raw: string): SubdomainShapeError | null {
 }
 
 /**
- * Podpowiedź subdomeny z kodu tenanta: kod dopuszcza podkreślenia, subdomena
- * nie, więc zamieniamy je na myślniki zamiast kazać operatorowi przepisywać.
+ * W instalacji per-tenant kod trafia także do nazwy projektu Compose, bazy
+ * i stanzy backupu, dlatego musi spełniać ten sam kontrakt co subdomena.
+ * W przeciwieństwie do pola subdomeny kod nie jest automatycznie normalizowany
+ * przed wysłaniem — wielkie litery i otaczające spacje muszą więc być błędem.
+ */
+export function instanceCodeShapeError(raw: string): SubdomainShapeError | null {
+  const value = raw.trim();
+
+  if (value !== raw || value !== value.toLowerCase()) return 'charset';
+
+  return subdomainShapeError(value);
+}
+
+/**
+ * Podpowiedź subdomeny z kodu tenanta. Podczas wpisywania sanitizujemy też
+ * znaki niedozwolone, zanim walidacja kodu pokaże operatorowi błąd.
  */
 export function suggestSubdomain(code: string): string {
   return (

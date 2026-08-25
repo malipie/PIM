@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router';
 
 import { Button } from '@/components/ui/button';
 import { isStructuralImportKind, useImportWizard } from '@/features/imports/hooks/useImportWizard';
-import { HttpError, jsonFetch } from '@/lib/http';
+import { HttpError, httpErrorDetail, jsonFetch } from '@/lib/http';
 
 import { StepConfirmPlaceholder } from './StepConfirm';
 import { StepDetect } from './StepDetect';
@@ -67,7 +67,9 @@ export function ImportWizardPage(): ReactElement {
         navigate(`/integrations/imports/${data.id}`);
       })
       .catch((err: unknown) => {
-        setSubmitError(err instanceof HttpError ? `HTTP ${err.status}` : 'unknown');
+        setSubmitError(
+          err instanceof HttpError ? (httpErrorDetail(err) ?? `HTTP ${err.status}`) : 'unknown',
+        );
         setSubmitting(false);
       });
   };
@@ -126,7 +128,7 @@ export function ImportWizardPage(): ReactElement {
       })
       .catch((err: unknown) => {
         if (err instanceof HttpError) {
-          setSubmitError(`HTTP ${err.status}`);
+          setSubmitError(httpErrorDetail(err) ?? `HTTP ${err.status}`);
         } else {
           setSubmitError(err instanceof Error ? err.message : 'unknown');
         }

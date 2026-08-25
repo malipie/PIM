@@ -10,6 +10,7 @@ use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
+use League\Flysystem\UnableToCopyFile;
 use RuntimeException;
 use Symfony\Component\Uid\Uuid;
 use Throwable;
@@ -142,6 +143,25 @@ final readonly class StagedFileService
      */
     public function copyToKey(StagedFile $stagedFile, string $destinationKey): void
     {
-        $this->importsStorage->copy($stagedFile->getStorageKey(), $destinationKey);
+        try {
+            $this->importsStorage->copy($stagedFile->getStorageKey(), $destinationKey);
+
+            return;
+        } catch (UnableToCopyFile) {
+            // Some S3-compatible stores (including the production MinIO
+            // setup) accept ordinary reads/writes but reject CopyObject. The
+            // staged file is known to be readable because parse-preview and
+            // dry-run already consumed it, so fall back to a streamed copy
+            // instead of failing the final import step with HTTP 400.
+        }
+
+        $read = $this->importsStorage->readStream($stagedFile->getStorageKey());
+        try {
+            $this->importsStorage->writeStream($destinationKey, $read);
+        } finally {
+            if (\is_resource($read)) {
+                fclose($read);
+            }
+        }
     }
 }
