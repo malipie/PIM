@@ -7,9 +7,9 @@ namespace App\Agent\Application\Run;
 use App\Agent\Application\Limits\AgentLimitGuard;
 use App\Agent\Application\Llm\AgentLlmClientInterface;
 use App\Agent\Application\Llm\AgentLlmResponse;
+use App\Agent\Application\Llm\StreamingAgentLlmClientInterface;
 use App\Agent\Application\Tool\AgentToolContext;
 use App\Agent\Application\Tool\GuardedToolExecutor;
-use App\Agent\Application\Tool\ToolKind;
 use App\Agent\Application\Tool\ToolRegistry;
 use App\Agent\Domain\Entity\AgentMessage;
 use App\Agent\Domain\Entity\AgentRun;
@@ -17,6 +17,7 @@ use App\Agent\Infrastructure\Anthropic\AgentModelSelector;
 use App\Identity\Contracts\Byok\ByokConfigReaderInterface;
 use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Throwable;
 
 use const JSON_UNESCAPED_SLASHES;
@@ -53,6 +54,8 @@ final readonly class AgentLoopRunner
         private \Symfony\Component\Messenger\MessageBusInterface $eventBus,
         private int $maxToolCallsPerRun,
         private int $maxTokensPerRun,
+        private ?AgentProgressPublisher $progress = null,
+        private ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -62,18 +65,10 @@ final readonly class AgentLoopRunner
         $context = new AgentToolContext($userId, $tenant, $run->getContext());
 
         $tools = $this->registry->toAnthropicToolDefs($userId);
-        // A per-tenant model override (Settings -> AI) pins every tool
-        // kind to one model; absent it, schema-ops get the Opus tier and
-        // everything else the Sonnet tier (P0-06).
-        $override = $this->tenantConfig->modelOverride($tenant);
-        $model = $override ?? ($this->registry->hasKind($userId, ToolKind::Schema)
-            ? $this->models->schemaModel()
-            : $this->models->defaultModel());
-        $run->setModel($model);
-
         $promptCaching = $this->tenantConfig->isPromptCachingEnabled($tenant);
 
         $system = $this->prompts->build($run);
+        $runContext = $this->prompts->buildContext($run);
         // AGENT-P4-01 (#1968) — a re-dispatched run (next user turn after
         // awaiting_input) resumes from the persisted transcript instead of
         // restarting at the intent.
@@ -83,14 +78,24 @@ final readonly class AgentLoopRunner
             $messages = [['role' => 'user', 'content' => $userTurn]];
             $this->persistMessage($run, AgentMessage::ROLE_USER, $userTurn);
         }
+        // A tenant override remains authoritative. Without it, route from the
+        // latest actual user turn — merely having permission to a schema tool
+        // must not put every ordinary conversation on the slow tier (#2998).
+        $override = $this->tenantConfig->modelOverride($tenant);
+        $model = $override ?? $this->models->modelForIntent($this->latestUserIntent($messages, $run->getIntent()));
+        $run->setModel($model);
+        $messages = $this->withRunContext($messages, $runContext);
 
         $toolCallCount = 0;
         // AGENT-P8-03 (#1985) — the collective plan of a multi-step intent.
         $planBatchId = null;
         $planAffected = 0;
+        $iteration = 0;
+        $deltaSequence = 0;
 
         try {
             while (true) {
+                ++$iteration;
                 try {
                     // 8.5 budgets (hour/day/month) re-checked before every
                     // model call - a run cannot spend past a cap mid-flight.
@@ -101,7 +106,20 @@ final readonly class AgentLoopRunner
                     return;
                 }
 
-                $response = $this->llm->create($tenant, $model, $system, $messages, $tools, $promptCaching);
+                $this->progress?->progress($run, 'model');
+                $response = $this->llm instanceof StreamingAgentLlmClientInterface
+                    ? $this->llm->createStreaming(
+                        $tenant,
+                        $model,
+                        $system,
+                        $messages,
+                        $tools,
+                        $promptCaching,
+                        function (string $delta) use ($run, &$deltaSequence): void {
+                            $this->progress?->delta($run, $delta, ++$deltaSequence);
+                        },
+                    )
+                    : $this->llm->create($tenant, $model, $system, $messages, $tools, $promptCaching);
                 $run->addUsage(
                     $response->inputTokens,
                     $response->outputTokens,
@@ -113,6 +131,23 @@ final readonly class AgentLoopRunner
                         $response->cacheCreationTokens,
                     ),
                 );
+                $run->recordLlmCall(
+                    $response->durationMs,
+                    $response->ttftMs,
+                    $response->cacheReadTokens,
+                    $response->cacheCreationTokens,
+                );
+                $this->logger?->info('Agent LLM iteration completed', [
+                    'run_id' => $run->getId()->toRfc4122(),
+                    'model' => $model,
+                    'iteration' => $iteration,
+                    'duration_ms' => $response->durationMs,
+                    'ttft_ms' => $response->ttftMs,
+                    'input_tokens' => $response->inputTokens,
+                    'output_tokens' => $response->outputTokens,
+                    'cache_read_tokens' => $response->cacheReadTokens,
+                    'cache_creation_tokens' => $response->cacheCreationTokens,
+                ]);
                 $this->persistMessage($run, AgentMessage::ROLE_ASSISTANT, $response->contentBlocks);
                 $messages[] = ['role' => 'assistant', 'content' => $response->contentBlocks];
 
@@ -150,6 +185,7 @@ final readonly class AgentLoopRunner
 
                 $toolResults = [];
                 foreach ($toolUses as $toolUse) {
+                    $this->progress?->progress($run, 'tool');
                     // AGENT-P8-03 (#1985) — multi-step plans accumulate into
                     // ONE batch: once a write tool materialized, every later
                     // write-tool call inherits the batch id (unless the model
@@ -215,9 +251,55 @@ final readonly class AgentLoopRunner
             // the run ends in `error`; nothing was committed (commits only
             // happen post-approval in P3-02).
             $run->markError($failure::class.': '.$failure->getMessage());
+            $this->logger?->error('Agent run failed', [
+                'run_id' => $run->getId()->toRfc4122(),
+                'model' => $model,
+                'iteration' => $iteration,
+                'exception' => $failure::class,
+            ]);
         } finally {
+            $this->progress?->progress($run, 'finalizing');
             $this->entityManager->flush();
+            $this->progress?->status($run);
         }
+    }
+
+    /**
+     * Inject compact trusted context into the in-memory request only. The
+     * persisted transcript and UI continue to show the user's original text.
+     *
+     * @param list<array{role: string, content: list<array<string, mixed>>}> $messages
+     *
+     * @return list<array{role: string, content: list<array<string, mixed>>}>
+     */
+    private function withRunContext(array $messages, string $context): array
+    {
+        if ([] === $messages) {
+            return $messages;
+        }
+
+        array_unshift($messages[0]['content'], ['type' => 'text', 'text' => $context]);
+
+        return $messages;
+    }
+
+    /**
+     * @param list<array{role: string, content: list<array<string, mixed>>}> $messages
+     */
+    private function latestUserIntent(array $messages, string $fallback): string
+    {
+        foreach (array_reverse($messages) as $message) {
+            if ('user' !== $message['role']) {
+                continue;
+            }
+            foreach (array_reverse($message['content']) as $block) {
+                if ('text' === ($block['type'] ?? null) && \is_string($block['text'] ?? null)) {
+                    return $block['text'];
+                }
+            }
+        }
+
+        return $fallback;
     }
 
     /**

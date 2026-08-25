@@ -41,9 +41,10 @@ final class AgentProgressPublisherTest extends TestCase
         [$run, $tenantId] = $this->makeRun();
         $publisher->status($run);
         $publisher->progress($run, 'materializing');
+        $publisher->delta($run, 'Gotowe', 1);
 
         $updates = $hub->getCapturedUpdates();
-        self::assertCount(4, $updates);
+        self::assertCount(6, $updates);
 
         $topics = [];
         foreach ($updates as $captured) {
@@ -52,7 +53,7 @@ final class AgentProgressPublisherTest extends TestCase
         }
         $runTopic = MercureSubscribeTopics::agentRun($tenantId, self::BASE, $run->getId()->toRfc4122());
         $userTopic = MercureSubscribeTopics::agentUser($tenantId, self::BASE, $run->getUserId()->toRfc4122());
-        self::assertSame([$runTopic, $userTopic, $runTopic, $userTopic], $topics);
+        self::assertSame([$runTopic, $userTopic, $runTopic, $userTopic, $runTopic, $userTopic], $topics);
 
         foreach ($updates as $update) {
             self::assertTrue($update->isPrivate(), 'AUD-001: agent updates must be private');
@@ -66,6 +67,12 @@ final class AgentProgressPublisherTest extends TestCase
         $progress = json_decode($updates[2]->getData(), true, flags: JSON_THROW_ON_ERROR);
         self::assertIsArray($progress);
         self::assertSame('materializing', $progress['phase']);
+
+        $delta = json_decode($updates[4]->getData(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($delta);
+        self::assertSame('delta', $delta['event']);
+        self::assertSame('Gotowe', $delta['delta']);
+        self::assertSame(1, $delta['sequence']);
     }
 
     #[Test]

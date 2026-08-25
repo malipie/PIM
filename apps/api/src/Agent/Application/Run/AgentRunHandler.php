@@ -10,6 +10,7 @@ use App\Agent\Domain\Exception\AgentUnavailableException;
 use App\Shared\Application\AbstractBatchHandler;
 use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
@@ -26,6 +27,7 @@ final class AgentRunHandler extends AbstractBatchHandler
         EntityManagerInterface $entityManager,
         private readonly AgentLoopRunner $loop,
         private readonly AgentFeatureGuard $guard,
+        private readonly ?LoggerInterface $logger = null,
     ) {
         parent::__construct($entityManager);
     }
@@ -45,6 +47,12 @@ final class AgentRunHandler extends AbstractBatchHandler
                 // Deleted / foreign-tenant run: nothing to do.
                 return;
             }
+
+            $run->recordDequeued($message->enqueuedAtMs);
+            $this->logger?->info('Agent run dequeued', [
+                'run_id' => $run->getId()->toRfc4122(),
+                'queue_delay_ms' => $run->getQueueDelayMs(),
+            ]);
 
             $tenant = $run->getTenant();
             if (!$tenant instanceof Tenant) {

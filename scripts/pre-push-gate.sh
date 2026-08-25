@@ -148,13 +148,12 @@ STATUS=0
 if [ -n "$PHP_SUITES" ]; then
     echo
     echo "▶ PHPUnit"
-    # MESSENGER_IMPORT_TRANSPORT_DSN=sync:// — without it the import
-    # handlers never run inline and their tests look broken for reasons
-    # that have nothing to do with the change under test.
+    # Async transports are synchronous under tests so handlers run inline.
     # shellcheck disable=SC2086
     docker compose exec -T \
         -e APP_ENV=test \
         -e MESSENGER_IMPORT_TRANSPORT_DSN=sync:// \
+        -e MESSENGER_AGENT_TRANSPORT_DSN=sync:// \
         api php bin/phpunit $PHP_SUITES || STATUS=1
 fi
 

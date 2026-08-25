@@ -124,7 +124,7 @@ wymagaj_kolejnosc() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 1. Topologia tenanta: api + worker
+# 1. Topologia tenanta: api + worker + agent-worker
 # ═══════════════════════════════════════════════════════════════════════════
 zaczyna "topologia tenanta"
 tmp="$(mktemp -d)"
@@ -150,11 +150,11 @@ for usluga in api worker; do
     fi
 done
 
-wymagaj_kolejnosc "$log" 'stop api worker' 'cache:clear' \
+wymagaj_kolejnosc "$log" 'stop api worker agent-worker' 'cache:clear' \
     "stop usług wyprzedza cache:clear"
 wymagaj_kolejnosc "$log" 'cache:clear' 'up -d --force-recreate' \
     "cache:clear wyprzedza wznowienie usług"
-wymagaj_kolejnosc "$log" 'doctrine:migrations:migrate' 'stop api worker' \
+wymagaj_kolejnosc "$log" 'doctrine:migrations:migrate' 'stop api worker agent-worker' \
     "migracje idą przed zatrzymaniem usług"
 wymagaj_kolejnosc "$log" 'build api worker' 'doctrine:migrations:migrate' \
     "build wyprzedza migracje"

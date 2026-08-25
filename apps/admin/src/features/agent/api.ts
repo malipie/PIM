@@ -27,6 +27,12 @@ export interface AgentRunSummary {
   bulk_operation_id: string | null;
   tokens_input: number;
   tokens_output: number;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+  llm_calls: number;
+  llm_duration_ms: number;
+  llm_ttft_ms: number;
+  queue_delay_ms: number | null;
   cost_usd: string;
   approved_by: string | null;
   approved_at: string | null;

@@ -44,6 +44,19 @@ final class AgentProgressPublisher
         $this->publish($run, 'progress', ['phase' => $phase]);
     }
 
+    /** Stream one visible assistant-text delta. Tool JSON never leaves the worker. */
+    public function delta(AgentRun $run, string $delta, int $sequence): void
+    {
+        if ('' === $delta) {
+            return;
+        }
+
+        $this->publish($run, 'delta', [
+            'delta' => $delta,
+            'sequence' => $sequence,
+        ]);
+    }
+
     /**
      * Status transition of the run lifecycle (awaiting_input /
      * awaiting_approval / committing / done / error / rolled_back).

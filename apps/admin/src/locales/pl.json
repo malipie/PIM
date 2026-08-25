@@ -4183,6 +4183,9 @@
     },
     "phase": {
       "planning": "Planuję…",
+      "model": "Myślę…",
+      "tool": "Sprawdzam dane…",
+      "finalizing": "Kończę…",
       "tool-call": "Wywołuję narzędzie…",
       "materializing": "Przygotowuję plan zmian…",
       "committing": "Zapisuję…"

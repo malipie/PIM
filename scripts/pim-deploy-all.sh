@@ -6,7 +6,7 @@
 # produkcji, wraz z pułapkami, które ją wymusiły:
 #
 #   1. zrzut przed wdrożeniem (#2865)   — jedyna rzecz, która cofa złą migrację
-#   2. build api + worker               — nowy obraz
+#   2. build api + worker               — nowy obraz (agent-worker używa tego samego)
 #   3. migracje z NOWEGO obrazu         — `run --rm --no-deps`, zanim nowy kod
 #                                         zacznie obsługiwać ruch. Zasada z
 #                                         wdrożenia 2026-08-13: migrację robi
@@ -144,7 +144,7 @@ if [ "$dry_run" = true ]; then
     cat <<EOF
 PLAN (nic nie zostało zmienione). Dla każdej instancji, po kolei:
   1. zrzut przed wdrożeniem $([ "$skip_dump" = true ] && echo '(POMINIĘTY — --skip-dump)')
-  2. build api worker
+  2. build api worker (agent-worker używa tego samego obrazu)
   3. migracje z nowego obrazu (run --rm --no-deps)
   4. stop usług aplikacyjnych (nikt nie może czytać kasowanego cache)
   5. cache:clear w jednorazowym kontenerze, osobno per usługa
@@ -171,7 +171,7 @@ deploy_one() {
     # `no such service: worker`.
     local do_budowy="api worker"      # obrazy do przebudowania
     local z_cache="api worker"        # usługi Symfony — mają kernel.cache_dir
-    local aplikacyjne="api worker"    # procesy zatrzymywane i wznawiane
+    local aplikacyjne="api worker agent-worker" # procesy zatrzymywane i wznawiane
 
     if [ "$tenant" = platform ]; then
         env_file=".env.platform"

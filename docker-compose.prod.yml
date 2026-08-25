@@ -75,6 +75,7 @@ services:
       # and the `worker` service below drains them. Keeps HTTP request
       # threads free of long-running work.
       MESSENGER_TRANSPORT_DSN: doctrine://default?queue_name=async&auto_setup=0
+      MESSENGER_AGENT_TRANSPORT_DSN: doctrine://default?queue_name=agent&auto_setup=0
       # PROD-02: re-route the web tier through PgBouncer (port 6432) so the
       # process pool multiplexes onto a small backend connection pool.
       # AUD-009 — POSTGRES_PASSWORD fail-loud (DSN embeds the credential).
@@ -156,7 +157,7 @@ services:
   # supervisor-on-exit pattern: `restart: unless-stopped` plus the worker's
   # own `--memory-limit` / `--time-limit` produces a clean PID 1 exit + Docker
   # restart cycle. No supervisor / runit needed — Docker is the supervisor.
-  worker:
+  worker: &prod_worker
     build:
       context: ./apps/api
       dockerfile: Dockerfile
@@ -181,6 +182,7 @@ services:
       # application_name shows up in pg_stat_activity for triage.
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in prod (no default).}@pgbouncer:6432/${POSTGRES_DB:-app}?serverVersion=16&charset=utf8&application_name=pim_api
       MESSENGER_TRANSPORT_DSN: doctrine://default?queue_name=async&auto_setup=0
+      MESSENGER_AGENT_TRANSPORT_DSN: doctrine://default?queue_name=agent&auto_setup=0
       # PROD-05: same shared lock store as the api container so the
       # worker sees locks acquired by inline imports and vice-versa.
       LOCK_DSN: redis://redis:6379
@@ -237,6 +239,24 @@ services:
     volumes: !override
       - api_var:/app/var
       - api_jwt:/app/config/jwt
+
+  agent-worker:
+    <<: *prod_worker
+    command:
+      - "php"
+      - "bin/console"
+      - "messenger:consume"
+      - "agent"
+      - "--memory-limit=256M"
+      - "--time-limit=3600"
+      - "--failure-limit=2"
+      - "-vv"
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
 
   # In production the frontend is a built artifact (apps/admin/dist) served by
   # Caddy as static files, not the Vite dev server. We park `admin` under a

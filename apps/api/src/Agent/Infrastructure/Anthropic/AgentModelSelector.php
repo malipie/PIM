@@ -29,6 +29,28 @@ final readonly class AgentModelSelector
         return self::KIND_SCHEMA === $kind ? $this->schemaModel : $this->defaultModel;
     }
 
+    /**
+     * Route the expensive schema tier from the requested operation, not from
+     * the user's permission surface. A modeling-capable user asking an
+     * ordinary catalog question should stay on the fast default model.
+     */
+    public function modelForIntent(string $intent): string
+    {
+        $normalized = mb_strtolower($intent);
+        // "change attribute price to 100" mutates an object's value, not the
+        // attribute definition. Keep this frequent phrasing on the fast tier.
+        if (1 === preg_match('/(?:zmie[nń]|ustaw|change|set|update)\s+(?:warto[sś][cć]\s+)?(?:atrybut|attribute)\s+\S+\s+(?:na|to|=)\s+/u', $normalized)) {
+            return $this->defaultModel;
+        }
+
+        $schemaVerb = '(?:dodaj|stw[oó]rz|utw[oó]rz|zmie[nń]|edytuj|przemianuj|usu[nń]|skasuj|create|add|update|edit|rename|delete|remove)';
+        $schemaNoun = '(?:atrybut|attribute|grup(?:a|ę|y)\s+atrybut|attribute\s+group|typ(?:u|y)?\s+obiektu|object\s+type|schemat|schema)';
+
+        $isSchemaIntent = 1 === preg_match('/'.$schemaVerb.'.{0,60}'.$schemaNoun.'|'.$schemaNoun.'.{0,60}'.$schemaVerb.'/u', $normalized);
+
+        return $isSchemaIntent ? $this->schemaModel : $this->defaultModel;
+    }
+
     public function defaultModel(): string
     {
         return $this->defaultModel;

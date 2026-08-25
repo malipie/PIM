@@ -4,10 +4,12 @@ import { useIdentity } from '@/lib/identity';
 import { ensureMercureAuthorization, mercureSubscribeUrl, mercureTenantTopic } from '@/lib/mercure';
 
 export interface AgentRunEvent {
-  event: 'progress' | 'status';
+  event: 'progress' | 'status' | 'delta';
   run_id: string;
   phase?: string;
   status?: string;
+  delta?: string;
+  sequence?: number;
   affected_count?: number | null;
   error_message?: string | null;
 }

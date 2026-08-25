@@ -49,6 +49,22 @@
                 <option name="default">0</option>
             </options>
         </field>
+        <field name="cacheReadTokens" type="integer" column="cache_read_tokens">
+            <options><option name="default">0</option></options>
+        </field>
+        <field name="cacheCreationTokens" type="integer" column="cache_creation_tokens">
+            <options><option name="default">0</option></options>
+        </field>
+        <field name="llmCalls" type="integer" column="llm_calls">
+            <options><option name="default">0</option></options>
+        </field>
+        <field name="llmDurationMs" type="integer" column="llm_duration_ms">
+            <options><option name="default">0</option></options>
+        </field>
+        <field name="llmTtftMs" type="integer" column="llm_ttft_ms">
+            <options><option name="default">0</option></options>
+        </field>
+        <field name="queueDelayMs" type="integer" column="queue_delay_ms" nullable="true"/>
         <field name="costUsd" type="decimal" precision="12" scale="6" column="cost_usd">
             <options>
                 <option name="default">0</option>

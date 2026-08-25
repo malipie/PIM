@@ -65,7 +65,9 @@ export function AgentChatSheet() {
   const [pendingError, setPendingError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [livePhase, setLivePhase] = useState<string | null>(null);
+  const [streamText, setStreamText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const streamSequenceRef = useRef(0);
   // AGENT-P6-07 (#1980) — live phases over SSE; polling stays as the
   // fallback whenever the stream is not connected.
   // SSE drives the live phase label; the status transition itself is
@@ -91,6 +93,8 @@ export function AgentChatSheet() {
       setOpen(true);
       const adoptedRunId = (event as CustomEvent<{ runId?: string }>).detail?.runId;
       if (typeof adoptedRunId === 'string') {
+        setStreamText('');
+        streamSequenceRef.current = 0;
         setRunId(adoptedRunId);
         void refresh(adoptedRunId);
       }
@@ -111,12 +115,22 @@ export function AgentChatSheet() {
     return () => window.clearInterval(timer);
   }, [open, runId, run, refresh]);
 
-  // SSE events: a status transition re-reads the run (fresh transcript);
-  // a progress tick just updates the live phase label.
+  // SSE events: assistant text is displayed immediately as deltas arrive;
+  // a status transition re-reads the canonical persisted transcript.
   useEffect(() => {
     if (lastEvent === null || runId === null) return;
-    if (lastEvent.event === 'status') {
+    if (
+      lastEvent.event === 'delta' &&
+      typeof lastEvent.delta === 'string' &&
+      typeof lastEvent.sequence === 'number' &&
+      lastEvent.sequence > streamSequenceRef.current
+    ) {
+      streamSequenceRef.current = lastEvent.sequence;
+      setStreamText((current) => current + lastEvent.delta);
+    } else if (lastEvent.event === 'status') {
       setLivePhase(null);
+      setStreamText('');
+      streamSequenceRef.current = 0;
       void refresh(runId);
     } else if (typeof lastEvent.phase === 'string') {
       setLivePhase(lastEvent.phase);
@@ -132,13 +146,15 @@ export function AgentChatSheet() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new messages only
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [run?.messages.length]);
+  }, [run?.messages.length, streamText]);
 
   const submit = async () => {
     const text = draft.trim();
     if (text === '' || sending) return;
     setSending(true);
     setPendingError(null);
+    setStreamText('');
+    streamSequenceRef.current = 0;
     try {
       if (runId === null || run === null || isRunTerminal(run.status)) {
         const created = await startAgentRun(text, 'chat');
@@ -236,6 +252,15 @@ export function AgentChatSheet() {
               </div>
             );
           })}
+          {run !== null && isRunBusy(run.status) && streamText !== '' && (
+            <div
+              className="max-w-[85%] whitespace-pre-wrap rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-900"
+              aria-live="polite"
+              data-testid="agent-streaming-message"
+            >
+              {streamText}
+            </div>
+          )}
           {run !== null && isRunBusy(run.status) && (
             <p
               className="flex items-center gap-2 text-sm text-zinc-500"
