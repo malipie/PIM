@@ -26,6 +26,7 @@ import {
   violationsByField,
 } from './definition-form';
 import { EnabledDefinitionConfirmDialog } from './EnabledDefinitionConfirmDialog';
+import { ReviewerSection } from './ReviewerSection';
 
 interface PermissionsResponse {
   member?: Array<{ module: string; permissions: Array<{ code: string }> }>;
@@ -168,6 +169,14 @@ export function DefinitionEditorPage() {
       </p>
     );
   }
+
+  const reviewerSection = (
+    <ReviewerSection
+      value={draft.reviewer}
+      onChange={(next) => setDraft({ ...draft, reviewer: next })}
+      error={fieldError('reviewer')}
+    />
+  );
 
   return (
     <div className="space-y-6" data-testid="workflow-definition-editor">
@@ -453,6 +462,8 @@ export function DefinitionEditorPage() {
           ))}
         </ul>
       </section>
+
+      {reviewerSection}
 
       <EnabledDefinitionConfirmDialog
         open={confirmOpen}

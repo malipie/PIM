@@ -1,5 +1,6 @@
 import type {
   DefinitionPayload,
+  DefinitionReviewer,
   DefinitionViolation,
   WorkflowDefinitionResource,
 } from '@/lib/workflow/definitions-api';
@@ -32,6 +33,33 @@ export interface DefinitionDraft {
   objectTypeId: string;
   places: PlaceDraft[];
   transitions: TransitionDraft[];
+  /**
+   * #3001 — task recipient, as one picker value: `role:<code>` or
+   * `user:<uuid>`. Empty string = no configured reviewer, i.e. the
+   * built-in `approver` role handles review tasks.
+   */
+  reviewer: string;
+}
+
+const REVIEWER_ROLE_PREFIX = 'role:';
+const REVIEWER_USER_PREFIX = 'user:';
+
+/** API reviewer envelope -> picker value. */
+export function reviewerToValue(reviewer: DefinitionReviewer): string {
+  if (reviewer === null) return '';
+  if ('role_code' in reviewer) return REVIEWER_ROLE_PREFIX + reviewer.role_code;
+  return REVIEWER_USER_PREFIX + reviewer.user_id;
+}
+
+/** Picker value -> API reviewer envelope (XOR role/user, null when unset). */
+export function valueToReviewer(value: string): DefinitionReviewer {
+  if (value.startsWith(REVIEWER_ROLE_PREFIX)) {
+    return { role_code: value.slice(REVIEWER_ROLE_PREFIX.length) };
+  }
+  if (value.startsWith(REVIEWER_USER_PREFIX)) {
+    return { user_id: value.slice(REVIEWER_USER_PREFIX.length) };
+  }
+  return null;
 }
 
 /** Fresh draft mirroring the static machine's minimum viable chain. */
@@ -53,6 +81,7 @@ export function emptyDraft(): DefinitionDraft {
         gatePct: '',
       },
     ],
+    reviewer: '',
   };
 }
 
@@ -77,6 +106,10 @@ export function draftFromResource(resource: WorkflowDefinitionResource): Definit
           ? ''
           : String(transition.completeness_gate.min_completeness_pct),
     })),
+    // #3001 — read the stored reviewer back. Without this the editor would
+    // send `reviewer: null` on every save and silently wipe a routing the
+    // operator configured, because the payload always carries the field.
+    reviewer: reviewerToValue(resource.reviewer),
   };
 }
 
@@ -107,6 +140,7 @@ export function draftToPayload(draft: DefinitionDraft): DefinitionPayload {
         ? { completeness_gate: { min_completeness_pct: Number(transition.gatePct) } }
         : {}),
     })),
+    reviewer: valueToReviewer(draft.reviewer),
   };
 }
 
