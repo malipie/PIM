@@ -11,13 +11,16 @@ use App\Agent\Application\Tool\ToolKind;
 use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentRun;
+use App\Catalog\Contracts\PendingChanges\PendingChangeDraft;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangeStatus;
 use App\Catalog\Contracts\PendingChanges\PendingChangeType;
+use App\Catalog\Domain\Entity\AttributeGroup;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
 use Doctrine\ORM\EntityManagerInterface;
+use LogicException;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
@@ -122,6 +125,74 @@ final class AgentSchemaFlowTest extends KernelTestCase
         self::assertSame(0, (int) (\is_scalar($group) ? $group : -1));
     }
 
+    #[Test]
+    public function localizedGroupLabelIsCanonicalizedBeforeProposalAndAttachedOnApproval(): void
+    {
+        [$em] = $this->fixture();
+        $pricing = new AttributeGroup('pricing', ['pl' => 'Ceny', 'en' => 'Pricing']);
+        $em->persist($pricing);
+        $em->flush();
+
+        $result = $this->tool()->execute([
+            'attributes' => [[
+                'code' => 'cena_promocyjna',
+                'type' => 'price',
+                'label' => ['pl' => 'Cena promocyjna'],
+                'groups' => ['Ceny'],
+            ]],
+        ], $this->context());
+
+        self::assertIsString($result['pending_change_batch_id']);
+        $batchId = Uuid::fromString($result['pending_change_batch_id']);
+        $pending = $this->pendingChanges()->listBatch($batchId);
+        $after = $pending[0]->after;
+        self::assertIsArray($after);
+        $cells = $after['cells'] ?? null;
+        self::assertIsArray($cells);
+        self::assertSame('pricing', $cells['groups'] ?? null);
+
+        $run = $this->awaitingRun($em, $batchId);
+        $this->approval()->approve($run->getId(), Uuid::v7());
+
+        $attached = $em->getConnection()->fetchOne(
+            "SELECT COUNT(*) FROM attribute_group_attributes aga JOIN attributes a ON a.id = aga.attribute_id JOIN attribute_groups g ON g.id = aga.attribute_group_id WHERE a.code = 'cena_promocyjna' AND g.code = 'pricing'",
+        );
+        self::assertSame(1, (int) (\is_scalar($attached) ? $attached : -1));
+    }
+
+    #[Test]
+    public function approvalRollsBackAProposalReferencingAnUnknownGroup(): void
+    {
+        [$em] = $this->fixture();
+        $batchId = Uuid::v7();
+        $this->pendingChanges()->materialize($batchId, 'agent', [
+            new PendingChangeDraft(
+                changeType: PendingChangeType::Schema,
+                attributeCode: 'orphan_candidate',
+                after: [
+                    'schema_kind' => 'attribute',
+                    'cells' => [
+                        'code' => 'orphan_candidate',
+                        'type' => 'price',
+                        'label.pl' => 'Kandydat',
+                        'groups' => 'Ceny',
+                    ],
+                ],
+            ),
+        ]);
+        $run = $this->awaitingRun($em, $batchId);
+
+        try {
+            $this->approval()->approve($run->getId(), Uuid::v7());
+            self::fail('Approval should reject a non-canonical, unknown group reference.');
+        } catch (LogicException $error) {
+            self::assertStringContainsString('unknown attribute group code "Ceny"', $error->getMessage());
+        }
+
+        $count = $em->getConnection()->fetchOne("SELECT COUNT(*) FROM attributes WHERE code = 'orphan_candidate'");
+        self::assertSame(0, (int) (\is_scalar($count) ? $count : -1));
+    }
+
     /**
      * @return array{0: EntityManagerInterface}
      */
@@ -169,7 +240,7 @@ final class AgentSchemaFlowTest extends KernelTestCase
 
     private function tool(): CreateAttributesFromSchemaTool
     {
-        $tool = new CreateAttributesFromSchemaTool($this->pendingChanges());
+        $tool = self::getContainer()->get(CreateAttributesFromSchemaTool::class);
         self::assertSame(ToolKind::Schema, $tool->kind());
         self::assertSame('modeling.attributes.add_edit', $tool->requiredPermission());
 

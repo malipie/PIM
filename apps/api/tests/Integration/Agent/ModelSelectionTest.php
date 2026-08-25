@@ -10,6 +10,7 @@ use App\Agent\Application\Llm\AgentLlmResponse;
 use App\Agent\Application\Run\AgentLoopRunner;
 use App\Agent\Application\Run\AgentSystemPromptBuilder;
 use App\Agent\Application\Run\UsageCostCalculator;
+use App\Agent\Application\Tool\AttributeGroupIdentifierResolver;
 use App\Agent\Application\Tool\CreateAttributesFromSchemaTool;
 use App\Agent\Application\Tool\GuardedToolExecutor;
 use App\Agent\Application\Tool\PingTool;
@@ -104,7 +105,10 @@ final class ModelSelectionTest extends KernelTestCase
         // The real schema tool declares kind=schema; ping is kind=read.
         $registry = new ToolRegistry([
             new PingTool(),
-            new CreateAttributesFromSchemaTool(self::getContainer()->get(PendingChangesPort::class)),
+            new CreateAttributesFromSchemaTool(
+                self::getContainer()->get(PendingChangesPort::class),
+                self::getContainer()->get(AttributeGroupIdentifierResolver::class),
+            ),
         ], $checker);
         $selector = new AgentModelSelector('claude-sonnet-test', 'claude-opus-test');
 

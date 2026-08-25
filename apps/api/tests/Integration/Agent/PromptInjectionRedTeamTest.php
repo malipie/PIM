@@ -13,6 +13,7 @@ use App\Agent\Application\Run\AgentLoopRunner;
 use App\Agent\Application\Run\AgentSystemPromptBuilder;
 use App\Agent\Application\Run\UsageCostCalculator;
 use App\Agent\Application\Tool\AgentToolContext;
+use App\Agent\Application\Tool\AttributeGroupIdentifierResolver;
 use App\Agent\Application\Tool\BulkEditValuesTool;
 use App\Agent\Application\Tool\CreateAttributesFromSchemaTool;
 use App\Agent\Application\Tool\GenerateProductDescriptionTool;
@@ -552,7 +553,10 @@ final class PromptInjectionRedTeamTest extends KernelTestCase
                 self::getContainer()->get(BulkEditValuesPort::class),
                 self::getContainer()->get(PendingChangesPort::class),
             ),
-            new CreateAttributesFromSchemaTool(self::getContainer()->get(PendingChangesPort::class)),
+            new CreateAttributesFromSchemaTool(
+                self::getContainer()->get(PendingChangesPort::class),
+                self::getContainer()->get(AttributeGroupIdentifierResolver::class),
+            ),
         ], $checker);
         $selector = new AgentModelSelector('claude-sonnet-test', 'claude-opus-test');
         $bus = new class implements MessageBusInterface {

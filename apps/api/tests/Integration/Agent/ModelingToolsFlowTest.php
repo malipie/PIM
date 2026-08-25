@@ -50,7 +50,7 @@ final class ModelingToolsFlowTest extends KernelTestCase
             'code' => 'weight',
             'type' => 'metric',
             'label' => ['pl' => 'Waga'],
-            'groups' => ['dimensions'],
+            'groups' => ['Wymiary'],
         ], $this->context());
         self::assertIsString($createResult['pending_change_batch_id']);
         $this->approveBatch($em, Uuid::fromString($createResult['pending_change_batch_id']));
@@ -58,6 +58,10 @@ final class ModelingToolsFlowTest extends KernelTestCase
         $conn = $em->getConnection();
         $type = $conn->fetchOne("SELECT type FROM attributes WHERE code = 'weight'");
         self::assertSame('metric', $type, 'approve must create the attribute');
+        $membership = $conn->fetchOne(
+            "SELECT COUNT(*) FROM attribute_group_attributes aga JOIN attributes a ON a.id = aga.attribute_id JOIN attribute_groups g ON g.id = aga.attribute_group_id WHERE a.code = 'weight' AND g.code = 'dimensions'",
+        );
+        self::assertSame(1, (int) (\is_scalar($membership) ? $membership : -1), 'localized group label must resolve to its canonical code');
 
         // Update: same code, new label - no duplicate, label patched.
         $updateResult = $this->attributeTool()->execute([
@@ -171,7 +175,7 @@ final class ModelingToolsFlowTest extends KernelTestCase
 
     private function attributeTool(): CreateUpdateAttributeTool
     {
-        $tool = new CreateUpdateAttributeTool($this->pendingChanges());
+        $tool = self::getContainer()->get(CreateUpdateAttributeTool::class);
         self::assertSame(ToolKind::Schema, $tool->kind());
 
         return $tool;

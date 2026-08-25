@@ -16,6 +16,7 @@ import {
   sendAgentMessage,
   startAgentRun,
 } from '@/features/agent/api';
+import { AgentMessageText } from '@/features/agent/chat/AgentMessageText';
 import { AGENT_PENDING_QUERY_KEY } from '@/features/agent/hooks/useAgentPendingProposals';
 import { useAgentRunStream } from '@/features/agent/hooks/useAgentRunStream';
 import { httpErrorDetail } from '@/lib/http';
@@ -248,7 +249,7 @@ export function AgentChatSheet() {
                   message.role === 'tool' && 'bg-purple-50 text-purple-900',
                 )}
               >
-                {text}
+                {message.role === 'assistant' ? <AgentMessageText text={text} /> : text}
               </div>
             );
           })}
@@ -258,7 +259,7 @@ export function AgentChatSheet() {
               aria-live="polite"
               data-testid="agent-streaming-message"
             >
-              {streamText}
+              <AgentMessageText text={streamText} />
             </div>
           )}
           {run !== null && isRunBusy(run.status) && (
