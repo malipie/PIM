@@ -239,12 +239,16 @@ export function DefinitionEditorPage() {
           <Label htmlFor="definition-object-type">
             {t('workflow.definitions.field_object_type', { defaultValue: 'Dla czego obowiązuje' })}
           </Label>
-          <Combobox
-            options={objectTypeOptions}
-            value={draft.objectTypeId === '' ? null : draft.objectTypeId}
-            onChange={(value) => setDraft({ ...draft, objectTypeId: value ?? '' })}
-            placeholder={t('settings.workflow.object_type_all', { defaultValue: 'Wszystkie typy' })}
-          />
+          <div id="definition-object-type" data-testid="definition-object-type">
+            <Combobox
+              options={objectTypeOptions}
+              value={draft.objectTypeId === '' ? null : draft.objectTypeId}
+              onChange={(value) => setDraft({ ...draft, objectTypeId: value ?? '' })}
+              placeholder={t('settings.workflow.object_type_all', {
+                defaultValue: 'Wszystkie typy',
+              })}
+            />
+          </div>
         </div>
       </section>
 
