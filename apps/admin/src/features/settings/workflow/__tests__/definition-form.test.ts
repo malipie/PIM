@@ -7,6 +7,8 @@ import {
   draftToPayload,
   emptyDraft,
   localViolations,
+  reviewerToValue,
+  valueToReviewer,
   violationsByField,
 } from '../definition-form';
 
@@ -139,5 +141,48 @@ describe('violationsByField', () => {
         { field: 'transitions[0].name', message: 'dup' },
       ]),
     ).toEqual({ places: 'second', 'transitions[0].name': 'dup' });
+  });
+});
+
+describe('reviewer round-trip (#3001)', () => {
+  it('maps the API envelope to a picker value and back', () => {
+    expect(reviewerToValue({ role_code: 'approver' })).toBe('role:approver');
+    expect(reviewerToValue({ user_id: '0192f3a1-0000-7000-8000-000000000001' })).toBe(
+      'user:0192f3a1-0000-7000-8000-000000000001',
+    );
+    expect(reviewerToValue(null)).toBe('');
+
+    expect(valueToReviewer('role:catalog_manager')).toEqual({ role_code: 'catalog_manager' });
+    expect(valueToReviewer('user:0192f3a1-0000-7000-8000-000000000001')).toEqual({
+      user_id: '0192f3a1-0000-7000-8000-000000000001',
+    });
+    expect(valueToReviewer('')).toBeNull();
+  });
+
+  it('carries a stored reviewer through an unrelated edit', () => {
+    // The regression this guards: the payload ALWAYS carries `reviewer`, so
+    // a draft that failed to read the stored value would wipe the routing on
+    // every save of an unrelated field.
+    const resource: WorkflowDefinitionResource = {
+      id: '0192f3a1-0000-7000-8000-0000000000aa',
+      name: 'Przepływ produktów',
+      object_type_id: null,
+      places: [{ name: 'draft' }, { name: 'published' }],
+      transitions: [{ name: 'publish', from: 'draft', to: 'published' }],
+      reviewer: { user_id: '0192f3a1-0000-7000-8000-000000000001' },
+      enabled: true,
+      updated_at: '2026-08-25T10:00:00+00:00',
+    };
+
+    const draft = draftFromResource(resource);
+    draft.name = 'Przepływ produktów (v2)';
+
+    expect(draftToPayload(draft).reviewer).toEqual({
+      user_id: '0192f3a1-0000-7000-8000-000000000001',
+    });
+  });
+
+  it('sends null when no reviewer is picked', () => {
+    expect(draftToPayload(emptyDraft()).reviewer).toBeNull();
   });
 });
