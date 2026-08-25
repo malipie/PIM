@@ -7,7 +7,9 @@ namespace App\Tests\Integration\Agent;
 use App\Agent\Application\Limits\AgentLimitGuard;
 use App\Agent\Application\Llm\AgentLlmClientInterface;
 use App\Agent\Application\Llm\AgentLlmResponse;
+use App\Agent\Application\Llm\StreamingAgentLlmClientInterface;
 use App\Agent\Application\Run\AgentLoopRunner;
+use App\Agent\Application\Run\AgentProgressPublisher;
 use App\Agent\Application\Run\AgentSystemPromptBuilder;
 use App\Agent\Application\Run\UsageCostCalculator;
 use App\Agent\Application\Tool\AgentToolContext;
@@ -25,6 +27,7 @@ use App\Identity\Contracts\Policy\PermissionCheckerInterface;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
+use App\Tests\Support\InMemoryMercureHub;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
 use PHPUnit\Framework\Attributes\Test;
@@ -33,6 +36,8 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
+
+use const JSON_THROW_ON_ERROR;
 
 /**
  * AGENT-P1-03 (#1955) — the loop against real Postgres with a scripted
@@ -179,6 +184,55 @@ final class AgentLoopRunnerTest extends KernelTestCase
         self::assertStringContainsString('backoff exhausted', (string) $run->getErrorMessage());
     }
 
+    #[Test]
+    public function streamingPublishesTextDeltasAndRecordsLatencyTelemetry(): void
+    {
+        [$run, $tenant, $em] = $this->fixture();
+        $hub = new InMemoryMercureHub();
+        $progress = new AgentProgressPublisher($hub, 'https://pim.localhost');
+        $llm = new class implements StreamingAgentLlmClientInterface {
+            public function create(Tenant $tenant, string $model, string $system, array $messages, array $tools, bool $promptCaching = true): AgentLlmResponse
+            {
+                throw new LogicException('The interactive loop must use streaming.');
+            }
+
+            public function createStreaming(Tenant $tenant, string $model, string $system, array $messages, array $tools, bool $promptCaching, callable $onTextDelta): AgentLlmResponse
+            {
+                $onTextDelta('Go');
+                $onTextDelta('towe');
+
+                return new AgentLlmResponse(
+                    'end_turn',
+                    [['type' => 'text', 'text' => 'Gotowe']],
+                    100,
+                    20,
+                    cacheReadTokens: 80,
+                    cacheCreationTokens: 10,
+                    durationMs: 320,
+                    ttftMs: 45,
+                );
+            }
+        };
+
+        $this->runner($llm, $em, progress: $progress)->run($run, $tenant);
+
+        self::assertSame(1, $run->getLlmCalls());
+        self::assertSame(320, $run->getLlmDurationMs());
+        self::assertSame(45, $run->getLlmTtftMs());
+        self::assertSame(80, $run->getCacheReadTokens());
+        self::assertSame(10, $run->getCacheCreationTokens());
+
+        $deltas = [];
+        foreach ($hub->getCapturedUpdates() as $update) {
+            $payload = json_decode($update->getData(), true, flags: JSON_THROW_ON_ERROR);
+            if (\is_array($payload) && 'delta' === ($payload['event'] ?? null)) {
+                $deltas[] = [$payload['delta'] ?? null, $payload['sequence'] ?? null];
+            }
+        }
+        // Each event is published to both the run and user topics.
+        self::assertSame([['Go', 1], ['Go', 1], ['towe', 2], ['towe', 2]], $deltas);
+    }
+
     /**
      * @return array{0: AgentRun, 1: Tenant, 2: EntityManagerInterface}
      */
@@ -227,8 +281,12 @@ final class AgentLoopRunnerTest extends KernelTestCase
     /**
      * @param list<AgentToolInterface>|null $tools
      */
-    private function runner(AgentLlmClientInterface $llm, EntityManagerInterface $em, ?array $tools = null): AgentLoopRunner
-    {
+    private function runner(
+        AgentLlmClientInterface $llm,
+        EntityManagerInterface $em,
+        ?array $tools = null,
+        ?AgentProgressPublisher $progress = null,
+    ): AgentLoopRunner {
         $checker = new class implements PermissionCheckerInterface {
             public function userHasPermission(Uuid $userId, string $permissionCode): bool
             {
@@ -271,6 +329,7 @@ final class AgentLoopRunnerTest extends KernelTestCase
             },
             maxToolCallsPerRun: 10,
             maxTokensPerRun: 100_000,
+            progress: $progress,
         );
     }
 

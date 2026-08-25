@@ -200,6 +200,7 @@ services:
       DATABASE_URL_OWNER: postgresql://${POSTGRES_USER:?POSTGRES_USER jest wymagany.}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD jest wymagany.}@database:5432/${POSTGRES_DB:?POSTGRES_DB jest wymagany.}?serverVersion=16&charset=utf8&application_name=pim_migrations
       MESSENGER_TRANSPORT_DSN: doctrine://default?queue_name=async&auto_setup=0
       MESSENGER_IMPORT_TRANSPORT_DSN: doctrine://default?auto_setup=0
+      MESSENGER_AGENT_TRANSPORT_DSN: doctrine://default?queue_name=agent&auto_setup=0
       LOCK_DSN: redis://redis:6379
       # APP_BASE_URL jest JEDYNĄ zależnością aplikacji od hosta (linki w
       # zaproszeniach, resetach hasła i redirect URI SSO). Per instancja =

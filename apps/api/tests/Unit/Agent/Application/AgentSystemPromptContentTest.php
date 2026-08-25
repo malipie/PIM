@@ -28,7 +28,7 @@ final class AgentSystemPromptContentTest extends TestCase
         $em = $this->createStub(EntityManagerInterface::class);
         $builder = new AgentSystemPromptBuilder($em);
 
-        $prompt = $builder->build($this->contentRun(['object_type' => 'product']));
+        $prompt = $builder->buildContext($this->contentRun(['object_type' => 'product']));
 
         self::assertStringNotContainsString('Brand voice', $prompt);
         self::assertStringNotContainsString('Content recipe', $prompt);
@@ -42,7 +42,7 @@ final class AgentSystemPromptContentTest extends TestCase
         $em->method('find')->willReturn(null);
         $builder = new AgentSystemPromptBuilder($em);
 
-        $prompt = $builder->build($this->contentRun(['recipe_id' => Uuid::v7()->toRfc4122()]));
+        $prompt = $builder->buildContext($this->contentRun(['recipe_id' => Uuid::v7()->toRfc4122()]));
 
         self::assertStringNotContainsString('Content recipe', $prompt);
         self::assertStringNotContainsString('ANTI-HALLUCINATION', $prompt);
@@ -60,7 +60,7 @@ final class AgentSystemPromptContentTest extends TestCase
         );
         $builder = new AgentSystemPromptBuilder($this->emReturning($voice));
 
-        $prompt = $builder->build($this->contentRun(['brand_voice_id' => Uuid::v7()->toRfc4122()]));
+        $prompt = $builder->buildContext($this->contentRun(['brand_voice_id' => Uuid::v7()->toRfc4122()]));
 
         self::assertStringContainsString('Brand voice "Ekspercki"', $prompt);
         self::assertStringContainsString('ekspercki, zwięzły', $prompt);
@@ -84,7 +84,7 @@ final class AgentSystemPromptContentTest extends TestCase
         $recipe->updateToneHint('rzeczowy');
         $builder = new AgentSystemPromptBuilder($this->emReturning($recipe));
 
-        $prompt = $builder->build($this->contentRun(['recipe_id' => Uuid::v7()->toRfc4122()]));
+        $prompt = $builder->buildContext($this->contentRun(['recipe_id' => Uuid::v7()->toRfc4122()]));
 
         self::assertStringContainsString('Content recipe "Meta SEO"', $prompt);
         self::assertStringContainsString('Target attribute: meta_description', $prompt);
@@ -114,7 +114,7 @@ final class AgentSystemPromptContentTest extends TestCase
             },
         );
 
-        $prompt = new AgentSystemPromptBuilder($em)->build($this->contentRun(['recipe_id' => Uuid::v7()->toRfc4122()]));
+        $prompt = new AgentSystemPromptBuilder($em)->buildContext($this->contentRun(['recipe_id' => Uuid::v7()->toRfc4122()]));
 
         self::assertStringContainsString('Brand voice "Przypięty"', $prompt);
     }

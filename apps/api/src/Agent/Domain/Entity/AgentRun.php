@@ -41,6 +41,12 @@ class AgentRun implements TenantScoped
     private ?int $affectedCount = null;
     private int $tokensInput = 0;
     private int $tokensOutput = 0;
+    private int $cacheReadTokens = 0;
+    private int $cacheCreationTokens = 0;
+    private int $llmCalls = 0;
+    private int $llmDurationMs = 0;
+    private int $llmTtftMs = 0;
+    private ?int $queueDelayMs = null;
     private string $costUsd = '0';
     private ?string $errorMessage = null;
     private DateTimeImmutable $startedAt;
@@ -147,6 +153,36 @@ class AgentRun implements TenantScoped
         return $this->tokensOutput;
     }
 
+    public function getCacheReadTokens(): int
+    {
+        return $this->cacheReadTokens;
+    }
+
+    public function getCacheCreationTokens(): int
+    {
+        return $this->cacheCreationTokens;
+    }
+
+    public function getLlmCalls(): int
+    {
+        return $this->llmCalls;
+    }
+
+    public function getLlmDurationMs(): int
+    {
+        return $this->llmDurationMs;
+    }
+
+    public function getLlmTtftMs(): int
+    {
+        return $this->llmTtftMs;
+    }
+
+    public function getQueueDelayMs(): ?int
+    {
+        return $this->queueDelayMs;
+    }
+
     public function getCostUsd(): string
     {
         return $this->costUsd;
@@ -189,6 +225,25 @@ class AgentRun implements TenantScoped
 
         $microSum = (int) round((float) $this->costUsd * 1_000_000) + (int) round((float) $costUsd * 1_000_000);
         $this->costUsd = number_format($microSum / 1_000_000, 6, '.', '');
+    }
+
+    public function recordDequeued(int $enqueuedAtMs, ?int $dequeuedAtMs = null): void
+    {
+        $dequeuedAtMs ??= (int) floor(microtime(true) * 1000);
+        $this->queueDelayMs = max(0, $dequeuedAtMs - $enqueuedAtMs);
+    }
+
+    public function recordLlmCall(
+        int $durationMs,
+        int $ttftMs,
+        int $cacheReadTokens,
+        int $cacheCreationTokens,
+    ): void {
+        ++$this->llmCalls;
+        $this->llmDurationMs += max(0, $durationMs);
+        $this->llmTtftMs += max(0, $ttftMs);
+        $this->cacheReadTokens += max(0, $cacheReadTokens);
+        $this->cacheCreationTokens += max(0, $cacheCreationTokens);
     }
 
     public function markAwaitingInput(): void

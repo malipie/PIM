@@ -17,6 +17,11 @@ parameters:
     pim.agent.model.schema.fallback: 'claude-opus-4-8'
     pim.agent.llm.max_retries: 4
     pim.agent.llm.timeout_seconds: 120.0
+    # Interactive orchestration fails fast; long-running content generation
+    # continues to use the background defaults above.
+    pim.agent.llm.interactive_max_tokens: 1024
+    pim.agent.llm.interactive_max_retries: 1
+    pim.agent.llm.interactive_timeout_seconds: 45.0
 
     # AGENT-P0-08 (#1951) — global agent feature flag; per-tenant
     # availability additionally requires an active BYOK key.
@@ -73,6 +78,12 @@ services:
         arguments:
             $maxRetries: '%pim.agent.llm.max_retries%'
             $timeoutSeconds: '%pim.agent.llm.timeout_seconds%'
+
+    App\Agent\Infrastructure\Anthropic\SdkAgentLlmClient:
+        arguments:
+            $interactiveMaxTokens: '%pim.agent.llm.interactive_max_tokens%'
+            $interactiveMaxRetries: '%pim.agent.llm.interactive_max_retries%'
+            $interactiveTimeoutSeconds: '%pim.agent.llm.interactive_timeout_seconds%'
 
     App\Agent\Infrastructure\Anthropic\AgentModelSelector:
         arguments:

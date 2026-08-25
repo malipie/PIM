@@ -49,6 +49,19 @@ framework:
                     multiplier: 2
                     max_delay: 300000
 
+            # #2998 — latency-sensitive agent turns must never sit behind a
+            # 200k-row import/export. A dedicated consumer drains this queue.
+            agent:
+                dsn: '%env(MESSENGER_AGENT_TRANSPORT_DSN)%'
+                options:
+                    queue_name: agent
+                    redeliver_timeout: 180
+                retry_strategy:
+                    max_retries: 1
+                    delay: 1000
+                    multiplier: 1
+                    max_delay: 1000
+
             # auto_setup=0 (GOLIVE #2177): the runtime role `pim_app` has no
             # DDL rights since W1-1, so an auto-setup CREATE TABLE on a fresh
             # install fails with "permission denied for schema public" and

@@ -27,18 +27,23 @@ final class AgentSystemPromptBuilderTest extends TestCase
             'total_matching' => 95,
         ]);
 
-        $prompt = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class))->build($run);
+        $builder = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class));
+        $prompt = $builder->buildContext($run);
 
         self::assertStringContainsString('SELECTION SCOPE', $prompt);
         self::assertStringContainsString('1 object(s) SELECTED', $prompt);
         self::assertStringContainsString('all 95 in the active view', $prompt);
         self::assertStringContainsString('ask ONE clarifying question', $prompt);
-        self::assertStringContainsString('get_object', $prompt);
-        self::assertStringContainsString('UNTRUSTED CATALOG DATA', $prompt);
-        self::assertStringContainsString('never reveal an omitted/restricted attribute', $prompt);
-        self::assertStringContainsString('obtain the user\'s confirmation', $prompt);
-        self::assertStringContainsString('confirmed=true', $prompt);
-        self::assertStringContainsString('workflow transition name', $prompt);
+        self::assertStringContainsString('"selected_count":1', $prompt);
+        self::assertStringNotContainsString('id-1', $prompt);
+
+        $system = $builder->build($run);
+        self::assertStringContainsString('get_object', $system);
+        self::assertStringContainsString('UNTRUSTED CATALOG DATA', $system);
+        self::assertStringContainsString('never reveal an omitted/restricted attribute', $system);
+        self::assertStringContainsString('obtain the user\'s confirmation', $system);
+        self::assertStringContainsString('confirmed=true', $system);
+        self::assertStringContainsString('workflow transition name', $system);
     }
 
     #[Test]
@@ -48,9 +53,11 @@ final class AgentSystemPromptBuilderTest extends TestCase
             'filter_dsl' => ['field' => 'brand', 'op' => 'eq', 'value' => 'Acme'],
         ]);
 
-        $prompt = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class))->build($run);
+        $prompt = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class))->buildContext($run);
 
         self::assertStringNotContainsString('SELECTION SCOPE', $prompt);
+        self::assertStringContainsString('"has_active_filter":true', $prompt);
+        self::assertStringNotContainsString('Acme', $prompt);
     }
 
     #[Test]
@@ -60,8 +67,18 @@ final class AgentSystemPromptBuilderTest extends TestCase
             'selected_ids' => [],
         ]);
 
-        $prompt = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class))->build($run);
+        $prompt = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class))->buildContext($run);
 
         self::assertStringNotContainsString('SELECTION SCOPE', $prompt);
+    }
+
+    #[Test]
+    public function systemPrefixIsByteStableAcrossDifferentRuns(): void
+    {
+        $builder = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class));
+        $first = new AgentRun(Uuid::v7(), AgentRunSurface::Chat, 'first', ['selected_ids' => ['secret-id']]);
+        $second = new AgentRun(Uuid::v7(), AgentRunSurface::CmdK, 'second', ['locale' => 'pl_PL']);
+
+        self::assertSame($builder->build($first), $builder->build($second));
     }
 }

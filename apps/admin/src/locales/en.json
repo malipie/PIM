@@ -4159,6 +4159,9 @@
     },
     "phase": {
       "planning": "Planning…",
+      "model": "Thinking…",
+      "tool": "Checking data…",
+      "finalizing": "Finishing…",
       "tool-call": "Calling a tool…",
       "materializing": "Materializing the plan…",
       "committing": "Committing…"

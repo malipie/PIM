@@ -31,16 +31,10 @@ use Zenstruck\Foundry\Test\ResetDatabase;
 
 /**
  * AGENT-P5-03 (#1972) — per-kind model selection end-to-end (PRD
- * §10.1): a run whose AVAILABLE tools include kind=schema (the user
- * holds a modeling permission) rides the Opus-tier model; a run whose
- * user only has value/read permissions rides the Sonnet-tier default.
- * The choice is declarative (registry kinds -> AgentModelSelector, both
- * configured in one place) and the used model persists on
- * agent_runs.model.
- *
- * Deliberate semantics: availability decides, not per-run usage — the
- * model must be picked BEFORE the first LLM call, and a modeling-
- * capable user's conversation can turn to schema at any point.
+ * §10.1): routing follows the actual intent, not the user's broad
+ * permission surface. This keeps ordinary conversations on the fast
+ * default tier even for administrators while schema mutations use the
+ * stronger tier. The used model persists on agent_runs.model.
  */
 final class ModelSelectionTest extends KernelTestCase
 {
@@ -48,9 +42,9 @@ final class ModelSelectionTest extends KernelTestCase
     use ResetDatabase;
 
     #[Test]
-    public function schemaCapableUserRidesOpus(): void
+    public function schemaMutationIntentRidesOpus(): void
     {
-        [$run, $tenant, $em] = $this->fixture();
+        [$run, $tenant, $em] = $this->fixture('dodaj atrybut EAN');
 
         $this->runner($em, allowModeling: true)->run($run, $tenant);
 
@@ -60,11 +54,11 @@ final class ModelSelectionTest extends KernelTestCase
     }
 
     #[Test]
-    public function valueOnlyUserRidesSonnet(): void
+    public function ordinaryIntentRidesSonnetEvenForSchemaCapableUser(): void
     {
-        [$run, $tenant, $em] = $this->fixture();
+        [$run, $tenant, $em] = $this->fixture('zmień cenę zaznaczonych produktów');
 
-        $this->runner($em, allowModeling: false)->run($run, $tenant);
+        $this->runner($em, allowModeling: true)->run($run, $tenant);
 
         self::assertSame('claude-sonnet-test', $run->getModel());
         $stored = $em->getConnection()->fetchOne('SELECT model FROM agent_runs WHERE id = :id', ['id' => $run->getId()->toRfc4122()]);
@@ -74,7 +68,7 @@ final class ModelSelectionTest extends KernelTestCase
     /**
      * @return array{0: AgentRun, 1: Tenant, 2: EntityManagerInterface}
      */
-    private function fixture(): array
+    private function fixture(string $intent): array
     {
         $tenant = new Tenant('alpha', 'Alpha Tenant');
         $em = $this->em();
@@ -83,7 +77,7 @@ final class ModelSelectionTest extends KernelTestCase
         self::getContainer()->get(TenantContext::class)->set($tenant);
         self::getContainer()->get(TenantFilterConfigurator::class)->apply();
 
-        $run = new AgentRun(Uuid::v7(), AgentRunSurface::Chat, 'do something');
+        $run = new AgentRun(Uuid::v7(), AgentRunSurface::Chat, $intent);
         $em->persist($run);
         $em->flush();
 
@@ -121,8 +115,8 @@ final class ModelSelectionTest extends KernelTestCase
             }
         };
 
-        // No per-tenant override / caching-off: exercises the default
-        // kind-based model selection this test asserts.
+        // No per-tenant override / caching-off: exercises intent-based
+        // model selection directly.
         $tenantConfig = new class implements \App\Identity\Contracts\Byok\ByokConfigReaderInterface {
             public function isProactiveScanEnabled(Tenant $tenant): bool
             {

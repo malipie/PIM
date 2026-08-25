@@ -182,6 +182,7 @@ services:
       # `doctrine://default?queue_name=async` so the FrankenPHP worker
       # pool drains the queue (audit MEDIUM-007).
       MESSENGER_TRANSPORT_DSN: sync://
+      MESSENGER_AGENT_TRANSPORT_DSN: sync://
       # IMP2-1.6a (#1468) — the import queue IS asynchronous in dev: the
       # `worker` service below drains it, so big files leave the request
       # path and pause/cancel (IMP2-2.3) have a real worker to act on.
@@ -324,6 +325,7 @@ services:
       DATABASE_URL: postgresql://${APP_DB_USER:-pim_app}:${APP_DB_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=16&charset=utf8
       DATABASE_URL_OWNER: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=16&charset=utf8
       MESSENGER_TRANSPORT_DSN: sync://
+      MESSENGER_AGENT_TRANSPORT_DSN: sync://
       # auto_setup=0 (GOLIVE #2177) — messenger_messages is created by migration
       # Version20260704050000; pim_app has no DDL rights, so runtime auto-setup
       # on a fresh install could only fail. Keep every doctrine DSN setup-free.

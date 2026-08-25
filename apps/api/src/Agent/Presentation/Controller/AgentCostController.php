@@ -55,6 +55,21 @@ final readonly class AgentCostController
                 # HELP agent_tokens_today Agent tokens spent for the tenant this UTC day.
                 # TYPE agent_tokens_today gauge
                 agent_tokens_today {$report->tokensToday}
+                # HELP agent_llm_calls_today Agent LLM calls for the tenant this UTC day.
+                # TYPE agent_llm_calls_today gauge
+                agent_llm_calls_today {$report->llmCallsToday}
+                # HELP agent_cache_read_tokens_today Agent prompt-cache read tokens this UTC day.
+                # TYPE agent_cache_read_tokens_today gauge
+                agent_cache_read_tokens_today {$report->cacheReadTokensToday}
+                # HELP agent_queue_delay_ms_today Average worker queue delay this UTC day.
+                # TYPE agent_queue_delay_ms_today gauge
+                agent_queue_delay_ms_today {$report->avgQueueDelayMsToday}
+                # HELP agent_llm_duration_ms_today Average LLM call duration this UTC day.
+                # TYPE agent_llm_duration_ms_today gauge
+                agent_llm_duration_ms_today {$report->avgLlmDurationMsToday}
+                # HELP agent_llm_ttft_ms_today Average LLM time to first text token this UTC day.
+                # TYPE agent_llm_ttft_ms_today gauge
+                agent_llm_ttft_ms_today {$report->avgLlmTtftMsToday}
                 METRICS;
 
             return new Response($body, Response::HTTP_OK, ['content-type' => 'text/plain; version=0.0.4']);
@@ -75,6 +90,12 @@ final readonly class AgentCostController
             'tokens_month' => $report->tokensMonth,
             'runs_today' => $report->runsToday,
             'runs_month' => $report->runsMonth,
+            'llm_calls_today' => $report->llmCallsToday,
+            'cache_read_tokens_today' => $report->cacheReadTokensToday,
+            'cache_creation_tokens_today' => $report->cacheCreationTokensToday,
+            'avg_queue_delay_ms_today' => $report->avgQueueDelayMsToday,
+            'avg_llm_duration_ms_today' => $report->avgLlmDurationMsToday,
+            'avg_llm_ttft_ms_today' => $report->avgLlmTtftMsToday,
             'day_cap_usd' => $report->dayCapUsd,
             'month_cap_usd' => $report->monthCapUsd,
             'day_cap_pct' => $report->dayCapPct,

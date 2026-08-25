@@ -59,6 +59,11 @@ final class AgentCostAggregatorTest extends KernelTestCase
         self::assertSame('10.500000', $report->costTodayUsd);
         self::assertSame(4650, $report->tokensToday, '1000+500+2000+1000+100+50');
         self::assertSame(3, $report->runsToday);
+        self::assertSame(3, $report->llmCallsToday);
+        self::assertSame(600, $report->cacheReadTokensToday);
+        self::assertSame(60, $report->cacheCreationTokensToday);
+        self::assertSame(200, $report->avgLlmDurationMsToday);
+        self::assertSame(50, $report->avgLlmTtftMsToday);
 
         // Caps come from the P1-04 knobs (day $20, month $300 by default).
         self::assertGreaterThan(0.0, $report->dayCapUsd);
@@ -81,6 +86,7 @@ final class AgentCostAggregatorTest extends KernelTestCase
         }
         $run = new AgentRun($userId, AgentRunSurface::Chat, 'work');
         $run->addUsage($inTokens, $outTokens, $cost);
+        $run->recordLlmCall(200, 50, 200, 20);
         $em->persist($run);
         $em->flush();
     }

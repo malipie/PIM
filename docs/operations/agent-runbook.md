@@ -37,7 +37,7 @@ refuses new runs until the window rolls over:
 
 There is no manual "unblock" — that is the design (a compromised or runaway
 loop cannot be un-throttled by a single click). To lift a block early, raise the
-cap (`pim.agent.limits.*` env, then restart the API worker) — do this only with
+cap (`pim.agent.limits.*` env, then restart `api` and `agent-worker`) — do this only with
 a clear reason. Watch spend in **Settings → AI → Koszt i limity** or scrape
 `GET /api/agent/cost?format=prometheus`.
 
@@ -77,3 +77,24 @@ manually first, then retry. Rollback never destroys data silently.
 `{ "proactive_scan_enabled": true }`) enables the scheduled data-steward scan.
 Run it via `pim:agent:proactive-scan <tenant-code> <steward-user-id>`; findings
 open a `proactive` run in the inbox — nothing commits without approval.
+
+## 8. Slow or stuck interactive run
+
+Interactive turns use the dedicated Messenger transport `agent` and the
+dedicated `agent-worker`. Imports and bulk content continue on `import`, so a
+large job must not create head-of-line blocking for chat.
+
+1. Check the consumer: `docker compose ps agent-worker` and
+   `docker compose logs --tail=200 agent-worker`.
+2. Check backlog: `docker compose exec api php bin/console messenger:stats agent`.
+3. Check latency telemetry in `GET /api/agent/cost?format=prometheus`:
+   `agent_queue_delay_ms_today`, `agent_llm_ttft_ms_today` and
+   `agent_llm_duration_ms_today`. Queue delay diagnoses worker capacity; TTFT
+   diagnoses provider/model latency.
+4. Restart only the interactive consumer when needed:
+   `docker compose up -d --force-recreate agent-worker`. Do not restart the
+   bulk worker merely to recover the agent queue.
+
+Each run response also exposes `queue_delay_ms`, `llm_duration_ms`,
+`llm_ttft_ms`, `cache_read_tokens` and `cache_creation_tokens`. The worker logs
+the same values with `run_id` and model, without prompts or catalog data.

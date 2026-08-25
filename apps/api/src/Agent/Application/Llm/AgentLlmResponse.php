@@ -31,6 +31,8 @@ final readonly class AgentLlmResponse
         public int $outputTokens,
         public int $cacheReadTokens = 0,
         public int $cacheCreationTokens = 0,
+        public int $durationMs = 0,
+        public int $ttftMs = 0,
     ) {
     }
 

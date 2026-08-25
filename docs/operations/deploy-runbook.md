@@ -135,8 +135,8 @@ docker compose ... exec -T api php bin/console pim:agent:seed-content-defaults
 - Rotacja sekretów: `docs/operations/secrets-runbook.md` + `credentials-rotation.md`.
 - Aktualizacje: `git fetch && git checkout <nowy-tag>` → `build api worker` →
   `run --rm --no-deps api php bin/console doctrine:migrations:migrate` →
-  **`stop api worker`** → **`run --rm --no-deps api php bin/console cache:clear`**
-  (i to samo dla `worker`) → `up -d --force-recreate api worker` → smoke pkt 1-3.
+  **`stop api worker agent-worker`** → **`run --rm --no-deps api php bin/console cache:clear`**
+  (i to samo dla `worker`) → `up -d --force-recreate api worker agent-worker` → smoke pkt 1-3.
   Pełna, uzasadniona wersja tej kolejności: [`docs/deploy/playbook.md`](../deploy/playbook.md).
   `cache:clear` jest OBOWIĄZKOWY: `/app/var` to named volume, więc skompilowany
   kontener DI z poprzedniej wersji przesłania świeży cache z obrazu i nowy kod
@@ -144,5 +144,7 @@ docker compose ... exec -T api php bin/console pim:agent:seed-content-defaults
   Wykonanie go przez `exec` na DZIAŁAJĄCYM kontenerze wywraca za to procesy,
   które ładują usługi leniwie (#2991) — stąd `stop` przed czyszczeniem.
 - Skalowanie workerów: `up -d --scale worker=4`.
+- `agent-worker` skaluje się niezależnie i konsumuje wyłącznie kolejkę
+  `agent`; nie dodawaj jej do puli `worker`, bo wróci blokowanie przez importy.
 - Retencja logów kontenerów: skonfiguruj `log-driver: json-file` z limitami w
   /etc/docker/daemon.json (`max-size=50m`, `max-file=5`) — RODO: logi zawierają e-maile.

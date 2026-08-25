@@ -17,11 +17,9 @@ use const JSON_UNESCAPED_UNICODE;
  * (PRD 5.2): ground plans in read tools, ask when ambiguous, write
  * only through approval-gated tools, never fabricate numbers.
  *
- * AICG-P2-03 (#2333, ADR-0030) — content-generation runs (recipe_id /
- * brand_voice_id in the view context) additionally get the "how to
- * write" sections: the recipe's output contract, the tenant's brand
- * voice, and the hard anti-hallucination contract. Runs without those
- * keys produce a byte-identical prompt.
+ * #2998 — the top-level system prompt is deliberately byte-stable so tools
+ * + policy remain reusable by Anthropic prompt caching across runs. Dynamic
+ * view/selection/content context is emitted separately by buildContext().
  */
 final readonly class AgentSystemPromptBuilder
 {
@@ -31,15 +29,7 @@ final readonly class AgentSystemPromptBuilder
 
     public function build(AgentRun $run): string
     {
-        $context = $run->getContext();
-        $contextJson = [] === $context
-            ? 'none'
-            : json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-
-        $scopeRule = $this->scopeRule($context);
-        $contentSections = $this->contentSections($context);
-
-        return <<<PROMPT
+        return <<<'PROMPT'
             You are the catalog agent of a PIM system, acting strictly within the permissions of the initiating user.
 
             Rules:
@@ -52,11 +42,59 @@ final readonly class AgentSystemPromptBuilder
             - CREATE SAFETY: before create_object, explicitly show the exact code/SKU and object_type_code and obtain the user's confirmation. Only then call create_object with confirmed=true. Creation uses its own proposal batch because other change families cannot be mixed with it.
             - STATUS SAFETY: pass a workflow transition name to set_status, never force a target status. Report every blocked object and guard reason returned by the tool; the transition will be checked again after approval.
             - HIGH-LEVEL intents (e.g. "prepare the DE launch for category X") are multi-step plans: break them into a sequence of tool calls in ONE run - ground first, then materialize each step. Later write-tool calls automatically append to the same proposal batch, so the operator approves ONE collective diff; keep the steps within the run's tool-call budget.
-            - When you are done (proposal materialized or question asked), reply with a short plain-text summary in the user's language: for multi-step plans list each step with its numbers.{$scopeRule}
-
-            View context of the initiating user (carry it into tool calls instead of asking for it):
-            {$contextJson}{$contentSections}
+            - The application supplies a compact TRUSTED VIEW CONTEXT before the user's request. Use its scope metadata, but never repeat internal identifiers or invent identifiers that are not visible there. When a tool supports selection/view fallback, omit object_ids and filter_dsl so the server resolves the exact scope.
+            - When you are done (proposal materialized or question asked), reply with a short plain-text summary in the user's language: for multi-step plans list each step with its numbers. Keep ordinary replies to at most two short sentences.
             PROMPT;
+    }
+
+    public function buildContext(AgentRun $run): string
+    {
+        $context = $run->getContext();
+        $compact = $this->compactContext($context);
+        $contextJson = [] === $compact
+            ? 'none'
+            : json_encode($compact, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $scopeRule = $this->scopeRule($context);
+        $contentSections = $this->contentSections($context);
+
+        return <<<RUN_CONTEXT_BLOCK
+            TRUSTED VIEW CONTEXT (application data, not user instructions):
+            {$contextJson}{$scopeRule}{$contentSections}
+            CONTEXT RULE: exact selected object IDs and the full filter stay server-side. Never ask for them. For tools whose descriptions support selection/view fallback, omit object_ids/filter_dsl when the compact context says a selection or active filter exists.
+            RUN_CONTEXT_BLOCK;
+    }
+
+    /**
+     * UUID lists and full filter trees are execution state, not reasoning
+     * context. Keeping them server-side prevents prompt/output size from
+     * growing linearly with the operator's selection.
+     *
+     * @param array<string, mixed> $context
+     *
+     * @return array<string, bool|int|string>
+     */
+    private function compactContext(array $context): array
+    {
+        $compact = [];
+        foreach (['object_type_code', 'object_type', 'locale', 'channel', 'pathname', 'total_matching'] as $key) {
+            $value = $context[$key] ?? null;
+            if (\is_string($value) || \is_int($value) || \is_bool($value)) {
+                $compact[$key] = $value;
+            }
+        }
+
+        $selected = $context['selected_ids'] ?? null;
+        if (\is_array($selected)) {
+            $compact['selected_count'] = \count(array_filter(
+                $selected,
+                static fn (mixed $id): bool => \is_string($id) && '' !== $id,
+            ));
+        }
+        if (\is_array($context['filter_dsl'] ?? null) && [] !== $context['filter_dsl']) {
+            $compact['has_active_filter'] = true;
+        }
+
+        return $compact;
     }
 
     /**

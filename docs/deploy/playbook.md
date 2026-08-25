@@ -116,10 +116,10 @@ Po migracji dotykającej uprawnień/ról: policz stan i porównaj z tym sprzed w
 ### 5. Nowy kod na antenie
 
 ```bash
-ssh $HOST "cd /opt/pim && $DC stop api worker"
+ssh $HOST "cd /opt/pim && $DC stop api worker agent-worker"
 ssh $HOST "cd /opt/pim && $DC run --rm --no-deps api    php bin/console cache:clear"
 ssh $HOST "cd /opt/pim && $DC run --rm --no-deps worker php bin/console cache:clear"
-ssh $HOST "cd /opt/pim && $DC up -d --force-recreate api worker"
+ssh $HOST "cd /opt/pim && $DC up -d --force-recreate api worker agent-worker"
 ```
 
 `cache:clear` w **obu** usługach — katalogi cache bywają osobne (`/app/var/cache/prod` vs
