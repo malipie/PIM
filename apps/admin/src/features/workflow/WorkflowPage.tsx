@@ -1,11 +1,11 @@
-import { GitBranch, SlidersHorizontal } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
 import { PillTabs } from '@/components/ui-v2/pill-tabs';
 import { usePageActions } from '@/layout/page-actions-context';
-import { hasFeature, useIdentity } from '@/lib/identity';
+import { useIdentity } from '@/lib/identity';
 
 import { ReviewQueuePage } from './ReviewQueuePage';
 import { TasksPanel } from './TasksPanel';
@@ -15,55 +15,39 @@ import { TasksPanel } from './TasksPanel';
  * awaits a decision) next to the task inbox (what awaits MY work) and
  * the tenant-wide task list for deciders. Pill-tab layout per the
  * catalogs/exports hub pattern. Deciders who can manage definitions get
- * the "Ustawienia przepływu" CTA (WFL redesign #2515).
+ * the "Definicje przepływów" CTA — the single entry point to flow
+ * configuration since #3000 merged the two screens into one.
  */
 export function WorkflowPage() {
   const { t } = useTranslation();
   const { identity } = useIdentity();
   const canDecide = identity?.permissions.has('workflow.approve_reject') ?? false;
   const canManageDefinitions = identity?.permissions.has('workflow.manage_definitions') ?? false;
-  // #2574 — custom definitions live in the hub now, gated by the same flag the
-  // old Settings entry used.
-  const showDefinitions =
-    canManageDefinitions && hasFeature(identity, 'workflow_custom_definitions');
   const [tab, setTab] = useState('review');
 
   usePageActions(
     useMemo(
       () =>
         canManageDefinitions ? (
-          // #2677 — the labels collapse to icon-only below `sm` so the two
-          // CTAs stop pushing the topbar past a mobile viewport (they added
-          // ~360px and caused a 141px horizontal overflow). `aria-label`
-          // keeps the icon-only buttons accessible.
-          <div className="flex items-center gap-2">
-            {showDefinitions ? (
-              <Link
-                to="/workflow/definitions"
-                data-testid="workflow-definitions-cta"
-                aria-label={t('workflow.definitions_cta', { defaultValue: 'Definicje przepływu' })}
-                className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2.5 text-[13px] font-semibold text-zinc-700 transition hover:bg-zinc-50 sm:px-3.5"
-              >
-                <GitBranch className="size-4" aria-hidden="true" />
-                <span className="hidden sm:inline">
-                  {t('workflow.definitions_cta', { defaultValue: 'Definicje przepływu' })}
-                </span>
-              </Link>
-            ) : null}
-            <Link
-              to="/workflow/settings"
-              data-testid="workflow-settings-cta"
-              aria-label={t('workflow.settings_cta', { defaultValue: 'Ustawienia przepływu' })}
-              className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-cta px-2.5 text-[13px] font-semibold text-cta-foreground transition hover:bg-accent-hover sm:px-3.5"
-            >
-              <SlidersHorizontal className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">
-                {t('workflow.settings_cta', { defaultValue: 'Ustawienia przepływu' })}
-              </span>
-            </Link>
-          </div>
+          // #2677 — the label collapses to icon-only below `sm` so the CTA
+          // stops pushing the topbar past a mobile viewport. `aria-label`
+          // keeps the icon-only button accessible.
+          // #3000 — one entry point: flow configuration lives entirely in
+          // the definitions screen, so the old "Ustawienia przepływu" CTA
+          // is gone rather than duplicated.
+          <Link
+            to="/workflow/definitions"
+            data-testid="workflow-definitions-cta"
+            aria-label={t('workflow.definitions_cta', { defaultValue: 'Definicje przepływów' })}
+            className="focus-ring inline-flex h-9 items-center gap-1.5 rounded-xl bg-cta px-2.5 text-[13px] font-semibold text-cta-foreground transition hover:bg-accent-hover sm:px-3.5"
+          >
+            <GitBranch className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline">
+              {t('workflow.definitions_cta', { defaultValue: 'Definicje przepływów' })}
+            </span>
+          </Link>
         ) : null,
-      [canManageDefinitions, showDefinitions, t],
+      [canManageDefinitions, t],
     ),
   );
 

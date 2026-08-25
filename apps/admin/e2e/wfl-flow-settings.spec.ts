@@ -13,8 +13,16 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, loginAsAdmin } from './helpers/auth';
  * shared CI database, so touching product/category here would leak an
  * enabled definition (with a completeness gate) into them. Asset is an
  * island; the created definition is disabled again on teardown.
+ *
+ * SKIPPED in #3000: the page it drives no longer exists — flow
+ * configuration moved into the definition editor, and `/workflow/settings`
+ * is a redirect. The scenario itself (pick an approver → save → the
+ * definition is enabled) is still worth covering and gets rewritten
+ * against the new screen in #3005. Refs #3005.
  */
-test('flow settings: pick an approver and save enables the asset definition', async ({ page }) => {
+test.skip('flow settings: pick an approver and save enables the asset definition', async ({
+  page,
+}) => {
   const login = await page.request.post('/api/auth/login', {
     data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
     headers: { accept: 'application/json' },

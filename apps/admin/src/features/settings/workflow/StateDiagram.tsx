@@ -2,10 +2,10 @@ import { ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * WFL redesign (#2515) — read-only visualization of the editorial
- * machine (ADR-0029). The flow itself is fixed; the settings page lets
- * the operator configure only the approver + gate, so this is a static
- * diagram, not an editor.
+ * WFL redesign (#2515) — read-only visualization of the built-in
+ * editorial machine (ADR-0029). Still a STATIC picture: #3003 rewires it
+ * to draw the definition currently in the editor, which is why it moved
+ * here in #3000 rather than being deleted with the settings page.
  */
 interface Stage {
   place: string;

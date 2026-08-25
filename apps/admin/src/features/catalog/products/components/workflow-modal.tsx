@@ -308,11 +308,11 @@ export function WorkflowModal({
               </span>
               {' · '}
               <Link
-                to="/workflow/settings"
+                to="/workflow/definitions"
                 className="text-indigo-600 underline hover:text-indigo-500"
               >
                 {t('workflow.control.change_routing', {
-                  defaultValue: 'zmień w Ustawieniach przepływu →',
+                  defaultValue: 'zmień w Definicjach przepływów →',
                 })}
               </Link>
             </p>
