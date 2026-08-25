@@ -84,6 +84,11 @@ test('definition builder: custom place shows up on the product without a deploy'
     await toSelect.locator('button[aria-haspopup="listbox"]').click();
     await toSelect.getByRole('button', { name: 'translation', exact: true }).click();
 
+    // #3003 — a custom step warns that it produces no task; the readiness
+    // list says the same thing before Save, not after the flow is live.
+    await expect(page.getByTestId('transition-custom-warning-1')).toBeVisible();
+    await expect(page.getByTestId('readiness-custom_transitions')).toBeVisible();
+
     await page.getByTestId('definition-save').click();
     await expect(page.getByTestId('workflow-definitions-page')).toBeVisible();
     await expect(
