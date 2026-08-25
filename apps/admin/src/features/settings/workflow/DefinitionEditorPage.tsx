@@ -26,6 +26,7 @@ import {
   violationsByField,
 } from './definition-form';
 import { EnabledDefinitionConfirmDialog } from './EnabledDefinitionConfirmDialog';
+import { FlowPreview } from './FlowPreview';
 import { PlacesSection } from './PlacesSection';
 import { ReviewerSection } from './ReviewerSection';
 import { TransitionsSection } from './TransitionsSection';
@@ -252,27 +253,33 @@ export function DefinitionEditorPage() {
         </div>
       </section>
 
-      <PlacesSection
-        places={draft.places}
-        onChange={(places) => setDraft({ ...draft, places })}
-        advanced={advanced}
-        error={fieldError}
-      />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="space-y-6">
+          <PlacesSection
+            places={draft.places}
+            onChange={(places) => setDraft({ ...draft, places })}
+            advanced={advanced}
+            error={fieldError}
+          />
 
-      <TransitionsSection
-        transitions={draft.transitions}
-        places={draft.places}
-        permissionCodes={permissionCodes}
-        onChange={(transitions) => setDraft({ ...draft, transitions })}
-        advanced={advanced}
-        error={fieldError}
-      />
+          <TransitionsSection
+            transitions={draft.transitions}
+            places={draft.places}
+            permissionCodes={permissionCodes}
+            onChange={(transitions) => setDraft({ ...draft, transitions })}
+            advanced={advanced}
+            error={fieldError}
+          />
 
-      <ReviewerSection
-        value={draft.reviewer}
-        onChange={(reviewer) => setDraft({ ...draft, reviewer })}
-        error={fieldError('reviewer')}
-      />
+          <ReviewerSection
+            value={draft.reviewer}
+            onChange={(reviewer) => setDraft({ ...draft, reviewer })}
+            error={fieldError('reviewer')}
+          />
+        </div>
+
+        <FlowPreview draft={draft} enabled={original?.enabled === true} />
+      </div>
 
       <EnabledDefinitionConfirmDialog
         open={confirmOpen}
