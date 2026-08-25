@@ -1,6 +1,6 @@
 import type { DefinitionDraft, PlaceDraft, TransitionDraft } from './definition-form';
 import { editorialPlaces, editorialTransitions } from './editorial-shape';
-import { humanizeName, PLACE_BLOCKS } from './flow-vocabulary';
+import { humanizeName, PLACE_BLOCKS, transitionLabel } from './flow-vocabulary';
 
 /**
  * #3004 — starter flows, so "Nowy przepływ" opens with a question an
@@ -21,7 +21,8 @@ export interface FlowTemplate {
   id: TemplateId;
   /** Places in order, for the chooser's little chain preview. */
   chain: string[];
-  build: () => DefinitionDraft;
+  /** `lang` drives the action labels — see {@see transitionLabel}. */
+  build: (lang: string) => DefinitionDraft;
 }
 
 function placeDraft(name: string): PlaceDraft {
@@ -34,11 +35,12 @@ function transitionDraft(
   name: string,
   from: string[],
   to: string,
+  lang: string,
   extra: Partial<TransitionDraft> = {},
 ): TransitionDraft {
   return {
     name,
-    label: humanizeName(name),
+    label: transitionLabel(name, lang),
     from,
     to,
     permission: '',
@@ -54,13 +56,14 @@ function emptyShell(places: PlaceDraft[], transitions: TransitionDraft[]): Defin
 }
 
 /** Editor draft built from the canonical editorial shape (single source). */
-function oneApprovalDraft(): DefinitionDraft {
+function oneApprovalDraft(lang: string): DefinitionDraft {
   const places = editorialPlaces().map((place) => placeDraft(place.name));
   const transitions = editorialTransitions(80).map((transition) =>
     transitionDraft(
       transition.name,
       Array.isArray(transition.from) ? transition.from : [transition.from],
       transition.to,
+      lang,
       {
         permission: transition.permission ?? '',
         commentRequired: transition.comment_required === true,
@@ -78,18 +81,22 @@ export const FLOW_TEMPLATES: readonly FlowTemplate[] = [
   {
     id: 'no_approval',
     chain: ['draft', 'published'],
-    build: () =>
+    build: (lang) =>
       emptyShell(
         [placeDraft('draft'), placeDraft('published'), placeDraft('archived')],
         [
-          transitionDraft('publish', ['draft'], 'published', { permission: 'products.edit' }),
-          transitionDraft('unpublish', ['published'], 'draft', {
-            permission: 'workflow.transition.unpublish',
-          }),
-          transitionDraft('archive', ['draft', 'published'], 'archived', {
+          transitionDraft('publish', ['draft'], 'published', lang, {
             permission: 'products.edit',
           }),
-          transitionDraft('restore', ['archived'], 'draft', { permission: 'products.edit' }),
+          transitionDraft('unpublish', ['published'], 'draft', lang, {
+            permission: 'workflow.transition.unpublish',
+          }),
+          transitionDraft('archive', ['draft', 'published'], 'archived', lang, {
+            permission: 'products.edit',
+          }),
+          transitionDraft('restore', ['archived'], 'draft', lang, {
+            permission: 'products.edit',
+          }),
         ],
       ),
   },
@@ -101,8 +108,8 @@ export const FLOW_TEMPLATES: readonly FlowTemplate[] = [
   {
     id: 'approval_then_publish',
     chain: ['draft', 'review', 'approved', 'published'],
-    build: () => {
-      const draft = oneApprovalDraft();
+    build: (lang) => {
+      const draft = oneApprovalDraft(lang);
       // Approval stops at `approved`; publishing to the channels becomes a
       // separate step for whoever runs exports and integrations. That step
       // is custom by definition, so the editor warns that it carries no
@@ -118,8 +125,8 @@ export const FLOW_TEMPLATES: readonly FlowTemplate[] = [
         transition.name === 'approve' ? { ...transition, to: 'approved', gatePct: '' } : transition,
       );
       draft.transitions.push(
-        transitionDraft('publish_approved', ['approved'], 'published', {
-          label: 'Przekaż do publikacji',
+        transitionDraft('publish_approved', ['approved'], 'published', lang, {
+          label: lang.startsWith('en') ? 'Hand over for publication' : 'Przekaż do publikacji',
           permission: 'publications.publish_unpublish',
           gatePct: '80',
         }),

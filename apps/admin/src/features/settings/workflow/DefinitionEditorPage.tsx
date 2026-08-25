@@ -59,7 +59,7 @@ const ADVANCED_STORAGE_KEY = 'pim.workflow.definitions.advanced';
  * live objects the moment it saves.
  */
 export function DefinitionEditorPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const editing = id !== undefined;
@@ -115,10 +115,10 @@ export function DefinitionEditorPage() {
           return;
         }
         setEnabled(found.enabled);
-        setDraft(draftFromResource(found));
+        setDraft(draftFromResource(found, i18n.language));
       })
       .finally(() => setLoading(false));
-  }, [editing, id, navigate, t]);
+  }, [editing, id, navigate, t, i18n.language]);
 
   const fieldError = useCallback((field: string) => errors[field], [errors]);
 

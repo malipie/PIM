@@ -85,7 +85,7 @@ describe('draftFromResource -> draftToPayload roundtrip', () => {
       updated_at: '2026-07-11T00:00:00+00:00',
     };
 
-    const payload = draftToPayload(draftFromResource(resource));
+    const payload = draftToPayload(draftFromResource(resource, 'pl'));
     expect(payload.object_type_id).toBe('ot-1');
     expect(payload.places.map((place) => place.name)).toEqual([
       'draft',
@@ -183,7 +183,7 @@ describe('reviewer round-trip (#3001)', () => {
       updated_at: '2026-08-25T10:00:00+00:00',
     };
 
-    const draft = draftFromResource(resource);
+    const draft = draftFromResource(resource, 'pl');
     draft.name = 'Przepływ produktów (v2)';
 
     expect(draftToPayload(draft).reviewer).toEqual({

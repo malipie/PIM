@@ -5,6 +5,7 @@ import {
   isCanonicalTransition,
   permissionLabel,
   slugify,
+  transitionLabel,
   transitionNameFor,
   uniqueSlug,
 } from '../flow-vocabulary';
@@ -97,5 +98,21 @@ describe('permissionLabel', () => {
     expect(isAdvancedPermission('tenant.delete')).toBe(true);
     expect(isAdvancedPermission('products.edit')).toBe(false);
     expect(isAdvancedPermission('')).toBe(false);
+  });
+});
+
+describe('transitionLabel (#3013)', () => {
+  // The regression this guards: templates and reloaded definitions used a
+  // humanised machine name, so a Polish screen greeted the operator with
+  // "Submit for review" — precisely the vocabulary #3002 removed.
+  it('gives canonical steps their real wording', () => {
+    expect(transitionLabel('submit_for_review', 'pl')).toBe('Zgłoś do przeglądu');
+    expect(transitionLabel('approve', 'pl')).toBe('Zatwierdź');
+    expect(transitionLabel('unpublish', 'pl')).toBe('Cofnij publikację');
+    expect(transitionLabel('approve', 'en')).toBe('Approve');
+  });
+
+  it('humanises anything the engine does not know', () => {
+    expect(transitionLabel('przekaz_do_publikacji', 'pl')).toBe('Przekaz do publikacji');
   });
 });

@@ -5,7 +5,7 @@ import type {
   WorkflowDefinitionResource,
 } from '@/lib/workflow/definitions-api';
 
-import { humanizeName } from './flow-vocabulary';
+import { transitionLabel } from './flow-vocabulary';
 
 /**
  * WFL-P5-03 (#2433) — pure editor-state <-> API-payload mapping for the
@@ -109,7 +109,15 @@ export function emptyDraft(): DefinitionDraft {
   };
 }
 
-export function draftFromResource(resource: WorkflowDefinitionResource): DefinitionDraft {
+/**
+ * #3013 — `lang` drives the action labels: the API stores no label for a
+ * transition, so a canonical one must come back as "Zatwierdź", not as a
+ * humanised `approve`.
+ */
+export function draftFromResource(
+  resource: WorkflowDefinitionResource,
+  lang: string,
+): DefinitionDraft {
   return {
     name: resource.name,
     objectTypeId: resource.object_type_id ?? '',
@@ -122,7 +130,7 @@ export function draftFromResource(resource: WorkflowDefinitionResource): Definit
     })),
     transitions: resource.transitions.map((transition) => ({
       name: transition.name,
-      label: humanizeName(transition.name),
+      label: transitionLabel(transition.name, lang),
       nameLocked: true,
       from: Array.isArray(transition.from) ? transition.from : [transition.from],
       to: transition.to,

@@ -10,7 +10,7 @@ describe('starter templates', () => {
     (id) => {
       const template = templateById(id);
       if (template === undefined) throw new Error(`missing template ${id}`);
-      const draft = template.build();
+      const draft = template.build('pl');
       draft.name = 'Test';
 
       const findings = analyseFlow(draft);
@@ -20,7 +20,7 @@ describe('starter templates', () => {
 
   it('starts every flow at draft and reaches published', () => {
     for (const template of FLOW_TEMPLATES) {
-      const draft = template.build();
+      const draft = template.build('pl');
       const names = draft.places.map((place) => place.name);
       expect(names).toContain('draft');
       expect(names).toContain('published');
@@ -33,7 +33,7 @@ describe('starter templates', () => {
   it('keeps built-in steps on canonical names', () => {
     for (const template of FLOW_TEMPLATES) {
       const custom = template
-        .build()
+        .build('pl')
         .transitions.filter((transition) => !isCanonicalTransition(transition.name));
 
       if (template.id === 'approval_then_publish') {
@@ -48,7 +48,7 @@ describe('starter templates', () => {
 
   it('gates every action on a permission', () => {
     for (const template of FLOW_TEMPLATES) {
-      for (const transition of template.build().transitions) {
+      for (const transition of template.build('pl').transitions) {
         expect(transition.permission).not.toBe('');
       }
     }
