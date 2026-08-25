@@ -52,6 +52,10 @@ test('definition builder: custom place shows up on the product without a deploy'
     ).toEqual([]);
 
     await page.getByTestId('definition-create').click();
+    // #3004 — a new flow starts from the template chooser; this spec builds
+    // its own shape, so it takes the blank path.
+    await expect(page.getByTestId('definition-template-picker')).toBeVisible();
+    await page.getByTestId('definition-template-blank').click();
     await expect(page.getByTestId('workflow-definition-editor')).toBeVisible();
 
     await page.getByTestId('definition-name').fill(definitionName);
