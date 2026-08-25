@@ -1,120 +1,87 @@
 import { ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * WFL redesign (#2515) — read-only visualization of the built-in
- * editorial machine (ADR-0029). Still a STATIC picture: #3003 rewires it
- * to draw the definition currently in the editor, which is why it moved
- * here in #3000 rather than being deleted with the settings page.
- */
-interface Stage {
-  place: string;
-  transition?: string;
-  captionKey: string;
-  captionDefault: string;
+import type { PlaceDraft, TransitionDraft } from './definition-form';
+
+interface StateDiagramProps {
+  places: PlaceDraft[];
+  transitions: TransitionDraft[];
 }
 
-const STAGES: Stage[] = [
-  {
-    place: 'draft',
-    captionKey: 'workflow.settings.diagram.draft',
-    captionDefault: 'Wprowadzający wypełnia i zgłasza',
-  },
-  {
-    place: 'review',
-    transition: 'submit_for_review',
-    captionKey: 'workflow.settings.diagram.review',
-    captionDefault: 'Akceptant zatwierdza / odrzuca',
-  },
-  {
-    place: 'published',
-    transition: 'approve',
-    captionKey: 'workflow.settings.diagram.published',
-    captionDefault: 'Widoczny w kanałach sprzedaży',
-  },
-  {
-    place: 'archived',
-    transition: 'archive',
-    captionKey: 'workflow.settings.diagram.archived',
-    captionDefault: 'Wycofany z obiegu',
-  },
-];
-
-const PLACE_TONE: Record<string, string> = {
-  draft: 'bg-zinc-100 text-zinc-600',
-  review: 'bg-amber-100 text-amber-700',
-  published: 'bg-emerald-100 text-emerald-700',
-  archived: 'bg-zinc-100 text-zinc-400',
-};
-
-export function StateDiagram() {
+/**
+ * WFL redesign (#2515) — picture of the editorial machine (ADR-0029).
+ *
+ * #3003 made it read the definition being edited. Until then it drew a
+ * hardcoded four-state chain, which told the truth only for the built-in
+ * flow and quietly lied about every custom one — the opposite of what a
+ * preview is for.
+ *
+ * Deliberately not a graph canvas: pills and arrows, one row per action.
+ * That stays legible for the handful of transitions a real flow has and
+ * needs no layout engine.
+ */
+export function StateDiagram({ places, transitions }: StateDiagramProps) {
   const { t } = useTranslation();
 
+  const named = places.filter((place) => place.name.trim() !== '');
+  const labelFor = (name: string): string => {
+    const place = named.find((candidate) => candidate.name === name);
+    if (place === undefined) return name;
+    return place.labelPl.trim() === '' ? place.name : place.labelPl.trim();
+  };
+  const colorFor = (name: string): string =>
+    named.find((candidate) => candidate.name === name)?.color ?? '#71717a';
+
+  const drawable = transitions.filter(
+    (transition) => transition.to !== '' && transition.from.length > 0,
+  );
+
   return (
-    <section
-      className="rounded-2xl border border-zinc-200 bg-white p-5"
-      data-testid="workflow-state-diagram"
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-[15px] font-semibold text-zinc-900">
-            {t('workflow.settings.diagram.title', { defaultValue: 'Przepływ stanów' })}
-          </h3>
-          <p className="text-[12px] text-zinc-500">
-            {t('workflow.settings.diagram.subtitle', {
-              defaultValue: 'Ścieżka wpisu od szkicu do publikacji.',
-            })}
-          </p>
-        </div>
-        <span className="text-[11px] text-zinc-400">
-          {t('workflow.settings.diagram.meta', { defaultValue: '7 przejść · maszyna stanów' })}
-        </span>
-      </div>
-
-      <ol className="mt-4 flex flex-wrap items-start gap-1">
-        {STAGES.map((stage, index) => (
-          <li key={stage.place} className="flex items-start gap-1">
-            {index > 0 && stage.transition ? (
-              <div className="flex flex-col items-center px-1 pt-2 text-center">
-                <span className="text-[10px] font-medium text-zinc-500">
-                  {t(`workflow.transition.${stage.transition}`, { defaultValue: stage.transition })}
-                </span>
-                <ArrowRight className="mt-0.5 size-4 text-zinc-300" aria-hidden="true" />
-              </div>
-            ) : null}
-            <div className="flex w-36 flex-col items-center text-center">
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium ${PLACE_TONE[stage.place] ?? 'bg-zinc-100 text-zinc-600'}`}
-              >
-                <span className="size-1.5 rounded-full bg-current opacity-70" aria-hidden="true" />
-                {t(`workflow.place.${stage.place}`, { defaultValue: stage.place })}
-              </span>
-              <span className="mt-1.5 text-[11px] leading-tight text-zinc-500">
-                {t(stage.captionKey, { defaultValue: stage.captionDefault })}
-              </span>
-            </div>
-          </li>
+    <div className="space-y-3 overflow-x-auto" data-testid="workflow-state-diagram">
+      <div className="flex flex-wrap gap-1.5">
+        {named.map((place) => (
+          <Pill key={place.name} label={labelFor(place.name)} color={place.color} />
         ))}
-      </ol>
-
-      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 border-t border-zinc-100 pt-3 text-[11px] text-zinc-500">
-        <span>
-          <span className="font-medium text-zinc-700">
-            {t('workflow.transition.reject', { defaultValue: 'Odrzuć' })}
-          </span>{' '}
-          {t('workflow.settings.diagram.reject_note', {
-            defaultValue: '— wraca do Szkic, zadanie „Poprawka" idzie do autora',
-          })}
-        </span>
-        <span>
-          <span className="font-medium text-zinc-700">
-            {t('workflow.transition.unpublish', { defaultValue: 'Cofnij publikację' })}
-          </span>{' '}
-          {t('workflow.settings.diagram.unpublish_note', {
-            defaultValue: '— z Opublikowany do Szkic',
-          })}
-        </span>
       </div>
-    </section>
+
+      {drawable.length === 0 ? (
+        <p className="text-[12px] text-zinc-500">
+          {t('workflow.definitions.preview.no_transitions', {
+            defaultValue: 'Dodaj pierwszą akcję, żeby zobaczyć ścieżkę.',
+          })}
+        </p>
+      ) : (
+        <ul className="space-y-1.5">
+          {drawable.map((transition, index) => (
+            <li
+              // biome-ignore lint/suspicious/noArrayIndexKey: rows mirror positional editor slots
+              key={index}
+              className="flex flex-wrap items-center gap-1.5 text-[11.5px]"
+            >
+              {transition.from.map((from) => (
+                <Pill key={from} label={labelFor(from)} color={colorFor(from)} />
+              ))}
+              <span className="inline-flex items-center gap-1 text-zinc-400">
+                <ArrowRight className="size-3" aria-hidden="true" />
+                <span className="text-zinc-500">
+                  {transition.label.trim() === '' ? transition.name : transition.label}
+                </span>
+                <ArrowRight className="size-3" aria-hidden="true" />
+              </span>
+              <Pill label={labelFor(transition.to)} color={colorFor(transition.to)} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function Pill({ label, color }: { label: string; color: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-0.5 text-[11.5px] font-medium text-zinc-700">
+      <span className="size-2 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
+      {label}
+    </span>
   );
 }
