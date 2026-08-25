@@ -85,7 +85,10 @@ test('flow editor: pick an approver, save, then activate the asset flow', async 
     await expect(page.getByTestId('definition-reviewer')).toContainText(/Approver/i);
 
     // Activation is a switch, confirmed because it governs live objects.
-    await page.getByTestId('definition-enabled-toggle').check();
+    // `.click()`, not `.check()`: the box stays unchecked until the dialog
+    // is confirmed, and Playwright's check() fails when the state does not
+    // flip on click — which is exactly the behaviour we want here.
+    await page.getByTestId('definition-enabled-toggle').click();
     await page.getByTestId('definition-confirm-save').click();
     await expect(page.getByTestId('definition-enabled-toggle')).toBeChecked();
   } finally {
