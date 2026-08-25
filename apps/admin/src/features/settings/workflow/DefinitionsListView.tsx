@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { GitBranch, Pencil, Plus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +14,7 @@ import {
   setDefinitionEnabled,
   type WorkflowDefinitionResource,
 } from '@/lib/workflow/definitions-api';
+import { fetchApproverDirectory } from '@/lib/workflow/directory-api';
 
 /**
  * WFL-P5-03 (#2433) — Settings → Workflow: the tenant's custom editorial
@@ -26,6 +28,33 @@ export function DefinitionsListView() {
   const [definitions, setDefinitions] = useState<WorkflowDefinitionResource[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // #3004 — the row answers "who approves here", which is the question
+  // that used to force a trip into the other screen.
+  const directoryQuery = useQuery({
+    queryKey: ['workflow-definitions', 'approver-options'],
+    queryFn: fetchApproverDirectory,
+  });
+
+  const reviewerLabel = (definition: WorkflowDefinitionResource): string => {
+    const reviewer = definition.reviewer;
+    if (reviewer === null) {
+      return t('settings.workflow.reviewer_default', { defaultValue: 'Akceptant: domyślna rola' });
+    }
+    const directory = directoryQuery.data;
+    if ('role_code' in reviewer) {
+      const role = directory?.roles.find((candidate) => candidate.code === reviewer.role_code);
+      return t('settings.workflow.reviewer_role', {
+        defaultValue: 'Akceptant: {{name}}',
+        name: role?.name ?? reviewer.role_code,
+      });
+    }
+    const user = directory?.users.find((candidate) => candidate.id === reviewer.user_id);
+    return t('settings.workflow.reviewer_user', {
+      defaultValue: 'Akceptant: {{name}}',
+      name: user?.display_name ?? user?.email ?? reviewer.user_id,
+    });
+  };
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -79,7 +108,7 @@ export function DefinitionsListView() {
           className="bg-cta text-cta-foreground hover:bg-accent-hover"
         >
           <Plus className="mr-1 size-4" />
-          {t('settings.workflow.create_cta', { defaultValue: 'Nowa definicja' })}
+          {t('settings.workflow.create_cta', { defaultValue: 'Nowy przepływ' })}
         </Button>
       </header>
 
@@ -89,7 +118,7 @@ export function DefinitionsListView() {
           title={t('settings.workflow.empty_title', { defaultValue: 'Brak definicji' })}
           description={t('settings.workflow.empty_body', {
             defaultValue:
-              'Dopóki nie włączysz własnej definicji, obiekty przechodzą przez wbudowany proces (szkic → przegląd → publikacja).',
+              'Dopóki nie włączysz własnego przepływu, obiekty idą wbudowaną ścieżką: szkic → przegląd → publikacja. Zacznij od gotowego szablonu.',
           })}
         />
       ) : (
@@ -124,10 +153,12 @@ export function DefinitionsListView() {
                       })}
                   {' · '}
                   {t('settings.workflow.shape_summary', {
-                    defaultValue: '{{places}} stanów · {{transitions}} przejść',
+                    defaultValue: '{{places}} etapów · {{transitions}} akcji',
                     places: definition.places.length,
                     transitions: definition.transitions.length,
                   })}
+                  {' · '}
+                  {reviewerLabel(definition)}
                 </p>
               </div>
               <Button
