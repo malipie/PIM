@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { instanceUrl, subdomainShapeError, suggestSubdomain } from './subdomain';
+import {
+  instanceCodeShapeError,
+  instanceUrl,
+  subdomainShapeError,
+  suggestSubdomain,
+} from './subdomain';
 
 describe('kształt subdomeny', () => {
   it('przyjmuje poprawne etykiety', () => {
@@ -24,8 +29,18 @@ describe('kształt subdomeny', () => {
   });
 });
 
+describe('kod instancji', () => {
+  it('używa kontraktu subdomeny wymaganego przez provisioner', () => {
+    expect(instanceCodeShapeError('demo-na-spotkanie')).toBeNull();
+    expect(instanceCodeShapeError('demo_na_spotkanie')).toBe('charset');
+    expect(instanceCodeShapeError('Demo')).toBe('charset');
+    expect(instanceCodeShapeError(' demo ')).toBe('charset');
+    expect(instanceCodeShapeError('ab')).toBe('too_short');
+  });
+});
+
 describe('podpowiedź z kodu tenanta', () => {
-  it('zamienia podkreślenia na myślniki, bo kod je dopuszcza a subdomena nie', () => {
+  it('zamienia podkreślenia na myślniki podczas wpisywania', () => {
     expect(suggestSubdomain('acme_corp')).toBe('acme-corp');
   });
 

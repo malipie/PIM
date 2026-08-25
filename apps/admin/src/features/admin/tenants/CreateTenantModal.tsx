@@ -16,7 +16,12 @@ import { toast } from '@/components/ui/toast';
 import { jsonFetch } from '@/lib/http';
 
 import { ProvisioningProgress } from './ProvisioningProgress';
-import { instanceUrl, subdomainShapeError, suggestSubdomain } from './subdomain';
+import {
+  instanceCodeShapeError,
+  instanceUrl,
+  subdomainShapeError,
+  suggestSubdomain,
+} from './subdomain';
 import type { AdminTenantSummary } from './types';
 
 /**
@@ -45,7 +50,7 @@ interface Props {
  * set their password without operator handoff.
  *
  * Form scope per operator spec:
- *   - code (slug, validated server-side against /[a-z0-9_-]{2,64}/)
+ *   - code (slug instancji: 3–32 znaki, małe litery, cyfry i myślniki)
  *   - name
  *   - owner_email (manual entry — no autocomplete from existing users
  *     because new tenants don't share user space)
@@ -85,6 +90,10 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
   const effectiveSubdomain = subdomainTouched
     ? subdomain.trim().toLowerCase()
     : suggestSubdomain(code);
+  const codeShapeError = code === '' ? null : instanceCodeShapeError(code);
+  const codeMessage = codeShapeError
+    ? t(`admin.tenants.create.code_error_${codeShapeError}`)
+    : null;
   const shapeError = effectiveSubdomain === '' ? null : subdomainShapeError(effectiveSubdomain);
   const subdomainMessage = shapeError
     ? t(`admin.tenants.create.subdomain_error_${shapeError}`)
@@ -93,6 +102,11 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (submitting) return;
+    if (codeShapeError !== null || code === '') {
+      toast.error(codeMessage ?? t('admin.tenants.create.code_error_empty'));
+
+      return;
+    }
     if (shapeError !== null || effectiveSubdomain === '') {
       toast.error(subdomainMessage ?? t('admin.tenants.create.subdomain_error_empty'));
 
@@ -124,6 +138,8 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
       const body = (error as { body?: ApiProblem })?.body;
       if (status === 409 && body?.code === 'duplicate_code') {
         toast.error(body?.detail ?? t('admin.tenants.create.error_duplicate'));
+      } else if (status === 422 && body?.code === 'invalid_code_for_instance') {
+        toast.error(body?.detail ?? t('admin.tenants.create.error_invalid_code_for_instance'));
       } else if (status === 422 && body?.code === 'invalid_subdomain') {
         toast.error(body?.detail ?? t('admin.tenants.create.subdomain_error_charset'));
       } else if (status === 409 && body?.code === 'duplicate_subdomain') {
@@ -220,19 +236,23 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
                   required
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  placeholder="acme_corp"
-                  // Myślnik MUSI być zaescape'owany. Przeglądarki kompilują
-                  // `pattern` z flagą `v`, a w niej `[a-z0-9_-]` jest błędem
-                  // składni — atrybut był po cichu martwy i walidacja HTML
-                  // nie działała wcale (znalezione E2E w #2909).
-                  pattern="[a-z0-9_\-]{2,64}"
-                  maxLength={64}
+                  placeholder="acme-corp"
+                  pattern="[a-z0-9][a-z0-9\-]{1,30}[a-z0-9]"
+                  minLength={3}
+                  maxLength={32}
                   className="font-mono"
                   autoComplete="off"
+                  aria-invalid={codeMessage !== null}
+                  aria-describedby="tenant-code-hint"
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p id="tenant-code-hint" className="text-[11px] text-muted-foreground">
                   {t('admin.tenants.create.field_code_hint')}
                 </p>
+                {codeMessage !== null && (
+                  <p className="text-[11px] text-destructive" role="alert">
+                    {codeMessage}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -329,7 +349,8 @@ export function CreateTenantModal({ open, onOpenChange, onSuccess }: Props) {
                 type="submit"
                 disabled={
                   submitting ||
-                  code.trim().length < 2 ||
+                  codeShapeError !== null ||
+                  code.length === 0 ||
                   name.trim().length === 0 ||
                   ownerEmail.trim().length === 0
                 }

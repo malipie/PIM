@@ -5,12 +5,11 @@
  */
 
 // ── KONFIGURACJA ──────────────────────────────────────────────────────────
-// Zgłoszenia idą PROSTO na skrzynkę odbiorczą operatora. Domena harmonpim.pl
-// nie ma (jeszcze) rekordu MX, więc adres kontakt@harmonpim.pl nie istnieje i
-// wysyłka na niego odbiłaby się. Wysyłanie Z domeny nie wymaga skrzynki W tej
-// domenie — autoryzuje je podpis DKIM Resendu. Gdy pojawi się skrzynka lub
-// przekierowanie na harmonpim.pl, wystarczy podmienić tę jedną linię.
-$ADRES_DOCELOWY = "marcin.lipiec@gmail.com";
+// Zgłoszenia trafiają na firmową skrzynkę w Hostingerze — rekordy MX apexu
+// wskazują mx1/mx2.hostinger.com. Kanał NADAWCZY (Resend) jest niezależny od
+// odbiorczego i siedzi na subdomenie `send`, więc ewentualna zmiana dostawcy
+// skrzynki nie wymaga tu żadnej korekty poza tą jedną linią.
+$ADRES_DOCELOWY = "kontakt@harmonpim.pl";
 // Nadawca techniczny — bez myślnika, żeby zgadzał się z MAILER_FROM aplikacji
 // PIM. Jeden adres nadawcy = jedna reputacja do zbudowania, nie dwie.
 $ADRES_NADAWCY  = "noreply@harmonpim.pl";

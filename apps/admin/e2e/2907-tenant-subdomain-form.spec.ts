@@ -32,17 +32,25 @@ test('subdomena: podpowiedź z kodu, podgląd adresu i odmowa dla złego kształ
   const subdomain = page.locator('#tenant-subdomain');
   await expect(subdomain).toBeVisible();
 
-  // Podkreślenie jest dozwolone w kodzie, ale nie w subdomenie — podpowiedź
-  // ma je zamienić, zamiast zmuszać operatora do przepisywania.
+  // Kod jest też nazwą projektu Compose, więc podkreślenie musi zostać
+  // odrzucone jeszcze w formularzu, zanim żądanie trafi do provisionera.
   await code.fill('acme_corp');
   await expect(subdomain).toHaveValue('acme-corp');
+  await expect(
+    page.getByText('Kod tenanta może zawierać tylko małe litery, cyfry i myślniki.'),
+  ).toBeVisible();
+
+  await code.fill('acme-corp');
+  await expect(
+    page.getByText('Kod tenanta może zawierać tylko małe litery, cyfry i myślniki.'),
+  ).toHaveCount(0);
 
   // Pełny adres pod polem: sama subdomena bez kontekstu bywa myląca.
   await expect(page.getByText('acme-corp.app.harmonpim.pl')).toBeVisible();
 
   // Nadpisanie ręczne przestaje śledzić kod.
   await subdomain.fill('inna-nazwa');
-  await code.fill('acme_corp_2');
+  await code.fill('acme-corp-2');
   await expect(subdomain).toHaveValue('inna-nazwa');
 
   // Zły kształt: myślnik na końcu. Komunikat ma mówić, CO poprawić.
