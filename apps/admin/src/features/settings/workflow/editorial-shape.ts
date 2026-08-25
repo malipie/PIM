@@ -1,12 +1,15 @@
 import type { DefinitionPlace, DefinitionTransition } from '@/lib/workflow/definitions-api';
 
 /**
- * WFL redesign (#2515) — the "Ustawienia przepływu" page configures the
- * built-in editorial machine (ADR-0029) per ObjectType: the operator
- * picks the approver and the completeness gate, the flow itself is
- * fixed. This helper mirrors `config/packages/workflow.yaml` so a saved
- * definition drives the exact same machine — only reviewer + gate +
- * (locked) reject-comment vary.
+ * WFL redesign (#2515) — the canonical shape of the built-in editorial
+ * machine (ADR-0029), mirroring `config/packages/workflow.yaml` so a
+ * saved definition drives the exact same machine.
+ *
+ * #3000 — its page ("Ustawienia przepływu") is gone; the shape stays
+ * because it is the source of the "Jedna akceptacja" starter template
+ * (#3004). Keeping the canonical transition NAMES matters: task
+ * automation and notifications are wired to them, so a template that
+ * renamed them would silently ship a flow without tasks.
  */
 
 export const EDITORIAL_PLACES: readonly string[] = ['draft', 'review', 'published', 'archived'];

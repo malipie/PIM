@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
 /**
- * WFL redesign (#2515) — the "two roles, two settings" primer at the top
- * of the flow-settings page. Answers the operator's recurring confusion:
- * WHO may approve is an RBAC permission (Settings → Roles), WHOSE inbox a
- * task lands in is configured here.
+ * WFL redesign (#2515) — the "two roles, two settings" primer. Answers
+ * the operator's recurring confusion: WHO may approve is an RBAC
+ * permission (Settings → Roles), WHOSE inbox a task lands in is
+ * configured here. Moved next to the definition editor in #3000, which
+ * merged the two flow screens into one.
  */
 export function RoleLegend() {
   const { t } = useTranslation();
