@@ -27,12 +27,16 @@ use Doctrine\Migrations\AbstractMigration;
  *    access and the 52 MB external sort.
  *
  * 2. Per-table autovacuum thresholds. `object_values` grows by ~1M rows per
- *    catalogue import, and the cluster defaults (20% dead / 10% modified)
- *    translate to a quarter of a million dead tuples before autovacuum wakes
- *    up. On the production tenant the table had never been vacuumed at all:
- *    the visibility map was empty and an Index Only Scan degraded into
- *    1 347 200 heap fetches, which is what made the counters slow enough to
- *    saturate the FrankenPHP worker pool.
+ *    catalogue import, and the cluster defaults (20% dead / 20% inserted /
+ *    10% modified) translate to roughly a quarter of a million changes before
+ *    autovacuum wakes up on the current production table. Updates and deletes
+ *    use `autovacuum_vacuum_scale_factor`, while insert-only growth has its own
+ *    `autovacuum_vacuum_insert_scale_factor`; both must be tightened or a new
+ *    catalogue can invalidate the visibility map on hundreds of thousands of
+ *    rows without triggering a vacuum. On the production tenant the table had
+ *    never been vacuumed at all: the visibility map was empty and an Index Only
+ *    Scan degraded into 1 347 200 heap fetches, which is what made the counters
+ *    slow enough to saturate the FrankenPHP worker pool.
  *
  * A plain (transactional) CREATE INDEX is used rather than CONCURRENTLY,
  * following Version20260617210000: CONCURRENTLY needs isTransactional(): false
@@ -65,6 +69,7 @@ final class Version20260826111500 extends AbstractMigration
         $this->addSql(
             'ALTER TABLE object_values SET ('
             .' autovacuum_vacuum_scale_factor = 0.02,'
+            .' autovacuum_vacuum_insert_scale_factor = 0.02,'
             .' autovacuum_analyze_scale_factor = 0.01'
             .' )'
         );
@@ -77,6 +82,7 @@ final class Version20260826111500 extends AbstractMigration
         $this->addSql(
             'ALTER TABLE object_values RESET ('
             .' autovacuum_vacuum_scale_factor,'
+            .' autovacuum_vacuum_insert_scale_factor,'
             .' autovacuum_analyze_scale_factor'
             .' )'
         );

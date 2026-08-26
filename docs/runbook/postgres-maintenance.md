@@ -78,9 +78,12 @@ Dwie rzeczy nałożyły się na siebie:
    liczników, więc stracił podstawę do decyzji. Statystyki planera
    (`pg_class.reltuples`) pozostały poprawne, dlatego plany zapytań nie wyglądały
    podejrzanie i problem nie rzucał się w oczy.
-2. **Domyślne progi są za luźne dla tej tabeli.** `autovacuum_vacuum_scale_factor
-   = 0.2` przy 1,3 mln wierszy oznacza ćwierć miliona martwych krotek zanim cokolwiek
-   ruszy. Migracja z #3034 obniża to per tabela do 0.02 / 0.01.
+2. **Domyślne progi są za luźne dla tej tabeli.** Zarówno
+   `autovacuum_vacuum_scale_factor`, jak i osobny próg dla wzrostu insert-only
+   `autovacuum_vacuum_insert_scale_factor` mają domyślnie wartość `0.2`.
+   Przy 1,3 mln wierszy oznacza to około ćwierć miliona zmian albo nowych
+   wierszy, zanim autovacuum ruszy. Migracja z #3034 obniża oba progi vacuum
+   per tabela do `0.02`, a próg analyze do `0.01`.
 
 Po zabiegu i po wdrożeniu migracji autovacuum utrzymuje tabelę sam — ten runbook
 jest jednorazowy per instancja, chyba że baza znów padnie nieczysto.
