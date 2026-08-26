@@ -77,11 +77,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generated OpenAPI types drift
+        run: |
+          pnpm --filter @pim/shared-types generate
+          git diff --exit-code -- packages/shared-types/src/api.d.ts
+
       - name: Biome check
         run: pnpm --filter @pim/admin lint
 
       - name: TypeScript typecheck
-        run: pnpm --filter @pim/admin typecheck
+        run: |
+          pnpm --filter @pim/shared-types typecheck
+          pnpm --filter @pim/admin typecheck
 
       - name: Vitest
         run: pnpm --filter @pim/admin test

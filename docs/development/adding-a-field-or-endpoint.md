@@ -259,8 +259,8 @@ docker compose exec -T api php bin/console doctrine:migrations:migrate --no-inte
 
 ### A.5 — Regeneracja shared-types
 
-Po zmianie kształtu odpowiedzi **zawsze** zregeneruj kontrakt TS (stack musi
-działać — patrz [onboarding](#regeneracja-shared-types-osobny-krok)):
+Po zmianie kształtu odpowiedzi **zawsze** najpierw odśwież wersjonowany snapshot
+OpenAPI, a potem zregeneruj z niego kontrakt TS. Sam codegen działa offline:
 
 ```bash
 pnpm --filter @pim/shared-types generate
@@ -601,7 +601,7 @@ Dwie warstwy, zależnie od typu endpointu:
 - [ ] Command + Handler `#[AsMessageHandler]`: walidacja biznesowa + mutacja.
 - [ ] Serializer XML: pole w grupie `admin:read` (i innych wg potrzeby).
 - [ ] Nowy kontekst? trzy ścieżki w `doctrine.yaml` + `api_platform.yaml` + `framework.yaml`.
-- [ ] shared-types: `pnpm --filter @pim/shared-types generate` (stack musi działać).
+- [ ] shared-types: `pnpm --filter @pim/shared-types generate` ze snapshotu `docs/api-spec/v0.json`.
 - [ ] Admin UI: konsumpcja przez data provider + `jsonFetch`.
 - [ ] ApiTestCase: 201/409/422/200/204/401 wg wzorca `ChannelsCrudApiTest`.
 - [ ] Bramki: `composer phpstan` + `cs-check` + `deptrac` + PHPUnit; `pnpm typecheck` + `build` + Biome.

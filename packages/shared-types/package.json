@@ -10,11 +10,11 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "generate": "NODE_TLS_REJECT_UNAUTHORIZED=0 openapi-typescript https://pim.localhost/api/docs.jsonopenapi -o src/api.d.ts",
+    "generate": "openapi-typescript ../../docs/api-spec/v0.json -o src/api.d.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "openapi-typescript": "^7.6.0",
-    "typescript": "~7.0.2"
+    "typescript": "~5.9.3"
   }
 }
