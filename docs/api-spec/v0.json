@@ -17638,6 +17638,84 @@
                 "x-cortex-permission": false
             }
         },
+        "/api/modeling/usage/attribute-groups": {
+            "get": {
+                "operationId": "api_modeling_usage_attribute_groups_get",
+                "tags": [
+                    "modeling"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api modeling usage attribute groups",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "attribute_group.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
+            }
+        },
+        "/api/modeling/usage/attributes": {
+            "get": {
+                "operationId": "api_modeling_usage_attributes_get",
+                "tags": [
+                    "modeling"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api modeling usage attributes",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "attribute.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
+            }
+        },
+        "/api/modeling/usage/object-types": {
+            "get": {
+                "operationId": "api_modeling_usage_object_types_get",
+                "tags": [
+                    "modeling"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    }
+                },
+                "summary": "Api modeling usage object types",
+                "description": "Custom controller route.",
+                "parameters": [],
+                "security": [
+                    {
+                        "JWT": []
+                    }
+                ],
+                "x-pim-source": "custom-route",
+                "x-cortex-permission": "object_type.read | modeling.view | products.view | categories.view | multimedia.view | products.add | categories.add_edit | multimedia.add_edit_own | multimedia.add_edit_any | object.add"
+            }
+        },
         "/api/notifications": {
             "get": {
                 "operationId": "api_notifications_get",

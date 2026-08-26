@@ -18,7 +18,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useOne } from '@refinedev/core';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Eye, GripVertical, Lock, Plus, Save, Trash2, X } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
 
@@ -37,6 +37,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { resolveLabel } from '@/features/catalog/attributes/list';
 import { HttpError, jsonFetch } from '@/lib/http';
 import { isLegacyOptionalSystemGroupCode } from '@/lib/legacy-attribute-groups';
+import { useModelingUsage } from '@/lib/modeling-usage';
 import { useCurrentWorkspace } from '@/lib/use-current-workspace';
 import { cn } from '@/lib/utils';
 
@@ -66,13 +67,6 @@ interface MemberRow {
 interface MembersResponse {
   attributeGroupId: string;
   members: MemberRow[];
-}
-
-interface UsageResponse {
-  totalObjects?: number;
-  attributeGroups?: Array<{ id: string }>;
-  objectTypes?: Array<{ id: string }>;
-  categories?: Array<{ id: string }>;
 }
 
 /**
@@ -169,11 +163,16 @@ function Editor({
     staleTime: 30_000,
   });
 
-  const { data: usage } = useQuery<UsageResponse>({
-    queryKey: ['attribute_groups', group.id, 'usage'],
-    queryFn: () => jsonFetch<UsageResponse>(`/api/attribute_groups/${group.id}/usage`),
-    staleTime: 60_000,
-  });
+  // #3034 — the local `UsageResponse` interface declared here used to name
+  // fields the endpoint never returns (`objectTypes` / `categories` /
+  // `totalObjects` instead of `directlyAttachedTo.*` / `affectedInstanceCount`),
+  // so all three "Where used" tiles below rendered a hard 0. Types now come
+  // from the shared module that mirrors the API.
+  const { data: usageByGroup } = useModelingUsage(
+    'attribute-groups',
+    useMemo(() => [group.id], [group.id]),
+  );
+  const usage = usageByGroup[group.id];
 
   const sortedMembers = [...members].sort((a, b) => a.position - b.position);
   const existingCodes = new Set(sortedMembers.map((m) => m.attribute.code));
@@ -249,9 +248,9 @@ function Editor({
   const reload = useCallback(async () => {
     await Promise.all([
       refetchMembers(),
-      queryClient.invalidateQueries({ queryKey: ['attribute_groups', group.id, 'usage'] }),
+      queryClient.invalidateQueries({ queryKey: ['modeling-usage'] }),
     ]);
-  }, [group.id, queryClient, refetchMembers]);
+  }, [queryClient, refetchMembers]);
 
   const detach = async (attributeId: string) => {
     try {
@@ -655,19 +654,19 @@ function Editor({
           </SectionTitle>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <StatBox
-              value={usage?.objectTypes?.length ?? 0}
+              value={usage?.directlyAttachedTo.objectTypes.length ?? 0}
               label={t('modeling.attributeGroups.where_used_object_types_label', {
                 defaultValue: 'ObjectTypes (globalnie)',
               })}
             />
             <StatBox
-              value={usage?.categories?.length ?? 0}
+              value={usage?.directlyAttachedTo.categories.length ?? 0}
               label={t('modeling.attributeGroups.where_used_categories_label', {
                 defaultValue: 'Categories (deklarują)',
               })}
             />
             <StatBox
-              value={(usage?.totalObjects ?? 0).toLocaleString('pl-PL')}
+              value={(usage?.affectedInstanceCount ?? 0).toLocaleString('pl-PL')}
               label={t('modeling.attributeGroups.where_used_instances_label', {
                 defaultValue: 'instancji dotkniętych',
               })}

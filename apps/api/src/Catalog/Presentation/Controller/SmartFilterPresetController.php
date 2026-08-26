@@ -12,6 +12,7 @@ use App\Shared\Application\UserIdentityAware;
 use DateTimeInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -54,6 +55,7 @@ final class SmartFilterPresetController
         private readonly TenantContext $tenantContext,
         private readonly Security $security,
         private readonly FilterDslResolver $filterDslResolver,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -367,6 +369,14 @@ final class SmartFilterPresetController
      * current tenant scope — system-shipped presets are surfaced with
      * the same count for every viewer (cheap, cache-friendly).
      *
+     * #3034 — this used to query `catalog_objects`, a table that does not
+     * exist (the table is `objects`), and to omit the `co` alias that the
+     * fragments from {@see FilterDslResolver} reference. Every call therefore
+     * raised `relation "catalog_objects" does not exist`, which the bare
+     * `catch (Throwable)` swallowed into a 0 — so in production every preset
+     * chip showed "0" and nobody could tell. The catch now logs before it
+     * degrades, so the next such breakage is visible in the logs.
+     *
      * @param list<SmartFilterPreset> $presets
      *
      * @return array<string, int>
@@ -383,27 +393,111 @@ final class SmartFilterPresetController
             return [];
         }
 
+        // Compile every DSL first. A preset targeting attributes that are not
+        // indexed compiles to null and is reported as 0 without touching SQL.
+        $fragments = [];
         $counts = [];
         foreach ($presets as $preset) {
+            $id = $preset->getId()->toRfc4122();
+            $counts[$id] = 0;
             $sql = $this->filterDslResolver->toCountSql($preset->getQuery());
-            if (null === $sql) {
-                $counts[$preset->getId()->toRfc4122()] = 0;
-                continue;
-            }
-            try {
-                // tenant-safe: explicit tenant_id filter
-                $result = $this->connection->executeQuery(
-                    'SELECT COUNT(*) FROM catalog_objects WHERE tenant_id = :tenant AND kind = :kind AND ('.$sql.')',
-                    ['tenant' => $tenantId, 'kind' => 'product'],
-                )->fetchOne();
-                $counts[$preset->getId()->toRfc4122()] = is_numeric($result) ? (int) $result : 0;
-            } catch (Throwable) {
-                // Fallback: 0 count rather than fail the whole list endpoint.
-                $counts[$preset->getId()->toRfc4122()] = 0;
+            if (null !== $sql) {
+                $fragments[$id] = $sql;
             }
         }
 
+        if ([] === $fragments) {
+            return $counts;
+        }
+
+        $batched = $this->countPresetsInOneScan($fragments, $tenantId);
+        if (null !== $batched) {
+            return array_replace($counts, $batched);
+        }
+
+        // One malformed fragment aborts the combined statement, so fall back
+        // to isolated queries rather than zeroing every preset at once.
+        foreach ($fragments as $id => $sql) {
+            $counts[$id] = $this->countOnePreset($sql, $tenantId, $id);
+        }
+
         return $counts;
+    }
+
+    /**
+     * Count every preset in ONE pass over `objects` using conditional
+     * aggregates, instead of one sequential scan per preset. On the production
+     * catalogue a single such scan costs ~570 ms, so six presets in a loop
+     * would have added ~3.4 s to the product list — trading a silent bug for
+     * a visible stall.
+     *
+     * Returns null when the combined statement fails, signalling the caller
+     * to retry preset by preset.
+     *
+     * @param array<string, string> $fragments presetId => parameter-free WHERE fragment
+     *
+     * @return array<string, int>|null
+     */
+    private function countPresetsInOneScan(array $fragments, string $tenantId): ?array
+    {
+        $selects = [];
+        $aliases = [];
+        $index = 0;
+        foreach ($fragments as $id => $sql) {
+            $alias = 'preset_count_'.$index;
+            $aliases[$alias] = $id;
+            $selects[] = \sprintf('COUNT(*) FILTER (WHERE (%s)) AS %s', $sql, $alias);
+            ++$index;
+        }
+
+        try {
+            $row = $this->connection->fetchAssociative(
+                'SELECT '.implode(', ', $selects)
+                .' FROM objects co WHERE co.tenant_id = :tenant AND co.kind = :kind',
+                ['tenant' => $tenantId, 'kind' => 'product'],
+            );
+        } catch (Throwable $error) {
+            $this->logger->warning(
+                'Batched smart-filter preset count failed; retrying preset by preset.',
+                ['exception' => $error],
+            );
+
+            return null;
+        }
+
+        if (false === $row) {
+            return null;
+        }
+
+        $out = [];
+        foreach ($aliases as $alias => $id) {
+            $value = $row[$alias] ?? null;
+            $out[$id] = is_numeric($value) ? (int) $value : 0;
+        }
+
+        return $out;
+    }
+
+    private function countOnePreset(string $sql, string $tenantId, string $presetId): int
+    {
+        try {
+            // tenant-safe: explicit tenant_id filter
+            $result = $this->connection->executeQuery(
+                'SELECT COUNT(*) FROM objects co WHERE co.tenant_id = :tenant AND co.kind = :kind AND ('.$sql.')',
+                ['tenant' => $tenantId, 'kind' => 'product'],
+            )->fetchOne();
+
+            return is_numeric($result) ? (int) $result : 0;
+        } catch (Throwable $error) {
+            // Degrade to 0 rather than failing the whole list endpoint — but
+            // say so, because a silent 0 here hid a broken query for months.
+            $this->logger->warning('Smart-filter preset count failed.', [
+                'preset_id' => $presetId,
+                'exception' => $error,
+            ]);
+
+            return 0;
+        }
     }
 
     /**

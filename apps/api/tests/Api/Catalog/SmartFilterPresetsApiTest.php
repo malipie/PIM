@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Api\Catalog;
 
 use App\Catalog\Application\BuiltInSmartFilterPresetsSeeder;
+use App\Catalog\Domain\Entity\CatalogObject;
+use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Identity\Domain\Entity\User;
 use App\Identity\Domain\Repository\RoleRepositoryInterface;
 use App\Identity\Domain\Repository\UserRepositoryInterface;
+use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
@@ -25,6 +29,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  *   - PATCH updates owner's preset, 403 on built-in, 404 on random UUID.
  *   - DELETE removes owner's preset, 403 on built-in.
  *   - Multi-tenant isolation: tenant B sees only built-ins + own user-defined.
+ *   - `?counts=1` reports real matches (#3034).
  */
 final class SmartFilterPresetsApiTest extends CatalogApiTestCase
 {
@@ -386,5 +391,47 @@ final class SmartFilterPresetsApiTest extends CatalogApiTestCase
 
         self::assertContains('red-low-completeness', $slugsB);
         self::assertNotContains('tylko-tenant-a', $slugsB);
+    }
+
+    /**
+     * #3034 — `?counts=1` used to query `catalog_objects`, a table that does
+     * not exist, and swallow the resulting error into a 0. Every preset chip
+     * in production therefore read "0". Nothing covered this path, which is
+     * why it went unnoticed; this test is that cover.
+     *
+     * `missing-images` matches any product without `main_image.asset_id`, so
+     * two bare products must be counted as two.
+     */
+    #[Test]
+    public function countsReportRealMatchesRatherThanZero(): void
+    {
+        $tenant = $this->em()->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
+        \assert($tenant instanceof Tenant);
+        self::getContainer()->get(TenantContext::class)->set($tenant);
+
+        $product = self::getContainer()->get(ObjectTypeRepositoryInterface::class)
+            ->findBuiltInByKind(ObjectKind::Product, $tenant);
+        \assert(null !== $product);
+
+        foreach (['SKU-COUNT-1', 'SKU-COUNT-2'] as $code) {
+            $this->em()->persist(new CatalogObject($product, $code));
+        }
+        $this->em()->flush();
+        self::getContainer()->get(TenantContext::class)->clear();
+
+        $body = $this->authenticatedClient()->request('GET', '/api/smart-filter-presets?counts=1')->toArray();
+        $data = $body['data'];
+        \assert(\is_array($data));
+
+        $counts = [];
+        foreach ($data as $row) {
+            \assert(\is_array($row));
+            $slug = $row['slug'] ?? null;
+            \assert(\is_string($slug));
+            $counts[$slug] = $row['count'] ?? null;
+        }
+
+        self::assertArrayHasKey('missing-images', $counts);
+        self::assertSame(2, $counts['missing-images']);
     }
 }

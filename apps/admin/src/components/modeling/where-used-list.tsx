@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { HttpError, jsonFetch } from '@/lib/http';
+import type { AttributeGroupUsage, AttributeUsage, ObjectTypeUsage } from '@/lib/modeling-usage';
 
 /**
  * UI-08.10 (#265) — `<WhereUsedList>` widget.
@@ -19,32 +20,12 @@ import { HttpError, jsonFetch } from '@/lib/http';
  * default to zero, missing arrays render as "—" so a half-finished
  * tenant (no junctions yet) still shows a clean detail panel rather
  * than `undefined`.
+ *
+ * #3034 — the payload shapes moved to `@/lib/modeling-usage`. They used to be
+ * duplicated here and at three call sites, and two of those copies had drifted
+ * from the API (silently rendering 0 forever).
  */
 type Resource = 'attributes' | 'attribute_groups' | 'object_types';
-
-interface AttributeUsage {
-  groups: { id: string; code: string; label?: Record<string, string> }[];
-  objectTypes: { id: string; code: string; kind: string }[];
-  categories: { id: string; path: string | null }[];
-  instanceCount: number;
-}
-
-interface AttributeGroupUsage {
-  directlyAttachedTo: {
-    objectTypes: { id: string; code: string; kind: string }[];
-    categories: { id: string; path: string | null; target_kind: string | null }[];
-  };
-  attributeCount: number;
-  affectedInstanceCount: number;
-}
-
-interface ObjectTypeUsage {
-  instanceCount: number;
-  attributesAttachedCount: number;
-  attributeGroupsAttachedCount: number;
-  referencedByApiProfileCount: number;
-  referencedByCategoryAttachmentCount: number;
-}
 
 type UsagePayload = AttributeUsage | AttributeGroupUsage | ObjectTypeUsage;
 

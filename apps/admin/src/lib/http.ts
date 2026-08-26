@@ -72,6 +72,15 @@ export interface JsonRequestInit {
   contentType?: string;
   accept?: string;
   query?: Record<string, string | number | undefined>;
+  /**
+   * #3034 — pass React Query's `queryFn({ signal })` through to `fetch` so
+   * leaving a page aborts its in-flight requests instead of leaving them to
+   * occupy server workers ahead of whatever the user navigated to.
+   *
+   * The signal survives the 401 → refresh → replay path: a request aborted
+   * mid-refresh must not come back as a replay nobody is waiting for.
+   */
+  signal?: AbortSignal;
 }
 
 interface InternalJsonRequestInit extends JsonRequestInit {
@@ -125,6 +134,7 @@ async function fetchInternal<T>(path: string, init: InternalJsonRequestInit): Pr
     headers,
     body,
     credentials: 'same-origin',
+    signal: init.signal,
   });
 
   if (response.status === 401 && shouldAttemptRefresh(path, init)) {
