@@ -1,7 +1,7 @@
 # GitHub `main` protection
 
-Owner: repository administrator  
-Last verified: 2026-08-26  
+Owner: repository administrator<br>
+Last verified: 2026-08-26<br>
 Source ticket: [#3016](https://github.com/malipie/PIM/issues/3016)
 
 `main` is protected through the GitHub branch-protection API. The committed
