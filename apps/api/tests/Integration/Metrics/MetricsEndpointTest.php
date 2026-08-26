@@ -48,6 +48,15 @@ final class MetricsEndpointTest extends WebTestCase
         self::assertStringContainsString('db_query_duration_seconds_bucket{le="+Inf"}', $body);
         self::assertStringContainsString('db_query_duration_seconds_sum ', $body);
         self::assertStringContainsString('db_query_duration_seconds_count ', $body);
+
+        // PostgreSQL maintenance gauges feed the autovacuum alerts. They are
+        // read from this instance's own database, so tenant labels remain the
+        // responsibility of the Prometheus scrape target.
+        self::assertStringContainsString('pim_postgres_maintenance_scrape_success 1', $body);
+        self::assertStringContainsString('pim_postgres_object_values_live_tuples ', $body);
+        self::assertStringContainsString('pim_postgres_object_values_dead_tuples ', $body);
+        self::assertStringContainsString('pim_postgres_object_values_inserts_since_vacuum ', $body);
+        self::assertStringContainsString('pim_postgres_object_values_never_vacuumed ', $body);
     }
 
     #[Test]

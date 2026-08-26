@@ -18,6 +18,8 @@ use Symfony\Component\Routing\Attribute\Route;
  *   the {@see \App\Shared\Infrastructure\Doctrine\Middleware\QueryTimingMiddleware}
  *   so ops can wire `histogram_quantile(0.95, …)` / `0.99` alerts on
  *   slow DB without re-enabling SQL logging in production.
+ * - `pim_postgres_object_values_*` gauges — autovacuum health of the hot
+ *   EAV table, read from the current tenant database's statistics view.
  *
  * Numbers reported are "for whichever worker handled THIS scrape" — fine
  * for single-worker dev. In production with multiple FrankenPHP workers
@@ -29,6 +31,7 @@ final readonly class MetricsController
     public function __construct(
         private QueryDurationHistogram $queryHistogram,
         private RbacMetricsRegistry $rbacMetrics,
+        private PostgresMaintenanceMetrics $postgresMaintenanceMetrics,
     ) {
     }
 
@@ -39,6 +42,9 @@ final readonly class MetricsController
         $resident = \memory_get_usage(true);
         $peak = \memory_get_peak_usage(true);
         $pid = \getmypid();
+        // Read Postgres first so this query is represented in the DB duration
+        // histogram rendered immediately afterwards.
+        $postgresMetrics = $this->postgresMaintenanceMetrics->render();
         $queryMetrics = $this->queryHistogram->render();
         $rbacMetrics = $this->rbacMetrics->render();
 
@@ -56,6 +62,7 @@ final readonly class MetricsController
             # TYPE db_query_duration_seconds histogram
             {$queryMetrics}
             {$rbacMetrics}
+            {$postgresMetrics}
             METRICS;
 
         return new Response($body, Response::HTTP_OK, ['content-type' => 'text/plain; version=0.0.4']);

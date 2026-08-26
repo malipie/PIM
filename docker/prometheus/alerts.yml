@@ -65,6 +65,54 @@ groups:
             and the PgBouncer admin console (port 6432) for connection
             pool saturation.
 
+  - name: pim-postgres-maintenance
+    interval: 30s
+    rules:
+      - alert: PostgresMaintenanceMetricsUnavailable
+        expr: pim_postgres_maintenance_scrape_success == 0
+        for: 5m
+        labels:
+          severity: warning
+          runbook: docs/runbook/postgres-maintenance.md
+        annotations:
+          summary: "Brak statystyk konserwacji Postgresa dla {{ $labels.tenant }}"
+          description: >-
+            API nie potrafi odczytać pg_stat_user_tables przez 5 minut.
+            Sprawdź połączenie z bazą, uprawnienia roli aplikacyjnej oraz
+            track_counts; bez tych metryk alerty autovacuum są ślepe.
+
+      - alert: ObjectValuesNeverVacuumed
+        expr: pim_postgres_object_values_never_vacuumed == 1 and pim_postgres_object_values_live_tuples > 100000
+        for: 15m
+        labels:
+          severity: warning
+          runbook: docs/runbook/postgres-maintenance.md
+        annotations:
+          summary: "Duża tabela object_values nigdy nie była vacuumowana ({{ $labels.tenant }})"
+          description: >-
+            object_values ma {{ $value }} jako flagę never_vacuumed i ponad
+            100 tys. rekordów. Uruchom jednorazowo VACUUM (ANALYZE), następnie
+            sprawdź autovacuum i track_counts według runbooka.
+
+      - alert: ObjectValuesVacuumFallingBehind
+        expr: >-
+          pim_postgres_object_values_live_tuples > 100000
+          and
+          (
+            pim_postgres_object_values_dead_tuples
+            + pim_postgres_object_values_inserts_since_vacuum
+          ) / clamp_min(pim_postgres_object_values_live_tuples, 1) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          runbook: docs/runbook/postgres-maintenance.md
+        annotations:
+          summary: "Autovacuum nie nadąża na object_values ({{ $labels.tenant }})"
+          description: >-
+            Ponad 5% tabeli stanowią martwe krotki lub inserty od ostatniego
+            vacuum przez co najmniej 15 minut. Oczekiwany próg autovacuum to
+            2%; sprawdź pg_stat_activity, blokady i logi procesu autovacuum.
+
   # ─── Dependency availability (#2222, chaos dry-run #2137) ─────────────
   #
   # The API degrades gracefully when a dependency dies (search 503

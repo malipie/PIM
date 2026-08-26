@@ -87,3 +87,13 @@ Dwie rzeczy nałożyły się na siebie:
 
 Po zabiegu i po wdrożeniu migracji autovacuum utrzymuje tabelę sam — ten runbook
 jest jednorazowy per instancja, chyba że baza znów padnie nieczysto.
+
+## Monitoring
+
+Każda instancja wystawia na wewnętrznym `/api/metrics` statystyki
+`object_values` z `pg_stat_user_tables`: liczbę żywych i martwych krotek,
+inserty od ostatniego vacuum oraz flagę „nigdy nie vacuumowano". Prometheus
+alarmuje, gdy odczyt statystyk nie działa albo duża tabela przekracza 5% zmian
+oczekujących na vacuum. Próg alarmu jest celowo luźniejszy od progu autovacuum
+`2%`: krótkie oczekiwanie na wolnego workera jest normalne, trwałe przekroczenie
+`5%` oznacza, że automatyczna konserwacja nie nadąża lub przestała działać.
