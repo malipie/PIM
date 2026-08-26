@@ -1,2 +1,2 @@
-# Generated from OpenAPI — produced by `pnpm --filter @pim/shared-types generate`.
-src/api.d.ts
+# `src/api.d.ts` is generated from OpenAPI and intentionally versioned so CI
+# can reject contract drift. Do not add it to this ignore file.

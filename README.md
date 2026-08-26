@@ -137,16 +137,18 @@ też w skrypcie); ręcznie możesz pominąć `-T`.
 ## shared-types (kontrakt TS z OpenAPI)
 
 `packages/shared-types` to **codegen**, nie klasyczny build: typy TypeScript są
-generowane z żywego dokumentu OpenAPI API Platform do
-`packages/shared-types/src/api.d.ts`. Stack musi działać:
+generowane z wersjonowanego snapshotu OpenAPI
+`docs/api-spec/v0.json` do `packages/shared-types/src/api.d.ts`. Działający
+stack ani wyłączanie weryfikacji TLS nie są potrzebne:
 
 ```bash
 pnpm --filter @pim/shared-types generate
-# = openapi-typescript https://pim.localhost/api/docs.jsonopenapi -o src/api.d.ts
+# = openapi-typescript ../../docs/api-spec/v0.json -o src/api.d.ts
 ```
 
 Regeneruj po każdej zmianie kształtu API (nowy zasób, nowe pole, zmiana grup
-serializacji). Pełny przepływ „jak dodać pole/endpoint" (z regeneracją włącznie):
+serializacji) i commituj zaktualizowany `api.d.ts`; CI odrzuca drift. Pełny
+przepływ „jak dodać pole/endpoint" (z regeneracją włącznie):
 [`docs/development/adding-a-field-or-endpoint.md`](docs/development/adding-a-field-or-endpoint.md).
 
 ## Quality gates

@@ -10,7 +10,7 @@ overrides:
   qs: '>=6.15.2'
   dompurify: '>=3.4.9'
   undici: '>=7.29.0 <8'
-  js-yaml: '>=4.3.1'
+  js-yaml: '>=4.3.1 <5'
   nanoid@<3.3.18: '>=3.3.18'
   nanoid@5.1.11: '>=5.1.16 <6'
 
@@ -235,10 +235,10 @@ importers:
     devDependencies:
       openapi-typescript:
         specifier: ^7.6.0
-        version: 7.13.0(typescript@7.0.2)
+        version: 7.13.0(typescript@5.9.3)
       typescript:
-        specifier: ~7.0.2
-        version: 7.0.2
+        specifier: ~5.9.3
+        version: 5.9.3
 
 packages:
 
@@ -3359,8 +3359,8 @@ packages:
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
-  js-yaml@5.2.3:
-    resolution: {integrity: sha512-n+mUVyUX5bVv7G/G2zyIHOhdxfuU1dY2NOFzTQUWiMUbFss8b57NFlgCCaggU78wSw5KVS9cllzeLyzyR+n5nw==}
+  js-yaml@4.3.1:
+    resolution: {integrity: sha512-CY6crGq313MX8GkwvB7tzgp99vjQxY1++5y10/BKN/GUfHqWaOGQMNZkBvqSzsZKWk/ijwHlWzzkLulsGHhjWQ==}
     hasBin: true
 
   jsdom@29.1.1:
@@ -4309,6 +4309,11 @@ packages:
   type-fest@5.8.0:
     resolution: {integrity: sha512-YGYEVz3Fm5iy/AybuA0oyNFq7H4CgQNfRp/qfe8nurE1kuCeNm3/vfm9X4Mtl+qLyaKJUh5xrFZwogr41SMjYA==}
     engines: {node: '>=20'}
+
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
 
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
@@ -5884,7 +5889,7 @@ snapshots:
       colorette: 1.4.0
       https-proxy-agent: 7.0.6(supports-color@10.2.2)
       js-levenshtein: 1.1.6
-      js-yaml: 5.2.3
+      js-yaml: 4.3.1
       minimatch: 5.1.9
       pluralize: 8.0.0
       yaml-ast-parser: 0.0.43
@@ -7404,7 +7409,7 @@ snapshots:
     dependencies:
       env-paths: 2.2.1
       import-fresh: 3.3.1
-      js-yaml: 5.2.3
+      js-yaml: 4.3.1
       parse-json: 5.2.0
     optionalDependencies:
       typescript: 7.0.2
@@ -7930,7 +7935,7 @@ snapshots:
 
   js-tokens@4.0.0: {}
 
-  js-yaml@5.2.3:
+  js-yaml@4.3.1:
     dependencies:
       argparse: 2.0.1
 
@@ -8455,14 +8460,14 @@ snapshots:
       regex: 6.1.0
       regex-recursion: 6.0.2
 
-  openapi-typescript@7.13.0(typescript@7.0.2):
+  openapi-typescript@7.13.0(typescript@5.9.3):
     dependencies:
       '@redocly/openapi-core': 1.34.12(supports-color@10.2.2)
       ansi-colors: 4.1.3
       change-case: 5.4.4
       parse-json: 8.3.0
       supports-color: 10.2.2
-      typescript: 7.0.2
+      typescript: 5.9.3
       yargs-parser: 21.1.1
 
   optics-ts@2.4.1: {}
@@ -9073,6 +9078,8 @@ snapshots:
   type-fest@5.8.0:
     dependencies:
       tagged-tag: 1.0.0
+
+  typescript@5.9.3: {}
 
   typescript@7.0.2:
     optionalDependencies:

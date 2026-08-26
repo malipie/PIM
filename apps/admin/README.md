@@ -100,17 +100,18 @@ pnpm --filter @pim/admin e2e
 ## shared-types — kontrakt TypeScript z OpenAPI
 
 Typy współdzielone z backendem **nie są pisane ręcznie** — są generowane z
-dokumentu OpenAPI API Platform do `packages/shared-types/src/api.d.ts`:
+wersjonowanego snapshotu `docs/api-spec/v0.json` do
+`packages/shared-types/src/api.d.ts`:
 
 ```bash
-# stack musi działać (https://pim.localhost dostępny)
 pnpm --filter @pim/shared-types generate
-# = openapi-typescript https://pim.localhost/api/docs.jsonopenapi -o src/api.d.ts
+# = openapi-typescript ../../docs/api-spec/v0.json -o src/api.d.ts
 ```
 
 **Kiedy regenerować:** po każdej zmianie kształtu API (nowy zasób, nowe pole,
 zmiana grup serializacji). To NIE jest klasyczny „build step" kompilujący kod —
-to **codegen kontraktu** odpytujący żywy endpoint. Admin importuje te typy przez
+to **deterministyczny codegen kontraktu offline**. Wygenerowany `api.d.ts` jest
+wersjonowany, a CI odrzuca drift. Admin importuje typy przez
 nazwę pakietu `@pim/shared-types` (workspace pnpm). Jak dodać pole/endpoint
 end-to-end (łącznie z regeneracją): [dev-guide](../../docs/development/adding-a-field-or-endpoint.md).
 
