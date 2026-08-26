@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# The running API container is deliberately APP_ENV=dev. PHPUnit's XML can
+# populate $_SERVER, but it cannot replace the process environment Symfony's
+# Dotenv bootstrap sees. Export the complete test contract before either the
+# cache or PHPUnit can boot a kernel.
+export APP_ENV=test
+export APP_DEBUG=0
+export MESSENGER_TRANSPORT_DSN=sync://
+export MESSENGER_IMPORT_TRANSPORT_DSN=sync://
+export MESSENGER_AGENT_TRANSPORT_DSN=sync://
+unset TEST_TOKEN
+
+php bin/console cache:clear --env=test --quiet
+exec php vendor/bin/phpunit "$@"

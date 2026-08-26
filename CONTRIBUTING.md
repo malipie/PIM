@@ -115,11 +115,15 @@ pnpm build                # turbo run build
 # PHP (inside the api container)
 docker compose exec api composer phpstan
 docker compose exec api composer cs-check
-docker compose exec -e APP_ENV=test api php bin/phpunit
+docker compose exec -T api composer test -- --testsuite=unit
 
 # E2E (host-side; alpine container can't host Playwright deps — see lessons)
 pnpm --filter @pim/admin e2e
 ```
+
+Do not invoke `php bin/phpunit` directly in the running API container. The
+guarded Composer entry point owns the complete test environment and refuses to
+boot Foundry against the development process environment.
 
 If any of those fails on a fresh checkout, that's a real bug — open an issue
 or fix it before continuing.
