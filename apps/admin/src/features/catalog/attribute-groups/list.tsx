@@ -1,5 +1,4 @@
 import { useList } from '@refinedev/core';
-import { useQueries } from '@tanstack/react-query';
 import { ChevronRight, Lock, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,8 +9,8 @@ import { Card } from '@/components/ui/card';
 import { TopbarCta } from '@/components/ui-v2/topbar-cta';
 import { resolveLabel } from '@/features/catalog/attributes/list';
 import { usePageActions } from '@/layout/page-actions-context';
-import { jsonFetch } from '@/lib/http';
 import { isLegacyOptionalSystemGroupCode } from '@/lib/legacy-attribute-groups';
+import { type AttributeGroupUsage, useModelingUsage } from '@/lib/modeling-usage';
 import { cn } from '@/lib/utils';
 
 interface AttributeGroupRow {
@@ -23,14 +22,6 @@ interface AttributeGroupRow {
   color?: string | null;
   systemGroup?: boolean;
   position?: number;
-}
-
-interface UsageResp {
-  attributeCount: number;
-  directlyAttachedTo: {
-    objectTypes: { id: string }[];
-    categories: { id: string }[];
-  };
 }
 
 /**
@@ -71,7 +62,11 @@ export function AttributeGroupsListPage() {
 
   const groups = result.data;
   const isLoading = query.isLoading;
-  const usage = useGroupsUsage(groups);
+  // #3034 — one batched read instead of one `/usage` request per group.
+  const { data: usage } = useModelingUsage(
+    'attribute-groups',
+    useMemo(() => groups.map((row) => row.id), [groups]),
+  );
 
   const filtered = groups.filter((row) => {
     if (search === '') return true;
@@ -198,7 +193,7 @@ function GroupRowItem({
 }: {
   row: AttributeGroupRow;
   locale: string;
-  usage?: UsageResp;
+  usage?: AttributeGroupUsage;
 }) {
   const { t } = useTranslation();
   const labelStr = resolveLabel(row.label, locale);
@@ -251,24 +246,4 @@ function GroupRowItem({
       </span>
     </Link>
   );
-}
-
-function useGroupsUsage(rows: AttributeGroupRow[]): Record<string, UsageResp> {
-  const queries = useQueries({
-    queries: rows.map((row) => ({
-      queryKey: ['attribute-group-usage', row.id] as const,
-      queryFn: () =>
-        jsonFetch<UsageResp>(`/api/attribute_groups/${row.id}/usage`, {
-          accept: 'application/json',
-        }),
-      staleTime: 60_000,
-    })),
-  });
-  const map: Record<string, UsageResp> = {};
-  for (let i = 0; i < rows.length; i += 1) {
-    const data = queries[i]?.data;
-    const row = rows[i];
-    if (data !== undefined && row !== undefined) map[row.id] = data;
-  }
-  return map;
 }

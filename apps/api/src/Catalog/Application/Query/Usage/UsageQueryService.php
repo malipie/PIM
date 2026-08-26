@@ -21,22 +21,45 @@ use Symfony\Contracts\Cache\TagAwareCacheInterface;
  *   - DBAL only (cross-BC counts hit `api_profiles` JSONB; staying in
  *     SQL avoids reaching into ApiConfigurator domain code, keeping
  *     Deptrac green).
- *   - Cached in `pim.modeling_cache` with TTL=60s (per epik plan §6.2 —
- *     usage data ages in seconds, not minutes; cache mainly absorbs
- *     burst reads from the admin panel switching tabs).
- *   - Invalidated by tags `pim_usage` (global) and
- *     `pim_usage.<resource>.<id>` (per-row). The shared invalidator in
- *     `ObjectFormSchemaCacheInvalidator` already nukes this on schema
- *     changes; here we just register the same tag set.
+ *   - Cached in `pim.modeling_cache`, invalidated by tags `pim_usage`
+ *     (global) and `pim_usage.<resource>.<id>` (per-row). The shared
+ *     invalidator in `ObjectFormSchemaCacheInvalidator` already nukes
+ *     this on schema changes; here we just register the same tag set.
+ *
+ * Batch reads (#3034): `forAttributes()` / `forAttributeGroups()` /
+ * `forObjectTypes()` answer a whole list page in ONE round trip per
+ * relation instead of N per row. The modeling list pages used to fan out
+ * one HTTP request per row (57 attributes = 57 requests), which saturated
+ * the FrankenPHP worker pool and pushed unrelated requests — including the
+ * detail page the operator had just navigated to — behind a queue tens of
+ * seconds deep on a tenant with 1.27M `object_values`.
+ *
+ * The batch methods share cache keys with the single-item methods, so a
+ * list page warms the detail page and vice versa.
  */
 final readonly class UsageQueryService
 {
     public const string CACHE_TAG = 'pim_usage';
-    public const int CACHE_TTL_SECONDS = 60;
+
+    /**
+     * Was 60s. Raised to 300s together with the batch reads (#3034): these
+     * counters are advisory ("where is this used?") and every destructive
+     * decision goes through {@see self::forAttributeFresh()}, which bypasses
+     * the cache entirely. A list page repainting a 4-minute-old instance
+     * count costs nothing; recomputing it costs a scan of `object_values`.
+     */
+    public const int CACHE_TTL_SECONDS = 300;
+
+    /**
+     * Guard rail for the batch endpoint: without a ceiling, `?ids=` would be
+     * a way to ask for an unbounded `IN (…)` over `object_values`.
+     */
+    public const int MAX_BATCH_IDS = 500;
 
     public function __construct(
         private Connection $connection,
         private TagAwareCacheInterface $modelingCache,
+        private UsageBatchLoader $batchLoader,
     ) {
     }
 
@@ -45,7 +68,8 @@ final readonly class UsageQueryService
      *     groups: list<array{id: string, code: string, label: array<string, string>}>,
      *     objectTypes: list<array{id: string, code: string, kind: string}>,
      *     categories: list<array{id: string, path: string|null}>,
-     *     instanceCount: int
+     *     instanceCount: int,
+     *     optionCount: int
      * }
      */
     public function forAttribute(Attribute $attribute): array
@@ -68,7 +92,8 @@ final readonly class UsageQueryService
      *     groups: list<array{id: string, code: string, label: array<string, string>}>,
      *     objectTypes: list<array{id: string, code: string, kind: string}>,
      *     categories: list<array{id: string, path: string|null}>,
-     *     instanceCount: int
+     *     instanceCount: int,
+     *     optionCount: int
      * }
      */
     public function forAttributeFresh(Attribute $attribute): array
@@ -120,11 +145,144 @@ final readonly class UsageQueryService
     }
 
     /**
+     * Batch counterpart of {@see self::forAttribute()} (#3034).
+     *
+     * Shares cache keys and tags with the single-item method, so whichever
+     * page runs first warms the other. The batch SQL is deferred into the
+     * cache callback and memoised across the loop: it runs at most once per
+     * call, and not at all when every id is already cached.
+     *
+     * @param list<string> $ids RFC 4122 attribute ids
+     *
+     * @return array<string, array{
+     *     groups: list<array{id: string, code: string, label: array<string, string>}>,
+     *     objectTypes: list<array{id: string, code: string, kind: string}>,
+     *     categories: list<array{id: string, path: string|null}>,
+     *     instanceCount: int,
+     *     optionCount: int
+     * }>
+     */
+    public function forAttributes(array $ids): array
+    {
+        $ids = $this->batchLoader->existingIds('attributes', UsageBatchLoader::dedupe($ids));
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var array<string, array{groups: list<array{id: string, code: string, label: array<string, string>}>, objectTypes: list<array{id: string, code: string, kind: string}>, categories: list<array{id: string, path: string|null}>, instanceCount: int, optionCount: int}>|null $batch */
+        $batch = null;
+        $out = [];
+
+        foreach ($ids as $id) {
+            /** @var array{groups: list<array{id: string, code: string, label: array<string, string>}>, objectTypes: list<array{id: string, code: string, kind: string}>, categories: list<array{id: string, path: string|null}>, instanceCount: int, optionCount: int} $payload */
+            $payload = $this->modelingCache->get(
+                \sprintf('pim_usage_attribute_%s', $id),
+                function (ItemInterface $item) use ($id, $ids, &$batch): array {
+                    $item->expiresAfter(self::CACHE_TTL_SECONDS);
+                    $item->tag([self::CACHE_TAG, self::CACHE_TAG.'.attribute.'.$id]);
+                    $batch ??= $this->batchLoader->loadAttributeUsageBatch($ids);
+
+                    return $batch[$id] ?? self::emptyAttributeUsage();
+                },
+            );
+            $out[$id] = $payload;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Batch counterpart of {@see self::forAttributeGroup()} (#3034).
+     *
+     * @param list<string> $ids RFC 4122 attribute group ids
+     *
+     * @return array<string, array{
+     *     directlyAttachedTo: array{
+     *         objectTypes: list<array{id: string, code: string, kind: string}>,
+     *         categories: list<array{id: string, path: string|null, target_kind: string|null}>
+     *     },
+     *     attributeCount: int,
+     *     affectedInstanceCount: int
+     * }>
+     */
+    public function forAttributeGroups(array $ids): array
+    {
+        $ids = $this->batchLoader->existingIds('attribute_groups', UsageBatchLoader::dedupe($ids));
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var array<string, array{directlyAttachedTo: array{objectTypes: list<array{id: string, code: string, kind: string}>, categories: list<array{id: string, path: string|null, target_kind: string|null}>}, attributeCount: int, affectedInstanceCount: int}>|null $batch */
+        $batch = null;
+        $out = [];
+
+        foreach ($ids as $id) {
+            /** @var array{directlyAttachedTo: array{objectTypes: list<array{id: string, code: string, kind: string}>, categories: list<array{id: string, path: string|null, target_kind: string|null}>}, attributeCount: int, affectedInstanceCount: int} $payload */
+            $payload = $this->modelingCache->get(
+                \sprintf('pim_usage_attribute_group_%s', $id),
+                function (ItemInterface $item) use ($id, $ids, &$batch): array {
+                    $item->expiresAfter(self::CACHE_TTL_SECONDS);
+                    $item->tag([self::CACHE_TAG, self::CACHE_TAG.'.attribute_group.'.$id]);
+                    $batch ??= $this->batchLoader->loadAttributeGroupUsageBatch($ids);
+
+                    return $batch[$id] ?? self::emptyAttributeGroupUsage();
+                },
+            );
+            $out[$id] = $payload;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Batch counterpart of {@see self::forObjectType()} (#3034).
+     *
+     * @param list<string> $ids RFC 4122 object type ids
+     *
+     * @return array<string, array{
+     *     instanceCount: int,
+     *     attributesAttachedCount: int,
+     *     attributeGroupsAttachedCount: int,
+     *     referencedByApiProfileCount: int,
+     *     referencedByCategoryAttachmentCount: int
+     * }>
+     */
+    public function forObjectTypes(array $ids): array
+    {
+        $ids = $this->batchLoader->existingIds('object_types', UsageBatchLoader::dedupe($ids));
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var array<string, array{instanceCount: int, attributesAttachedCount: int, attributeGroupsAttachedCount: int, referencedByApiProfileCount: int, referencedByCategoryAttachmentCount: int}>|null $batch */
+        $batch = null;
+        $out = [];
+
+        foreach ($ids as $id) {
+            /** @var array{instanceCount: int, attributesAttachedCount: int, attributeGroupsAttachedCount: int, referencedByApiProfileCount: int, referencedByCategoryAttachmentCount: int} $payload */
+            $payload = $this->modelingCache->get(
+                \sprintf('pim_usage_object_type_%s', $id),
+                function (ItemInterface $item) use ($id, $ids, &$batch): array {
+                    $item->expiresAfter(self::CACHE_TTL_SECONDS);
+                    $item->tag([self::CACHE_TAG, self::CACHE_TAG.'.object_type.'.$id]);
+                    $batch ??= $this->batchLoader->loadObjectTypeUsageBatch($ids);
+
+                    return $batch[$id] ?? self::emptyObjectTypeUsage();
+                },
+            );
+            $out[$id] = $payload;
+        }
+
+        return $out;
+    }
+
+    /**
      * @return array{
      *     groups: list<array{id: string, code: string, label: array<string, string>}>,
      *     objectTypes: list<array{id: string, code: string, kind: string}>,
      *     categories: list<array{id: string, path: string|null}>,
-     *     instanceCount: int
+     *     instanceCount: int,
+     *     optionCount: int
      * }
      */
     private function loadAttributeUsage(Attribute $attribute): array
@@ -163,11 +321,20 @@ final readonly class UsageQueryService
             [$attributeId],
         );
 
+        // #3034 — carried in the usage payload so the modeling list does not
+        // need a second per-row fan-out to `/api/attributes/{code}/options`
+        // just to render the "N wartości" link.
+        $optionCountRaw = $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM attribute_options WHERE attribute_id = ?',
+            [$attributeId],
+        );
+
         return [
-            'groups' => $this->normalizeGroupRows($groups),
-            'objectTypes' => $this->normalizeObjectTypeRows($objectTypes),
-            'categories' => $this->normalizeCategoryRows($categories),
+            'groups' => UsageRowNormalizer::normalizeGroupRows($groups),
+            'objectTypes' => UsageRowNormalizer::normalizeObjectTypeRows($objectTypes),
+            'categories' => UsageRowNormalizer::normalizeCategoryRows($categories),
             'instanceCount' => \is_scalar($instanceCountRaw) ? (int) $instanceCountRaw : 0,
+            'optionCount' => \is_scalar($optionCountRaw) ? (int) $optionCountRaw : 0,
         ];
     }
 
@@ -218,8 +385,8 @@ final readonly class UsageQueryService
 
         return [
             'directlyAttachedTo' => [
-                'objectTypes' => $this->normalizeObjectTypeRows($objectTypes),
-                'categories' => $this->normalizeCategoryAttachmentRows($categories),
+                'objectTypes' => UsageRowNormalizer::normalizeObjectTypeRows($objectTypes),
+                'categories' => UsageRowNormalizer::normalizeCategoryAttachmentRows($categories),
             ],
             'attributeCount' => \is_scalar($attributeCountRaw) ? (int) $attributeCountRaw : 0,
             'affectedInstanceCount' => \is_scalar($affectedInstanceCountRaw) ? (int) $affectedInstanceCountRaw : 0,
@@ -273,99 +440,61 @@ final readonly class UsageQueryService
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
-     *
-     * @return list<array{id: string, code: string, label: array<string, string>}>
+     * @return array{
+     *     groups: list<array{id: string, code: string, label: array<string, string>}>,
+     *     objectTypes: list<array{id: string, code: string, kind: string}>,
+     *     categories: list<array{id: string, path: string|null}>,
+     *     instanceCount: int,
+     *     optionCount: int
+     * }
      */
-    private function normalizeGroupRows(array $rows): array
+    private static function emptyAttributeUsage(): array
     {
-        $out = [];
-        foreach ($rows as $row) {
-            $rawId = $row['id'] ?? '';
-            $rawCode = $row['code'] ?? '';
-            $id = \is_scalar($rawId) ? (string) $rawId : '';
-            $code = \is_scalar($rawCode) ? (string) $rawCode : '';
-            $label = $row['label'] ?? null;
-            if (\is_string($label)) {
-                $decoded = json_decode($label, true);
-                $label = \is_array($decoded) ? $decoded : [];
-            }
-            if (!\is_array($label)) {
-                $label = [];
-            }
-            $cleanLabel = [];
-            foreach ($label as $k => $v) {
-                if (\is_string($k) && \is_string($v)) {
-                    $cleanLabel[$k] = $v;
-                }
-            }
-            $out[] = ['id' => $id, 'code' => $code, 'label' => $cleanLabel];
-        }
-
-        return $out;
+        return [
+            'groups' => [],
+            'objectTypes' => [],
+            'categories' => [],
+            'instanceCount' => 0,
+            'optionCount' => 0,
+        ];
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
-     *
-     * @return list<array{id: string, code: string, kind: string}>
+     * @return array{
+     *     directlyAttachedTo: array{
+     *         objectTypes: list<array{id: string, code: string, kind: string}>,
+     *         categories: list<array{id: string, path: string|null, target_kind: string|null}>
+     *     },
+     *     attributeCount: int,
+     *     affectedInstanceCount: int
+     * }
      */
-    private function normalizeObjectTypeRows(array $rows): array
+    private static function emptyAttributeGroupUsage(): array
     {
-        $out = [];
-        foreach ($rows as $row) {
-            $out[] = [
-                'id' => $this->scalarString($row['id'] ?? null),
-                'code' => $this->scalarString($row['code'] ?? null),
-                'kind' => $this->scalarString($row['kind'] ?? null),
-            ];
-        }
-
-        return $out;
+        return [
+            'directlyAttachedTo' => ['objectTypes' => [], 'categories' => []],
+            'attributeCount' => 0,
+            'affectedInstanceCount' => 0,
+        ];
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
-     *
-     * @return list<array{id: string, path: string|null}>
+     * @return array{
+     *     instanceCount: int,
+     *     attributesAttachedCount: int,
+     *     attributeGroupsAttachedCount: int,
+     *     referencedByApiProfileCount: int,
+     *     referencedByCategoryAttachmentCount: int
+     * }
      */
-    private function normalizeCategoryRows(array $rows): array
+    private static function emptyObjectTypeUsage(): array
     {
-        $out = [];
-        foreach ($rows as $row) {
-            $path = $row['path'] ?? null;
-            $out[] = [
-                'id' => $this->scalarString($row['id'] ?? null),
-                'path' => \is_string($path) ? $path : null,
-            ];
-        }
-
-        return $out;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $rows
-     *
-     * @return list<array{id: string, path: string|null, target_kind: string|null}>
-     */
-    private function normalizeCategoryAttachmentRows(array $rows): array
-    {
-        $out = [];
-        foreach ($rows as $row) {
-            $path = $row['path'] ?? null;
-            $kind = $row['target_kind'] ?? null;
-            $out[] = [
-                'id' => $this->scalarString($row['id'] ?? null),
-                'path' => \is_string($path) ? $path : null,
-                'target_kind' => \is_string($kind) ? $kind : null,
-            ];
-        }
-
-        return $out;
-    }
-
-    private function scalarString(mixed $value): string
-    {
-        return \is_scalar($value) ? (string) $value : '';
+        return [
+            'instanceCount' => 0,
+            'attributesAttachedCount' => 0,
+            'attributeGroupsAttachedCount' => 0,
+            'referencedByApiProfileCount' => 0,
+            'referencedByCategoryAttachmentCount' => 0,
+        ];
     }
 }

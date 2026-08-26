@@ -1,6 +1,6 @@
 import { useList } from '@refinedev/core';
 import { Lock, Plus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
@@ -10,7 +10,7 @@ import { ObjectTypeIcon } from '@/components/modeling/object-type-icon';
 import { TopbarCta } from '@/components/ui-v2/topbar-cta';
 import { resolveLabel } from '@/features/catalog/attributes/list';
 import { usePageActions } from '@/layout/page-actions-context';
-import { jsonFetch } from '@/lib/http';
+import { useModelingUsage } from '@/lib/modeling-usage';
 
 interface ObjectTypeRow {
   id: string;
@@ -53,8 +53,25 @@ export function ObjectTypesListPage() {
 
   const types = result.data;
   const isLoading = query.isLoading;
-  const instanceCounts = useObjectTypeInstanceCounts(types);
-  const groupCounts = useObjectTypeGroupCounts(types);
+  // #3034 — one batched read replaces two `Promise.all` fan-outs (one
+  // `/usage` and one `/attached_groups` request per row). `attached_groups`
+  // counted rows of `object_type_attribute_groups`, which is exactly what the
+  // usage payload's `attributeGroupsAttachedCount` reports.
+  const { data: usage } = useModelingUsage(
+    'object-types',
+    useMemo(() => types.map((row) => row.id), [types]),
+  );
+  const instanceCounts = useMemo(
+    () => Object.fromEntries(Object.entries(usage).map(([id, u]) => [id, u.instanceCount])),
+    [usage],
+  );
+  const groupCounts = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(usage).map(([id, u]) => [id, u.attributeGroupsAttachedCount]),
+      ),
+    [usage],
+  );
 
   usePageActions(
     useMemo(
@@ -213,65 +230,4 @@ function ObjectTypeListRow({ row, language, instanceCount, groupCount }: ObjectT
       }
     />
   );
-}
-
-function useObjectTypeInstanceCounts(types: ObjectTypeRow[]): Record<string, number> {
-  const [counts, setCounts] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const next: Record<string, number> = {};
-      await Promise.all(
-        types.map(async (row) => {
-          try {
-            const usage = await jsonFetch<{ instanceCount: number }>(
-              `/api/object_types/${row.id}/usage`,
-              { accept: 'application/json' },
-            );
-            next[row.id] = usage.instanceCount;
-          } catch {
-            // tolerate 404 / network — leave row's count blank.
-          }
-        }),
-      );
-      if (!cancelled) setCounts(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [types]);
-
-  return counts;
-}
-
-function useObjectTypeGroupCounts(types: ObjectTypeRow[]): Record<string, number> {
-  const [counts, setCounts] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const next: Record<string, number> = {};
-      await Promise.all(
-        types.map(async (row) => {
-          try {
-            const groups = await jsonFetch<unknown[]>(
-              `/api/object_types/${row.id}/attached_groups`,
-              { accept: 'application/json' },
-            );
-            next[row.id] = Array.isArray(groups) ? groups.length : 0;
-          } catch {
-            // tolerate failure — fall back to "0 grup" rather than dash.
-            next[row.id] = 0;
-          }
-        }),
-      );
-      if (!cancelled) setCounts(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [types]);
-
-  return counts;
 }

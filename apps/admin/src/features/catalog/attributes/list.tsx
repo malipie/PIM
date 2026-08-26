@@ -1,5 +1,4 @@
 import { useList } from '@refinedev/core';
-import { useQueries } from '@tanstack/react-query';
 import { ChevronRight, Layers, Search, Shield, Zap } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
 import { TopbarCta } from '@/components/ui-v2/topbar-cta';
 import { usePageActions } from '@/layout/page-actions-context';
-import { jsonFetch } from '@/lib/http';
+import { type AttributeUsage, useModelingUsage } from '@/lib/modeling-usage';
 import { cn } from '@/lib/utils';
 
 interface AttributeRow {
@@ -22,12 +21,6 @@ interface AttributeRow {
   scopable?: boolean;
   unique?: boolean;
   system?: boolean;
-}
-
-interface UsageResponse {
-  totalObjects?: number;
-  attributeGroups?: Array<{ id: string }>;
-  objectTypes?: Array<{ id: string }>;
 }
 
 const TYPE_FILTERS = [
@@ -120,8 +113,15 @@ export function AttributesListPage() {
   // library instead of the tail, where it was easy to miss.
   const attributes = [...result.data].sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
   const isLoading = listQuery.isLoading;
-  const usage = useAttributeUsage(attributes);
-  const optionCounts = useOptionCounts(attributes);
+  // #3034 — ONE request for every row's counters (and its option count),
+  // replacing one `/usage` request per attribute plus one `/options` request
+  // per select attribute. On a 57-attribute tenant that was ~77 requests fired
+  // at once, enough to fill the FrankenPHP worker pool and stall whatever the
+  // operator clicked next.
+  const { data: usage } = useModelingUsage(
+    'attributes',
+    useMemo(() => attributes.map((row) => row.id), [attributes]),
+  );
 
   const visible = attributes.filter((row) => {
     // System audit attributes (created_at/updated_at/created_by/updated_by)
@@ -239,7 +239,6 @@ export function AttributesListPage() {
                 row={row}
                 locale={i18n.language}
                 usage={usage[row.id]}
-                optionsCount={optionCounts[row.code]}
               />
             ))}
           </div>
@@ -253,12 +252,10 @@ function AttributeRowItem({
   row,
   locale,
   usage,
-  optionsCount,
 }: {
   row: AttributeRow;
   locale: string;
-  usage?: { typesUsed: number; groupsUsed: number; instancesWith: number };
-  optionsCount?: number;
+  usage?: AttributeUsage;
 }) {
   const isOpt = row.type === 'select' || row.type === 'multiselect';
   const label = resolveLabel(row.label, locale);
@@ -300,14 +297,14 @@ function AttributeRowItem({
         ) : null}
       </span>
       <span className="text-right text-[12.5px] tabular-nums">
-        <span className="font-medium text-foreground">{usage?.typesUsed ?? 0}</span>
+        <span className="font-medium text-foreground">{usage?.objectTypes.length ?? 0}</span>
         <span className="text-muted-foreground"> typów</span>
       </span>
       <span className="text-right text-[12.5px] font-medium tabular-nums text-foreground">
-        {usage?.groupsUsed ?? 0}
+        {usage?.groups.length ?? 0}
       </span>
       <span className="text-right text-[12.5px] tabular-nums text-foreground/80">
-        {(usage?.instancesWith ?? 0).toLocaleString('pl-PL')}
+        {(usage?.instanceCount ?? 0).toLocaleString('pl-PL')}
       </span>
       <span className="flex justify-end">
         {isOpt ? (
@@ -317,7 +314,7 @@ function AttributeRowItem({
             className="inline-flex h-7 items-center gap-1.5 rounded-lg bg-orange-50 px-2.5 text-[11.5px] font-medium text-orange-700 transition hover:bg-orange-100"
           >
             <Layers className="size-3 text-orange-500" />
-            <span className="tabular-nums">{optionsCount ?? '—'}</span>
+            <span className="tabular-nums">{usage?.optionCount ?? '—'}</span>
             <span className="hidden xl:inline">wartości</span>
           </Link>
         ) : (
@@ -350,53 +347,6 @@ function TypeBadge({ type }: { type: string }) {
       {type}
     </span>
   );
-}
-
-function useAttributeUsage(
-  rows: AttributeRow[],
-): Record<string, { typesUsed: number; groupsUsed: number; instancesWith: number }> {
-  const queries = useQueries({
-    queries: rows.map((row) => ({
-      queryKey: ['attribute-usage', row.id] as const,
-      queryFn: () => jsonFetch<UsageResponse>(`/api/attributes/${row.id}/usage`),
-      staleTime: 60_000,
-    })),
-  });
-
-  const map: Record<string, { typesUsed: number; groupsUsed: number; instancesWith: number }> = {};
-  for (let i = 0; i < rows.length; i += 1) {
-    const row = rows[i];
-    if (row === undefined) continue;
-    const data = queries[i]?.data;
-    map[row.id] = {
-      typesUsed: data?.objectTypes?.length ?? 0,
-      groupsUsed: data?.attributeGroups?.length ?? 0,
-      instancesWith: data?.totalObjects ?? 0,
-    };
-  }
-  return map;
-}
-
-function useOptionCounts(rows: AttributeRow[]): Record<string, number> {
-  const selectRows = rows.filter((r) => r.type === 'select' || r.type === 'multiselect');
-  const queries = useQueries({
-    queries: selectRows.map((row) => ({
-      queryKey: ['attribute-options-count', row.code] as const,
-      queryFn: async () => {
-        const data = await jsonFetch<{ member?: unknown[] }>(`/api/attributes/${row.code}/options`);
-        return data.member?.length ?? 0;
-      },
-      staleTime: 60_000,
-    })),
-  });
-
-  const counts: Record<string, number> = {};
-  for (let i = 0; i < selectRows.length; i += 1) {
-    const data = queries[i]?.data;
-    const row = selectRows[i];
-    if (typeof data === 'number' && row !== undefined) counts[row.code] = data;
-  }
-  return counts;
 }
 
 export function resolveLabel(

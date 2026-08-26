@@ -30,7 +30,7 @@ use Throwable;
  *   - `description.pl`    — locale-scoped (per-locale JSONB path).
  *   - `description.en`    — same.
  *   - `meta_description`  — single-value attribute.
- *   - `completeness_pct`  — column on catalog_objects, NOT JSONB.
+ *   - `completeness_pct`  — column on objects, NOT JSONB.
  *
  * Custom attribute codes (brand, family, ip_class, voltage…) hit
  * `attributes_indexed->>'{code}'` — GIN-indexed per ADR-006.
@@ -315,7 +315,7 @@ final class FilterDslResolver
 
     /**
      * Convert DSL to a PostgreSQL `WHERE`-fragment SQL string usable
-     * inside the bulk count query (`SELECT COUNT(*) FROM catalog_objects co WHERE ... AND ({sql})`).
+     * inside the bulk count query (`SELECT COUNT(*) FROM objects co WHERE ... AND ({sql})`).
      *
      * Returns `null` when the DSL targets attributes not yet indexed
      * (graceful degradation; count = 0 surfaced to the user).

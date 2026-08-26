@@ -14,7 +14,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router';
 
@@ -41,6 +41,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
 import { HttpError, jsonFetch } from '@/lib/http';
+import { useModelingUsage } from '@/lib/modeling-usage';
 import { useCurrentWorkspace } from '@/lib/use-current-workspace';
 import { cn } from '@/lib/utils';
 
@@ -971,41 +972,34 @@ function AttachedGroupsCard({ attribute, locale }: { attribute: AttributeDetail;
     staleTime: 30_000,
   });
 
-  // Per-group membership probe — `/api/attribute_groups/{id}/attributes`
-  // returns the same `members[].attribute.id` shape used elsewhere, so
-  // this hits the same already-warm cache used by VIEW-03 detail.
-  const memberships = useQuery<Array<{ groupId: string; groupCode: string; row: GroupRow }>>({
-    queryKey: ['attribute', attribute.id, 'memberships'],
-    queryFn: async () => {
-      const out: Array<{ groupId: string; groupCode: string; row: GroupRow }> = [];
-      await Promise.all(
-        allGroups.map(async (group) => {
-          try {
-            const data = await jsonFetch<{
-              members?: Array<{ attribute: { id: string } }>;
-            }>(`/api/attribute_groups/${group.id}/attributes`, {
-              accept: 'application/json',
-            });
-            if ((data.members ?? []).some((m) => m.attribute.id === attribute.id)) {
-              out.push({ groupId: group.id, groupCode: group.code, row: group });
-            }
-          } catch {
-            // tolerate one-group failure; continue with the rest
-          }
-        }),
-      );
-      return out;
-    },
-    enabled: allGroups.length > 0,
-    staleTime: 30_000,
-  });
+  // #3034 — membership used to be probed by requesting
+  // `/api/attribute_groups/{id}/attributes` for EVERY group and checking
+  // whether this attribute appeared in the response: 15 requests on the
+  // production tenant, fired while the detail page was still rendering.
+  // `/usage` already returns the attribute's groups from the same junction
+  // table, so the answer costs one request that the list has usually warmed.
+  const { data: usage } = useModelingUsage(
+    'attributes',
+    useMemo(() => [attribute.id], [attribute.id]),
+  );
 
-  const attached = memberships.data ?? [];
+  const attached = useMemo(() => {
+    const byId = new Map(allGroups.map((group) => [group.id, group] as const));
+
+    // Only groups present in `allGroups` can be rendered — the chip needs the
+    // colour/icon/system flag that the usage payload does not carry.
+    return (usage[attribute.id]?.groups ?? []).flatMap((group) => {
+      const row = byId.get(group.id);
+      return row === undefined ? [] : [{ groupId: group.id, groupCode: group.code, row }];
+    });
+  }, [usage, attribute.id, allGroups]);
   const attachedCodes = new Set(attached.map((m) => m.groupCode));
 
   const reload = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['attribute', attribute.id, 'memberships'] }),
+      // Attaching/detaching changes usage on both sides of the junction, so
+      // invalidate every batched usage query rather than one resource's.
+      queryClient.invalidateQueries({ queryKey: ['modeling-usage'] }),
       queryClient.invalidateQueries({ queryKey: ['attribute_groups'] }),
     ]);
   };
