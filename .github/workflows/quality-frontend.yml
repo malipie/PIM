@@ -3,24 +3,12 @@ name: Quality (Frontend)
 # Runs on every PR; on push to main only the fast checks run — Playwright is
 # revalidated nightly (see `schedule`). A squash merge re-validates a tree the
 # PR already covered, which cost ~38 CI min/day for no new signal (CI minutes
-# audit, 2026-08-06). There is no branch protection on this repo today, so
-# these gates are advisory, not enforcing.
+# audit, 2026-08-06). AUD-CI-001 (#3016) makes both stable job names required
+# on `main`, so the workflow starts for every PR. Path-filtering the workflow
+# would strand a required context in "Expected" and block unrelated PRs.
 
 on:
   pull_request:
-    paths:
-      - "apps/admin/**"
-      # Playwright runs the full stack — any backend / infra change can break the E2E happy path.
-      - "apps/api/**"
-      - "docker-compose.yml"
-      - "docker/**"
-      - "packages/**"
-      - "biome.json"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "turbo.json"
-      - ".github/workflows/quality-frontend.yml"
   push:
     branches: [main]
     paths:

@@ -87,8 +87,10 @@ comments and commit metadata are English.
    commit history readable so the squash narrative writes itself.
 4. PR description — at minimum a `## Summary` (1–3 bullets) and a
    `## Test plan` checklist. Reference the issue with `Closes #N`.
-5. CI must be green before merge. Branch protection on `main` enforces this
-   plus an up-to-date branch.
+5. CI must be green before merge. Branch protection on `main` enforces the
+   PHP, frontend, security and dependency gates, an up-to-date branch and one
+   approving review. The exceptional admin path is documented in
+   [`docs/operations/github-main-protection.md`](docs/operations/github-main-protection.md).
 
 ## Hook expectations
 

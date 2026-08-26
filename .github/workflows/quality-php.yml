@@ -5,38 +5,16 @@ name: Quality (PHP)
 # squash merge produces a new SHA over a tree that the PR already validated
 # minutes earlier, and re-running the full matrix on main cost ~133 CI min/day
 # for zero failures in the measured week (CI minutes audit, 2026-08-06).
-# NOTE: there is no branch protection on this repo today (the protection API
-# answers 403 on the current plan and `branches/main` reports
-# "protected": false), so these gates are advisory, not enforcing.
+# AUD-CI-001 (#3016): the stable job names below are required by protection on
+# `main`. The workflow must therefore start for every PR; a workflow-level path
+# filter would leave the required context in "Expected" forever.
 # See ticket #11 (0.0.11) for the full quality gates rationale.
 
 on:
-  # AUD-061 — blacklist (paths-ignore), not whitelist (paths). The old `paths:`
-  # whitelist (apps/api + a few scripts) silently skipped every backend gate
-  # (PHPStan / PHPUnit / Deptrac / cs-fixer) on any PR that did not touch
-  # apps/api/** — e.g. a PR touching only packages/shared-types/** (which feeds
-  # the OpenAPI/TS contract), root composer files, or this workflow itself.
-  # That meta-gap let latent PHPStan errors land on main (W1-7 TenantOffboarding-
-  # PurgeTest, fixed in W2-1). A whitelist also re-opens the same hole for every
-  # *future* backend-relevant directory nobody remembers to add. paths-ignore is
-  # fail-safe: the gates run ALWAYS unless a PR touches ONLY pure docs/markdown.
-  #
-  # docs/api-spec/** is NOT ignored (it is re-included via `!`): the openapi-spec
-  # job diffs docs/api-spec/v0.json, so a spec change must still re-trigger.
   pull_request:
     # `labeled` is required for the opt-in benchmark gate below: without it a
     # freshly applied `run-benchmarks` label would not re-trigger the run.
     types: [opened, synchronize, reopened, labeled]
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - "!docs/api-spec/**"
-      # Strona marketingowa (#2952) — wciagnieta do repo, zeby miec historie
-      # i kopie, ale NIE jest aplikacja PIM: nie ma w niej PHP, encji ani
-      # uprawnien, wiec PHPStan/Deptrac/PHPUnit nie maja czego sprawdzac.
-      # Wykluczenie jest po SCIEZCE, nie po rozszerzeniu — inaczej kazda zmiana
-      # tresci marketingowej odpalalaby 40 minut bramek backendu.
-      - "sites/**"
   push:
     branches: [main]
     paths-ignore:
