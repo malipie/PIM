@@ -148,13 +148,10 @@ STATUS=0
 if [ -n "$PHP_SUITES" ]; then
     echo
     echo "▶ PHPUnit"
-    # Async transports are synchronous under tests so handlers run inline.
+    # `composer test` is the guarded entry point: it exports APP_ENV=test and
+    # forces async transports to sync before Symfony or Foundry can boot.
     # shellcheck disable=SC2086
-    docker compose exec -T \
-        -e APP_ENV=test \
-        -e MESSENGER_IMPORT_TRANSPORT_DSN=sync:// \
-        -e MESSENGER_AGENT_TRANSPORT_DSN=sync:// \
-        api php bin/phpunit $PHP_SUITES || STATUS=1
+    docker compose exec -T api composer test -- $PHP_SUITES || STATUS=1
 fi
 
 if [ "$FRONTEND" -eq 1 ]; then

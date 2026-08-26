@@ -158,14 +158,14 @@ pnpm build        # build production wszystkich workspace'ów
 # PHP gates (w kontenerze api)
 docker compose exec api composer phpstan        # PHPStan max
 docker compose exec api composer cs-check       # PHP-CS-Fixer (dry-run)
-docker compose exec -e APP_ENV=test api php bin/phpunit --testsuite=unit
+docker compose exec -T api composer test -- --testsuite=unit
 ```
 
-> **PHPUnit lokalnie = TYLKO `--testsuite=unit`** (przechodzi na świeżym klonie).
-> Suity kernel/Api wymagają test-env (klucze JWT + `.env.test.local` + baza
-> testowa) i pełny run ginie na limicie pamięci 256M — lokalna procedura dla
-> kernel-suitów: [`docs/testing/local-kernel-suites.md`](docs/testing/local-kernel-suites.md);
-> default = CI (#2183).
+> **`composer test` jest jedynym bezpiecznym wejściem do PHPUnit.** Ustawia
+> procesowy `APP_ENV=test`, synchroniczne transporty i czyści cache testowy
+> przed startem. Bezpośrednie `php bin/phpunit` kończy się fail-fast, zanim
+> Foundry może dotknąć bazy. Pełna procedura dla kernel-suitów:
+> [`docs/testing/local-kernel-suites.md`](docs/testing/local-kernel-suites.md).
 
 CI: GitHub Actions na PR + push do main — `quality-php.yml`, `quality-frontend.yml` (Biome / typecheck / Vite build / **Playwright E2E**), `audit.yml` (composer + pnpm audit).
 

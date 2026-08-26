@@ -9,7 +9,7 @@
 
 | Suita | Lokalnie | Jak |
 |---|---|---|
-| `--testsuite=unit` (+ `architecture`) | ✅ | `docker compose exec -e APP_ENV=test api php bin/phpunit --testsuite=unit` — działa na świeżym klonie |
+| `--testsuite=unit` (+ `architecture`) | ✅ | `docker compose exec -T api composer test -- --testsuite=unit` — guard ustawia pełny test-env |
 | `integration`, `api-*` (kernel) | ⚠️ wymaga setupu | procedura niżej; default = CI (matrix-shard w `quality-php.yml`) |
 | pełny `bin/phpunit` jednym strzałem | ❌ | ginie na `memory_limit=256M` (suita architecture); CI dzieli na shardy |
 
@@ -19,7 +19,8 @@
    gitignored) + `JWT_PASSPHRASE` w `.env.test.local`; bez nich każdy test Api
    pada na `JWTEncodeFailureException`.
 2. **Baza testowa** — Foundry `ResetDatabase` robi drop/create schematu, co
-   wymaga roli OWNER (`pim`), i koliduje z bazą dev, jeśli wskażesz tę samą.
+   wymaga roli OWNER (`pim`). Bootstrap odrzuca proces inny niż `APP_ENV=test`
+   przed inicjalizacją Foundry; standardowy wrapper dodatkowo wymusza test-env.
 3. **Pamięć** — pełny run przekracza 256M (`FlushWithoutClearInLoopRuleTest`).
 
 ## Procedura: kernel-suity w izolowanym kontenerze
@@ -48,6 +49,10 @@ docker run --rm --entrypoint sh \
 
 Kluczowe decyzje (każda odkryta boleśnie):
 
+- **Działający stack → tylko `composer test`** — wrapper eksportuje procesowy
+  `APP_ENV=test` i synchroniczne transporty przed bootem. Bezpośredni PHPUnit
+  jest dozwolony niżej wyłącznie w jednorazowym kontenerze, który jawnie ma
+  `-e APP_ENV=test` i dedykowany DSN.
 - **`--entrypoint sh`** — domyślny entrypoint obrazu robi doctrine-checki i
   zjada argumenty.
 - **Wolumen `pim_api_vendor`** — vendor z obrazu stacka; przy podejrzeniu

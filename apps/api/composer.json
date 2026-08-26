@@ -112,8 +112,7 @@
         "cs-fix": "php-cs-fixer fix --using-cache=no",
         "test": [
             "Composer\\Config::disableProcessTimeout",
-            "@php bin/console cache:clear --env=test --quiet",
-            "@php vendor/bin/phpunit"
+            "bash bin/test"
         ]
     },
     "conflict": {
