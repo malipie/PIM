@@ -27,7 +27,6 @@ use App\Shared\Domain\Tenant;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Uid\Uuid;
-use Symfony\Contracts\Cache\TagAwareCacheInterface;
 
 /**
  * #3034 — batch `where-used` endpoints for the modeling list pages.
@@ -309,9 +308,8 @@ final class ModelingUsageApiTest extends CatalogApiTestCase
 
     private function clearUsageCache(): void
     {
-        $pool = self::getContainer()->get('pim.modeling_cache');
-        \assert($pool instanceof TagAwareCacheInterface);
-        $pool->invalidateTags([UsageQueryService::CACHE_TAG]);
+        self::getContainer()->get('pim.modeling_cache')
+            ->invalidateTags([UsageQueryService::CACHE_TAG]);
     }
 
     private function seedLimitedUsers(Tenant $tenant): void
