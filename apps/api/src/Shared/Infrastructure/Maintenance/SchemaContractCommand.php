@@ -9,13 +9,13 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ManyToManyOwningSideMapping;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Process\Process;
 
-use const PHP_BINARY;
 use const SORT_STRING;
 
 /**
@@ -77,8 +77,6 @@ final class SchemaContractCommand extends Command
         #[Autowire(service: 'doctrine.dbal.owner_connection')]
         private readonly Connection $ownerConnection,
         private readonly EntityManagerInterface $entityManager,
-        #[Autowire(param: 'kernel.project_dir')]
-        private readonly string $projectDir,
     ) {
         parent::__construct();
     }
@@ -87,6 +85,25 @@ final class SchemaContractCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
         $errors = [];
+
+        [$ormDriftOk, $ormDriftOutput] = $this->runConsole('doctrine:schema:update', '--dump-sql');
+        $ormDrift = $this->normaliseSqlStatements($ormDriftOutput);
+        // A nested schema command does not inherit the migrations command's
+        // schema-assets filter and proposes dropping its version table. That
+        // exact table is owned and presence-checked separately below.
+        $ormDrift = array_values(array_diff($ormDrift, ['DROP TABLE doctrine_migration_versions;']));
+        $ormDriftHash = hash('sha256', implode("\n", $ormDrift)."\n");
+        if (
+            !$ormDriftOk
+            || self::ORM_DRIFT_STATEMENT_COUNT !== \count($ormDrift)
+            || self::ORM_DRIFT_SHA256 !== $ormDriftHash
+        ) {
+            $errors[] = sprintf(
+                'ORM drift differs from the reviewed allowlist: %d statement(s), sha256=%s. Review `doctrine:schema:update --dump-sql`; never run it with --force.',
+                \count($ormDrift),
+                $ormDriftHash,
+            );
+        }
 
         [$migrationsOk, $migrationsOutput] = $this->runConsole('doctrine:migrations:up-to-date');
         if (!$migrationsOk) {
@@ -121,21 +138,6 @@ final class SchemaContractCommand extends Command
         }
         if ([] !== $unowned) {
             $errors[] = 'Public tables without an owner: '.implode(', ', $unowned);
-        }
-
-        [$ormDriftOk, $ormDriftOutput] = $this->runConsole('doctrine:schema:update', '--dump-sql');
-        $ormDrift = $this->normaliseSqlStatements($ormDriftOutput);
-        $ormDriftHash = hash('sha256', implode("\n", $ormDrift)."\n");
-        if (
-            !$ormDriftOk
-            || self::ORM_DRIFT_STATEMENT_COUNT !== \count($ormDrift)
-            || self::ORM_DRIFT_SHA256 !== $ormDriftHash
-        ) {
-            $errors[] = sprintf(
-                'ORM drift differs from the reviewed allowlist: %d statement(s), sha256=%s. Review `doctrine:schema:update --dump-sql`; never run it with --force.',
-                \count($ormDrift),
-                $ormDriftHash,
-            );
         }
 
         $ownerCounts = array_count_values($owners);
@@ -211,16 +213,24 @@ final class SchemaContractCommand extends Command
     }
 
     /** @return array{bool, string} */
-    private function runConsole(string ...$arguments): array
+    private function runConsole(string $commandName, string ...$options): array
     {
-        $process = new Process(
-            [PHP_BINARY, $this->projectDir.'/bin/console', ...$arguments, '--no-interaction'],
-            $this->projectDir,
-        );
-        $process->setTimeout(180);
-        $process->run();
+        $application = $this->getApplication();
+        if (null === $application) {
+            return [false, 'Console application is not available.'];
+        }
 
-        return [$process->isSuccessful(), $process->getOutput()."\n".$process->getErrorOutput()];
+        $parameters = [];
+        foreach ($options as $option) {
+            $parameters[$option] = true;
+        }
+
+        $input = new ArrayInput($parameters);
+        $input->setInteractive(false);
+        $output = new BufferedOutput();
+        $exitCode = $application->find($commandName)->run($input, $output);
+
+        return [Command::SUCCESS === $exitCode, $output->fetch()];
     }
 
     /** @return list<string> */
