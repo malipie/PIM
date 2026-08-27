@@ -65,17 +65,17 @@ pnpm dev          # foreground, Ctrl+C zatrzymuje
 pnpm stack:up     # detached, działa w tle
 pnpm stack:logs   # tail logów
 
-# 4. Zainicjalizuj bazę: drop + create + migrate + audit:schema:update + fixtures.
+# 4. Zainicjalizuj bazę: drop + create + migracje (wraz z auditorem) + fixtures.
 #    Jeden skrót (zalecane — patrz "pim:db:reset" niżej):
 docker compose exec -T api php bin/console pim:db:reset --with-fixtures --force
-#    Manualny odpowiednik to TRZY kroki (audit:schema:update jest wymagany —
-#    tabele *_audit są poza pipeline'em migracji; bez tego INSERT do audytowanej
-#    encji wywala 500 "relation '*_audit' does not exist").
-#    UWAGA (#2178): po splicie ról W1-1 audit:schema:update i fixtures:load
-#    wymagają roli owner — stąd swap DATABASE_URL (migrate ma własne połączenie
-#    owner w konfiguracji; pim:db:reset robi ten swap sam):
+#    Manualny odpowiednik to dwa kroki mutujące + read-only gate. Od #3019
+#    wszystkie aktywne tabele *_audit są własnością migracji;
+#    `audit:schema:update --force` jest zabronione jako ukryty mutator schematu.
+#    UWAGA (#2178): po splicie ról W1-1 fixtures:load wymaga roli owner — stąd
+#    swap DATABASE_URL (migrate ma własne połączenie owner w konfiguracji;
+#    pim:db:reset robi ten swap sam):
 #      docker compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction
-#      docker compose exec -T api sh -c 'DATABASE_URL="$DATABASE_URL_OWNER" php bin/console audit:schema:update --force'
+#      docker compose exec -T api php bin/console pim:db:schema:validate --no-interaction
 #      docker compose exec -T api sh -c 'DATABASE_URL="$DATABASE_URL_OWNER" php bin/console doctrine:fixtures:load --no-interaction'
 
 # 5. Sprawdź single-origin i zaloguj się (admin@demo.localhost / changeme)
@@ -108,14 +108,14 @@ docker compose exec -T api php bin/console pim:db:reset --with-fixtures --force
 ```
 
 Robi po kolei: `doctrine:database:drop` → `create` → `migrations:migrate` →
-`audit:schema:update --force` → (z `--with-fixtures`) `fixtures:load` +
+`pim:db:schema:validate` → (z `--with-fixtures`) `fixtures:load` +
 `pim:search:reindex --purge`. Flagi: `--with-fixtures` (załaduj fixtures),
 `--force` (pomiń pytanie potwierdzające), `--force-prod` (dopuść `APP_ENV=prod` —
 domyślnie odmawia). Używaj **tylko na bazie deweloperskiej**.
 
 Komenda **sama przełącza się na połączenie owner** (`DATABASE_URL_OWNER`,
 rola `pim`) — po splicie ról W1-1 runtime'owa rola `pim_app` nie ma DDL ani
-BYPASSRLS, więc drop/create/audit/fixtures pod nią padają (#2178). Nie trzeba
+BYPASSRLS, więc drop/create/fixtures pod nią padają (#2178). Nie trzeba
 (i nie należy) ręcznie podmieniać env-varów. Drop wykonuje się jako
 `DROP DATABASE … WITH (FORCE)` — sesje trzymane przez api/worker są zrywane
 atomowo, **nie trzeba zatrzymywać kontenerów** przed resetem.

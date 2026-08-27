@@ -203,6 +203,7 @@ jobs:
           docker compose exec -T api php bin/console cache:clear --env=dev --no-warmup
           docker compose exec -T api php bin/console cache:warmup --env=dev
           docker compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction --env=dev
+          PIM_ALLOW_SCHEMA_DRIFT_PROBE=1 bash scripts/test-schema-contract.sh
           # Use the owner DSN already provided to the container as
           # DATABASE_URL_OWNER (compose env) — expanded INSIDE the container so
           # no literal credential lives in this workflow file.

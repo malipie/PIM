@@ -50,7 +50,7 @@ final class DatabaseResetCommand extends Command
         // Closed right after the FORCE drop: a console-boot listener may have
         // already opened it, and a session killed by DROP … WITH (FORCE)
         // surfaces as "terminating connection due to administrator command"
-        // on next reuse (observed on the chained audit:schema:update step).
+        // on next reuse (observed on chained post-create console steps).
         // close() discards the dead socket; DBAL reconnects lazily.
         #[Autowire(service: 'doctrine.dbal.default_connection')]
         private readonly Connection $defaultConnection,
@@ -99,7 +99,7 @@ final class DatabaseResetCommand extends Command
 
         // GOLIVE #2178 (cold-start L5/L6/L8) — since the W1-1 role split the
         // default connection is `pim_app` (non-owner, NOBYPASSRLS): database
-        // drop/create and audit:schema:update need the table-owner role, and
+        // drop/create need the table-owner role, and
         // fixtures/reindex need BYPASSRLS (a CLI run never sets the per-request
         // tenant GUC, so FORCE RLS would deny every insert / hide every row).
         // The entrypoint seed already works around this by swapping
@@ -199,14 +199,7 @@ final class DatabaseResetCommand extends Command
         $steps = [
             ['doctrine:database:create', ['--if-not-exists' => true]],
             ['doctrine:migrations:migrate', ['--no-interaction' => true, '--allow-no-migration' => true]],
-            // dh_auditor creates *_audit tables outside the regular Doctrine
-            // migrations pipeline. Without this step, INSERTs into audited
-            // entities (ImportSession, ImportProfile, Channel, Asset, …)
-            // trip a "relation does not exist" inside the auditor listener,
-            // rollback the surrounding transaction, and the operator sees a
-            // bare 500 with a foreign-key violation when the parent rows
-            // were never actually committed.
-            ['audit:schema:update', ['--force' => true]],
+            ['pim:db:schema:validate', []],
         ];
 
         if ($loadFixtures) {

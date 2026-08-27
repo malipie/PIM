@@ -21,13 +21,8 @@ use Zenstruck\Foundry\Test\ResetDatabase;
  *   - the audit-log cleanup CLI (`pim:audit:cleanup`) lists every
  *     `<entity>_audit` table by introspecting `pg_tables`.
  *
- * What this test deliberately does NOT do: insert a row through the
- * Doctrine ORM and read the audit row back. The DAMADoctrineTestBundle
- * wraps every PHPUnit test in a single rolled-back transaction so the
- * audit subscriber's INSERT and the assertion's SELECT see different
- * states. End-to-end audit-write coverage runs through manual smoke
- * + production observability — see `lessons.md` (0.11.4 entry) for
- * the workaround when this needs CI coverage in a follow-up.
+ * End-to-end write coverage needs a real request (the auditor's user/security
+ * provider is request-scoped) and lives in AuditWriteApiTest.
  */
 final class AuditLogTest extends KernelTestCase
 {
@@ -51,6 +46,9 @@ final class AuditLogTest extends KernelTestCase
         'tenants_audit',
         'api_profiles_audit',
         'api_keys_audit',
+        'import_sessions_audit',
+        'import_profiles_audit',
+        'backups_audit',
     ];
 
     #[Test]

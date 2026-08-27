@@ -256,7 +256,9 @@ fi
 step "migrations" "running" "doctrine:migrations:migrate"
 dc exec -T api php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration >/dev/null 2>&1 \
     || fail "migrations" 20 "migracje nie przeszły"
-step "migrations" "ok" "schemat aktualny"
+dc exec -T api php bin/console pim:db:schema:validate --no-interaction >/dev/null 2>&1 \
+    || fail "migrations" 20 "schemat nie spełnia kontraktu migracji/auditora"
+step "migrations" "ok" "schemat aktualny i zgodny z kontraktem"
 
 # Dopiero ze schematem w bazie healthcheck ma szansę przejść.
 step "api-health" "running" "oczekiwanie na healthy po migracjach"

@@ -8,7 +8,7 @@ import { loginAsAdmin } from './helpers/auth';
  * Uses the newest session from the history table; skips when the
  * environment has no import sessions yet.
  */
-test('NUI-11 — session view renders pipeline, summary and report link', async ({ page }) => {
+test('NUI-11 — session view renders pipeline, summary and report action', async ({ page }) => {
   await loginAsAdmin(page);
   await page.goto('/integrations/imports/sessions');
 
@@ -30,7 +30,7 @@ test('NUI-11 — session view renders pipeline, summary and report link', async 
 
   // Terminal session shows the results card with the report download.
   await expect(page.getByText(/zaimportowano|imported/i).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('link', { name: /raport|report/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /raport|report/i })).toBeVisible();
 });
 
 /**
