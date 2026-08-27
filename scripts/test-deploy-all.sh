@@ -156,6 +156,10 @@ wymagaj_kolejnosc "$log" 'cache:clear' 'up -d --force-recreate' \
     "cache:clear wyprzedza wznowienie usług"
 wymagaj_kolejnosc "$log" 'doctrine:migrations:migrate' 'stop api worker agent-worker' \
     "migracje idą przed zatrzymaniem usług"
+wymagaj_kolejnosc "$log" 'doctrine:migrations:migrate' 'pim:db:schema:validate' \
+    "read-only kontrakt schematu idzie po migracjach"
+wymagaj_kolejnosc "$log" 'pim:db:schema:validate' 'stop api worker agent-worker' \
+    "kontrakt schematu blokuje wypuszczenie kodu"
 wymagaj_kolejnosc "$log" 'build api worker' 'doctrine:migrations:migrate' \
     "build wyprzedza migracje"
 wymagaj_kolejnosc "$log" 'up -d --force-recreate' 'curl' \

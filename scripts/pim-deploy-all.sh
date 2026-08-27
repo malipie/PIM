@@ -7,8 +7,8 @@
 #
 #   1. zrzut przed wdrożeniem (#2865)   — jedyna rzecz, która cofa złą migrację
 #   2. build api + worker               — nowy obraz (agent-worker używa tego samego)
-#   3. migracje z NOWEGO obrazu         — `run --rm --no-deps`, zanim nowy kod
-#                                         zacznie obsługiwać ruch. Zasada z
+#   3. migracje + schema contract       — `run --rm --no-deps`, zanim nowy kod
+#      z NOWEGO obrazu                    zacznie obsługiwać ruch. Zasada z
 #                                         wdrożenia 2026-08-13: migrację robi
 #                                         się PRZED wypuszczeniem kodu,
 #                                         niezależnie od tego, co pokazuje diff
@@ -145,7 +145,7 @@ if [ "$dry_run" = true ]; then
 PLAN (nic nie zostało zmienione). Dla każdej instancji, po kolei:
   1. zrzut przed wdrożeniem $([ "$skip_dump" = true ] && echo '(POMINIĘTY — --skip-dump)')
   2. build api worker (agent-worker używa tego samego obrazu)
-  3. migracje z nowego obrazu (run --rm --no-deps)
+  3. migracje + read-only kontrakt schematu z nowego obrazu (run --rm --no-deps)
   4. stop usług aplikacyjnych (nikt nie może czytać kasowanego cache)
   5. cache:clear w jednorazowym kontenerze, osobno per usługa
   6. up -d --force-recreate
@@ -227,9 +227,11 @@ deploy_one() {
     dc build $do_budowy >/dev/null 2>&1 || { echo "  BŁĄD: build nie powiódł się." >&2; return 30; }
 
     # Migracje z NOWEGO obrazu, zanim nowe kontenery zaczną obsługiwać ruch.
-    echo "  [3/7] migracje (nowy obraz, przed wypuszczeniem kodu)"
+    echo "  [3/7] migracje + read-only schema contract (nowy obraz, przed wypuszczeniem kodu)"
     dc run --rm --no-deps api php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration >/dev/null 2>&1 \
         || { echo "  BŁĄD: migracje nie przeszły." >&2; return 40; }
+    dc run --rm --no-deps api php bin/console pim:db:schema:validate --no-interaction >/dev/null 2>&1 \
+        || { echo "  BŁĄD: schemat nie spełnia kontraktu migracji/auditora." >&2; return 40; }
 
     # KROK 4 i 5 są nierozłączne: cache wolno czyścić tylko wtedy, gdy żaden
     # proces nie trzyma skompilowanego kontenera DI (#2991).
