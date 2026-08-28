@@ -230,7 +230,17 @@ deploy_one() {
     echo "  [3/7] migracje + read-only schema contract (nowy obraz, przed wypuszczeniem kodu)"
     dc run --rm --no-deps api php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration >/dev/null 2>&1 \
         || { echo "  BŁĄD: migracje nie przeszły." >&2; return 40; }
-    dc run --rm --no-deps api php bin/console pim:db:schema:validate --no-interaction >/dev/null 2>&1 \
+    # APP_CACHE_DIR jest tu OBOWIĄZKOWY (#3050). Wolumen /app/var przesłania
+    # katalog cache z obrazu, więc jednorazowy kontener startuje na
+    # SKOMPILOWANYM KONTENERZE DI SPRZED wdrożenia — a `cache:clear` jest
+    # dopiero w kroku 5. Komenda dodana w tej samej partii co bramka nie jest
+    # wtedy zarejestrowana i konsola kończy się `NamespaceNotFoundException`,
+    # co skrypt raportował jako „schemat nie spełnia kontraktu". Dokładnie to
+    # zablokowało wdrożenie ccaa0675 na instancji `platform`, choć jej schemat
+    # był poprawny. Własny katalog cache daje świeży kontener DI z nowego
+    # obrazu i — w odróżnieniu od `cache:clear` — nie dotyka /app/var, którego
+    # używają działające procesy (pułapka #2991).
+    dc run --rm --no-deps -e APP_CACHE_DIR=/tmp/schema-contract api php bin/console pim:db:schema:validate --no-interaction >/dev/null 2>&1 \
         || { echo "  BŁĄD: schemat nie spełnia kontraktu migracji/auditora." >&2; return 40; }
 
     # KROK 4 i 5 są nierozłączne: cache wolno czyścić tylko wtedy, gdy żaden

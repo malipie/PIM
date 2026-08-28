@@ -165,6 +165,26 @@ wymagaj_kolejnosc "$log" 'build api worker' 'doctrine:migrations:migrate' \
 wymagaj_kolejnosc "$log" 'up -d --force-recreate' 'curl' \
     "smoke dopiero po wznowieniu usług"
 
+# #3050 — bramka kontraktu schematu startuje z wolumenem /app/var, w którym
+# leży skompilowany kontener DI SPRZED wdrożenia, a `cache:clear` jest dopiero
+# w kroku 5. Bez własnego katalogu cache komenda dodana w tej samej partii co
+# bramka nie jest zarejestrowana i konsola kończy się NamespaceNotFoundException,
+# raportowanym jako „schemat nie spełnia kontraktu". Dokładnie to zablokowało
+# wdrożenie ccaa0675 na instancji `platform` przy poprawnym schemacie.
+if grep -qE 'run --rm --no-deps -e APP_CACHE_DIR=[^ ]+ api php bin/console pim:db:schema:validate' "$log"; then
+    ok "kontrakt schematu jedzie z własnym katalogiem cache (świeży kontener DI z nowego obrazu)"
+else
+    blad "pim:db:schema:validate bez APP_CACHE_DIR — wystartuje na cache DI sprzed wdrożenia (#3050)"
+fi
+
+# Własny katalog cache nie może wskazywać na współdzielony /app/var — to by
+# było czyszczenie kontenera DI pod działającym procesem tylnymi drzwiami.
+if grep -qE 'APP_CACHE_DIR=/app/var' "$log"; then
+    blad "APP_CACHE_DIR wskazuje na współdzielony /app/var — to ta sama pułapka co #2991"
+else
+    ok "katalog cache bramki jest poza /app/var"
+fi
+
 # Stary, kruchy licznik nie może wrócić.
 if grep -q 'messenger:failed:show' "$log"; then
     blad "licznik kolejki failed nadal parsuje tabelę 'messenger:failed:show' (#2989)"
