@@ -282,10 +282,17 @@ dc exec -T -e "${owner_password_env}=${!owner_password_env}" api php bin/console
     || fail "tenant" 50 "bootstrap tenanta/właściciela nie powiódł się"
 step "tenant" "ok" "tenant '${code}' i właściciel ${owner_email}"
 
-# ── 8. Worker ───────────────────────────────────────────────────────────────
-step "stack-worker" "running" "start workera"
-dc up -d worker mercure >/dev/null 2>&1 || fail "stack-worker" 10 "worker/mercure nie wstały"
-step "stack-worker" "ok" "worker i mercure działają"
+# ── 8. Workery ──────────────────────────────────────────────────────────────
+#
+# `agent-worker` jedzie razem z `worker` (#3046): tenant zakładany z panelu ma
+# włączonego agenta i transport `agent` przyjmuje komunikaty, więc bez tego
+# procesu tury agenta i generowanie treści lądują w kolejce, której nikt nie
+# konsumuje — bez błędu i bez timeoutu, po prostu cisza. Trzy pierwsze
+# instancje miały workera tylko dlatego, że przeszły przez `pim-deploy-all.sh`.
+# Lista usług jest pilnowana przez `scripts/test-tenant-new.sh`.
+step "stack-worker" "running" "start workerów"
+dc up -d worker agent-worker mercure >/dev/null 2>&1 || fail "stack-worker" 10 "workery/mercure nie wstały"
+step "stack-worker" "ok" "worker, agent-worker i mercure działają"
 
 # ── 8b. Target Prometheusa ──────────────────────────────────────────────────
 #
