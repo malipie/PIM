@@ -10,9 +10,9 @@ use App\Catalog\Application\Bulk\BulkChangeStatusHandler;
 use App\Catalog\Application\Bulk\BulkMoveCategoryHandler;
 use App\Catalog\Application\Bulk\BulkRemoveCategoryHandler;
 use App\Catalog\Application\BulkContext;
-use App\Catalog\Application\Handler\RebuildAttributesIndexedHandler;
 use App\Catalog\Application\Command\CreateCatalogObject\CreateCatalogObjectCommand;
 use App\Catalog\Application\Command\CreateCatalogObject\CreateCatalogObjectHandler;
+use App\Catalog\Application\Handler\RebuildAttributesIndexedHandler;
 use App\Catalog\Application\Message\ObjectValuesChangedMessage;
 use App\Catalog\Application\Reindex\BulkReindexQueueInterface;
 use App\Catalog\Contracts\Command\PendingBatchCommitPort;
@@ -520,9 +520,8 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
     /**
      * @param array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>, locale: ?string, channel: ?string}>> $perObject
      * @param array<string, mixed>                                                                                                                    $provenanceMeta
-     *
-     * @param bool $rebuildInline #3053 — caller rebuilds the projection after the
-     *                             commit, so the chunk loop must not enqueue it too
+     * @param bool                                                                                                                                    $rebuildInline  #3053 — caller rebuilds the projection after the
+     *                                                                                                                                                                commit, so the chunk loop must not enqueue it too
      *
      * @return array{0: int, 1: int, 2: int, 3: list<array{objectId: string, attributeCode: string, message: string}>}
      */
