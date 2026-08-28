@@ -7,7 +7,7 @@ namespace App\Catalog\Application\Validation;
 use App\Catalog\Domain\Entity\Attribute;
 
 /**
- * Contract for per-{@see \App\Catalog\Domain\AttributeType} validators
+ * Contract for per-{@see \App\Catalog\Contracts\AttributeType} validators
  * dispatched by {@see AttributeValueValidator}.
  *
  * Implementations check the raw JSONB `value` payload + apply the rules

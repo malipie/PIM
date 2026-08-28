@@ -8,7 +8,7 @@ use App\Agent\Application\Tool\AgentToolContext;
 use App\Agent\Application\Tool\GenerateFeedTool;
 use App\Agent\Application\Tool\SuggestFeedStructureTool;
 use App\Agent\Application\Tool\ToolKind;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;

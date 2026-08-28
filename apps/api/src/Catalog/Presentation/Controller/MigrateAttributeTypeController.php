@@ -7,7 +7,7 @@ namespace App\Catalog\Presentation\Controller;
 use App\Catalog\Application\Migration\AttributeMigrationExecutor;
 use App\Catalog\Application\Migration\AttributeMigrationPlan;
 use App\Catalog\Application\Migration\AttributeMigrationPlanner;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
 use App\Identity\Contracts\Attribute\RequiresPermission;
 use Symfony\Component\HttpFoundation\JsonResponse;

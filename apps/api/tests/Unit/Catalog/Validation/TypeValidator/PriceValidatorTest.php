@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Validation\TypeValidator;
 
 use App\Catalog\Application\Validation\TypeValidator\PriceValidator;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;

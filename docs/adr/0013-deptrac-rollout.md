@@ -43,6 +43,22 @@ A baseline of 27 pre-existing violations lives inline in `skip_violations`, each
 2. `ChannelObjectTypeMapping` cross-BC FKs to `Catalog\Domain\Entity\ObjectType` + `Attribute`. RF-19 deferred this junction's Uuid sweep.
 3. `Shared\Infrastructure\Http\RequestTenantSubscriber` depending on `Identity\Application\CurrentTenantProvider`. Cleanup: move provider into `Shared\Application`.
 
+### 2026-08-28 amendment — first Import/Export baseline burn-down
+
+`AttributeType` is shared vocabulary, not a Catalog implementation detail. Its
+canonical enum therefore lives in `Catalog/Contracts`; Catalog Domain,
+Import and Export consume that one type, and Doctrine maps the same backed enum
+from its Contracts FQCN. The former `Catalog/Domain/AttributeType` name is a
+runtime compatibility alias only and must not be used by new source or tests.
+
+This mechanical seam removed 47 skipped Import/Export → Catalog Domain
+occurrences and 8 source/target pairs without changing enum values, database
+storage, payloads or the ruleset. The live baseline after the tranche is 309
+occurrences / 175 pairs, with zero violations and zero uncovered dependencies.
+The architecture test treats those numbers as upper budgets: later work may
+lower them, but a new skip or pair fails the suite instead of silently regrowing
+the baseline.
+
 CI: `Deptrac (architectural fitness)` job in `.github/workflows/quality-php.yml`, required-on-merge.
 
 ### Consequences

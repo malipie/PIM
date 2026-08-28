@@ -6,7 +6,7 @@ namespace App\Tests\Integration\Catalog;
 
 use App\Catalog\Application\BuiltInLabelAttributeSeeder;
 use App\Catalog\Application\BuiltInObjectTypeSeeder;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\AttributeRepositoryInterface;

@@ -40,7 +40,7 @@
                 <option name="jsonb">true</option>
             </options>
         </field>
-        <field name="type" type="string" length="32" enum-type="App\Catalog\Domain\AttributeType"/>
+        <field name="type" type="string" length="32" enum-type="App\Catalog\Contracts\AttributeType"/>
         <field name="isLocalizable" type="boolean" column="is_localizable">
             <options>
                 <option name="default">false</option>

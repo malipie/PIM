@@ -726,8 +726,10 @@ parameters:
     #     controllers whose User reach is entangled with other Catalog reaches
     #     (ImportImportProfile, StartImport, ValidateDryRun) — same mechanical
     #     migration, kept out of #2736 to keep the diff reviewable.
-    #   - the Export/Import -> Catalog\Domain reaches, which need a Catalog
-    #     Contracts seam rather than a swap (design work, not mechanics).
+    #   - the remaining Export/Import -> Catalog\Domain reaches. #3023 moved
+    #     the shared AttributeType vocabulary to Catalog Contracts and removed
+    #     47 occurrences / 8 pairs; entity and repository reaches still need
+    #     DTO/query/command seams rather than ruleset exceptions.
     skip_violations:
         App\Catalog\Application\DemoCatalogSeeder:
             - App\Asset\Domain\Entity\Asset
@@ -776,7 +778,6 @@ parameters:
         #    baselined here; the shared writer core (#1466, closed) removed the
         #    bulk — what is left is tracked by #2736.
         App\Export\Application\Builder\ExportBuilder:
-            - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\Attribute
             - App\Catalog\Domain\Entity\CatalogObject
             - App\Catalog\Domain\Entity\ObjectValue
@@ -809,7 +810,6 @@ parameters:
             - App\Catalog\Domain\Entity\ObjectTypeAttributeGroup
             - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
         App\Export\Application\Builder\ValueSerializer:
-            - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\ObjectValue
         App\Export\Application\Sync\SyncExportRunner:
             - App\Catalog\Domain\Entity\CatalogObject
@@ -872,7 +872,6 @@ parameters:
             - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
             - App\Catalog\Domain\Repository\ObjectRelationRepositoryInterface
         App\Import\Application\Service\ImportObjectCreator:
-            - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\Attribute
             - App\Catalog\Domain\Entity\CatalogObject
             - App\Catalog\Domain\Entity\ObjectCategory
@@ -888,7 +887,6 @@ parameters:
         # #1728 — attribute auto-create mints Attribute + ObjectTypeAttribute via
         # the same Import→Catalog seam as ImportObjectCreator.
         App\Import\Application\Service\AttributeAutoCreator:
-            - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\Attribute
             - App\Catalog\Domain\Entity\ObjectType
             - App\Catalog\Domain\Entity\ObjectTypeAttribute
@@ -907,7 +905,6 @@ parameters:
             - App\Catalog\Application\Command\CreateAttribute\CreateAttributeCommand
             - App\Catalog\Application\Command\UpdateAttribute\UpdateAttributeCommand
             - App\Catalog\Application\ObjectTypeService
-            - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\Attribute
             - App\Catalog\Domain\Entity\AttributeGroup
             - App\Catalog\Domain\Entity\AttributeGroupAttribute
@@ -942,7 +939,6 @@ parameters:
             - App\Catalog\Domain\Provenance
             - App\Catalog\Domain\Repository\ObjectValueRepositoryInterface
         App\Import\Application\Service\ImportValidationService:
-            - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\Attribute
             - App\Catalog\Domain\Entity\ObjectType
             - App\Catalog\Domain\ObjectKind
@@ -973,7 +969,6 @@ parameters:
             - App\Catalog\Domain\Entity\ObjectType
             - App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface
             - App\Identity\Domain\Entity\User
-            - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\Attribute
             - App\Catalog\Domain\Repository\AttributeRepositoryInterface
         App\Import\Presentation\Controller\ValidateDryRunController:
@@ -1003,7 +998,6 @@ parameters:
             # part of the #1466 Import → Catalog_Internals burndown.
             - App\Catalog\Application\BulkContext
             - App\Catalog\Application\Message\ObjectValuesChangedMessage
-            - App\Catalog\Domain\AttributeType
             - App\Catalog\Domain\Entity\Attribute
             - App\Catalog\Domain\Entity\CatalogObject
             - App\Catalog\Domain\Entity\ObjectType

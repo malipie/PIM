@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Api\Import;
 
 use App\Catalog\Application\Reindex\BulkReindexQueueInterface;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Contracts\Service\AttributesIndexedBatchRebuilder;
 use App\Catalog\Contracts\Service\BulkOperationScope;
-use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectTypeAttribute;

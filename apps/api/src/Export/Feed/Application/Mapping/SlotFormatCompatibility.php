@@ -16,7 +16,7 @@ use App\Export\Feed\Domain\Descriptor\SlotFormat;
  * slot format. It is advisory only — the mapper never blocks the mapping, it
  * paints a badge so the operator can override deliberately.
  *
- * Attribute type vocabulary mirrors {@see \App\Catalog\Domain\AttributeType};
+ * Attribute type vocabulary mirrors {@see \App\Catalog\Contracts\AttributeType};
  * we key on the string tag carried by the cross-BC
  * {@see \App\Catalog\Contracts\Query\AttributeSummary} to avoid coupling the
  * Feed sub-area to the Catalog domain enum.

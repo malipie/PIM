@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Integration\Generic;
 
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Contracts\Integration\InboundRecordWriter;
 use App\Catalog\Contracts\Integration\OutboundRecordReader;
 use App\Catalog\Contracts\Integration\OutboundResultWriter;
-use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;

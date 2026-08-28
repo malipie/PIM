@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application;
 
 use App\Catalog\Application\ValueWriteCore;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;

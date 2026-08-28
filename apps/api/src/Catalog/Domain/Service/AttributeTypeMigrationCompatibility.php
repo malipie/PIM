@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Domain\Service;
 
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 
 /**
  * UI-08.6 (#261) — compatibility matrix for `Attribute.type` migrations.

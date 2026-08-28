@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Export\Catalog;
 
 use App\Catalog\Application\Filter\FilterDslResolver;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectTypeAttribute;

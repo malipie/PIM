@@ -449,8 +449,8 @@ final class SearchEndpointsApiTest extends CatalogApiTestCase
         \assert($product instanceof \App\Catalog\Domain\Entity\ObjectType);
 
         $em = $this->em();
-        $sku = new \App\Catalog\Domain\Entity\Attribute('sku', ['en' => 'SKU'], \App\Catalog\Domain\AttributeType::Text);
-        $name = new \App\Catalog\Domain\Entity\Attribute('name', ['en' => 'Name'], \App\Catalog\Domain\AttributeType::Text);
+        $sku = new \App\Catalog\Domain\Entity\Attribute('sku', ['en' => 'SKU'], \App\Catalog\Contracts\AttributeType::Text);
+        $name = new \App\Catalog\Domain\Entity\Attribute('name', ['en' => 'Name'], \App\Catalog\Contracts\AttributeType::Text);
         $em->persist($sku);
         $em->persist($name);
         $em->persist(new \App\Catalog\Domain\Entity\ObjectTypeAttribute($product, $sku, false, 1));

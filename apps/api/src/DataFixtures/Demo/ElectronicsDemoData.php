@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\DataFixtures\Demo;
 
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 
 /**
  * Static data catalog for {@see ElectronicsDemoSeeder}: category trees,

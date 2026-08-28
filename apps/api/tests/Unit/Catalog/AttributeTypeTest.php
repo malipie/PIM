@@ -4,13 +4,20 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Catalog;
 
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 final class AttributeTypeTest extends TestCase
 {
+    #[Test]
+    public function legacyDomainNameResolvesToTheContractEnum(): void
+    {
+        self::assertTrue(class_exists('App\\Catalog\\Domain\\AttributeType'));
+        self::assertSame(AttributeType::Text, constant('App\\Catalog\\Domain\\AttributeType::Text'));
+    }
+
     #[Test]
     public function casesAreDefinedExactly(): void
     {

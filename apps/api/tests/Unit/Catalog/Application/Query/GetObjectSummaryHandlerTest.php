@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Catalog\Application\Query;
 
 use App\Catalog\Application\Query\GetObjectSummary\GetObjectSummaryHandler;
 use App\Catalog\Application\Query\GetObjectSummary\GetObjectSummaryQuery;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;

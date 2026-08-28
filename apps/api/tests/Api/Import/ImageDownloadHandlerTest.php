@@ -6,8 +6,8 @@ namespace App\Tests\Api\Import;
 
 use App\Asset\Contracts\AssetIngestorInterface;
 use App\Asset\Domain\Repository\AssetRepositoryInterface;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Contracts\Service\ProductAssetLinker;
-use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;

@@ -8,7 +8,7 @@ use App\Agent\Application\Tool\AgentToolContext;
 use App\Agent\Application\Tool\GetObjectTool;
 use App\Catalog\Application\ObjectValueLocaleOverlay;
 use App\Catalog\Application\Query\AgentObjectReader;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;

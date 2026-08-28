@@ -7,7 +7,7 @@ namespace App\Tests\Integration\Agent;
 use App\Agent\Application\Tool\AgentToolContext;
 use App\Agent\Application\Tool\SuggestColumnMappingTool;
 use App\Agent\Application\Tool\ToolKind;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Import\Contracts\ColumnMappingPort;
 use App\Shared\Application\TenantContext;
