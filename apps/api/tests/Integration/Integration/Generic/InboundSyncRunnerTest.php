@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Integration\Generic;
 
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Contracts\Integration\InboundRecordWriter;
-use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\ObjectKind;

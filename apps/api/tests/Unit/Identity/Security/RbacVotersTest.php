@@ -8,7 +8,7 @@ use App\ApiConfigurator\Domain\Entity\ApiKey;
 use App\ApiConfigurator\Domain\Entity\ApiProfile;
 use App\ApiConfigurator\Domain\Enum\OutputFormat;
 use App\Asset\Domain\Entity\Asset;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\AttributeGroup;
 use App\Catalog\Domain\Entity\CatalogObject;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Catalog;
 
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Service\AttributeTypeMigrationCompatibility;
 use App\Catalog\Domain\Service\MigrationCompatibility;
 use PHPUnit\Framework\Attributes\Test;

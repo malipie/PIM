@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Catalog;
 
 use App\Catalog\Application\Bulk\BulkSetAttributeHandler;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\BulkSession;
 use App\Catalog\Domain\Entity\CatalogObject;

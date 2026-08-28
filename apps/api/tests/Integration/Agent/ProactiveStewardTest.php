@@ -8,7 +8,7 @@ use App\Agent\Application\Proactive\ProactiveStewardScanner;
 use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentMessage;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;

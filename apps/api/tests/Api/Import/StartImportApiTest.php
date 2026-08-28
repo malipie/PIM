@@ -8,7 +8,7 @@ use App\Backup\Domain\Entity\Backup;
 use App\Backup\Domain\Enum\BackupStatus;
 use App\Backup\Domain\Enum\BackupTriggerAction;
 use App\Backup\Domain\Repository\BackupRepositoryInterface;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectType;

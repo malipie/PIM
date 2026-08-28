@@ -6,7 +6,7 @@ namespace App\Tests\Api\Identity;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
 use App\Identity\Application\RbacSeeder;

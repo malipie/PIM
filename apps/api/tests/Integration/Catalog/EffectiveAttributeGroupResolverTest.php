@@ -8,7 +8,7 @@ use App\Catalog\Application\BuiltInObjectTypeSeeder;
 use App\Catalog\Application\BuiltInSystemAttributesSeeder;
 use App\Catalog\Application\Query\GetObjectFormSchema\GetObjectFormSchemaHandler;
 use App\Catalog\Application\Query\GetObjectFormSchema\GetObjectFormSchemaQuery;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\AttributeGroup;
 use App\Catalog\Domain\Entity\AttributeGroupAttribute;

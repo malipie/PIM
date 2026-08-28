@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Domain\Validator;
 
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\RelationCardinality;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Shared\Domain\Tenant;

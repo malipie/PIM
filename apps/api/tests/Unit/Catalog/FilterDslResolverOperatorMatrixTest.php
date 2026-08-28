@@ -131,7 +131,7 @@ final class FilterDslResolverOperatorMatrixTest extends TestCase
                 $attribute = new \App\Catalog\Domain\Entity\Attribute(
                     $code,
                     ['en' => $code],
-                    \App\Catalog\Domain\AttributeType::from($type),
+                    \App\Catalog\Contracts\AttributeType::from($type),
                 );
                 $attribute->changeLocalizable(true);
                 $attribute->changeScopable(true);

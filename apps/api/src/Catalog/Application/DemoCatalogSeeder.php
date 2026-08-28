@@ -6,7 +6,7 @@ namespace App\Catalog\Application;
 
 use App\Asset\Domain\Entity\Asset;
 use App\Asset\Domain\Entity\AssetVariant;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\AttributeOption;
 use App\Catalog\Domain\Entity\CatalogObject;

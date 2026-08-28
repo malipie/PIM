@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Catalog\Application;
 use App\Catalog\Application\HtmlSanitizer;
 use App\Catalog\Application\Validation\AttributeValueValidator;
 use App\Catalog\Application\ValueWriteCore;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;

@@ -6,7 +6,7 @@ namespace App\Catalog\Presentation\Controller;
 
 use App\Catalog\Application\AttributesIndexedRebuilder;
 use App\Catalog\Application\BulkContext;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectValue;

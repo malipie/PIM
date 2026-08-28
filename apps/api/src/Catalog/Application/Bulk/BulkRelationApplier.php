@@ -6,7 +6,7 @@ namespace App\Catalog\Application\Bulk;
 
 use App\Catalog\Application\Lock\AttributeLockReader;
 use App\Catalog\Application\ObjectRelationService;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\BulkLog;
 use App\Catalog\Domain\Entity\BulkSession;
 use App\Catalog\Domain\Entity\CatalogObject;

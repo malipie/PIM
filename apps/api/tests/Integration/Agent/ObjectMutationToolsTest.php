@@ -6,11 +6,11 @@ namespace App\Tests\Integration\Agent;
 
 use App\Catalog\Application\PendingChanges\AgentValueNormalizer;
 use App\Catalog\Application\PendingChanges\CreateObjectMaterializer;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Contracts\Command\PendingBatchCommitPort;
 use App\Catalog\Contracts\Command\SetStatusProposalPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangeType;
-use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\AttributeOption;
 use App\Catalog\Domain\Entity\CatalogObject;

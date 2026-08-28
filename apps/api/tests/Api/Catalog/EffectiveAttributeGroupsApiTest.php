@@ -6,7 +6,7 @@ namespace App\Tests\Api\Catalog;
 
 use App\Catalog\Application\BuiltInSystemAttributesSeeder;
 use App\Catalog\Application\ObjectTypeService;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\AttributeGroup;
 use App\Catalog\Domain\Entity\AttributeGroupAttribute;

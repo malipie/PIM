@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Catalog;
 use App\Catalog\Application\Filter\AttributeMetadataResolver;
 use App\Catalog\Application\Filter\FilterDslResolver;
 use App\Catalog\Application\Filter\FilterScopeResolver;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Repository\AttributeRepositoryInterface;
 use App\Channel\Contracts\ScopeEnumeratorInterface;

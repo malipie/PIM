@@ -6,7 +6,7 @@ namespace App\Tests\Integration\Catalog;
 
 use App\Catalog\Application\BuiltInObjectTypeSeeder;
 use App\Catalog\Application\BuiltInProductRelationAttributesSeeder;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\ObjectTypeAttribute;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\RelationCardinality;

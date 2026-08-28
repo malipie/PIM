@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Export\Application\Builder;
 
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\ObjectValue;
 use DateTimeInterface;
 

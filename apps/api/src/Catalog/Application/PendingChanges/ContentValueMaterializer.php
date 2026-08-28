@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Catalog\Application\PendingChanges;
 
 use App\Catalog\Application\Validation\AttributeValueValidator;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Contracts\Command\ContentValuePort;
 use App\Catalog\Contracts\Command\ContentValueProposal;
 use App\Catalog\Contracts\PendingChanges\PendingChangeDraft;
 use App\Catalog\Contracts\PendingChanges\PendingChangesPort;
 use App\Catalog\Contracts\PendingChanges\PendingChangeType;
-use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Repository\ObjectValueRepositoryInterface;

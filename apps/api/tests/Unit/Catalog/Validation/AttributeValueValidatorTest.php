@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Catalog\Validation;
 use App\Catalog\Application\Validation\AttributeValueValidator;
 use App\Catalog\Application\Validation\AttributeValueValidatorInterface;
 use App\Catalog\Application\Validation\ValidationError;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;

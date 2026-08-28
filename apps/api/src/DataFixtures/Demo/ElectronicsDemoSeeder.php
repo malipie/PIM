@@ -6,7 +6,7 @@ namespace App\DataFixtures\Demo;
 
 use App\Asset\Contracts\AssetIngestorInterface;
 use App\Catalog\Application\BulkContext;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\AttributeGroup;
 use App\Catalog\Domain\Entity\AttributeOption;

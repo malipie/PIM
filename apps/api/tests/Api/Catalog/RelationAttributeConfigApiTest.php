@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Api\Catalog;
 
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\RelationCardinality;
 use App\Catalog\Domain\Repository\AttributeRepositoryInterface;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application;
 
 use App\Catalog\Application\CrossFieldRulesValidator;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Repository\ObjectValueRepositoryInterface;
 use App\Catalog\Domain\Rule\CompareRule;

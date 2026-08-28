@@ -6,7 +6,7 @@ namespace App\Tests\Integration\Export\Catalog;
 
 use App\Asset\Contracts\Service\AssetInliner;
 use App\Catalog\Application\Filter\FilterDslResolver;
-use App\Catalog\Domain\AttributeType;
+use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectTypeAttribute;
