@@ -44,6 +44,13 @@ use const JSON_UNESCAPED_UNICODE;
  */
 final readonly class GenerateProductDescriptionTool implements AgentToolInterface
 {
+    /**
+     * #3048 — attribute this tool fills when the caller names none. Used to
+     * resolve the recipe by its functional key instead of a hardcoded recipe
+     * code that only the built-in seeder ever produces.
+     */
+    private const string DEFAULT_TARGET_ATTRIBUTE = 'description';
+
     public function __construct(
         private EntityManagerInterface $em,
         private ContentGroundingService $grounding,
@@ -122,7 +129,17 @@ final readonly class GenerateProductDescriptionTool implements AgentToolInterfac
 
         $recipe = $this->resolveRecipe($arguments);
         if (null === $recipe) {
-            return ['error' => 'No content recipe found — pass recipe_id or configure one for the target attribute in Settings → AI content.'];
+            // #3048 — name the attribute that was searched for. The old copy
+            // told the operator to configure a recipe they had already
+            // configured, because the lookup ran on a different key.
+            $searched = \is_string($arguments['target_attribute'] ?? null) && '' !== $arguments['target_attribute']
+                ? $arguments['target_attribute']
+                : self::DEFAULT_TARGET_ATTRIBUTE;
+
+            return ['error' => \sprintf(
+                'No content recipe targets the attribute "%s". Create one for that attribute in Settings → AI content, or pass recipe_id explicitly.',
+                $searched,
+            )];
         }
         $targetAttribute = \is_string($arguments['target_attribute'] ?? null) && '' !== $arguments['target_attribute']
             ? $arguments['target_attribute']
@@ -225,8 +242,17 @@ final readonly class GenerateProductDescriptionTool implements AgentToolInterfac
             return $this->em->find(ContentRecipe::class, $recipeId);
         }
 
+        // #3048 — the fallback used to be the hardcoded code
+        // `product_description`, which only exists when AiContentDefaultsSeeder
+        // ran. A recipe the operator created in Settings → AI content carries
+        // their own code, so it was unreachable on this path and the tool
+        // reported "no recipe" while a correctly configured one sat in the
+        // database. Resolve by TARGET ATTRIBUTE instead — that is what the
+        // recipe is keyed on functionally — defaulting to the attribute this
+        // tool exists to fill. Built-in still wins, so seeded recipes keep
+        // their precedence.
         $target = $arguments['target_attribute'] ?? null;
-        $criteria = \is_string($target) && '' !== $target ? ['targetAttribute' => $target] : ['code' => 'product_description'];
+        $criteria = ['targetAttribute' => \is_string($target) && '' !== $target ? $target : self::DEFAULT_TARGET_ATTRIBUTE];
         $repository = $this->em->getRepository(ContentRecipe::class);
 
         return $repository->findOneBy($criteria + ['isBuiltIn' => true]) ?? $repository->findOneBy($criteria);

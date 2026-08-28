@@ -73,6 +73,43 @@ final class AgentSystemPromptBuilderTest extends TestCase
     }
 
     #[Test]
+    public function carriesTheAskAiTargetIntoTheViewContext(): void
+    {
+        // #3048 — the per-field Ask AI sends the product it stands on and the
+        // field the operator clicked. Both used to be dropped by the
+        // allow-list, so the run opened by asking for the SKU of the product
+        // whose form was already on screen.
+        $run = new AgentRun(Uuid::v7(), AgentRunSurface::Chat, 'write the description', [
+            'product_id' => '01a048b5-0000-7000-8000-000000000001',
+            'target_attribute' => 'description',
+            'locale' => 'pl',
+        ]);
+
+        $prompt = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class))->buildContext($run);
+
+        self::assertStringContainsString('"product_id":"01a048b5-0000-7000-8000-000000000001"', $prompt);
+        self::assertStringContainsString('"target_attribute":"description"', $prompt);
+        self::assertStringContainsString('"locale":"pl"', $prompt);
+    }
+
+    #[Test]
+    public function aBulkSelectionStaysServerSideEvenAlongsideASingleTarget(): void
+    {
+        // The single explicit target travels; the selected UUID list must not
+        // start travelling with it.
+        $run = new AgentRun(Uuid::v7(), AgentRunSurface::CmdK, 'write descriptions', [
+            'product_id' => '01a048b5-0000-7000-8000-000000000002',
+            'selected_ids' => ['secret-id-1', 'secret-id-2'],
+        ]);
+
+        $prompt = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class))->buildContext($run);
+
+        self::assertStringContainsString('"product_id":"01a048b5-0000-7000-8000-000000000002"', $prompt);
+        self::assertStringNotContainsString('secret-id-1', $prompt);
+        self::assertStringContainsString('"selected_count":2', $prompt);
+    }
+
+    #[Test]
     public function systemPrefixIsByteStableAcrossDifferentRuns(): void
     {
         $builder = new AgentSystemPromptBuilder($this->createStub(EntityManagerInterface::class));
