@@ -150,10 +150,13 @@ final class ContentValueCommitTest extends KernelTestCase
         $reloaded = $em->find(CatalogObject::class, $object->getId());
         \assert(null !== $reloaded);
 
-        $indexed = $reloaded->getAttributesIndexed();
+        // getAttributesIndexed() is array<string, mixed>; narrow the slot before
+        // reading the envelope so PHPStan max sees a real array, not mixed.
+        $slot = $reloaded->getAttributesIndexed()['description'] ?? null;
+        self::assertIsArray($slot);
         self::assertSame(
             'Świeża treść od agenta.',
-            $indexed['description']['value'] ?? null,
+            $slot['value'] ?? null,
             'attributes_indexed must be fresh before the response returns — the UI reads the projection, not object_values',
         );
 
