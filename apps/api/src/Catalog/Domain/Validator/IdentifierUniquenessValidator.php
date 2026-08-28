@@ -6,7 +6,7 @@ namespace App\Catalog\Domain\Validator;
 
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
-use Doctrine\DBAL\Connection;
+use App\Catalog\Domain\Repository\IdentifierDuplicateQueryInterface;
 
 /**
  * #1179 — application-level pre-check for `identifier` value uniqueness
@@ -14,8 +14,9 @@ use Doctrine\DBAL\Connection;
  * the DB-level partial unique index (the index remains the race-proof
  * source of truth).
  *
- * Queries the trigger-maintained denormalised columns directly so the
- * lookup rides the `object_values_identifier_uniq` index. Existing
+ * Delegates to a persistence-independent query port whose Doctrine adapter
+ * reads the trigger-maintained denormalised columns, so the lookup rides the
+ * `object_values_identifier_uniq` index. Existing
  * identifier rows always have the columns populated (the trigger runs on
  * every write); the object being saved is excluded by id so re-saving the
  * same value does not collide with itself.
@@ -26,34 +27,12 @@ use Doctrine\DBAL\Connection;
 final readonly class IdentifierUniquenessValidator
 {
     public function __construct(
-        private Connection $connection,
+        private IdentifierDuplicateQueryInterface $duplicates,
     ) {
     }
 
     public function isDuplicate(CatalogObject $object, Attribute $attribute, string $value): bool
     {
-        $tenant = $object->getTenant();
-        if (null === $tenant) {
-            return false;
-        }
-
-        $found = $this->connection->fetchOne(
-            'SELECT 1 FROM object_values'
-            .' WHERE tenant_id = :tenant'
-            .' AND identifier_object_type_id = :objectType'
-            .' AND attribute_id = :attribute'
-            .' AND identifier_value = :value'
-            .' AND object_id <> :currentObject'
-            .' LIMIT 1',
-            [
-                'tenant' => $tenant->getId()->toRfc4122(),
-                'objectType' => $object->getObjectType()->getId()->toRfc4122(),
-                'attribute' => $attribute->getId()->toRfc4122(),
-                'value' => $value,
-                'currentObject' => $object->getId()->toRfc4122(),
-            ],
-        );
-
-        return false !== $found;
+        return $this->duplicates->isDuplicate($object, $attribute, $value);
     }
 }

@@ -113,6 +113,53 @@ final class EffectiveAttributeGroupResolverTest extends KernelTestCase
     }
 
     #[Test]
+    public function auxiliaryQueriesPreserveDisplayModesAttributesAndSourceProvenance(): void
+    {
+        $em = $this->em();
+        $service = new ObjectType('service-provenance', ObjectKind::Custom, ['en' => 'Service']);
+        $em->persist($service);
+
+        $global = $this->makeGroup('global-details', 'Global details');
+        $inherited = $this->makeGroup('inherited-details', 'Inherited details');
+        $declared = $this->makeGroup('declared-details', 'Declared details');
+        $em->persist(new ObjectTypeAttributeGroup(
+            $service,
+            $global,
+            position: 1,
+            displayMode: ObjectTypeAttributeGroup::DISPLAY_MODE_STACKED,
+        ));
+
+        $root = $this->makeCategory('services', 'services');
+        $leaf = $this->makeCategory('consulting', 'services.consulting', parent: $root);
+        $em->persist(new CategoryAttributeGroup($root->getId(), $service, $inherited, 1));
+        $em->persist(new CategoryAttributeGroup($leaf->getId(), $service, $declared, 1));
+        $em->flush();
+
+        $resolver = $this->resolver();
+        self::assertSame(
+            ObjectTypeAttributeGroup::DISPLAY_MODE_STACKED,
+            $resolver->loadObjectTypeGroupDisplayModes($service)[$global->getId()->toRfc4122()],
+        );
+
+        $attributes = $resolver->loadGroupAttributes([$global]);
+        self::assertCount(1, $attributes[$global->getId()->toRfc4122()]);
+        self::assertSame(
+            'global-details_field',
+            $attributes[$global->getId()->toRfc4122()][0]->getAttribute()->getCode(),
+        );
+
+        $sources = $resolver->buildSourceMap($service, $leaf);
+        self::assertSame('object_type', $sources[$global->getId()->toRfc4122()]['source']);
+        self::assertSame('inherited_from', $sources[$inherited->getId()->toRfc4122()]['source']);
+        self::assertSame(
+            $root->getId()->toRfc4122(),
+            $sources[$inherited->getId()->toRfc4122()]['sourceCategory']['id'] ?? null,
+        );
+        self::assertSame('declared_here', $sources[$declared->getId()->toRfc4122()]['source']);
+        self::assertNull($sources[$declared->getId()->toRfc4122()]['sourceCategory']);
+    }
+
+    #[Test]
     public function formSchemaHandlerReturnsNoGroupsForBuiltInProductByDefault(): void
     {
         $product = $this->makeProduct('SKU-002');
