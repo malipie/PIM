@@ -125,6 +125,15 @@ jobs:
         working-directory: .
         run: bash scripts/test-deploy-all.sh
 
+      # #3046 — provisioning startowal piec z szesciu uslug tenanta. Instancja
+      # wstawala, odpowiadala 200 i wygladala zdrowo, ale kolejka `agent` nie
+      # miala konsumenta: tury agenta i generowanie tresci lądowaly w
+      # messenger_messages bez bledu i bez timeoutu. Test porownuje ZBIORY
+      # uslug, wiec kolejna dopisana do compose'a pada tutaj, a nie u klienta.
+      - name: Tenant provisioning services (unit)
+        working-directory: .
+        run: bash scripts/test-tenant-new.sh
+
       # #2993 — retencja zrzutow sortowala po NAZWIE, a nazwa zaczyna sie od
       # skrotu commita, wiec swiezy zrzut pre-deploy bywal kasowany sekundy po
       # utworzeniu (wdrozenie 1075215c: trzy instancje, zero kopii, cisza).
