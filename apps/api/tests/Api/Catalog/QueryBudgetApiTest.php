@@ -104,10 +104,9 @@ final class QueryBudgetApiTest extends CatalogApiTestCase
     /**
      * Counts the SQL statements one authenticated GET costs.
      *
-     * `disableReboot()` keeps a single kernel — and therefore a single
-     * histogram instance — alive across requests, so the before/after delta
-     * is meaningful; without it the client rebuilds the container per
-     * request and the counter resets.
+     * `disableReboot()` keeps request warm-up state stable. Since #3021 the
+     * histogram itself is Redis-backed and survives a kernel/worker recycle;
+     * its before/after delta remains meaningful either way.
      *
      * The first request is a warm-up: it pays one-off costs (ORM metadata
      * hydration, the schema-existence probes the permission policy memoises

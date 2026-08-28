@@ -41,6 +41,9 @@ final class MetricsEndpointTest extends WebTestCase
         self::assertStringContainsString('frankenphp_worker_peak_memory_bytes', $body);
         self::assertStringContainsString('frankenphp_worker_pid', $body);
 
+        // Counters/histograms are shared through Redis across the worker pool.
+        self::assertStringContainsString('pim_shared_metrics_registry_up 1', $body);
+
         // New DB histogram surface (audit MEDIUM-003).
         self::assertStringContainsString('# TYPE db_query_duration_seconds histogram', $body);
         self::assertStringContainsString('db_query_duration_seconds_bucket{le="0.001"}', $body);
