@@ -5,12 +5,8 @@ declare(strict_types=1);
 namespace App\Catalog\Domain\Validator;
 
 use App\Catalog\Domain\Entity\Attribute;
-use App\Catalog\Domain\Entity\AttributeGroupAttribute;
-use App\Catalog\Domain\Entity\CategoryAttributeGroup;
 use App\Catalog\Domain\Entity\ObjectType;
-use App\Catalog\Domain\Entity\ObjectTypeAttribute;
-use Doctrine\ORM\EntityManagerInterface;
-use LogicException;
+use App\Catalog\Domain\Repository\AttributeCodeConflictQueryInterface;
 
 /**
  * ADR-014 / MOD-04 (#896) — checks that an Attribute code is unique within
@@ -40,7 +36,7 @@ use LogicException;
 final readonly class AttributeCodeUniquenessValidator
 {
     public function __construct(
-        private EntityManagerInterface $em,
+        private AttributeCodeConflictQueryInterface $conflicts,
     ) {
     }
 
@@ -49,81 +45,11 @@ final readonly class AttributeCodeUniquenessValidator
         ObjectType $objectType,
         ?Attribute $excludeAttribute = null,
     ): ?AttributeCodeConflict {
-        $excludeId = $excludeAttribute?->getId()->toRfc4122();
-
-        // Layer 1 — directly attached via object_type_attributes.
-        /** @var ObjectTypeAttribute|null $direct */
-        $direct = $this->em
-            ->createQuery(
-                'SELECT j, a FROM '.ObjectTypeAttribute::class.' j'
-                .' JOIN j.attribute a'
-                .' WHERE j.objectType = :type AND a.code = :code'
-                .(null !== $excludeId ? ' AND a.id <> :excludeId' : '')
-            )
-            ->setParameter('type', $objectType)
-            ->setParameter('code', $code)
-            ->setMaxResults(1)
-            ->setParameters(
-                null !== $excludeId
-                    ? ['type' => $objectType, 'code' => $code, 'excludeId' => $excludeId]
-                    : ['type' => $objectType, 'code' => $code],
-            )
-            ->getOneOrNullResult();
-
-        if (null !== $direct) {
-            return new AttributeCodeConflict(
-                code: $code,
-                existingLocation: 'base',
-                conflictingAttributeId: $direct->getAttribute()->getId(),
-            );
+        $baseConflict = $this->conflicts->findBaseConflict($code, $objectType, $excludeAttribute);
+        if (null !== $baseConflict) {
+            return $baseConflict;
         }
 
-        // Layer 2 — distributed via category_attribute_groups → attribute_group_attributes.
-        /** @var array<int, array{a_id: string, category_id: string}> $rows */
-        $rows = $this->em
-            ->createQuery(
-                'SELECT a.id AS a_id, cag.categoryObjectId AS category_id'
-                .' FROM '.CategoryAttributeGroup::class.' cag'
-                .' JOIN '.AttributeGroupAttribute::class.' aga'
-                .' WITH aga.attributeGroup = cag.attributeGroup'
-                .' JOIN aga.attribute a'
-                .' WHERE cag.targetObjectType = :type AND a.code = :code'
-                .(null !== $excludeId ? ' AND a.id <> :excludeId' : '')
-            )
-            ->setParameters(
-                null !== $excludeId
-                    ? ['type' => $objectType, 'code' => $code, 'excludeId' => $excludeId]
-                    : ['type' => $objectType, 'code' => $code],
-            )
-            ->setMaxResults(1)
-            ->getArrayResult();
-
-        if ([] !== $rows) {
-            $row = $rows[0];
-
-            return new AttributeCodeConflict(
-                code: $code,
-                existingLocation: 'category:'.$this->toUuidString($row['category_id']),
-                conflictingAttributeId: \Symfony\Component\Uid\Uuid::fromString($this->toUuidString($row['a_id'])),
-            );
-        }
-
-        return null;
-    }
-
-    /**
-     * `getArrayResult` returns Doctrine's `uuid` type as `Uuid` on local
-     * hydration but as a string under CI's stricter PHPStan analysis.
-     * Normalise both paths to RFC-4122 string.
-     */
-    private function toUuidString(mixed $raw): string
-    {
-        if ($raw instanceof \Symfony\Component\Uid\Uuid) {
-            return $raw->toRfc4122();
-        }
-        if (\is_string($raw)) {
-            return $raw;
-        }
-        throw new LogicException('Expected Uuid or string from Doctrine array result, got '.\get_debug_type($raw).'.');
+        return $this->conflicts->findCategoryConflict($code, $objectType, $excludeAttribute);
     }
 }

@@ -11,12 +11,12 @@ use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Entity\ObjectTypeAttribute;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\EffectiveAttributeGroupQueryInterface;
 use App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeAttributeRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Catalog\Domain\Service\EffectiveAttributeGroupResolver;
 use App\Identity\Contracts\Policy\AttributePermissionReader;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
@@ -456,7 +456,7 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
     private function groupResolver(): EffectiveAttributeGroupResolver
     {
         return new EffectiveAttributeGroupResolver(
-            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(EffectiveAttributeGroupQueryInterface::class),
             $this->createMock(ObjectCategoryRepositoryInterface::class),
         );
     }

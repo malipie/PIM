@@ -9,10 +9,9 @@ use App\Catalog\Domain\Entity\AttributeGroupAttribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\CategoryAttributeGroup;
 use App\Catalog\Domain\Entity\ObjectType;
-use App\Catalog\Domain\Entity\ObjectTypeAttributeGroup;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\EffectiveAttributeGroupQueryInterface;
 use App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
@@ -58,7 +57,7 @@ use Symfony\Component\Uid\Uuid;
 readonly class EffectiveAttributeGroupResolver
 {
     public function __construct(
-        private EntityManagerInterface $em,
+        private EffectiveAttributeGroupQueryInterface $groupQuery,
         private ObjectCategoryRepositoryInterface $productCategories,
     ) {
     }
@@ -172,19 +171,8 @@ readonly class EffectiveAttributeGroupResolver
      */
     private function loadObjectTypeGroups(ObjectType $type): array
     {
-        /** @var list<ObjectTypeAttributeGroup> $junctions */
-        $junctions = $this->em
-            ->createQuery(
-                'SELECT j, g FROM '.ObjectTypeAttributeGroup::class.' j'
-                .' JOIN j.attributeGroup g'
-                .' WHERE j.objectType = :type'
-                .' ORDER BY j.position ASC, g.code ASC'
-            )
-            ->setParameter('type', $type)
-            ->getResult();
-
         $groups = [];
-        foreach ($junctions as $junction) {
+        foreach ($this->groupQuery->findObjectTypeGroups($type) as $junction) {
             $group = $junction->getAttributeGroup();
             $groups[$group->getId()->toRfc4122()] = $group;
         }
@@ -202,20 +190,7 @@ readonly class EffectiveAttributeGroupResolver
             return;
         }
 
-        /** @var list<CategoryAttributeGroup> $junctions */
-        $junctions = $this->em
-            ->createQuery(
-                'SELECT j, g FROM '.CategoryAttributeGroup::class.' j'
-                .' JOIN j.attributeGroup g'
-                .' WHERE j.categoryObjectId IN (:ids)'
-                .' AND j.targetObjectType = :type'
-                .' ORDER BY j.position ASC, g.code ASC'
-            )
-            ->setParameter('ids', array_map(static fn (Uuid $u): string => $u->toRfc4122(), $categoryIds))
-            ->setParameter('type', $targetType)
-            ->getResult();
-
-        foreach ($junctions as $junction) {
+        foreach ($this->groupQuery->findCategoryGroups($categoryIds, $targetType) as $junction) {
             $group = $junction->getAttributeGroup();
             $key = $group->getId()->toRfc4122();
             if (isset($groups[$key])) {
@@ -300,20 +275,7 @@ readonly class EffectiveAttributeGroupResolver
         }
 
         foreach ($ancestorChain as $ancestor) {
-            /** @var list<CategoryAttributeGroup> $junctions */
-            $junctions = $this->em
-                ->createQuery(
-                    'SELECT j, g FROM '.CategoryAttributeGroup::class.' j'
-                    .' JOIN j.attributeGroup g'
-                    .' WHERE j.categoryObjectId = :categoryId'
-                    .' AND j.targetObjectType = :type'
-                    .' ORDER BY j.position ASC, g.code ASC'
-                )
-                ->setParameter('categoryId', $ancestor->getId(), 'uuid')
-                ->setParameter('type', $type)
-                ->getResult();
-
-            foreach ($junctions as $junction) {
+            foreach ($this->groupQuery->findCategoryGroups([$ancestor->getId()], $type) as $junction) {
                 $group = $junction->getAttributeGroup();
                 $key = $group->getId()->toRfc4122();
                 if (isset($sources[$key])) {
@@ -348,18 +310,8 @@ readonly class EffectiveAttributeGroupResolver
      */
     public function loadObjectTypeGroupDisplayModes(ObjectType $type): array
     {
-        /** @var list<ObjectTypeAttributeGroup> $junctions */
-        $junctions = $this->em
-            ->createQuery(
-                'SELECT j, g FROM '.ObjectTypeAttributeGroup::class.' j'
-                .' JOIN j.attributeGroup g'
-                .' WHERE j.objectType = :type'
-            )
-            ->setParameter('type', $type)
-            ->getResult();
-
         $modes = [];
-        foreach ($junctions as $junction) {
+        foreach ($this->groupQuery->findObjectTypeGroups($type) as $junction) {
             $modes[$junction->getAttributeGroup()->getId()->toRfc4122()] = $junction->getDisplayMode();
         }
 
@@ -381,20 +333,8 @@ readonly class EffectiveAttributeGroupResolver
             return [];
         }
 
-        /** @var list<AttributeGroupAttribute> $junctions */
-        $junctions = $this->em
-            ->createQuery(
-                'SELECT j, a, g FROM '.AttributeGroupAttribute::class.' j'
-                .' JOIN j.attribute a'
-                .' JOIN j.attributeGroup g'
-                .' WHERE g IN (:groups)'
-                .' ORDER BY j.position ASC, a.code ASC'
-            )
-            ->setParameter('groups', $groups)
-            ->getResult();
-
         $byGroup = [];
-        foreach ($junctions as $junction) {
+        foreach ($this->groupQuery->findGroupAttributes($groups) as $junction) {
             $byGroup[$junction->getAttributeGroup()->getId()->toRfc4122()][] = $junction;
         }
 

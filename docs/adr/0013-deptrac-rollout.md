@@ -24,6 +24,19 @@ Deptrac 4 wired up at `apps/api/deptrac.yaml`. Layers:
 
 Ruleset: cross-BC traffic only through `*_Contracts`. Tooling may pull from any BC, no BC may pull from Tooling.
 
+### 2026-08-28 amendment — persistence-free Catalog Domain
+
+`Catalog_Domain` is now a separate layer from the remaining
+`Catalog_Internals`. Doctrine is likewise carved out of the generic Vendor
+layer. `Catalog_Domain` may depend on Catalog Contracts, Shared and non-Doctrine
+Vendor code, but it may not depend on Doctrine. Application, Infrastructure and
+Presentation retain their existing Doctrine access and may consume Domain.
+
+Persistence-backed validation and effective-model reads cross semantic query
+ports declared in `Catalog/Domain/Repository`; Doctrine implementations and all
+DQL/SQL live in `Catalog/Infrastructure/Doctrine`. This makes a new
+Domain-to-Doctrine import a Deptrac violation without adding a baseline entry.
+
 A baseline of 27 pre-existing violations lives inline in `skip_violations`, each annotated with a follow-up:
 
 1. `Catalog\Domain` enums (ObjectKind / AttributeType / Provenance) used by Catalog Contracts. Cleanup: move into `Catalog\Contracts\Enum`.
@@ -35,6 +48,9 @@ CI: `Deptrac (architectural fitness)` job in `.github/workflows/quality-php.yml`
 ### Consequences
 
 - **Positive:** new violations fail at CI. The baseline is finite and tracked.
+- **Positive:** Catalog business rules cannot acquire new direct ORM/DBAL
+  dependencies; persistence queries are replaceable ports with integration-tested
+  adapters.
 - **Negative:** baseline entries can rot — review them when a BC layout changes substantially.
 - **Follow-ups:** clean up the three baseline clusters in dedicated tickets; target an empty `skip_violations` map.
 

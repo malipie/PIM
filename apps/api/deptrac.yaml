@@ -15,10 +15,15 @@ parameters:
         - '#src/Kernel\.php#'
     layers:
         # ─── Catalog ───────────────────────────────────────────────────
-        - name: Catalog_Internals
+        # AUD-ARCH-001 (#3022): Domain is a separate fitness boundary so
+        # Infrastructure libraries can be forbidden there while remaining
+        # available to Catalog adapters and presentation/application code.
+        - name: Catalog_Domain
           collectors:
               - type: directory
                 value: 'src/Catalog/Domain/.*'
+        - name: Catalog_Internals
+          collectors:
               - type: directory
                 value: 'src/Catalog/Application/.*'
               - type: directory
@@ -229,8 +234,15 @@ parameters:
                 value: 'src/Dashboard/.*'
 
         # ─── Vendor (third-party + PHP-internal classes) ───────────────
+        # Doctrine is carved out so Catalog_Domain can forbid it explicitly.
+        # Other layers opt in below exactly as they previously did through the
+        # broad Vendor bucket.
+        - name: Doctrine
+          collectors:
+              - type: classNameRegex
+                value: '#^Doctrine\\#'
         # AUD-053 (W3-1): every dependency from a first-party class onto a
-        # framework/library/PHP-internal class (Symfony, Doctrine, API
+        # framework/library/PHP-internal class (Symfony, API
         # Platform, PSR, …) was previously counted as "Uncovered" — ~5.3k
         # silent edges that hid the handful of REAL first-party gaps among
         # them. This catch-all assigns "anything not under App\" to a named
@@ -242,6 +254,8 @@ parameters:
                 must_not:
                     - type: classNameRegex
                       value: '#^App\\#'
+                    - type: classNameRegex
+                      value: '#^Doctrine\\#'
 
         # ─── Import / Export (ADR-0019, IMP2-1.1 #1463) ────────────────
         # Target ruleset: only *_Contracts + Shared. Existing reaches into
@@ -363,9 +377,9 @@ parameters:
                 value: 'src/PHPStan/.*'
 
     ruleset:
-        # AUD-053 (W3-1): `Vendor` appears in every ruleset below so that
-        # framework / library / PHP-internal edges resolve to an allowed
-        # layer instead of inflating the Uncovered count.
+        # AUD-053 (W3-1): `Vendor` and the carved-out `Doctrine` layer appear
+        # in every ruleset except Catalog_Domain so framework/library edges
+        # stay covered without allowing persistence into that domain layer.
 
         # ADR-0026 (DASH-04 #2255) — read-only dashboard aggregates. Only
         # Contracts seams + Shared; cross-BC data without a seam is read
@@ -375,9 +389,16 @@ parameters:
             - Channel_Contracts
             - Identity_Contracts
             - Shared
+            - Doctrine
+            - Vendor
+
+        Catalog_Domain:
+            - Catalog_Contracts
+            - Shared
             - Vendor
 
         Catalog_Internals:
+            - Catalog_Domain
             - Catalog_Contracts
             - Asset_Contracts
             - Channel_Contracts
@@ -386,9 +407,11 @@ parameters:
             # object_editorial state machine; vocabulary via Workflow seam.
             - Workflow_Contracts
             - Shared
+            - Doctrine
             - Vendor
         Catalog_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         # ADR-0029 — Workflow BC reaches Catalog/Identity only via seams;
@@ -403,9 +426,11 @@ parameters:
             # through the Notification seam.
             - Notification_Contracts
             - Shared
+            - Doctrine
             - Vendor
         Workflow_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         # WFL-P2-02 — thin notification context (Dashboard precedent):
@@ -417,9 +442,11 @@ parameters:
             - Identity_Contracts
             - Workflow_Contracts
             - Shared
+            - Doctrine
             - Vendor
         Notification_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         Channel_Internals:
@@ -428,9 +455,11 @@ parameters:
             - Asset_Contracts
             - Identity_Contracts
             - Shared
+            - Doctrine
             - Vendor
         Channel_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         Asset_Internals:
@@ -438,9 +467,11 @@ parameters:
             - Catalog_Contracts
             - Identity_Contracts
             - Shared
+            - Doctrine
             - Vendor
         Asset_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         Import:
@@ -457,9 +488,11 @@ parameters:
             # explicitly rather than baseline it as a violation.
             - Backup_Internals
             - Shared
+            - Doctrine
             - Vendor
         Import_Contracts:
             - Shared
+            - Doctrine
             - Vendor
         Export:
             - Export_Contracts
@@ -468,9 +501,11 @@ parameters:
             - Asset_Contracts
             - Identity_Contracts
             - Shared
+            - Doctrine
             - Vendor
         Export_Contracts:
             - Shared
+            - Doctrine
             - Vendor
         Export_Feed_Internals:
             - Export
@@ -481,9 +516,11 @@ parameters:
             - Asset_Contracts
             - Identity_Contracts
             - Shared
+            - Doctrine
             - Vendor
         Export_Feed_Contracts:
             - Shared
+            - Doctrine
             - Vendor
         Export_Catalog_Internals:
             - Export
@@ -494,9 +531,11 @@ parameters:
             - Asset_Contracts
             - Identity_Contracts
             - Shared
+            - Doctrine
             - Vendor
         Export_Catalog_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         Identity_Internals:
@@ -514,12 +553,15 @@ parameters:
             # through its dedicated single-class layer.
             - Identity_TenantProvider
             - Shared
+            - Doctrine
             - Vendor
         Identity_TenantProvider:
             - Shared
+            - Doctrine
             - Vendor
         Identity_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         Shared:
@@ -530,6 +572,7 @@ parameters:
             # attribute classes (RequiresPermission + NoPermissionRequired),
             # which are pure metadata with zero runtime coupling.
             - Identity_Contracts
+            - Doctrine
             - Vendor
 
         Search:
@@ -537,6 +580,7 @@ parameters:
             - Shared
             - Catalog_Contracts
             - Catalog_Internals
+            - Catalog_Domain
             - Channel_Contracts
             - Identity_Contracts
             # AUD-079 (W3-1): narrowed from the whole Identity_Internals to
@@ -544,9 +588,11 @@ parameters:
             # actually uses (debug: it touches nothing else in Identity
             # Internals).
             - Identity_TenantProvider
+            - Doctrine
             - Vendor
         Search_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         Backup_Internals:
@@ -556,9 +602,11 @@ parameters:
             # the User-entity leak was removed via that seam in W3-1.
             - Identity_Contracts
             - Shared
+            - Doctrine
             - Vendor
         Backup_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         Integration:
@@ -568,10 +616,12 @@ parameters:
             - Channel_Contracts
             - Asset_Contracts
             - Identity_Contracts
+            - Doctrine
             - Vendor
 
         Integration_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         Integration_Generic_Internals:
@@ -581,9 +631,11 @@ parameters:
             - Channel_Contracts
             - Asset_Contracts
             - Identity_Contracts
+            - Doctrine
             - Vendor
         Integration_Generic_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         # ADR-0024: Agent_Internals sees engine Contracts seams only — never
@@ -600,9 +652,11 @@ parameters:
             - Search_Contracts
             - Import_Contracts
             - Integration_Contracts
+            - Doctrine
             - Vendor
         Agent_Contracts:
             - Shared
+            - Doctrine
             - Vendor
 
         ApiConfigurator:
@@ -611,10 +665,12 @@ parameters:
             - Channel_Contracts
             - Asset_Contracts
             - Identity_Contracts
+            - Doctrine
             - Vendor
 
         Tooling:
             - Catalog_Internals
+            - Catalog_Domain
             - Catalog_Contracts
             - Channel_Internals
             - Channel_Contracts
@@ -632,7 +688,14 @@ parameters:
             - Export_Contracts
             - Export_Catalog_Internals
             - Export_Catalog_Contracts
+            - Doctrine
             - Vendor
+
+        # Agent migrations use a non-App namespace and therefore belong to
+        # the Vendor catch-all. Preserve their existing Doctrine access after
+        # carving Doctrine into its own fitness layer.
+        Vendor:
+            - Doctrine
 
     # Inline baseline of pre-existing cross-BC violations that the cleanup
     # tickets handle in follow-ups (see ADR-0013). Three clusters:

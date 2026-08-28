@@ -156,6 +156,15 @@ services:
     App\Shared\Infrastructure\Metrics\MetricsStore:
         alias: App\Shared\Infrastructure\Metrics\RedisMetricsStore
 
+    # AUD-ARCH-001 (#3022) — Catalog Domain consumes semantic query ports;
+    # Doctrine/DQL remains in Infrastructure adapters.
+    App\Catalog\Domain\Repository\AttributeCodeConflictQueryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\DoctrineAttributeCodeConflictQuery
+    App\Catalog\Domain\Repository\EffectiveAttributeGroupQueryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\DoctrineEffectiveAttributeGroupQuery
+    App\Catalog\Domain\Repository\IdentifierDuplicateQueryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\DoctrineIdentifierDuplicateQuery
+
     # W2-9 / AUD-045 — application-level JSON request body cap. Autoconfigure
     # tags the EventSubscriberInterface; only the byte limit needs binding.
     # 10 MB default (env-overridable); .env.test lowers it to 1 KB.
