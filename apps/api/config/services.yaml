@@ -92,6 +92,10 @@ services:
             # in services_agent.yaml so the module is deletable wholesale
             # (supersedes the narrower P1-01 migrations-only exclude).
             - '../src/Agent/'
+            # AUD-ARCH-002 (#3023) — runtime-only compatibility alias for the
+            # AttributeType enum moved to Catalog Contracts; this file does not
+            # declare a discoverable service class matching its legacy FQCN.
+            - '../src/Catalog/Domain/AttributeType.php'
 
     # CPDF-P0-03 / CPDF-P6-03 (ADR-0027) — the PdfRenderer port resolves through
     # a factory: `CATALOG_PDF_RENDERER=gotenberg` + `GOTENBERG_URL` activate the
