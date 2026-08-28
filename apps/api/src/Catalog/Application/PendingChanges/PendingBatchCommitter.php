@@ -10,6 +10,7 @@ use App\Catalog\Application\Bulk\BulkChangeStatusHandler;
 use App\Catalog\Application\Bulk\BulkMoveCategoryHandler;
 use App\Catalog\Application\Bulk\BulkRemoveCategoryHandler;
 use App\Catalog\Application\BulkContext;
+use App\Catalog\Application\Handler\RebuildAttributesIndexedHandler;
 use App\Catalog\Application\Command\CreateCatalogObject\CreateCatalogObjectCommand;
 use App\Catalog\Application\Command\CreateCatalogObject\CreateCatalogObjectHandler;
 use App\Catalog\Application\Message\ObjectValuesChangedMessage;
@@ -70,6 +71,24 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
 {
     private const int CHUNK = 200;
 
+    /**
+     * #3053 — batches at or below this many objects rebuild `attributes_indexed`
+     * INLINE instead of handing it to the worker.
+     *
+     * The async rebuild is the import pattern: right for 50k rows, wrong for an
+     * approval the operator is watching. `object_values` commits synchronously,
+     * but the product detail endpoint reads the denormalised projection — so the
+     * refetch fired right after `approve` returns races the worker and shows the
+     * value from BEFORE the change. The operator sees an unchanged field and has
+     * to leave the product and come back.
+     *
+     * Invisible in dev and in tests: there `async` is a `sync://` alias
+     * (messenger.yaml), so the rebuild is already in-band. Two earlier attempts
+     * at this bug hardened the editor instead, because the editor is where the
+     * symptom shows.
+     */
+    private const int INLINE_REBUILD_MAX_OBJECTS = 25;
+
     public function __construct(
         private EntityManagerInterface $entityManager,
         private TenantContext $tenantContext,
@@ -78,6 +97,7 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
         private BulkContext $bulkContext,
         private BulkReindexQueueInterface $reindexQueue,
         private MessageBusInterface $messageBus,
+        private RebuildAttributesIndexedHandler $rebuildIndexed,
         private BulkAddCategoryHandler $addCategories,
         private BulkRemoveCategoryHandler $removeCategories,
         private BulkMoveCategoryHandler $moveCategories,
@@ -163,6 +183,10 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
             $this->entityManager->persist($session);
             $this->entityManager->flush();
 
+            // #3053 — decided BEFORE the write so the chunk loop knows whether to
+            // enqueue the rebuild at all; an inline batch must not also queue it.
+            $rebuildInline = \count($perObject) <= self::INLINE_REBUILD_MAX_OBJECTS;
+
             $this->bulkContext->setBulk(true, $sessionId);
             try {
                 [$committedValues, $objectsTouched, $skipped, $issues] = $this->writeChunks(
@@ -170,6 +194,7 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
                     $sessionId,
                     $perObject,
                     $provenanceMeta,
+                    $rebuildInline,
                 );
             } finally {
                 $this->bulkContext->setBulk(false);
@@ -183,6 +208,17 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
             $this->entityManager->flush();
 
             $connection->commit();
+
+            // #3053 — AFTER the commit, so the rebuild reads the values it is
+            // supposed to project. Small batches rebuild here rather than on the
+            // worker, which is what makes the value visible to the refetch the
+            // frontend fires the moment `approve` returns.
+            if ($rebuildInline && [] !== $targetIds) {
+                $this->rebuildIndexed->__invoke(new ObjectValuesChangedMessage(
+                    $targetIds,
+                    Uuid::fromString($tenantId),
+                ));
+            }
 
             $this->reindexQueue->queueAll($targetIds);
 
@@ -485,9 +521,12 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
      * @param array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>, locale: ?string, channel: ?string}>> $perObject
      * @param array<string, mixed>                                                                                                                    $provenanceMeta
      *
+     * @param bool $rebuildInline #3053 — caller rebuilds the projection after the
+     *                             commit, so the chunk loop must not enqueue it too
+     *
      * @return array{0: int, 1: int, 2: int, 3: list<array{objectId: string, attributeCode: string, message: string}>}
      */
-    private function writeChunks(string $tenantId, Uuid $sessionId, array $perObject, array $provenanceMeta): array
+    private function writeChunks(string $tenantId, Uuid $sessionId, array $perObject, array $provenanceMeta, bool $rebuildInline = false): array
     {
         $committedValues = 0;
         $objectsTouched = 0;
@@ -582,10 +621,12 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
             // principal to recover the tenant from. Carry it on the message
             // itself so the worker can bind TenantContext + the RLS GUC before
             // rebuilding attributes_indexed from the canonical values.
-            $this->messageBus->dispatch(new ObjectValuesChangedMessage(
-                $chunkIds,
-                Uuid::fromString($tenantId),
-            ));
+            if (!$rebuildInline) {
+                $this->messageBus->dispatch(new ObjectValuesChangedMessage(
+                    $chunkIds,
+                    Uuid::fromString($tenantId),
+                ));
+            }
         }
 
         return [$committedValues, $objectsTouched, $skipped, $issues];

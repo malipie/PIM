@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Catalog;
 
+use App\Catalog\Application\Message\ObjectValuesChangedMessage;
 use App\Catalog\Application\PendingChanges\ContentValueMaterializer;
 use App\Catalog\Application\PendingChanges\PendingBatchCommitter;
 use App\Catalog\Application\Validation\AttributeValueValidator;
@@ -115,6 +116,57 @@ final class ContentValueCommitTest extends KernelTestCase
             ->findOneByScope($reloadedObject, $reloadedAttribute);
         self::assertNotNull($global);
         self::assertSame(['value' => 'Opis globalny.'], $global->getValue(), 'the global reading must stay untouched');
+    }
+
+    #[Test]
+    public function aSmallBatchRefreshesTheProjectionWithoutTheWorker(): void
+    {
+        // #3053 — `object_values` commits synchronously, but the product detail
+        // endpoint reads `attributes_indexed`. That projection used to be
+        // rebuilt ONLY by the worker (import pattern), so the refetch the UI
+        // fires the moment `approve` returns read the value from BEFORE the
+        // change: the operator saw an unchanged field and had to leave the
+        // product and come back. Deliberately NO drainAsyncTransport() here —
+        // the projection has to be correct without the worker ever running.
+        $tenant = $this->createTenant();
+        [$object] = $this->seedProduct();
+        $em = $this->em();
+
+        $batchId = Uuid::v7();
+        $this->materializer()->materializeGeneratedValue(
+            $batchId,
+            Uuid::v7(),
+            $object->getId(),
+            'description',
+            'Świeża treść od agenta.',
+            meta: ['intent' => 'generate_product_description'],
+        );
+
+        $result = $this->committer()->commitAcceptedBatch($batchId, Uuid::v7(), []);
+        self::assertSame(1, $result->committedValues);
+
+        $em->clear();
+        $this->activateTenantFilter($this->reloadTenant($tenant));
+        $reloaded = $em->find(CatalogObject::class, $object->getId());
+        \assert(null !== $reloaded);
+
+        $indexed = $reloaded->getAttributesIndexed();
+        self::assertSame(
+            'Świeża treść od agenta.',
+            $indexed['description']['value'] ?? null,
+            'attributes_indexed must be fresh before the response returns — the UI reads the projection, not object_values',
+        );
+
+        // The inline rebuild REPLACES the queued one; leaving both would make
+        // the worker redo the same write for every approval.
+        $transport = self::getContainer()->get('messenger.transport.async');
+        if ($transport instanceof InMemoryTransport) {
+            $queued = array_filter(
+                $transport->getSent(),
+                static fn (object $envelope): bool => $envelope->getMessage() instanceof ObjectValuesChangedMessage,
+            );
+            self::assertSame([], $queued, 'a batch rebuilt inline must not also enqueue ObjectValuesChangedMessage');
+        }
     }
 
     /**
