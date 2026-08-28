@@ -21,10 +21,9 @@ use Symfony\Component\Routing\Attribute\Route;
  * - `pim_postgres_object_values_*` gauges — autovacuum health of the hot
  *   EAV table, read from the current tenant database's statistics view.
  *
- * Numbers reported are "for whichever worker handled THIS scrape" — fine
- * for single-worker dev. In production with multiple FrankenPHP workers
- * behind the edge Caddy, scraping reaches one randomly, so alert
- * thresholds watch the rolling max across scrapes.
+ * Memory/PID gauges describe whichever worker handled this scrape and retain
+ * rolling-max semantics. Counters and histograms are shared through Redis, so
+ * every worker contributes to the same monotonic instance-wide series.
  */
 final readonly class MetricsController
 {
@@ -32,6 +31,7 @@ final readonly class MetricsController
         private QueryDurationHistogram $queryHistogram,
         private RbacMetricsRegistry $rbacMetrics,
         private PostgresMaintenanceMetrics $postgresMaintenanceMetrics,
+        private MetricsStore $metricsStore,
     ) {
     }
 
@@ -47,6 +47,7 @@ final readonly class MetricsController
         $postgresMetrics = $this->postgresMaintenanceMetrics->render();
         $queryMetrics = $this->queryHistogram->render();
         $rbacMetrics = $this->rbacMetrics->render();
+        $sharedRegistryUp = (int) $this->metricsStore->isAvailable();
 
         $body = <<<METRICS
             # HELP frankenphp_worker_memory_bytes Resident PHP memory of the FrankenPHP worker that handled the scrape.
@@ -58,7 +59,10 @@ final readonly class MetricsController
             # HELP frankenphp_worker_pid Process id of the worker that handled the scrape.
             # TYPE frankenphp_worker_pid gauge
             frankenphp_worker_pid {$pid}
-            # HELP db_query_duration_seconds Wall-clock duration of every Doctrine DBAL query handled by this worker since boot.
+            # HELP pim_shared_metrics_registry_up Whether the shared Redis metrics registry is reachable from this worker.
+            # TYPE pim_shared_metrics_registry_up gauge
+            pim_shared_metrics_registry_up {$sharedRegistryUp}
+            # HELP db_query_duration_seconds Wall-clock duration of every Doctrine DBAL query handled by this instance across all workers.
             # TYPE db_query_duration_seconds histogram
             {$queryMetrics}
             {$rbacMetrics}

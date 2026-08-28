@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Metrics;
 
 /**
- * RBAC-P6-009 (#721) — in-memory Prometheus registry for RBAC-specific
+ * RBAC-P6-009 (#721) — shared Prometheus registry for RBAC-specific
  * counters + gauges exposed by `MetricsController` at `/api/metrics`.
  *
  * Six surfaces — same hierarchy as the Grafana panels under
@@ -30,11 +30,9 @@ namespace App\Shared\Infrastructure\Metrics;
  *   - `cortex_super_admin_recovery_total` — every successful
  *     `POST /api/admin/break-glass` invocation. Always Slack-notify.
  *
- * Same worker-scoped-state caveat as {@see QueryDurationHistogram}:
- * `cortex_*` numbers reflect the worker that handled the scrape; with
- * multiple FrankenPHP workers behind Caddy the dashboard sums across
- * scrapes via the rolling-max recording rule defined in
- * `docs/operations/grafana-dashboards/rbac.json`.
+ * Runtime DI binds the backing {@see MetricsStore} to Redis. All workers
+ * therefore increment the same monotonic series; a worker restart cannot
+ * reduce them and every scrape sees the complete instance.
  */
 final class RbacMetricsRegistry
 {
@@ -44,7 +42,7 @@ final class RbacMetricsRegistry
      *
      * @var array<string, array<string, int>> indexed [metricName][labelKey] => count
      */
-    private array $counters = [
+    private const array COUNTERS = [
         'cortex_permission_denied_total' => [],
         'cortex_cross_tenant_access_total' => [],
         'cortex_api_token_created_total' => [],
@@ -57,9 +55,16 @@ final class RbacMetricsRegistry
      *
      * @var array<string, array<string, float>>
      */
-    private array $gauges = [
+    private const array GAUGES = [
         'cortex_mfa_enrollment_percentage' => [],
     ];
+
+    private readonly MetricsStore $store;
+
+    public function __construct(?MetricsStore $store = null)
+    {
+        $this->store = $store ?? new InMemoryMetricsStore();
+    }
 
     /**
      * @param array<string, string> $labels alphabetically stable label set
@@ -94,7 +99,7 @@ final class RbacMetricsRegistry
 
     public function setMfaEnrollmentPercentage(string $tenant, float $percentage): void
     {
-        $this->gauges['cortex_mfa_enrollment_percentage'][$this->serializeLabels(['tenant' => $tenant])] = $percentage;
+        $this->store->setGauge('cortex_mfa_enrollment_percentage', $this->serializeLabels(['tenant' => $tenant]), $percentage);
     }
 
     /**
@@ -103,7 +108,7 @@ final class RbacMetricsRegistry
     private function increment(string $metric, array $labels): void
     {
         $key = $this->serializeLabels($labels);
-        $this->counters[$metric][$key] = ($this->counters[$metric][$key] ?? 0) + 1;
+        $this->store->incrementCounter($metric, $key);
     }
 
     /**
@@ -128,7 +133,8 @@ final class RbacMetricsRegistry
     {
         $lines = [];
 
-        foreach ($this->counters as $metric => $series) {
+        foreach (array_keys(self::COUNTERS) as $metric) {
+            $series = $this->store->counterSeries($metric);
             $lines[] = '# HELP '.$metric.' '.$this->helpFor($metric);
             $lines[] = '# TYPE '.$metric.' counter';
             if ([] === $series) {
@@ -141,7 +147,8 @@ final class RbacMetricsRegistry
             }
         }
 
-        foreach ($this->gauges as $metric => $series) {
+        foreach (array_keys(self::GAUGES) as $metric) {
+            $series = $this->store->gaugeSeries($metric);
             $lines[] = '# HELP '.$metric.' '.$this->helpFor($metric);
             $lines[] = '# TYPE '.$metric.' gauge';
             foreach ($series as $labelKey => $value) {

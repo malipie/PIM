@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "RBAC observability — denials, cross-tenant access, MFA enrolment, brute-force attempts, break-glass usage. RBAC-P6-009 (#721).",
+  "description": "RBAC observability — instance-wide counters aggregated through the shared Redis registry, plus registry health. RBAC-P6-009 (#721), AUD-OBS-001 (#3021).",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -159,6 +159,42 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PROM_UID" },
+      "description": "All RBAC counters and the DB-query histogram are stored in the shared Redis registry. Zero means business traffic remains fail-open but the security and SQL panels have a telemetry gap.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "options": {
+                "0": { "color": "red", "text": "Unavailable" },
+                "1": { "color": "green", "text": "Healthy" }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 27 },
+      "id": 7,
+      "title": "Shared metrics registry",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "min by (instance, tenant) (pim_shared_metrics_registry_up)",
+          "legendFormat": "{{tenant}} {{instance}}",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "refresh": "30s",
@@ -170,6 +206,6 @@
   "timezone": "",
   "title": "RBAC Overview — Cortex PIM",
   "uid": "cortex-rbac-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

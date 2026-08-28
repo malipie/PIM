@@ -46,8 +46,10 @@ scrape_configs:
     metrics_path: /api/metrics
     # Scraped directly on the internal docker network — the edge Caddy 404s
     # /api/metrics (#2729), and the endpoint must never be publicly reachable.
-    # Each scrape lands on a fresh worker pick (random LB across the worker
-    # pool); the rolling-max alert rule in alerts.yml makes that acceptable.
+    # Each scrape lands on a fresh worker pick. Process memory/PID gauges remain
+    # worker-local and use rolling-max alerts; counters and histograms are
+    # already instance-wide because MetricsController reads the shared Redis
+    # registry (ADR-0038).
     scheme: http
     static_configs:
       - targets: ["api:80"]

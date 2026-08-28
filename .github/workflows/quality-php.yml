@@ -137,7 +137,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
-          extensions: ctype, iconv, intl, opcache, pcntl, pdo_pgsql, zip
+          extensions: ctype, iconv, intl, opcache, pcntl, pdo_pgsql, redis, zip
           coverage: none
           tools: composer:v2
 
@@ -330,6 +330,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     # Hoisted to job level (was duplicated per step) — every PHPUnit invocation
     # in this job needs the same test env. Foundry's ResetDatabase rebuilds the
     # schema into the dbname_suffix-derived "pim_test" database; the Postgres
@@ -344,6 +353,7 @@ jobs:
       MERCURE_JWT_SECRET: ci-mercure-key-at-least-256-bits-long
       JWT_PASSPHRASE: ci
       APP_DEFAULT_TENANT_CODE: demo
+      METRICS_REDIS_DSN: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v7
 
@@ -351,7 +361,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
-          extensions: ctype, iconv, intl, opcache, pcntl, pdo_pgsql, zip
+          extensions: ctype, iconv, intl, opcache, pcntl, pdo_pgsql, redis, zip
           coverage: none
           tools: composer:v2
 
@@ -441,6 +451,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       APP_ENV: test
       APP_DEBUG: "0"
@@ -451,6 +470,7 @@ jobs:
       MERCURE_JWT_SECRET: ci-mercure-key-at-least-256-bits-long
       JWT_PASSPHRASE: ci
       APP_DEFAULT_TENANT_CODE: demo
+      METRICS_REDIS_DSN: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v7
 
@@ -458,7 +478,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
-          extensions: ctype, iconv, intl, opcache, pcntl, pdo_pgsql, zip
+          extensions: ctype, iconv, intl, opcache, pcntl, pdo_pgsql, redis, zip
           coverage: none
           tools: composer:v2
 
@@ -530,7 +550,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
-          extensions: ctype, iconv, intl, opcache, pcntl, pdo_pgsql, zip
+          extensions: ctype, iconv, intl, opcache, pcntl, pdo_pgsql, redis, zip
           coverage: none
           tools: composer:v2
 

@@ -48,12 +48,24 @@ groups:
   - name: pim-db-latency
     interval: 30s
     rules:
+      - alert: SharedMetricsRegistryUnavailable
+        expr: pim_shared_metrics_registry_up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Shared Redis metrics registry is unavailable"
+          description: |
+            The API still serves business traffic, but counters and DB-query
+            histograms are no longer being recorded across workers. Check the
+            Redis container and network before trusting RBAC or SQL SLI panels.
+
       # Slow-query smoke alarm. Backed by db_query_duration_seconds
       # histogram emitted from QueryTimingMiddleware (audit MEDIUM-003).
       # 0.5s p99 is generous for read paths; tighter thresholds belong
       # in tier-specific alerts once we have per-route labels.
       - alert: DbQueryP99Slow
-        expr: histogram_quantile(0.99, sum by (le) (rate(db_query_duration_seconds_bucket[5m]))) > 0.5
+        expr: histogram_quantile(0.99, sum by (job, instance, tenant, le) (rate(db_query_duration_seconds_bucket[5m]))) > 0.5
         for: 10m
         labels:
           severity: warning

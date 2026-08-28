@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Metrics;
 
 /**
- * In-memory Prometheus histogram for Doctrine DBAL query durations
- * (audit MEDIUM-003).
+ * Prometheus histogram for Doctrine DBAL query durations (audit MEDIUM-003).
  *
  * Logging is OFF in production (memory discipline — sekcja 3.10 of the
  * architecture), but ops still needs to see when a query starts taking
@@ -15,11 +14,10 @@ namespace App\Shared\Infrastructure\Metrics;
  * seconds, so p95 / p99 alerts can be wired to `histogram_quantile`
  * without re-enabling SQL logging.
  *
- * State lives on the worker — same lifetime as
- * {@see MetricsController} reads
- * from `memory_get_usage()`. With multiple FrankenPHP workers behind
- * Caddy, scraping reaches one randomly; alerts watch the rolling max
- * across scrapes (same caveat as the worker memory metric).
+ * Runtime state lives in the shared {@see MetricsStore}, so every FrankenPHP
+ * worker contributes to one monotonic histogram and a random scrape target
+ * sees the complete instance. Direct construction uses an isolated in-memory
+ * store for unit tests only.
  */
 final class QueryDurationHistogram
 {
@@ -48,33 +46,28 @@ final class QueryDurationHistogram
     /** @var list<float> */
     private array $buckets;
 
-    /** @var array<int, int> bucket index → cumulative count */
-    private array $bucketCounts;
-
-    private int $count = 0;
-
-    private float $sum = 0.0;
+    private readonly MetricsStore $store;
 
     /**
      * @param list<float>|null $buckets ascending bucket boundaries; null
      *                                  uses {@see DEFAULT_BUCKETS}
      */
-    public function __construct(?array $buckets = null)
+    public function __construct(?MetricsStore $store = null, ?array $buckets = null)
     {
+        $this->store = $store ?? new InMemoryMetricsStore();
         $this->buckets = $buckets ?? self::DEFAULT_BUCKETS;
-        $this->bucketCounts = array_fill(0, \count($this->buckets), 0);
     }
 
     public function observe(float $durationSeconds): void
     {
-        ++$this->count;
-        $this->sum += $durationSeconds;
-
+        $matchingBucketIndexes = [];
         foreach ($this->buckets as $index => $upperBound) {
             if ($durationSeconds <= $upperBound) {
-                ++$this->bucketCounts[$index];
+                $matchingBucketIndexes[] = $index;
             }
         }
+
+        $this->store->observeHistogram('db_query_duration_seconds', $durationSeconds, $matchingBucketIndexes);
     }
 
     /**
@@ -85,29 +78,30 @@ final class QueryDurationHistogram
      */
     public function render(): string
     {
+        $snapshot = $this->store->histogram('db_query_duration_seconds', \count($this->buckets));
         $lines = [];
         foreach ($this->buckets as $index => $upperBound) {
             $lines[] = \sprintf(
                 'db_query_duration_seconds_bucket{le="%s"} %d',
                 self::formatBucketBound($upperBound),
-                $this->bucketCounts[$index],
+                $snapshot->bucketCounts[$index],
             );
         }
-        $lines[] = \sprintf('db_query_duration_seconds_bucket{le="+Inf"} %d', $this->count);
-        $lines[] = \sprintf('db_query_duration_seconds_sum %s', self::formatFloat($this->sum));
-        $lines[] = \sprintf('db_query_duration_seconds_count %d', $this->count);
+        $lines[] = \sprintf('db_query_duration_seconds_bucket{le="+Inf"} %d', $snapshot->count);
+        $lines[] = \sprintf('db_query_duration_seconds_sum %s', self::formatFloat($snapshot->sum));
+        $lines[] = \sprintf('db_query_duration_seconds_count %d', $snapshot->count);
 
         return implode("\n", $lines);
     }
 
     public function count(): int
     {
-        return $this->count;
+        return $this->store->histogram('db_query_duration_seconds', \count($this->buckets))->count;
     }
 
     public function sum(): float
     {
-        return $this->sum;
+        return $this->store->histogram('db_query_duration_seconds', \count($this->buckets))->sum;
     }
 
     /**
@@ -123,7 +117,7 @@ final class QueryDurationHistogram
      */
     public function bucketCounts(): array
     {
-        return $this->bucketCounts;
+        return $this->store->histogram('db_query_duration_seconds', \count($this->buckets))->bucketCounts;
     }
 
     private static function formatBucketBound(float $value): string

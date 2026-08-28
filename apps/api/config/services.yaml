@@ -146,6 +146,16 @@ services:
         arguments:
             $debug: '%kernel.debug%'
 
+    # AUD-OBS-001 (#3021) — counters/histograms must survive a FrankenPHP
+    # worker recycle and aggregate across the whole pool. Each test process gets
+    # an isolated suffix so ParaTest query-budget deltas cannot race.
+    App\Shared\Infrastructure\Metrics\RedisMetricsStore:
+        arguments:
+            $dsn: '%env(METRICS_REDIS_DSN)%'
+            $namespace: 'pim:metrics:v1:%kernel.environment%:%env(default::TEST_TOKEN)%'
+    App\Shared\Infrastructure\Metrics\MetricsStore:
+        alias: App\Shared\Infrastructure\Metrics\RedisMetricsStore
+
     # W2-9 / AUD-045 — application-level JSON request body cap. Autoconfigure
     # tags the EventSubscriberInterface; only the byte limit needs binding.
     # 10 MB default (env-overridable); .env.test lowers it to 1 KB.
