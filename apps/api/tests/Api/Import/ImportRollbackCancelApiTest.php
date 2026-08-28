@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Api\Import;
 
-use App\Catalog\Application\AttributesIndexedRebuilder;
 use App\Catalog\Application\Reindex\BulkReindexQueueInterface;
+use App\Catalog\Contracts\Service\AttributesIndexedBatchRebuilder;
+use App\Catalog\Contracts\Service\BulkOperationScope;
 use App\Catalog\Domain\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\ObjectType;
@@ -117,7 +118,8 @@ final class ImportRollbackCancelApiTest extends CatalogApiTestCase
             $sessions,
             $c->get(ImportUndoLogRepositoryInterface::class),
             $c->get(ObjectValueRepositoryInterface::class),
-            $c->get(AttributesIndexedRebuilder::class),
+            $c->get(AttributesIndexedBatchRebuilder::class),
+            $c->get(BulkOperationScope::class),
             $c->get(BulkReindexQueueInterface::class),
             $c->get(BulkOperationLock::class),
             $c->get(TenantContext::class),

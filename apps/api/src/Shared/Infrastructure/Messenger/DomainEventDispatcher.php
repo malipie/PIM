@@ -8,6 +8,7 @@ use App\Shared\Domain\AggregateRoot;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
 use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Events;
+use Doctrine\Persistence\Proxy;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -44,6 +45,14 @@ final readonly class DomainEventDispatcher
         foreach ($unitOfWork->getIdentityMap() as $entities) {
             foreach ($entities as $entity) {
                 if (!$entity instanceof AggregateRoot) {
+                    continue;
+                }
+                // A lazy aggregate proxy cannot have recorded an in-memory
+                // event: none of its domain methods has run. Calling
+                // pullEvents() would initialise it only to discover an empty
+                // buffer, producing an N+1 whenever another entity's relation
+                // seeded the identity map (notably ObjectValue rollback).
+                if ($entity instanceof Proxy && !$entity->__isInitialized()) {
                     continue;
                 }
 

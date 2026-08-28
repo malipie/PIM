@@ -1,0 +1,12 @@
+# AUD-DATA-001 (#3020) — test-only SQL shape counter. The production
+# QueryTimingMiddleware deliberately aggregates durations without retaining SQL.
+services:
+    App\Tests\Support\SqlQueryCounter:
+        public: true
+
+    pim.test.sql_logging_middleware:
+        class: Doctrine\DBAL\Logging\Middleware
+        arguments:
+            - '@App\Tests\Support\SqlQueryCounter'
+        tags:
+            - { name: doctrine.middleware }

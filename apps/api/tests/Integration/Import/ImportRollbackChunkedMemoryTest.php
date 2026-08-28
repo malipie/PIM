@@ -18,10 +18,12 @@ use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
 use App\Tests\Support\InMemoryMercureHub;
+use App\Tests\Support\SqlQueryCounter;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\PostLoadEventArgs;
 use Doctrine\ORM\Events;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
@@ -155,6 +157,125 @@ final class ImportRollbackChunkedMemoryTest extends KernelTestCase
             $this->valueOf('MEM-'.self::OBJECTS, 'col1'),
             'the restore must reach the last chunk, not just the first',
         );
+    }
+
+    /** AUD-DATA-001 (#3020) — object hydration must cost one SELECT per chunk. */
+    #[Test]
+    #[Group('import-benchmark')]
+    public function rollbackObjectSelectCountDoesNotScaleWithinAChunk(): void
+    {
+        $one = $this->countObjectSelectsForRollback(1, 'rollback-qc-one', 'QC1');
+        $hundred = $this->countObjectSelectsForRollback(100, 'rollback-qc-hundred', 'QC100');
+
+        self::assertSame(1, $one, 'precondition: one rollback chunk needs one object hydration query');
+        self::assertSame(
+            $one,
+            $hundred,
+            \sprintf(
+                'objects SELECT count must be constant within one 200-object chunk: 1 object=%d, 100 objects=%d',
+                $one,
+                $hundred,
+            ),
+        );
+    }
+
+    private function countObjectSelectsForRollback(int $objectCount, string $tenantCode, string $skuPrefix): int
+    {
+        $em = $this->em();
+        $tenant = new Tenant($tenantCode, 'Rollback query-count tenant');
+        $em->persist($tenant);
+        $em->flush();
+        $tenantId = $tenant->getId();
+        self::getContainer()->get(TenantContext::class)->set($tenant);
+
+        $type = new ObjectType('product', ObjectKind::Product, ['en' => 'Product']);
+        $sku = new Attribute('sku', ['en' => 'SKU'], AttributeType::Text);
+        $name = new Attribute('name', ['en' => 'Name'], AttributeType::Text);
+        $em->persist($type);
+        $em->persist($sku);
+        $em->persist($name);
+        $em->persist(new ObjectTypeAttribute($type, $sku, false, 1));
+        $em->persist(new ObjectTypeAttribute($type, $name, false, 2));
+        $em->flush();
+        $typeId = $type->getId();
+
+        self::getContainer()->get(TenantFilterConfigurator::class)->apply();
+        $hub = self::getContainer()->get(InMemoryMercureHub::class);
+        \assert($hub instanceof InMemoryMercureHub);
+        $hub->stopRetaining();
+
+        $this->runSizedImport($tenantId, $typeId, $objectCount, $skuPrefix, 'first', 'Old');
+        $sessionId = $this->runSizedImport($tenantId, $typeId, $objectCount, $skuPrefix, 'second', 'New');
+
+        $this->rebindTenant($tenantId);
+        $session = self::getContainer()->get(ImportSessionRepositoryInterface::class)->findById($sessionId);
+        self::assertInstanceOf(ImportSession::class, $session);
+        $session->markRollbackStarted(new DateTimeImmutable());
+        self::getContainer()->get(ImportSessionRepositoryInterface::class)->save($session);
+
+        $counter = self::getContainer()->get(SqlQueryCounter::class);
+        self::assertInstanceOf(SqlQueryCounter::class, $counter);
+        $counter->start();
+
+        try {
+            \memory_reset_peak_usage();
+            $report = self::getContainer()->get(ImportRollbackService::class)->run($session);
+            $peak = \memory_get_peak_usage(true);
+
+            self::assertSame($objectCount * 2, $report['restoredValues'], 'each object restores sku + name');
+            self::assertLessThan(
+                256 * 1024 * 1024,
+                $peak,
+                \sprintf('rollback of %d objects peaked at %0.1f MiB', $objectCount, $peak / 1024 / 1024),
+            );
+
+            // Count only entity-hydration SELECTs. Optimistic-lock version
+            // probes are writes' fixed ORM cost and raw COUNT/id-plan queries
+            // are separate phases; the audited N+1 is `find()` issuing
+            // `WHERE id = ?` here.
+            return $counter->countMatching('/\bFROM\s+objects\s+\w+\s+WHERE\s+\(?\s*\w+\.id\s+(?:=|IN\s*\()/i');
+        } finally {
+            $counter->stop();
+        }
+    }
+
+    private function runSizedImport(
+        Uuid $tenantId,
+        Uuid $typeId,
+        int $objectCount,
+        string $skuPrefix,
+        string $label,
+        string $valuePrefix,
+    ): Uuid {
+        $em = $this->em();
+        $tenant = $this->rebindTenant($tenantId);
+        $type = $em->find(ObjectType::class, $typeId->toRfc4122());
+        \assert($type instanceof ObjectType);
+
+        $session = new ImportSession(
+            userId: Uuid::v7(),
+            targetObjectType: $type,
+            fileName: $label.'.csv',
+            fileSizeBytes: 1024,
+        );
+        $session->assignTenant($tenant);
+        $session->setColumnMapping(['sku' => 'sku', 'name' => 'name']);
+        $em->persist($session);
+        $em->flush();
+        $sessionId = $session->getId();
+
+        $csv = "sku;name\n";
+        for ($row = 1; $row <= $objectCount; ++$row) {
+            $csv .= \sprintf("%s-%d;%s-%d\n", $skuPrefix, $row, $valuePrefix, $row);
+        }
+
+        self::getContainer()->get('imports.storage')->write(
+            \sprintf('%s/%s/%s.csv', $tenantId->toRfc4122(), $sessionId->toRfc4122(), $label),
+            $csv,
+        );
+        self::getContainer()->get(ImportRunHandler::class)->run($session);
+
+        return $sessionId;
     }
 
     /**
