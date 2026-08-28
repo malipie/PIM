@@ -873,9 +873,7 @@ parameters:
             - App\Catalog\Domain\Entity\ObjectValue
             - App\Catalog\Domain\Repository\ObjectValueRepositoryInterface
         App\Import\Application\Service\ImportRollbackService:
-            - App\Catalog\Application\AttributesIndexedRebuilder
             - App\Catalog\Application\Reindex\BulkReindexQueueInterface
-            - App\Catalog\Domain\Entity\CatalogObject
             - App\Catalog\Domain\Entity\ObjectType
             - App\Catalog\Domain\Entity\ObjectValue
             - App\Catalog\Domain\Provenance

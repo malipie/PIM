@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application;
 
 use App\Catalog\Contracts\BulkGuard;
+use App\Catalog\Contracts\Service\BulkOperationScope;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Contracts\Service\ResetInterface;
 
@@ -30,7 +31,7 @@ use Symfony\Contracts\Service\ResetInterface;
  * downstream listeners on `ObjectValue` can stamp
  * `provenance = Bulk` + `meta.bulk_session_id` for audit (PRD §5.4).
  */
-final class BulkContext implements ResetInterface, BulkGuard
+final class BulkContext implements ResetInterface, BulkGuard, BulkOperationScope
 {
     private bool $bulk = false;
     private ?Uuid $sessionId = null;
@@ -49,6 +50,20 @@ final class BulkContext implements ResetInterface, BulkGuard
     public function getSessionId(): ?Uuid
     {
         return $this->sessionId;
+    }
+
+    public function run(callable $operation): mixed
+    {
+        if ($this->bulk) {
+            return $operation();
+        }
+
+        $this->setBulk(true);
+        try {
+            return $operation();
+        } finally {
+            $this->setBulk(false);
+        }
     }
 
     /**

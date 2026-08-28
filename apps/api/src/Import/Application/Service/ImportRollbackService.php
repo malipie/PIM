@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Import\Application\Service;
 
-use App\Catalog\Application\AttributesIndexedRebuilder;
 use App\Catalog\Application\Reindex\BulkReindexQueueInterface;
-use App\Catalog\Domain\Entity\CatalogObject;
+use App\Catalog\Contracts\Service\AttributesIndexedBatchRebuilder;
+use App\Catalog\Contracts\Service\BulkOperationScope;
 use App\Catalog\Domain\Entity\ObjectType;
 use App\Catalog\Domain\Provenance;
 use App\Catalog\Domain\Repository\ObjectValueRepositoryInterface;
@@ -58,7 +58,8 @@ final readonly class ImportRollbackService
         private ImportSessionRepositoryInterface $sessions,
         private ImportUndoLogRepositoryInterface $undoLog,
         private ObjectValueRepositoryInterface $objectValues,
-        private AttributesIndexedRebuilder $rebuilder,
+        private AttributesIndexedBatchRebuilder $batchRebuilder,
+        private BulkOperationScope $bulkScope,
         private BulkReindexQueueInterface $reindexQueue,
         private BulkOperationLock $bulkLock,
         private TenantContext $tenantContext,
@@ -240,6 +241,20 @@ final readonly class ImportRollbackService
      */
     private function replayChunkTransactionally(ImportSession $session, array $chunkIds): array
     {
+        // This method owns the one explicit batch rebuild below. The Catalog
+        // scope mutes its synchronous per-object listener for this chunk.
+        return $this->bulkScope->run(
+            fn (): array => $this->replayChunkAndRebuild($session, $chunkIds),
+        );
+    }
+
+    /**
+     * @param list<Uuid> $chunkIds
+     *
+     * @return array{restoredValues: int, removedValues: int, skippedManualEdits: int, skippedSuperseded: int, affectedIds: list<string>}
+     */
+    private function replayChunkAndRebuild(ImportSession $session, array $chunkIds): array
+    {
         $restored = 0;
         $removed = 0;
         $skipped = 0;
@@ -258,6 +273,13 @@ final readonly class ImportRollbackService
             $skippedSuperseded,
         );
         $this->em->flush();
+
+        // currentValueIndex() materialises lazy CatalogObject proxies through
+        // ObjectValue::$object. A subsequent IN query sees those proxies in
+        // Doctrine's identity map but does not initialise them; the rebuilder
+        // then triggers one SELECT per object. Start the rebuild from a clean
+        // identity map so findByIds() really hydrates the chunk in one query.
+        $this->em->clear();
 
         $affectedIds = array_keys($affected);
         $this->rebuildAffected($affectedIds);
@@ -512,20 +534,7 @@ final readonly class ImportRollbackService
     private function rebuildAffected(array $affectedIds): void
     {
         foreach (array_chunk($affectedIds, self::ROLLBACK_CHUNK_OBJECTS) as $chunk) {
-            $valuesByObject = $this->objectValues->findByObjectIds(
-                array_map(static fn (string $id): Uuid => Uuid::fromString($id), $chunk),
-            );
-            foreach ($chunk as $idRfc) {
-                $object = $this->em->find(CatalogObject::class, $idRfc);
-                if ($object instanceof CatalogObject) {
-                    $this->rebuilder->rebuild($object, $valuesByObject[$idRfc] ?? []);
-                }
-            }
-            $this->em->flush();
-            // Same contract as the replay's chunk boundary: clear() detaches the
-            // graph without touching the open transaction, so the rollback stays
-            // all-or-nothing while the resident set tracks the chunk.
-            $this->em->clear();
+            $this->batchRebuilder->rebuild($chunk);
         }
     }
 
