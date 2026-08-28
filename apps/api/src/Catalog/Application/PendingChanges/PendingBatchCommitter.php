@@ -183,10 +183,6 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
             $this->entityManager->persist($session);
             $this->entityManager->flush();
 
-            // #3053 — decided BEFORE the write so the chunk loop knows whether to
-            // enqueue the rebuild at all; an inline batch must not also queue it.
-            $rebuildInline = \count($perObject) <= self::INLINE_REBUILD_MAX_OBJECTS;
-
             $this->bulkContext->setBulk(true, $sessionId);
             try {
                 [$committedValues, $objectsTouched, $skipped, $issues] = $this->writeChunks(
@@ -194,7 +190,6 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
                     $sessionId,
                     $perObject,
                     $provenanceMeta,
-                    $rebuildInline,
                 );
             } finally {
                 $this->bulkContext->setBulk(false);
@@ -210,10 +205,18 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
             $connection->commit();
 
             // #3053 — AFTER the commit, so the rebuild reads the values it is
-            // supposed to project. Small batches rebuild here rather than on the
-            // worker, which is what makes the value visible to the refetch the
-            // frontend fires the moment `approve` returns.
-            if ($rebuildInline && [] !== $targetIds) {
+            // supposed to project. This is what makes the new value visible to
+            // the refetch the frontend fires the moment `approve` returns,
+            // instead of losing that race to the worker.
+            //
+            // The queued message above is deliberately LEFT IN PLACE: the
+            // in-transaction dispatch is part of the choreography the rollback
+            // path depends on (AgentRollbackTest), and the rebuild is
+            // idempotent — it recomputes from canonical object_values — so the
+            // worker's later pass is a cheap no-op rather than a second source
+            // of truth. Bounded to small batches so an import-scale commit
+            // never pays for it on the request thread.
+            if ([] !== $targetIds && \count($targetIds) <= self::INLINE_REBUILD_MAX_OBJECTS) {
                 $this->rebuildIndexed->__invoke(new ObjectValuesChangedMessage(
                     $targetIds,
                     Uuid::fromString($tenantId),
@@ -520,12 +523,9 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
     /**
      * @param array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>, locale: ?string, channel: ?string}>> $perObject
      * @param array<string, mixed>                                                                                                                    $provenanceMeta
-     * @param bool                                                                                                                                    $rebuildInline  #3053 — caller rebuilds the projection after the
-     *                                                                                                                                                                commit, so the chunk loop must not enqueue it too
-     *
      * @return array{0: int, 1: int, 2: int, 3: list<array{objectId: string, attributeCode: string, message: string}>}
      */
-    private function writeChunks(string $tenantId, Uuid $sessionId, array $perObject, array $provenanceMeta, bool $rebuildInline = false): array
+    private function writeChunks(string $tenantId, Uuid $sessionId, array $perObject, array $provenanceMeta): array
     {
         $committedValues = 0;
         $objectsTouched = 0;
@@ -620,12 +620,10 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
             // principal to recover the tenant from. Carry it on the message
             // itself so the worker can bind TenantContext + the RLS GUC before
             // rebuilding attributes_indexed from the canonical values.
-            if (!$rebuildInline) {
-                $this->messageBus->dispatch(new ObjectValuesChangedMessage(
-                    $chunkIds,
-                    Uuid::fromString($tenantId),
-                ));
-            }
+            $this->messageBus->dispatch(new ObjectValuesChangedMessage(
+                $chunkIds,
+                Uuid::fromString($tenantId),
+            ));
         }
 
         return [$committedValues, $objectsTouched, $skipped, $issues];

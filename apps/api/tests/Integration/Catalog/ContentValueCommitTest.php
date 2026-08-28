@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Catalog;
 
-use App\Catalog\Application\Message\ObjectValuesChangedMessage;
 use App\Catalog\Application\PendingChanges\ContentValueMaterializer;
 use App\Catalog\Application\PendingChanges\PendingBatchCommitter;
 use App\Catalog\Application\Validation\AttributeValueValidator;
@@ -128,6 +127,8 @@ final class ContentValueCommitTest extends KernelTestCase
         // change: the operator saw an unchanged field and had to leave the
         // product and come back. Deliberately NO drainAsyncTransport() here —
         // the projection has to be correct without the worker ever running.
+        // (The message is still queued; the inline pass just gets there first,
+        // and the rebuild is idempotent.)
         $tenant = $this->createTenant();
         [$object] = $this->seedProduct();
         $em = $this->em();
@@ -159,17 +160,6 @@ final class ContentValueCommitTest extends KernelTestCase
             $slot['value'] ?? null,
             'attributes_indexed must be fresh before the response returns — the UI reads the projection, not object_values',
         );
-
-        // The inline rebuild REPLACES the queued one; leaving both would make
-        // the worker redo the same write for every approval.
-        $transport = self::getContainer()->get('messenger.transport.async');
-        if ($transport instanceof InMemoryTransport) {
-            $queued = array_filter(
-                $transport->getSent(),
-                static fn (object $envelope): bool => $envelope->getMessage() instanceof ObjectValuesChangedMessage,
-            );
-            self::assertSame([], $queued, 'a batch rebuilt inline must not also enqueue ObjectValuesChangedMessage');
-        }
     }
 
     /**
