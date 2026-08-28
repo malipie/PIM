@@ -76,7 +76,13 @@ final readonly class AgentSystemPromptBuilder
     private function compactContext(array $context): array
     {
         $compact = [];
-        foreach (['object_type_code', 'object_type', 'locale', 'channel', 'pathname', 'total_matching'] as $key) {
+        // #3048 — `product_id` / `target_attribute` come from the per-field
+        // Ask AI (use-ask-ai.ts): one object the operator pointed at, plus the
+        // field they clicked. That is NOT the bulk selection this allow-list
+        // was built to keep server-side — a single explicit target has to
+        // reach the model, otherwise the run opens by asking the operator for
+        // the SKU of the product whose form they are standing on.
+        foreach (['object_type_code', 'object_type', 'locale', 'channel', 'pathname', 'total_matching', 'product_id', 'target_attribute'] as $key) {
             $value = $context[$key] ?? null;
             if (\is_string($value) || \is_int($value) || \is_bool($value)) {
                 $compact[$key] = $value;

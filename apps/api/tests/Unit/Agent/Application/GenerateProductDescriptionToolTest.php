@@ -58,6 +58,72 @@ final class GenerateProductDescriptionToolTest extends TestCase
     }
 
     #[Test]
+    public function resolvesTheRecipeByTargetAttributeNotByAHardcodedCode(): void
+    {
+        // #3048 — the fallback used to be findOneBy(['code' => 'product_description']),
+        // a code only AiContentDefaultsSeeder ever produces. An operator who
+        // created a recipe in Settings → AI content got "no content recipe
+        // found" while their correctly configured recipe sat in the database.
+        $operatorRecipe = new ContentRecipe(
+            code: 'opis_produktu_pomiarowe',
+            name: 'Opis produktu — narzędzia pomiarowe',
+            targetAttribute: 'description',
+            sourceAttributes: ['material', 'color'],
+            constraints: ['format' => 'html'],
+        );
+
+        /** @var list<array<string, mixed>> $seen */
+        $seen = [];
+        $recipeRepo = $this->createMock(EntityRepository::class);
+        $recipeRepo->method('findOneBy')->willReturnCallback(
+            static function (array $criteria) use (&$seen, $operatorRecipe): ?ContentRecipe {
+                $seen[] = $criteria;
+                // No built-in recipe exists on this tenant.
+                if (($criteria['isBuiltIn'] ?? false) === true) {
+                    return null;
+                }
+
+                return ($criteria['targetAttribute'] ?? null) === 'description' ? $operatorRecipe : null;
+            },
+        );
+
+        $tool = $this->toolWithRecipeRepository($recipeRepo);
+
+        // No target_attribute — exactly the call the loop makes when the run
+        // context did not carry one.
+        $result = $tool->execute(
+            ['product_id' => Uuid::v7()->toRfc4122()],
+            $this->context(),
+        );
+
+        self::assertArrayNotHasKey('error', $result, 'the operator-created recipe must be reachable');
+        self::assertNotSame([], $seen);
+        foreach ($seen as $criteria) {
+            self::assertArrayNotHasKey('code', $criteria, 'lookup must not key on a hardcoded recipe code');
+            self::assertSame('description', $criteria['targetAttribute'] ?? null);
+        }
+    }
+
+    #[Test]
+    public function namesTheSearchedAttributeWhenNoRecipeMatches(): void
+    {
+        // #3048 — the old copy told the operator to configure a recipe they
+        // had already configured, because the lookup ran on a different key.
+        $recipeRepo = $this->createStub(EntityRepository::class);
+        $recipeRepo->method('findOneBy')->willReturn(null);
+
+        $tool = $this->toolWithRecipeRepository($recipeRepo);
+        $result = $tool->execute(
+            ['product_id' => Uuid::v7()->toRfc4122(), 'target_attribute' => 'short_description'],
+            $this->context(),
+        );
+
+        $error = $result['error'] ?? null;
+        self::assertIsString($error);
+        self::assertStringContainsString('short_description', $error);
+    }
+
+    #[Test]
     public function happyPathMaterializesWithAuditMetaAndUsage(): void
     {
         $calls = new LlmCallRecorder();
@@ -174,6 +240,51 @@ final class GenerateProductDescriptionToolTest extends TestCase
         self::assertSame(ToolKind::Write, $tool->kind());
         self::assertSame('object.write', $tool->requiredPermission());
         self::assertSame(['product_id'], $tool->parametersSchema()['required']);
+    }
+
+    /**
+     * #3048 — the standard {@see tool()} stubs findOneBy to always return a
+     * recipe, so it cannot observe WHICH criteria the lookup uses. This
+     * variant injects the repository double while keeping the rest of the
+     * wiring identical.
+     *
+     * @param EntityRepository<ContentRecipe> $recipeRepo
+     */
+    private function toolWithRecipeRepository(EntityRepository $recipeRepo): GenerateProductDescriptionTool
+    {
+        $voice = new BrandVoiceProfile('Ekspercki', 'ekspercki, zwięzły');
+        $voiceRepo = $this->createStub(EntityRepository::class);
+        $voiceRepo->method('findOneBy')->willReturn($voice);
+
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('getRepository')->willReturnCallback(
+            static fn (string $class): EntityRepository => ContentRecipe::class === $class ? $recipeRepo : $voiceRepo,
+        );
+
+        $grounding = new ContentGrounding(
+            facts: ['material' => ['value' => 'aluminium'], 'color' => ['option_code' => 'red']],
+            usedCodes: ['material', 'color'],
+            missingCodes: [],
+        );
+        $factsPort = $this->createStub(ObjectFactsPort::class);
+        $factsPort->method('facts')->willReturn(new ObjectFacts(
+            objectId: Uuid::v7(),
+            objectTypeId: Uuid::v7(),
+            values: $grounding->facts,
+            missingCodes: $grounding->missingCodes,
+            siblingLocales: $grounding->siblingLocales,
+        ));
+        $models = new AgentModelSelector('claude-sonnet-test', 'claude-opus-test');
+
+        return new GenerateProductDescriptionTool(
+            $em,
+            new ContentGroundingService($factsPort, $this->createStub(ChannelPublicationResolverInterface::class)),
+            new GroundingGate(),
+            $this->acceptingPort(),
+            $this->scriptedLlm('Rzeczowy opis z aluminium.', new LlmCallRecorder()),
+            $models,
+            new UsageCostCalculator($models, 3.0, 15.0, 5.0, 25.0),
+        );
     }
 
     private function tool(
