@@ -8,6 +8,7 @@ use App\Agent\Application\Approval\AgentApprovalService;
 use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentRun;
+use App\Catalog\Application\AttributesIndexedRebuilder;
 use App\Agent\Domain\Exception\ApprovalConflictException;
 use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Contracts\PendingChanges\PendingChangeDraft;
@@ -58,6 +59,22 @@ final class AgentRollbackTest extends KernelTestCase
         $rolledBack = $this->approval()->rollback($run->getId());
 
         $this->probe($em, 'po rollback');
+
+        // TEMPORARY (#3053) — rozstrzyga, czy przebudowa po rollbacku w ogole
+        // dojezdza. Recznie wolamy rebuilder: jesli projekcja sie wyczysci,
+        // problem jest w dostarczeniu wiadomosci, a nie w samym wyliczeniu.
+        $probeObject = $em->getRepository(CatalogObject::class)->findOneBy(['code' => 'OBJ-1']);
+        fwrite(STDERR, \sprintf(
+            "\n[#3053][recznie] znaleziony=%s\n",
+            $probeObject instanceof CatalogObject ? 'TAK' : 'NIE (filtr tenanta?)',
+        ));
+        if ($probeObject instanceof CatalogObject) {
+            $rebuilder = self::getContainer()->get('test.catalog.attributes_indexed_rebuilder');
+            \assert($rebuilder instanceof AttributesIndexedRebuilder);
+            $rebuilder->rebuild($probeObject);
+            $em->flush();
+            $this->probe($em, 'po recznej przebudowie');
+        }
 
         self::assertSame(AgentRunStatus::RolledBack, $rolledBack->getStatus());
 
