@@ -75,6 +75,21 @@ argumenty="$*"
 printf '%s\n' "$argumenty" >> "$DOCKER_LOG"
 
 case "$argumenty" in
+    # ATRAPA_UP_FAIL odgrywa `api` czekające na `service_healthy` zależności,
+    # która nigdy nie zdrowieje (wdrożenie 34643502, #3063).
+    *"up -d --force-recreate"*)
+        [ "${ATRAPA_UP_FAIL:-0}" = "1" ] && exit 1
+        exit 0 ;;
+    *"ps -aq"*)
+        [ "${ATRAPA_UP_FAIL:-0}" = "1" ] && printf 'cid-database\n'
+        exit 0 ;;
+    *"inspect"*)
+        case "$argumenty" in
+            *"Health.Status"*) echo "unhealthy" ;;
+            *".Name"*)         echo "/pim-acme-database-1" ;;
+            *"Health.Log"*)    echo "127: pim-init-query-stats.sh: not found" ;;
+        esac
+        exit 0 ;;
     *"/api/objects"*) echo "401"; exit 0 ;;
     *"curl"*)         echo "200"; exit 0 ;;
     *"messenger:stats"*)
@@ -160,7 +175,7 @@ wymagaj_kolejnosc "$log" 'doctrine:migrations:migrate' 'pim:db:schema:validate' 
     "read-only kontrakt schematu idzie po migracjach"
 wymagaj_kolejnosc "$log" 'pim:db:schema:validate' 'stop api worker agent-worker' \
     "kontrakt schematu blokuje wypuszczenie kodu"
-wymagaj_kolejnosc "$log" 'build api worker' 'doctrine:migrations:migrate' \
+wymagaj_kolejnosc "$log" ' build$' 'doctrine:migrations:migrate' \
     "build wyprzedza migracje"
 wymagaj_kolejnosc "$log" 'up -d --force-recreate' 'curl' \
     "smoke dopiero po wznowieniu usług"
@@ -183,6 +198,129 @@ if grep -qE 'APP_CACHE_DIR=/app/var' "$log"; then
     blad "APP_CACHE_DIR wskazuje na współdzielony /app/var — to ta sama pułapka co #2991"
 else
     ok "katalog cache bramki jest poza /app/var"
+fi
+
+# #3063 — build MUSI iść bez listy usług. Imienna lista (`api worker`)
+# pomijała `database`: #3061 dodał skrypt do obrazu Postgresa, `up -d`
+# odtworzyło kontener bazy na starym obrazie, healthcheck padł na
+# `pim-init-query-stats.sh: not found`, a `api` utknęło na `service_healthy` —
+# wdrożenie 34643502 stanęło na pierwszej instancji. `docker compose build`
+# bez argumentów buduje każdą usługę z sekcją `build:`, więc nie ma listy,
+# która mogłaby się rozjechać z compose.
+if grep -qE '(^| )build +[a-z]' "$log"; then
+    blad "build jedzie z imienną listą usług — pominie każdą nową usługę z build: (#3063)"
+else
+    ok "build bez listy usług — obejmuje wszystkie obrazy z sekcją build:"
+fi
+
+# Sanity: build w ogóle się odbył (regułę wyżej spełniłby też brak builda).
+if grep -qE '(^| )build *$' "$log"; then
+    ok "krok build wykonany"
+else
+    blad "brak wywołania 'build' — nowy obraz nigdy nie powstaje"
+fi
+
+# #3063, kryterium akceptacji 2 — bramka liczona na PRAWDZIWYCH plikach compose,
+# nie na atrapie: zbiór budowanych obrazów musi pokrywać zbiór usług z `build:`.
+# Wzorzec z `test-tenant-new.sh` (#3046), gdzie ten sam rozjazd „usługa jest
+# w compose, skrypt jej nie dotyka" wyszedł dopiero na produkcji.
+#
+# Brak PyYAML jest BŁĘDEM, nie pominięciem: bramka, która po cichu nie startuje,
+# to dokładnie ta klasa problemu, którą ten plik ma wyłapywać.
+rc_pokrycie=0
+raport="$(python3 - "$SKRYPT" "${ROOT}/docker-compose.tenant.yml" "${ROOT}/docker-compose.platform.yml" <<'PYGATE' 2>&1
+import re, sys
+
+try:
+    import yaml
+except ImportError:                                    # pragma: no cover
+    yaml = None
+
+
+def z_yaml(tresc):
+    dane = yaml.safe_load(tresc) or {}
+    # safe_load rozwiazuje kotwice i klucze scalajace, wiec usluga dziedziczaca
+    # `build:` przez `<<: *anchor` (jak `agent-worker`) tez sie tu policzy.
+    return {n for n, s in (dane.get("services") or {}).items() if s and s.get("build")}
+
+
+def bez_yaml(tresc):
+    """Awaryjny parser na wypadek runnera bez PyYAML — bramka ma dzialac
+    zawsze, a nie pomijac sie po cichu. Rozwiazuje `<<: *anchor` jednym
+    punktem stalym, bo `agent-worker` dziedziczy `build:` po `worker`."""
+    bloki, kotwice = {}, {}
+    biezacy = None
+    for linia in tresc.splitlines():
+        naglowek = re.match(r"^(?:  )?([A-Za-z0-9_.-]+):\s*(?:&([A-Za-z0-9_-]+))?\s*$", linia)
+        if naglowek and not linia.startswith("    "):
+            biezacy = naglowek.group(1)
+            bloki.setdefault(biezacy, [])
+            if naglowek.group(2):
+                kotwice[naglowek.group(2)] = biezacy
+            continue
+        if biezacy is not None:
+            bloki[biezacy].append(linia)
+
+    def wlasny_build(nazwa):
+        return any(re.match(r"^\s{4}build:", l) for l in bloki.get(nazwa, []))
+
+    def scalane(nazwa):
+        wynik = []
+        for l in bloki.get(nazwa, []):
+            m = re.match(r"^\s+<<:\s*(.+)$", l)
+            if m:
+                wynik += re.findall(r"\*([A-Za-z0-9_-]+)", m.group(1))
+        return wynik
+
+    buduje = {n for n in bloki if wlasny_build(n)}
+    zmiana = True
+    while zmiana:
+        zmiana = False
+        for nazwa in bloki:
+            if nazwa in buduje:
+                continue
+            if any(kotwice.get(a) in buduje for a in scalane(nazwa)):
+                buduje.add(nazwa)
+                zmiana = True
+
+    blok_uslug = re.search(r"^services:\n(.*?)(?=^\S|\Z)", tresc, re.S | re.M)
+    if blok_uslug is None:
+        return set()
+    uslugi = set(re.findall(r"^  ([A-Za-z0-9_-]+):", blok_uslug.group(1), re.M))
+    return buduje & uslugi
+
+skrypt = open(sys.argv[1], encoding="utf-8").read()
+
+# Argumenty kazdego wywolania `dc build ...` w skrypcie. Pusta lista == build
+# bez argumentow, czyli z definicji wszystkie uslugi z sekcja `build:`.
+wywolania = re.findall(r"^\s*dc build([^\n|>]*)", skrypt, re.M)
+if not wywolania:
+    print("BLAD: skrypt nie wola 'dc build'")
+    raise SystemExit(1)
+
+for plik in sys.argv[2:]:
+    tresc = open(plik, encoding="utf-8").read()
+    wymagane = z_yaml(tresc) if yaml is not None else bez_yaml(tresc)
+    if not wymagane:
+        print(f"BLAD: {plik} nie ma zadnej uslugi z 'build:' - bramka bylaby pusta")
+        raise SystemExit(1)
+    for argumenty in wywolania:
+        budowane = {a for a in argumenty.split() if not a.startswith("-") and not a.startswith(">")}
+        if not budowane:
+            continue  # build bez listy: pokrywa wszystko
+        brak = wymagane - budowane
+        if brak:
+            print(f"BLAD: {plik}: nie budowane uslugi z 'build:': {', '.join(sorted(brak))}")
+            raise SystemExit(1)
+    print(f"OK: {plik}: pokryte {len(wymagane)} uslug z 'build:' ({', '.join(sorted(wymagane))})")
+PYGATE
+)" || rc_pokrycie=$?
+# Bez `|| rc=…` `set -e` ubiłby CAŁY test na pierwszym niepowodzeniu bramki,
+# zanim `blad` zdążyłby cokolwiek wypisać — awaria wyglądałaby jak cisza.
+if [ "$rc_pokrycie" -eq 0 ]; then
+    printf '%s\n' "$raport" | while IFS= read -r linia; do ok "${linia#OK: }"; done
+else
+    blad "pokrycie budowanych obrazów: ${raport}"
 fi
 
 # Stary, kruchy licznik nie może wrócić.
@@ -252,6 +390,34 @@ if grep -q -- '-f docker-compose.platform.yml' "$log"; then
     ok "użyto pliku Compose platformy"
 else
     blad "platforma wdrażana nie tym plikiem Compose"
+fi
+rm -rf "$tmp"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 2b. #3063: gdy usługi nie wstają, komunikat ma wskazać WINNĄ zależność
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# „usługi aplikacyjne nie wstały" nie mówi, czego szukać. Przy wdrożeniu
+# 34643502 winna była baza (healthcheck padał z kodem 127), a `api` tylko
+# czekało na `service_healthy`. Diagnostyka po nieudanym `up` ma wypisać nazwę
+# niezdrowego kontenera i ostatnie wyjście jego sondy.
+zaczyna "nieudane 'up' wskazuje niezdrową zależność"
+tmp="$(mktemp -d)"
+przygotuj_drzewo "$tmp" tenant
+rc=0
+ATRAPA_UP_FAIL=1 uruchom "$tmp" --tag test --skip-dump || rc=$?
+
+[ "$rc" -eq 30 ] && ok "nieudane wznowienie → kod 30" \
+    || blad "nieudane wznowienie dało kod ${rc}, oczekiwano 30"
+if grep -q 'pim-acme-database-1' "${tmp}/err.txt"; then
+    ok "komunikat nazywa niezdrowy kontener"
+else
+    blad "komunikat nie mówi, KTÓRA usługa jest niezdrowa (#3063)"
+fi
+if grep -q 'pim-init-query-stats.sh: not found' "${tmp}/err.txt"; then
+    ok "komunikat cytuje wyjście healthchecku"
+else
+    blad "brak wyjścia sondy — diagnoza wymaga wtedy ręcznego 'docker inspect'"
 fi
 rm -rf "$tmp"
 

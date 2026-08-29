@@ -84,15 +84,21 @@ Sprawdź, że plik, który miał dojechać, faktycznie dojechał (`ls -la` na cz
 ### 3. Obrazy
 
 ```bash
-ssh $HOST "cd /opt/pim && $DC build api worker caddy"
+ssh $HOST "cd /opt/pim && $DC build"
 ```
 
 Produkcja **nie bind-mountuje kodu PHP** — nowy kod trafia do środka wyłącznie przez przebudowany obraz.
 To jest źródło pułapki nr 1 poniżej.
 
-`caddy` jest na tej liście od #2908: edge nie stoi już na gotowym `caddy:2-alpine`, tylko na obrazie
-budowanym z `docker/caddy/Dockerfile` (Caddy z pluginem DNS Cloudflare — bez niego nie ma certyfikatu
-wildcard dla subdomen tenantów). **`up -d` buduje obraz tylko wtedy, gdy go BRAKUJE**, więc zmiana
+**Bez listy usług** (#3063). `docker compose build` bez argumentów buduje każdą usługę z sekcją
+`build:`; obrazy bez zmian są no-opem dzięki cache warstw, więc lista niczego nie oszczędza, a potrafi
+się rozjechać z compose. Tak wywróciło się wdrożenie 34643502: #3061 dołożył skrypt do obrazu
+Postgresa, lista go nie obejmowała, `up -d` odtworzyło bazę na starym obrazie, healthcheck padł
+(`pim-init-query-stats.sh: not found`), a `api` utknęło na `service_healthy`. Ta sama pułapka trafiła
+wcześniej `caddy` (#2908): edge nie stoi już na gotowym `caddy:2-alpine`, tylko na obrazie budowanym
+z `docker/caddy/Dockerfile` (Caddy z pluginem DNS Cloudflare — bez niego nie ma certyfikatu
+wildcard dla subdomen tenantów). Wniosek zastosowano wtedy do jednej usługi zamiast do reguły.
+**`up -d` buduje obraz tylko wtedy, gdy go BRAKUJE**, więc zmiana
 w tym `Dockerfile` — bump wersji Caddy'ego albo pluginu — przeszłaby bez śladu, a edge zostałby na
 starej binarce. Objaw byłby odległy od przyczyny: nie błąd wdrożenia, tylko nieodnowiony certyfikat
 kilkadziesiąt dni później, **u wszystkich klientów naraz**.
