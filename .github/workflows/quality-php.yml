@@ -418,16 +418,59 @@ jobs:
       # Suites other than api-catalog stay sequential for now — they finish
       # in 12-15 min and are not the bottleneck; widening this is a follow-up
       # once the catalog leg proves stable in parallel.
+      # #3057 — a hung shard used to run into the job's 35-minute limit and
+      # surface as `cancelled`, which `gh pr checks` renders as `fail`:
+      # indistinguishable from a broken test, with an empty `--log-failed`,
+      # and only `gh api .../jobs/{id} -q .conclusion` telling the two apart.
+      # Three false alarms in one session came from exactly that.
+      #
+      # Cap the run BELOW the job limit so a hang fails loudly instead of
+      # being cancelled, and stream PHPUnit's events to a file so the tail
+      # names the test that never finished. Measured: api-catalog ~9 min,
+      # api-rest ~14 min (observed up to 17), api-heavy ~16 min.
       - name: Run PHPUnit (${{ matrix.suite }})
         run: |
-          if [ "${{ matrix.suite }}" = "api-catalog" ]; then
-            vendor/bin/paratest \
-              --processes 4 \
-              --testsuite ${{ matrix.suite }} \
-              --passthru-php="-d max_execution_time=0"
+          set -o pipefail
+          limit=25m
+          events="phpunit-events-${{ matrix.suite }}.txt"
+          status=0
+          # Nie zakladamy obecnosci flagi na slepo: gdyby ta wersja PHPUnita
+          # jej nie znala, kazdy shard padlby natychmiast na nieznanej opcji.
+          events_opt=""
+          if php bin/phpunit --help 2>/dev/null | grep -q -- '--log-events-text'; then
+            events_opt="--log-events-text $events"
           else
-            php bin/phpunit --testsuite ${{ matrix.suite }}
+            echo "::notice::PHPUnit bez --log-events-text; zawieszenie nie nazwie testu (#3057)."
           fi
+          if [ "${{ matrix.suite }}" = "api-catalog" ]; then
+            timeout --signal=TERM --kill-after=30s "$limit" \
+              vendor/bin/paratest \
+                --processes 4 \
+                --testsuite ${{ matrix.suite }} \
+                --passthru-php="-d max_execution_time=0" || status=$?
+          else
+            # shellcheck disable=SC2086 # events_opt ma sie rozwinac na 2 argumenty
+            timeout --signal=TERM --kill-after=30s "$limit" \
+              php bin/phpunit --testsuite ${{ matrix.suite }} $events_opt || status=$?
+          fi
+          # 124 = timeout sent TERM, 137 = it had to follow up with KILL.
+          if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+            echo "::error title=Shard zawiesil sie::${{ matrix.suite }} przekroczyl ${limit} — to ZAWIESZENIE, nie wolny test (#3057)."
+            echo "----- ostatnie zdarzenia PHPUnit: test na koncu listy nigdy sie nie zakonczyl -----"
+            tail -n 40 "$events" 2>/dev/null || echo "(brak pliku zdarzen — hang przed pierwszym testem)"
+          fi
+          exit "$status"
+
+      # Zachowaj slad po zawieszeniu: tail w logu bywa przyciety, pelna lista
+      # zdarzen pozwala odtworzyc kolejnosc testow az do momentu zatrzymania.
+      - name: Upload PHPUnit events on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpunit-events-${{ matrix.suite }}
+          path: apps/api/phpunit-events-${{ matrix.suite }}.txt
+          if-no-files-found: ignore
+          retention-days: 7
 
   phpunit-benchmark:
     # AUD-083 — the heavy 5k/50k import + export memory benchmark, split out of
