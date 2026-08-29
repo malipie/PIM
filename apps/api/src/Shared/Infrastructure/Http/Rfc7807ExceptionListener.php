@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Http;
 
+use App\Shared\Infrastructure\Audit\AuditWriteFailedException;
 use League\Flysystem\FilesystemException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -86,6 +87,27 @@ final class Rfc7807ExceptionListener implements EventSubscriberInterface
         // FIXED string — Flysystem messages embed storage keys/paths
         // (information leak, AUD-042); logging already happened in Symfony's
         // ErrorListener::logKernelException at higher priority.
+        // #3045 — an audit write that failed took the whole transaction with
+        // it (Postgres aborts, COMMIT silently downgrades to ROLLBACK). The
+        // request MUST NOT look successful: nothing was saved. `detail` stays
+        // a fixed string per AUD-042 — the audit table name is an internal
+        // detail and already reached the log through
+        // ErrorListener::logKernelException at higher priority.
+        if ($throwable instanceof AuditWriteFailedException && $this->isCustomApiRequest($request)) {
+            $event->setResponse(new JsonResponse(
+                data: [
+                    'type' => $this->typeForStatus(Response::HTTP_INTERNAL_SERVER_ERROR),
+                    'title' => Response::$statusTexts[Response::HTTP_INTERNAL_SERVER_ERROR],
+                    'status' => Response::HTTP_INTERNAL_SERVER_ERROR,
+                    'detail' => 'The change could not be recorded in the audit trail and was rolled back — nothing was saved. Report this: the instance needs a schema check.',
+                ],
+                status: Response::HTTP_INTERNAL_SERVER_ERROR,
+                headers: ['content-type' => 'application/problem+json'],
+            ));
+
+            return;
+        }
+
         if ($throwable instanceof FilesystemException && $this->isCustomApiRequest($request)) {
             $event->setResponse(new JsonResponse(
                 data: [

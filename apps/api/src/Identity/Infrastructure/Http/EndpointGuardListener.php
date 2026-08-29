@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Identity\Infrastructure\Http;
 
+use ApiPlatform\Metadata\Operation;
 use App\Identity\Application\PermissionResolverInterface;
 use App\Identity\Contracts\Attribute\NoPermissionRequired;
 use App\Identity\Contracts\Attribute\RequiresPermission;
@@ -107,6 +108,23 @@ final class EndpointGuardListener implements EventSubscriberInterface
             $path = $event->getRequest()->getPathInfo();
             if (!str_starts_with($path, '/api/')) {
                 return;
+            }
+
+            // #3045 — API Platform routes every resource operation through one
+            // controller (MainController::__invoke), which by definition
+            // carries neither attribute. Warning on it fired for EVERY
+            // resource endpoint, protected or not, and the noise buried the
+            // signal: chasing one of those warnings is what first suggested
+            // /api/import-profiles was unguarded, when its authorisation lives
+            // in `security="is_granted(...)"` on the operation. Trust that
+            // declaration; keep warning when an operation declares nothing,
+            // because that IS an unguarded endpoint.
+            $operation = $event->getRequest()->attributes->get('_api_operation');
+            if ($operation instanceof Operation) {
+                $declared = $operation->getSecurity();
+                if (\is_string($declared) && '' !== trim($declared)) {
+                    return;
+                }
             }
 
             $location = $reflection->getDeclaringClass()->getName().'::'.$reflection->getName();

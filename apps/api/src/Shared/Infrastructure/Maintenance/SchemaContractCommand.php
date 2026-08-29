@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Maintenance;
 
+use App\Shared\Infrastructure\Audit\AuditedTableRegistry;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ManyToManyOwningSideMapping;
@@ -32,25 +33,6 @@ use const SORT_STRING;
 )]
 final class SchemaContractCommand extends Command
 {
-    /** @var list<string> */
-    private const array AUDITOR_TABLES = [
-        'api_keys_audit',
-        'api_profiles_audit',
-        'assets_audit',
-        'attribute_groups_audit',
-        'attribute_options_audit',
-        'attributes_audit',
-        'backups_audit',
-        'channels_audit',
-        'import_profiles_audit',
-        'import_sessions_audit',
-        'object_types_audit',
-        'permissions_audit',
-        'roles_audit',
-        'tenants_audit',
-        'users_audit',
-    ];
-
     /**
      * Tables deliberately not represented by active ORM metadata. Historical
      * audit tables stay readable, while infra/junction tables remain owned by
@@ -77,6 +59,7 @@ final class SchemaContractCommand extends Command
         #[Autowire(service: 'doctrine.dbal.owner_connection')]
         private readonly Connection $ownerConnection,
         private readonly EntityManagerInterface $entityManager,
+        private readonly AuditedTableRegistry $auditedTables,
     ) {
         parent::__construct();
     }
@@ -184,7 +167,11 @@ final class SchemaContractCommand extends Command
             }
         }
 
-        foreach (self::AUDITOR_TABLES as $table) {
+        // #3045 — derived from dh_auditor.yaml, not from a second hand-kept
+        // copy of the same list. The incident WAS list drift: three entities
+        // were added to the auditor config with no tables, and a check keyed on
+        // its own copy would have passed while writes were silently lost.
+        foreach ($this->auditedTables->expectedTableNames() as $table) {
             $this->assignOwner($owners, $errors, $table, 'auditor');
         }
         foreach (self::MIGRATIONS_ONLY_TABLES as $table) {
