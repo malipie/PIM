@@ -27,6 +27,10 @@ use Symfony\Component\Uid\Uuid;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
 
+use const JSON_UNESCAPED_SLASHES;
+use const JSON_UNESCAPED_UNICODE;
+use const STDERR;
+
 /**
  * AGENT-P3-04 (#1964, SEC failing-test-first) — "Cofnij tę operację":
  * rollback restores the before-state on the CANONICAL object_values
@@ -154,7 +158,9 @@ final class AgentRollbackTest extends KernelTestCase
         $row = $conn->fetchAssociative(
             'SELECT o.id::text AS id, o.version, o.attributes_indexed::text AS indexed,'
             .' (SELECT COUNT(*) FROM object_values ov WHERE ov.object_id = o.id) AS own_values,'
-            .' (SELECT COUNT(*) FROM object_values) AS all_values,'
+            .' (SELECT ov.value::text FROM object_values ov WHERE ov.object_id = o.id LIMIT 1) AS stored_value,'
+            .' (SELECT bl.new_value::text FROM bulk_logs bl LIMIT 1) AS log_new,'
+            .' (SELECT bl.old_value::text FROM bulk_logs bl LIMIT 1) AS log_old,'
             .' (SELECT COUNT(*) FROM bulk_logs) AS logs'
             .' FROM objects o WHERE o.code = :c',
             ['c' => 'OBJ-1'],
