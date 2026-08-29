@@ -29,6 +29,7 @@ final readonly class AnthropicClientFactory
 {
     public function __construct(
         private ByokKeyResolverInterface $keyResolver,
+        private AnthropicClientBuilderInterface $clientBuilder,
         private int $maxRetries,
         private float $timeoutSeconds,
     ) {
@@ -41,7 +42,7 @@ final readonly class AnthropicClientFactory
             throw AgentUnavailableException::missingByokKey();
         }
 
-        return new Client(
+        return $this->clientBuilder->build(
             apiKey: $apiKey,
             requestOptions: [
                 'maxRetries' => $this->maxRetries,

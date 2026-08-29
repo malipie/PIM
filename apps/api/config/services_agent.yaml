@@ -79,6 +79,9 @@ services:
             $maxRetries: '%pim.agent.llm.max_retries%'
             $timeoutSeconds: '%pim.agent.llm.timeout_seconds%'
 
+    App\Agent\Infrastructure\Anthropic\AnthropicClientBuilderInterface:
+        alias: App\Agent\Infrastructure\Anthropic\SdkAnthropicClientBuilder
+
     App\Agent\Infrastructure\Anthropic\SdkAgentLlmClient:
         arguments:
             $interactiveMaxTokens: '%pim.agent.llm.interactive_max_tokens%'
