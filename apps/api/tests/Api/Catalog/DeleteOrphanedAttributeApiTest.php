@@ -40,14 +40,23 @@ final class DeleteOrphanedAttributeApiTest extends CatalogApiTestCase
 
         $attribute = new Attribute('orphan_color', ['en' => 'Orphan color'], AttributeType::Text);
         $em->persist($attribute);
+        // Survivor: still attached to the ObjectType, so the purge must leave
+        // its slot alone. It is the positive control for the closing absence
+        // assertion (#3056) — a rebuild that produced nothing at all would
+        // also "not contain" the deleted key.
+        $kept = new Attribute('kept_size', ['en' => 'Kept size'], AttributeType::Text);
+        $em->persist($kept);
+        $em->persist(new ObjectTypeAttribute($productType, $kept, false, 0));
         $object = new CatalogObject($productType, 'ORPH-001');
         $object->forceStatus(CatalogObject::STATUS_PUBLISHED);
         $em->persist($object);
         $em->flush();
 
         // Value present but attribute attached to NOTHING — the orphaned state.
+        // AttributesIndexedSyncListener projects both rows into
+        // `attributes_indexed` on this flush (single-edit path, BulkContext off).
         $em->persist(new ObjectValue($object, $attribute, ['value' => 'taupe'], Provenance::Manual));
-        $object->updateAttributeIndex(['orphan_color' => ['value' => 'taupe']]);
+        $em->persist(new ObjectValue($object, $kept, ['value' => 'XL'], Provenance::Manual));
         $em->flush();
 
         $attributeId = $attribute->getId()->toRfc4122();
@@ -77,6 +86,11 @@ final class DeleteOrphanedAttributeApiTest extends CatalogApiTestCase
             [$objectId],
         );
         self::assertIsString($indexed);
+        self::assertStringContainsString(
+            'kept_size',
+            $indexed,
+            'Cache must be rebuilt, not emptied — otherwise the check below asserts nothing.',
+        );
         self::assertStringNotContainsString('orphan_color', $indexed, 'Cache must drop the deleted key.');
     }
 
