@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\PendingChanges;
 
-use App\Catalog\Application\BatchValueWriter;
 use App\Catalog\Application\AttributesIndexedRebuilder;
+use App\Catalog\Application\BatchValueWriter;
 use App\Catalog\Application\Bulk\BulkAddCategoryHandler;
 use App\Catalog\Application\Bulk\BulkChangeStatusHandler;
 use App\Catalog\Application\Bulk\BulkMoveCategoryHandler;
