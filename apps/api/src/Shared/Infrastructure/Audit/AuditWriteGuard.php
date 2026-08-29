@@ -57,6 +57,7 @@ final class AuditWriteGuard
         $this->probedThisFlush = true;
 
         try {
+            // tenant-safe: liveness probe, touches no table and returns no row
             $this->connection->executeQuery('SELECT 1');
         } catch (DbalException $failure) {
             $payload = $event->getPayload();

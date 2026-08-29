@@ -6,8 +6,10 @@ namespace App\Tests\Integration\Audit;
 
 use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
+use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Audit\AuditWriteFailedException;
+use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
@@ -44,6 +46,7 @@ final class AuditWriteFailureTest extends KernelTestCase
         $tenant = new Tenant('alpha', 'Alpha');
         $em->persist($tenant);
         $em->flush();
+        $this->bindTenant($tenant);
 
         $this->connection()->executeStatement('DROP TABLE attributes_audit');
 
@@ -67,6 +70,7 @@ final class AuditWriteFailureTest extends KernelTestCase
         $tenant = new Tenant('beta', 'Beta');
         $em->persist($tenant);
         $em->flush();
+        $this->bindTenant($tenant);
 
         $attribute = new Attribute('audit_ok', ['pl' => 'Dobry', 'en' => 'Fine'], AttributeType::Text);
         $em->persist($attribute);
@@ -83,6 +87,12 @@ final class AuditWriteFailureTest extends KernelTestCase
             ['t' => 'insert'],
         );
         self::assertGreaterThan(0, (int) (\is_scalar($audited) ? $audited : 0), 'the audit row must be there on the happy path');
+    }
+
+    private function bindTenant(Tenant $tenant): void
+    {
+        self::getContainer()->get(TenantContext::class)->set($tenant);
+        self::getContainer()->get(TenantFilterConfigurator::class)->apply();
     }
 
     private function em(): EntityManagerInterface
