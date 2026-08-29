@@ -8,7 +8,6 @@ use App\Agent\Application\Approval\AgentApprovalService;
 use App\Agent\Domain\AgentRunStatus;
 use App\Agent\Domain\AgentRunSurface;
 use App\Agent\Domain\Entity\AgentRun;
-use App\Catalog\Application\AttributesIndexedRebuilder;
 use App\Agent\Domain\Exception\ApprovalConflictException;
 use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Contracts\PendingChanges\PendingChangeDraft;
@@ -24,13 +23,12 @@ use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\ReceivedStamp;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Symfony\Component\Uid\Uuid;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
-
-use const JSON_UNESCAPED_SLASHES;
-use const JSON_UNESCAPED_UNICODE;
-use const STDERR;
 
 /**
  * AGENT-P3-04 (#1964, SEC failing-test-first) — "Cofnij tę operację":
@@ -51,30 +49,8 @@ final class AgentRollbackTest extends KernelTestCase
         [$em] = $this->fixture();
         $run = $this->committedRun($em, before: null, after: ['value' => 100]);
 
-        // TEMPORARY (#3053) — probe, to be removed before merge. Reading the
-        // code did not explain why the projection survives the rollback; this
-        // prints the state at each step into the CI log.
-        $this->probe($em, 'po commit');
-
         $rolledBack = $this->approval()->rollback($run->getId());
-
-        $this->probe($em, 'po rollback');
-
-        // TEMPORARY (#3053) — rozstrzyga, czy przebudowa po rollbacku w ogole
-        // dojezdza. Recznie wolamy rebuilder: jesli projekcja sie wyczysci,
-        // problem jest w dostarczeniu wiadomosci, a nie w samym wyliczeniu.
-        $probeObject = $em->getRepository(CatalogObject::class)->findOneBy(['code' => 'OBJ-1']);
-        fwrite(STDERR, \sprintf(
-            "\n[#3053][recznie] znaleziony=%s\n",
-            $probeObject instanceof CatalogObject ? 'TAK' : 'NIE (filtr tenanta?)',
-        ));
-        if ($probeObject instanceof CatalogObject) {
-            $rebuilder = self::getContainer()->get('test.catalog.attributes_indexed_rebuilder');
-            \assert($rebuilder instanceof AttributesIndexedRebuilder);
-            $rebuilder->rebuild($probeObject);
-            $em->flush();
-            $this->probe($em, 'po recznej przebudowie');
-        }
+        $this->drainAsyncTransport();
 
         self::assertSame(AgentRunStatus::RolledBack, $rolledBack->getStatus());
 
@@ -82,7 +58,12 @@ final class AgentRollbackTest extends KernelTestCase
         $values = $conn->fetchOne('SELECT COUNT(*) FROM object_values');
         self::assertSame(0, (int) (\is_scalar($values) ? $values : -1), 'a value the agent created must be gone after rollback');
 
-        // Projection rebuilt from canon (sync:// transport runs it inline).
+        // Projection rebuilt from canon. The rebuild travels on the `async`
+        // transport, which CI pins to `in-memory://` (quality-php.yml) — the
+        // message is QUEUED there, not executed — so the drain above is what
+        // makes this assertion mean anything. Until #3053 the commit-time
+        // rebuild was queued and dropped the same way, so the projection was
+        // never populated and "does not contain price" passed for free.
         $indexed = $conn->fetchOne('SELECT attributes_indexed FROM objects WHERE code = :c', ['c' => 'OBJ-1']);
         self::assertIsString($indexed);
         self::assertStringNotContainsString('"price"', $indexed, 'attributes_indexed must follow the restored canon');
@@ -166,27 +147,20 @@ final class AgentRollbackTest extends KernelTestCase
     }
 
     /**
-     * TEMPORARY (#3053) — dumps the canonical values, the projection and the
-     * optimistic-lock version so CI can answer what reading the code could not.
+     * CI pins the `async` transport to `in-memory://`, so a dispatched
+     * ObjectValuesChangedMessage only queues. Replay what the worker would
+     * have consumed. Mirrors ContentValueCommitTest.
      */
-    private function probe(EntityManagerInterface $em, string $label): void
+    private function drainAsyncTransport(): void
     {
-        $conn = $em->getConnection();
-        $row = $conn->fetchAssociative(
-            'SELECT o.id::text AS id, o.version, o.attributes_indexed::text AS indexed,'
-            .' (SELECT COUNT(*) FROM object_values ov WHERE ov.object_id = o.id) AS own_values,'
-            .' (SELECT ov.value::text FROM object_values ov WHERE ov.object_id = o.id LIMIT 1) AS stored_value,'
-            .' (SELECT bl.new_value::text FROM bulk_logs bl LIMIT 1) AS log_new,'
-            .' (SELECT bl.old_value::text FROM bulk_logs bl LIMIT 1) AS log_old,'
-            .' (SELECT COUNT(*) FROM bulk_logs) AS logs'
-            .' FROM objects o WHERE o.code = :c',
-            ['c' => 'OBJ-1'],
-        );
-        fwrite(STDERR, \sprintf(
-            "\n[#3053][%s] %s\n",
-            $label,
-            \is_array($row) ? json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : 'BRAK WIERSZA',
-        ));
+        $transport = self::getContainer()->get('messenger.transport.async');
+        if (!$transport instanceof InMemoryTransport) {
+            return;
+        }
+        $bus = self::getContainer()->get(MessageBusInterface::class);
+        foreach ($transport->getSent() as $envelope) {
+            $bus->dispatch($envelope->getMessage(), [new ReceivedStamp('async')]);
+        }
     }
 
     /**

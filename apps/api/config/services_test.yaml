@@ -10,9 +10,3 @@ services:
             - '@App\Tests\Support\SqlQueryCounter'
         tags:
             - { name: doctrine.middleware }
-
-    # TEMPORARY (#3053) — public alias so the rollback probe can call the
-    # rebuilder directly and tell delivery apart from computation.
-    test.catalog.attributes_indexed_rebuilder:
-        alias: App\Catalog\Application\AttributesIndexedRebuilder
-        public: true
