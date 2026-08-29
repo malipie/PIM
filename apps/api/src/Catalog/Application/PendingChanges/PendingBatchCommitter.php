@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\PendingChanges;
 
 use App\Catalog\Application\BatchValueWriter;
+use App\Catalog\Application\AttributesIndexedRebuilder;
 use App\Catalog\Application\Bulk\BulkAddCategoryHandler;
 use App\Catalog\Application\Bulk\BulkChangeStatusHandler;
 use App\Catalog\Application\Bulk\BulkMoveCategoryHandler;
@@ -12,7 +13,6 @@ use App\Catalog\Application\Bulk\BulkRemoveCategoryHandler;
 use App\Catalog\Application\BulkContext;
 use App\Catalog\Application\Command\CreateCatalogObject\CreateCatalogObjectCommand;
 use App\Catalog\Application\Command\CreateCatalogObject\CreateCatalogObjectHandler;
-use App\Catalog\Application\Handler\RebuildAttributesIndexedHandler;
 use App\Catalog\Application\Message\ObjectValuesChangedMessage;
 use App\Catalog\Application\Reindex\BulkReindexQueueInterface;
 use App\Catalog\Contracts\Command\PendingBatchCommitPort;
@@ -97,7 +97,7 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
         private BulkContext $bulkContext,
         private BulkReindexQueueInterface $reindexQueue,
         private MessageBusInterface $messageBus,
-        private RebuildAttributesIndexedHandler $rebuildIndexed,
+        private AttributesIndexedRebuilder $indexedRebuilder,
         private BulkAddCategoryHandler $addCategories,
         private BulkRemoveCategoryHandler $removeCategories,
         private BulkMoveCategoryHandler $moveCategories,
@@ -209,18 +209,28 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
             // the refetch the frontend fires the moment `approve` returns,
             // instead of losing that race to the worker.
             //
+            // Deliberately the REBUILDER, not RebuildAttributesIndexedHandler:
+            // the handler owns the message lifecycle and ends each object with
+            // `$em->clear()`, which detaches the Tenant held by TenantContext.
+            // A later rollback in the same request then finds its own rebuild
+            // filtered out (`find()` → null → silent no-op) and the projection
+            // keeps the value the rollback just deleted — measured in CI on
+            // AgentRollbackTest: objects.version frozen at 4 while own_values
+            // went 1 → 0.
+            //
             // The queued message above is deliberately LEFT IN PLACE: the
-            // in-transaction dispatch is part of the choreography the rollback
-            // path depends on (AgentRollbackTest), and the rebuild is
-            // idempotent — it recomputes from canonical object_values — so the
-            // worker's later pass is a cheap no-op rather than a second source
-            // of truth. Bounded to small batches so an import-scale commit
-            // never pays for it on the request thread.
+            // rebuild is idempotent — it recomputes from canonical
+            // object_values — so the worker's later pass is a cheap no-op
+            // rather than a second source of truth. Bounded to small batches so
+            // an import-scale commit never pays for it on the request thread.
             if ([] !== $targetIds && \count($targetIds) <= self::INLINE_REBUILD_MAX_OBJECTS) {
-                $this->rebuildIndexed->__invoke(new ObjectValuesChangedMessage(
-                    $targetIds,
-                    Uuid::fromString($tenantId),
-                ));
+                foreach ($targetIds as $targetId) {
+                    $object = $this->entityManager->find(CatalogObject::class, $targetId);
+                    if ($object instanceof CatalogObject) {
+                        $this->indexedRebuilder->rebuild($object);
+                    }
+                }
+                $this->entityManager->flush();
             }
 
             $this->reindexQueue->queueAll($targetIds);
