@@ -220,6 +220,109 @@ else
     blad "brak wywołania 'build' — nowy obraz nigdy nie powstaje"
 fi
 
+# #3063, kryterium akceptacji 2 — bramka liczona na PRAWDZIWYCH plikach compose,
+# nie na atrapie: zbiór budowanych obrazów musi pokrywać zbiór usług z `build:`.
+# Wzorzec z `test-tenant-new.sh` (#3046), gdzie ten sam rozjazd „usługa jest
+# w compose, skrypt jej nie dotyka" wyszedł dopiero na produkcji.
+#
+# Brak PyYAML jest BŁĘDEM, nie pominięciem: bramka, która po cichu nie startuje,
+# to dokładnie ta klasa problemu, którą ten plik ma wyłapywać.
+rc_pokrycie=0
+raport="$(python3 - "$SKRYPT" "${ROOT}/docker-compose.tenant.yml" "${ROOT}/docker-compose.platform.yml" <<'PYGATE' 2>&1
+import re, sys
+
+try:
+    import yaml
+except ImportError:                                    # pragma: no cover
+    yaml = None
+
+
+def z_yaml(tresc):
+    dane = yaml.safe_load(tresc) or {}
+    # safe_load rozwiazuje kotwice i klucze scalajace, wiec usluga dziedziczaca
+    # `build:` przez `<<: *anchor` (jak `agent-worker`) tez sie tu policzy.
+    return {n for n, s in (dane.get("services") or {}).items() if s and s.get("build")}
+
+
+def bez_yaml(tresc):
+    """Awaryjny parser na wypadek runnera bez PyYAML — bramka ma dzialac
+    zawsze, a nie pomijac sie po cichu. Rozwiazuje `<<: *anchor` jednym
+    punktem stalym, bo `agent-worker` dziedziczy `build:` po `worker`."""
+    bloki, kotwice = {}, {}
+    biezacy = None
+    for linia in tresc.splitlines():
+        naglowek = re.match(r"^(?:  )?([A-Za-z0-9_.-]+):\s*(?:&([A-Za-z0-9_-]+))?\s*$", linia)
+        if naglowek and not linia.startswith("    "):
+            biezacy = naglowek.group(1)
+            bloki.setdefault(biezacy, [])
+            if naglowek.group(2):
+                kotwice[naglowek.group(2)] = biezacy
+            continue
+        if biezacy is not None:
+            bloki[biezacy].append(linia)
+
+    def wlasny_build(nazwa):
+        return any(re.match(r"^\s{4}build:", l) for l in bloki.get(nazwa, []))
+
+    def scalane(nazwa):
+        wynik = []
+        for l in bloki.get(nazwa, []):
+            m = re.match(r"^\s+<<:\s*(.+)$", l)
+            if m:
+                wynik += re.findall(r"\*([A-Za-z0-9_-]+)", m.group(1))
+        return wynik
+
+    buduje = {n for n in bloki if wlasny_build(n)}
+    zmiana = True
+    while zmiana:
+        zmiana = False
+        for nazwa in bloki:
+            if nazwa in buduje:
+                continue
+            if any(kotwice.get(a) in buduje for a in scalane(nazwa)):
+                buduje.add(nazwa)
+                zmiana = True
+
+    blok_uslug = re.search(r"^services:\n(.*?)(?=^\S|\Z)", tresc, re.S | re.M)
+    if blok_uslug is None:
+        return set()
+    uslugi = set(re.findall(r"^  ([A-Za-z0-9_-]+):", blok_uslug.group(1), re.M))
+    return buduje & uslugi
+
+skrypt = open(sys.argv[1], encoding="utf-8").read()
+
+# Argumenty kazdego wywolania `dc build ...` w skrypcie. Pusta lista == build
+# bez argumentow, czyli z definicji wszystkie uslugi z sekcja `build:`.
+wywolania = re.findall(r"^\s*dc build([^\n|>]*)", skrypt, re.M)
+if not wywolania:
+    print("BLAD: skrypt nie wola 'dc build'")
+    raise SystemExit(1)
+
+for plik in sys.argv[2:]:
+    tresc = open(plik, encoding="utf-8").read()
+    wymagane = z_yaml(tresc) if yaml is not None else bez_yaml(tresc)
+    if not wymagane:
+        print(f"BLAD: {plik} nie ma zadnej uslugi z 'build:' - bramka bylaby pusta")
+        raise SystemExit(1)
+    for argumenty in wywolania:
+        budowane = {a for a in argumenty.split() if not a.startswith("-") and not a.startswith(">")}
+        if not budowane:
+            continue  # build bez listy: pokrywa wszystko
+        brak = wymagane - budowane
+        if brak:
+            print(f"BLAD: {plik}: nie budowane uslugi z 'build:': {', '.join(sorted(brak))}")
+            raise SystemExit(1)
+    print(f"OK: {plik}: pokryte {len(wymagane)} uslug z 'build:' ({', '.join(sorted(wymagane))})")
+PYGATE
+)" || rc_pokrycie=$?
+# Bez `|| rc=…` `set -e` ubiłby CAŁY test na pierwszym niepowodzeniu bramki,
+# zanim `blad` zdążyłby cokolwiek wypisać — awaria wyglądałaby jak cisza.
+if [ "$rc_pokrycie" -eq 0 ]; then
+    printf '%s\n' "$raport" | while IFS= read -r linia; do ok "${linia#OK: }"; done
+else
+    blad "pokrycie budowanych obrazów: ${raport}"
+fi
+
 # Stary, kruchy licznik nie może wrócić.
 if grep -q 'messenger:failed:show' "$log"; then
     blad "licznik kolejki failed nadal parsuje tabelę 'messenger:failed:show' (#2989)"
