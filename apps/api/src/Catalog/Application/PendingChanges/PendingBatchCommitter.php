@@ -82,9 +82,11 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
      * value from BEFORE the change. The operator sees an unchanged field and has
      * to leave the product and come back.
      *
-     * Invisible in dev and in tests: there `async` is a `sync://` alias
-     * (messenger.yaml), so the rebuild is already in-band. Two earlier attempts
-     * at this bug hardened the editor instead, because the editor is where the
+     * Invisible outside production. Dev aliases `async` to `sync://`
+     * (messenger.yaml) so the rebuild is already in-band; CI pins it to
+     * `in-memory://` (quality-php.yml) so the rebuild is queued and never runs
+     * at all. Neither environment can reproduce the race, which is why two
+     * earlier attempts hardened the editor instead — the editor is where the
      * symptom shows.
      */
     private const int INLINE_REBUILD_MAX_OBJECTS = 25;
@@ -210,13 +212,10 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
             // instead of losing that race to the worker.
             //
             // Deliberately the REBUILDER, not RebuildAttributesIndexedHandler:
-            // the handler owns the message lifecycle and ends each object with
-            // `$em->clear()`, which detaches the Tenant held by TenantContext.
-            // A later rollback in the same request then finds its own rebuild
-            // filtered out (`find()` → null → silent no-op) and the projection
-            // keeps the value the rollback just deleted — measured in CI on
-            // AgentRollbackTest: objects.version frozen at 4 while own_values
-            // went 1 → 0.
+            // the handler owns the message lifecycle (per-object clear, retry,
+            // reindex enqueue). Called from here that lifecycle fights the
+            // caller's — this method hands a live manager and tenant context to
+            // whatever runs next in the request.
             //
             // The queued message above is deliberately LEFT IN PLACE: the
             // rebuild is idempotent — it recomputes from canonical
@@ -232,20 +231,16 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
                 }
                 $this->entityManager->flush();
 
-                // Both halves are load-bearing, each proven by a test that
-                // fails without it (measured in CI on AgentRollbackTest):
+                // clear() is load-bearing and was proven by a failing test:
+                // without it the objects loaded above stay managed, and a later
+                // rollback in the same request reads its superseded guard off a
+                // STALE identity map — it saw the agent's value where the
+                // database already held a manual edit, and deleted the
+                // operator's correction (laterManualEditSurvivesRollback).
                 //
-                //  - clear(): without it the objects this rebuild loaded stay
-                //    managed, and a later rollback in the same request reads its
-                //    superseded guard off a STALE identity map — it saw the
-                //    agent's value where the database already held a manual
-                //    edit, and deleted the operator's correction.
-                //  - rebind: clear() detaches the Tenant in TenantContext, and
-                //    the rollback's own rebuild then finds its object filtered
-                //    out (find() -> null -> silent no-op), leaving the value it
-                //    had just deleted in the projection.
-                //
-                // Same pairing the method already uses after its other clears.
+                // The rebind is the standing companion of every clear in this
+                // method: TenantContext must not be left holding a detached
+                // Tenant for whatever runs next.
                 $this->entityManager->clear();
                 $this->tenantContext->set($this->managedTenant($tenantId));
             }
