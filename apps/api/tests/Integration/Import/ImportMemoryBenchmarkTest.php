@@ -41,10 +41,12 @@ use Zenstruck\Foundry\Test\ResetDatabase;
  * Measured prod-faithfully, the import worker is flat: ~95 MiB at 50k rows (and
  * 5k/10k sit in the same band) — O(chunk), no per-row growth. Three dev/test
  * artifacts otherwise inflate the raw process peak, none with a prod counterpart:
- *   1. `async` = `sync://` in dev/test → the rebuild runs INLINE in this process
- *      (prod offloads it to a bounded worker). We assert on the row-phase peak,
- *      captured before dispatch, and lift the process memory_limit so the inline
- *      rebuild cannot abort the harness — the gate is the assertion, not a crash.
+ *   1. `async` = `sync://` LOCALLY → the rebuild runs INLINE in this process
+ *      (prod offloads it to a bounded worker; CI pins the transport to
+ *      `in-memory://`, where it does not run at all). We assert on the row-phase
+ *      peak, captured before dispatch, and lift the process memory_limit so the
+ *      inline rebuild cannot abort the harness — the gate is the assertion, not
+ *      a crash. The lift is therefore a no-op in CI and load-bearing locally.
  *   2. The in-memory test hub retains every Mercure Update (prod POSTs + discards)
  *      → {@see InMemoryMercureHub::stopRetaining()}.
  *   3. With `APP_DEBUG=1` (the local default for `test`) DoctrineBundle's
@@ -70,10 +72,12 @@ final class ImportMemoryBenchmarkTest extends KernelTestCase
     #[Test]
     public function bulkImportStaysUnderImportWorkerMemoryBudget(): void
     {
-        // Artifact 1 (see class docblock): with `async` = `sync://` the rebuild
-        // runs inline after the row phase in THIS process and can push the peak
-        // past 256 MiB — a limit a fresh prod rebuild worker never sees. Lift the
-        // cap so it cannot abort the harness; the gate is the row-phase assertion.
+        // Artifact 1 (see class docblock): LOCALLY, where `async` is `sync://`,
+        // the rebuild runs inline after the row phase in THIS process and can
+        // push the peak past 256 MiB — a limit a fresh prod rebuild worker never
+        // sees. Lift the cap so it cannot abort the harness; the gate is the
+        // row-phase assertion. In CI the transport is `in-memory://`, so there
+        // is no inline rebuild and this lift changes nothing.
         $originalLimit = \ini_get('memory_limit');
         \ini_set('memory_limit', '-1');
 

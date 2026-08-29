@@ -1,0 +1,26 @@
+# Pliki z asercją NIEOBECNOŚCI na stanie budowanym asynchronicznie, które NIE
+# drenują transportu. Zamrożone przy zakładaniu bramki (#3056) — lista ma
+# maleć, nie rosnąć. Każdy wpis wymaga przejrzenia: czy asercja faktycznie
+# coś sprawdza, czy przechodzi na stanie, który w CI nigdy nie powstaje.
+#
+# Patrz docs/testing/messenger-transports.md
+
+# Poprzedzona asercją na `provenance` z tej samej projekcji, więc projekcja
+# jest tam zapisana — prawdopodobnie fałszywe trafienie. Do potwierdzenia.
+apps/api/tests/Integration/Catalog/BulkIncrementNumericHandlerTest.php
+
+# Asercja "zero zapisów przed akceptacją" — sparowana z twardym
+# COUNT(*) FROM object_values = 0, który sam w sobie jest wystarczający.
+apps/api/tests/Integration/Agent/BulkEditValuesMaterializerTest.php
+
+# Seeder ustawia projekcję wprost w fixture, bez udziału transportu.
+apps/api/tests/Integration/Catalog/DemoCatalogSeederTest.php
+
+# PODEJRZANE — ta sama klasa co #3053: asercja, że projekcja PORZUCIŁA klucz
+# po usunięciu atrybutu. Jeśli przebudowa jest asynchroniczna, asercja może
+# przechodzić na projekcji, która nigdy nie powstała.
+apps/api/tests/Api/Catalog/DeleteOrphanedAttributeApiTest.php
+
+# PODEJRZANE — jak wyżej: projekcja ma nie zawierać klucza relacji po
+# `clear_attribute`.
+apps/api/tests/Api/Catalog/BulkRelationActionsApiTest.php

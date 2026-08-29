@@ -116,6 +116,16 @@ jobs:
         working-directory: .
         run: bash scripts/lint-healthcheck-reaper.sh
 
+      # #3056 — w CI transport `async` to `in-memory://`: wiadomosc trafia do
+      # kolejki i nikt jej nie konsumuje. Asercja OBECNOSCI broni sie sama
+      # (brak przebudowy = czerwony test), ale asercja NIEOBECNOSCI jest wtedy
+      # trywialnie prawdziwa i przechodzi z niewlasciwego powodu. Tak przez
+      # dlugi czas wygladal AgentRollbackTest, ktory asertowal stan projekcji
+      # nigdy w CI nie zbudowanej. Bramka trzyma liste w baseline: ma malec.
+      - name: Async-effect assertions guard
+        working-directory: .
+        run: bash scripts/lint-async-effect-assertions.sh
+
       # #2991 — orkiestrator wdrozen to jedyny kod, ktorego blad widac dopiero
       # na produkcji klienta: `cache:clear` na dzialajacym procesie wywracal
       # workery, a licznik kolejki failed parsowal tabele konsolowa i meldowal
