@@ -53,7 +53,9 @@ Sekrety aplikacyjne z Symfony Vault (jeśli używane): wstrzyknij
 
 ```bash
 # Backend: obraz prod (APP_ENV=prod, composer --no-dev, warmed cache)
-docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml build api worker
+# Bez listy usług (#3063): buduje każdą usługę z sekcją build:, w tym `database` i `caddy`,
+# których obrazy też niosą pliki z repo. Obrazy bez zmian są no-opem (cache warstw).
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml build
 
 # Frontend: zbudowany bundle serwowany przez Caddy z ./apps/admin/dist
 corepack enable && pnpm install --frozen-lockfile
@@ -133,7 +135,7 @@ docker compose ... exec -T api php bin/console pim:agent:seed-content-defaults
 ## 7. Po starcie
 
 - Rotacja sekretów: `docs/operations/secrets-runbook.md` + `credentials-rotation.md`.
-- Aktualizacje: `git fetch && git checkout <nowy-tag>` → `build api worker` →
+- Aktualizacje: `git fetch && git checkout <nowy-tag>` → `build` (bez listy usług, #3063) →
   `run --rm --no-deps api php bin/console doctrine:migrations:migrate` →
   **`stop api worker agent-worker`** → **`run --rm --no-deps api php bin/console cache:clear`**
   (i to samo dla `worker`) → `up -d --force-recreate api worker agent-worker` → smoke pkt 1-3.

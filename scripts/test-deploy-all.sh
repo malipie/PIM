@@ -75,6 +75,21 @@ argumenty="$*"
 printf '%s\n' "$argumenty" >> "$DOCKER_LOG"
 
 case "$argumenty" in
+    # ATRAPA_UP_FAIL odgrywa `api` czekające na `service_healthy` zależności,
+    # która nigdy nie zdrowieje (wdrożenie 34643502, #3063).
+    *"up -d --force-recreate"*)
+        [ "${ATRAPA_UP_FAIL:-0}" = "1" ] && exit 1
+        exit 0 ;;
+    *"ps -aq"*)
+        [ "${ATRAPA_UP_FAIL:-0}" = "1" ] && printf 'cid-database\n'
+        exit 0 ;;
+    *"inspect"*)
+        case "$argumenty" in
+            *"Health.Status"*) echo "unhealthy" ;;
+            *".Name"*)         echo "/pim-acme-database-1" ;;
+            *"Health.Log"*)    echo "127: pim-init-query-stats.sh: not found" ;;
+        esac
+        exit 0 ;;
     *"/api/objects"*) echo "401"; exit 0 ;;
     *"curl"*)         echo "200"; exit 0 ;;
     *"messenger:stats"*)
@@ -160,7 +175,7 @@ wymagaj_kolejnosc "$log" 'doctrine:migrations:migrate' 'pim:db:schema:validate' 
     "read-only kontrakt schematu idzie po migracjach"
 wymagaj_kolejnosc "$log" 'pim:db:schema:validate' 'stop api worker agent-worker' \
     "kontrakt schematu blokuje wypuszczenie kodu"
-wymagaj_kolejnosc "$log" 'build api worker' 'doctrine:migrations:migrate' \
+wymagaj_kolejnosc "$log" ' build$' 'doctrine:migrations:migrate' \
     "build wyprzedza migracje"
 wymagaj_kolejnosc "$log" 'up -d --force-recreate' 'curl' \
     "smoke dopiero po wznowieniu usług"
@@ -183,6 +198,26 @@ if grep -qE 'APP_CACHE_DIR=/app/var' "$log"; then
     blad "APP_CACHE_DIR wskazuje na współdzielony /app/var — to ta sama pułapka co #2991"
 else
     ok "katalog cache bramki jest poza /app/var"
+fi
+
+# #3063 — build MUSI iść bez listy usług. Imienna lista (`api worker`)
+# pomijała `database`: #3061 dodał skrypt do obrazu Postgresa, `up -d`
+# odtworzyło kontener bazy na starym obrazie, healthcheck padł na
+# `pim-init-query-stats.sh: not found`, a `api` utknęło na `service_healthy` —
+# wdrożenie 34643502 stanęło na pierwszej instancji. `docker compose build`
+# bez argumentów buduje każdą usługę z sekcją `build:`, więc nie ma listy,
+# która mogłaby się rozjechać z compose.
+if grep -qE '(^| )build +[a-z]' "$log"; then
+    blad "build jedzie z imienną listą usług — pominie każdą nową usługę z build: (#3063)"
+else
+    ok "build bez listy usług — obejmuje wszystkie obrazy z sekcją build:"
+fi
+
+# Sanity: build w ogóle się odbył (regułę wyżej spełniłby też brak builda).
+if grep -qE '(^| )build *$' "$log"; then
+    ok "krok build wykonany"
+else
+    blad "brak wywołania 'build' — nowy obraz nigdy nie powstaje"
 fi
 
 # Stary, kruchy licznik nie może wrócić.
@@ -252,6 +287,34 @@ if grep -q -- '-f docker-compose.platform.yml' "$log"; then
     ok "użyto pliku Compose platformy"
 else
     blad "platforma wdrażana nie tym plikiem Compose"
+fi
+rm -rf "$tmp"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 2b. #3063: gdy usługi nie wstają, komunikat ma wskazać WINNĄ zależność
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# „usługi aplikacyjne nie wstały" nie mówi, czego szukać. Przy wdrożeniu
+# 34643502 winna była baza (healthcheck padał z kodem 127), a `api` tylko
+# czekało na `service_healthy`. Diagnostyka po nieudanym `up` ma wypisać nazwę
+# niezdrowego kontenera i ostatnie wyjście jego sondy.
+zaczyna "nieudane 'up' wskazuje niezdrową zależność"
+tmp="$(mktemp -d)"
+przygotuj_drzewo "$tmp" tenant
+rc=0
+ATRAPA_UP_FAIL=1 uruchom "$tmp" --tag test --skip-dump || rc=$?
+
+[ "$rc" -eq 30 ] && ok "nieudane wznowienie → kod 30" \
+    || blad "nieudane wznowienie dało kod ${rc}, oczekiwano 30"
+if grep -q 'pim-acme-database-1' "${tmp}/err.txt"; then
+    ok "komunikat nazywa niezdrowy kontener"
+else
+    blad "komunikat nie mówi, KTÓRA usługa jest niezdrowa (#3063)"
+fi
+if grep -q 'pim-init-query-stats.sh: not found' "${tmp}/err.txt"; then
+    ok "komunikat cytuje wyjście healthchecku"
+else
+    blad "brak wyjścia sondy — diagnoza wymaga wtedy ręcznego 'docker inspect'"
 fi
 rm -rf "$tmp"
 

@@ -144,7 +144,7 @@ if [ "$dry_run" = true ]; then
     cat <<EOF
 PLAN (nic nie zostało zmienione). Dla każdej instancji, po kolei:
   1. zrzut przed wdrożeniem $([ "$skip_dump" = true ] && echo '(POMINIĘTY — --skip-dump)')
-  2. build api worker (agent-worker używa tego samego obrazu)
+  2. build wszystkich obrazów z sekcją build: (bez listy usług — #3063)
   3. migracje + read-only kontrakt schematu z nowego obrazu (run --rm --no-deps)
   4. stop usług aplikacyjnych (nikt nie może czytać kasowanego cache)
   5. cache:clear w jednorazowym kontenerze, osobno per usługa
@@ -169,7 +169,6 @@ deploy_one() {
     # workera** (nie przetwarza katalogu ani importów), za to ma provisionera.
     # Zaszyte `api worker` wywracało wdrożenie na kroku 2 komunikatem
     # `no such service: worker`.
-    local do_budowy="api worker"      # obrazy do przebudowania
     local z_cache="api worker"        # usługi Symfony — mają kernel.cache_dir
     local aplikacyjne="api worker agent-worker" # procesy zatrzymywane i wznawiane
 
@@ -177,7 +176,6 @@ deploy_one() {
         env_file=".env.platform"
         project="pim-platform"
         compose_file="docker-compose.platform.yml"
-        do_budowy="api provisioner"
         # Provisioner to kontener Pythona bez Symfony — `cache:clear` nie ma
         # tam czego wyczyścić, a `run --rm provisioner php …` padłby na braku
         # binarki. Zatrzymywany i wznawiany jest mimo to: niesie nowy obraz.
@@ -186,6 +184,25 @@ deploy_one() {
     fi
 
     dc() { docker compose -p "$project" --env-file "$env_file" -f "$compose_file" "$@"; }
+
+    # #3063 — „usługi aplikacyjne nie wstały" nie mówi, CZEGO szukać. Kiedy
+    # `api` czeka na `service_healthy`, winna jest zależność, nie ono samo:
+    # wdrożenie 34643502 stanęło, bo healthcheck bazy wołał skrypt, którego w
+    # obrazie nie było. Wypisz niezdrowe usługi i ostatnie wyjście ich sondy.
+    diagnoza_niezdrowych() {
+        local cid nazwa stan wyjscie
+        for cid in $(dc ps -aq 2>/dev/null); do
+            stan="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" 2>/dev/null || echo unknown)"
+            case "$stan" in
+                healthy|running) continue ;;
+            esac
+            nazwa="$(docker inspect -f '{{.Name}}' "$cid" 2>/dev/null | sed 's|^/||')"
+            echo "        niezdrowe: ${nazwa} (${stan})" >&2
+            wyjscie="$(docker inspect -f '{{if .State.Health}}{{with index .State.Health.Log -1}}{{.ExitCode}}: {{.Output}}{{end}}{{end}}' "$cid" 2>/dev/null | head -c 200)"
+            [ -n "$wyjscie" ] && echo "          healthcheck → ${wyjscie}" >&2
+        done
+        echo "        Jeśli to zależność (baza, redis) — sprawdź, czy jej obraz jest aktualny (#3063)." >&2
+    }
 
     echo "── ${tenant} ──────────────────────────────────────────"
 
@@ -222,9 +239,18 @@ deploy_one() {
         echo "        kopia: ${sciezka_zrzutu} ($(wc -c < "$sciezka_zrzutu" | tr -d ' ') B)"
     fi
 
-    echo "  [2/7] build ${do_budowy}"
-    # shellcheck disable=SC2086 # lista usług ma się rozwinąć na osobne argumenty
-    dc build $do_budowy >/dev/null 2>&1 || { echo "  BŁĄD: build nie powiódł się." >&2; return 30; }
+    # #3063 — BEZ listy usług. `docker compose build` bez argumentów buduje
+    # każdą usługę, która ma sekcję `build:`, więc nie ma czego utrzymywać i
+    # nie ma czemu się rozjechać. Poprzednia, imienna lista (`api worker`)
+    # pomijała `database`: #3061 dodał skrypt do obrazu Postgresa, `up -d`
+    # odtworzyło kontener bazy na STARYM obrazie, healthcheck padł z
+    # `pim-init-query-stats.sh: not found`, a `api` utknęło na
+    # `service_healthy`. Playbook opisuje tę samą pułapkę dla Caddy'ego
+    # (#2908) — wniosek zastosowano wtedy do jednej usługi zamiast do reguły.
+    #
+    # Koszt: obrazy bez zmian i tak są no-opem dzięki cache warstw.
+    echo "  [2/7] build (wszystkie obrazy z sekcją build:)"
+    dc build >/dev/null 2>&1 || { echo "  BŁĄD: build nie powiódł się." >&2; return 30; }
 
     # Migracje z NOWEGO obrazu, zanim nowe kontenery zaczną obsługiwać ruch.
     echo "  [3/7] migracje + read-only schema contract (nowy obraz, przed wypuszczeniem kodu)"
@@ -276,10 +302,10 @@ deploy_one() {
     # odtworzenie gwarantuje proces z obrazu z kroku 2.
     # shellcheck disable=SC2086 # jw.
     dc up -d --force-recreate $aplikacyjne >/dev/null 2>&1 \
-        || { echo "  BŁĄD: usługi aplikacyjne nie wstały." >&2; return 30; }
+        || { echo "  BŁĄD: usługi aplikacyjne nie wstały." >&2; diagnoza_niezdrowych; return 30; }
     # Konwergencja reszty stacku: nowa usługa dołożona w tej partii (albo
     # zatrzymana ręcznie przy diagnostyce) ma wstać razem z wdrożeniem.
-    dc up -d >/dev/null 2>&1 || { echo "  BŁĄD: kontenery nie wstały." >&2; return 30; }
+    dc up -d >/dev/null 2>&1 || { echo "  BŁĄD: kontenery nie wstały." >&2; diagnoza_niezdrowych; return 30; }
 
     echo "  [7/7] smoke"
     local tries=30 status=""
