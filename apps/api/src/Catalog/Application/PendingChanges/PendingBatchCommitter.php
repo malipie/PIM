@@ -231,6 +231,23 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
                     }
                 }
                 $this->entityManager->flush();
+
+                // Both halves are load-bearing, each proven by a test that
+                // fails without it (measured in CI on AgentRollbackTest):
+                //
+                //  - clear(): without it the objects this rebuild loaded stay
+                //    managed, and a later rollback in the same request reads its
+                //    superseded guard off a STALE identity map — it saw the
+                //    agent's value where the database already held a manual
+                //    edit, and deleted the operator's correction.
+                //  - rebind: clear() detaches the Tenant in TenantContext, and
+                //    the rollback's own rebuild then finds its object filtered
+                //    out (find() -> null -> silent no-op), leaving the value it
+                //    had just deleted in the projection.
+                //
+                // Same pairing the method already uses after its other clears.
+                $this->entityManager->clear();
+                $this->tenantContext->set($this->managedTenant($tenantId));
             }
 
             $this->reindexQueue->queueAll($targetIds);
