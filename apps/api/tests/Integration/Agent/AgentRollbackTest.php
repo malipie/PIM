@@ -145,26 +145,6 @@ final class AgentRollbackTest extends KernelTestCase
     }
 
     /**
-     * @param array<string, mixed> $envelope
-     */
-    private function writeManualValue(EntityManagerInterface $em, CatalogObject $object, Attribute $attribute, array $envelope): void
-    {
-        $em->persist(new \App\Catalog\Domain\Entity\ObjectValue(
-            object: $object,
-            attribute: $attribute,
-            value: $envelope,
-            provenance: \App\Catalog\Domain\Provenance::Manual,
-        ));
-        $em->flush();
-    }
-
-    /**
-     * Materialize -> approve -> commit; returns the done run.
-     *
-     * @param array<string, mixed>|null $before
-     * @param array<string, mixed>      $after
-     */
-    /**
      * TEMPORARY (#3053) — dumps the canonical values, the projection and the
      * optimistic-lock version so CI can answer what reading the code could not.
      */
@@ -186,6 +166,26 @@ final class AgentRollbackTest extends KernelTestCase
         ));
     }
 
+    /**
+     * @param array<string, mixed> $envelope
+     */
+    private function writeManualValue(EntityManagerInterface $em, CatalogObject $object, Attribute $attribute, array $envelope): void
+    {
+        $em->persist(new \App\Catalog\Domain\Entity\ObjectValue(
+            object: $object,
+            attribute: $attribute,
+            value: $envelope,
+            provenance: \App\Catalog\Domain\Provenance::Manual,
+        ));
+        $em->flush();
+    }
+
+    /**
+     * Materialize -> approve -> commit; returns the done run.
+     *
+     * @param array<string, mixed>|null $before
+     * @param array<string, mixed>      $after
+     */
     private function committedRun(EntityManagerInterface $em, ?array $before, array $after): AgentRun
     {
         $object = $em->getRepository(CatalogObject::class)->findOneBy(['code' => 'OBJ-1']);
