@@ -49,9 +49,14 @@ final class AuditWriteGuard
 
     public function onAuditEvent(LifecycleEvent $event): void
     {
-        // Outside a transaction a failed audit INSERT poisons nothing — there
-        // is no pending work that a silent rollback could take with it.
-        if ($this->probedThisFlush || $this->connection->getTransactionNestingLevel() < 1) {
+        // Deliberately NOT gated on getTransactionNestingLevel(): the first
+        // version skipped the probe whenever the counter read 0 and the guard
+        // stayed silent on the very case it exists for — CI produced a raw
+        // SQLSTATE[25P02] "current transaction is aborted" from an unrelated
+        // listener (RlsContextListener) instead of a named failure. A healthy
+        // connection answers the probe in well under a millisecond; guessing
+        // when it is safe to skip is what cost the guard its purpose.
+        if ($this->probedThisFlush) {
             return;
         }
         $this->probedThisFlush = true;
