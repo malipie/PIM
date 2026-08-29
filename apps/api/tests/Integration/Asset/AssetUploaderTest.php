@@ -135,8 +135,12 @@ final class AssetUploaderTest extends KernelTestCase
 
         // An image upload dispatches AssetThumbnailsRequested, whose handler
         // syncs the asset into the catalogue and therefore needs the built-in
-        // Asset ObjectType. `sync://` runs it inline, so the seed has to
-        // happen before the first upload rather than lazily.
+        // Asset ObjectType. The message routes to `async`, which runs in-band
+        // locally (`.env.test` aliases it to sync://) — so the seed has to
+        // happen before the first upload rather than lazily. In CI that
+        // transport is `in-memory://` and the handler never runs at all;
+        // anything this test asserts about the handler's effects would have to
+        // drain the transport first (docs/testing/messenger-transports.md).
         self::getContainer()->get(\App\Catalog\Application\BuiltInObjectTypeSeeder::class)->seed($tenant);
 
         return $tenant;
