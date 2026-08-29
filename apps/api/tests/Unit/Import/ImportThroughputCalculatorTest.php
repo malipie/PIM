@@ -25,14 +25,14 @@ final class ImportThroughputCalculatorTest extends TestCase
 {
     public function testRejectsWindowBelowOne(): void
     {
-        $calculator = new ImportThroughputCalculator($this->createMock(EntityManagerInterface::class));
+        $calculator = new ImportThroughputCalculator($this->createStub(EntityManagerInterface::class));
         $this->expectException(InvalidArgumentException::class);
         $calculator->calculate($this->tenant(), Uuid::v7(), 0);
     }
 
     public function testRejectsWindowOver60(): void
     {
-        $calculator = new ImportThroughputCalculator($this->createMock(EntityManagerInterface::class));
+        $calculator = new ImportThroughputCalculator($this->createStub(EntityManagerInterface::class));
         $this->expectException(InvalidArgumentException::class);
         $calculator->calculate($this->tenant(), Uuid::v7(), 61);
     }

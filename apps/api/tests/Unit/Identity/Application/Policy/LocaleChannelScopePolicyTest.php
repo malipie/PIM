@@ -115,7 +115,7 @@ final class LocaleChannelScopePolicyTest extends TestCase
      */
     private function resolverWith(array $localeScope, array $channelScope): PermissionResolverInterface
     {
-        $resolver = $this->createMock(PermissionResolverInterface::class);
+        $resolver = $this->createStub(PermissionResolverInterface::class);
         $resolver->method('resolve')->willReturn(new PermissionSet(
             permissionCodes: ['products.edit'],
             localeScope: $localeScope,

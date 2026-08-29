@@ -247,7 +247,9 @@ jobs:
       # one job and one container per PR. phpunit.dist.xml marks both suites
       # as kernel-free; `agent-removability` already runs them without a DB.
       - name: PHPUnit (unit + architecture)
-        run: php bin/phpunit --testsuite unit,architecture
+        run: |
+          bash ../../scripts/test-phpunit-notice-gate.sh
+          php bin/phpunit --testsuite unit,architecture
         env:
           APP_ENV: test
           APP_DEBUG: "0"

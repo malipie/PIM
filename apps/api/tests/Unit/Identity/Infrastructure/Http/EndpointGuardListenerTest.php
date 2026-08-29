@@ -155,11 +155,10 @@ final class EndpointGuardListenerTest extends TestCase
         );
 
         // The user holds products.edit (the code guardedAction requires), so
-        // the guard must let the request through. The resolver mock is set up
-        // with ->with($user): PHPUnit verifies that interaction at teardown,
-        // which both proves the guard consulted the right principal AND counts
-        // as the assertion. A PermissionDeniedException here would fail the
-        // test before that verification ever runs.
+        // the guard must let the request through. The resolver stub throws if
+        // it receives another principal; PermissionDeniedException or that
+        // guard exception would fail this no-throw contract.
+        $this->expectNotToPerformAssertions();
         $listener->onControllerArguments($this->buildEvent(
             controller: [new EndpointGuardFixture(), 'guardedAction'],
             path: '/api/products/123',
@@ -237,7 +236,7 @@ final class EndpointGuardListenerTest extends TestCase
 
     private function securityWithoutUser(): Security
     {
-        $security = $this->createMock(Security::class);
+        $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(null);
 
         return $security;
@@ -245,7 +244,7 @@ final class EndpointGuardListenerTest extends TestCase
 
     private function securityWithUser(User $user): Security
     {
-        $security = $this->createMock(Security::class);
+        $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn($user);
 
         return $security;
@@ -256,8 +255,12 @@ final class EndpointGuardListenerTest extends TestCase
      */
     private function resolverFor(User $user, array $codes): PermissionResolverInterface
     {
-        $resolver = $this->createMock(PermissionResolverInterface::class);
-        $resolver->method('resolve')->with($user)->willReturn(new PermissionSet($codes));
+        $resolver = $this->createStub(PermissionResolverInterface::class);
+        $resolver->method('resolve')->willReturnCallback(
+            static fn (User $candidate): PermissionSet => $candidate === $user
+                ? new PermissionSet($codes)
+                : throw new LogicException('Endpoint guard resolved permissions for the wrong user.'),
+        );
 
         return $resolver;
     }

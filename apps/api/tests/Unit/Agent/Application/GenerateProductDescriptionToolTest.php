@@ -74,7 +74,7 @@ final class GenerateProductDescriptionToolTest extends TestCase
 
         /** @var list<array<string, mixed>> $seen */
         $seen = [];
-        $recipeRepo = $this->createMock(EntityRepository::class);
+        $recipeRepo = $this->createStub(EntityRepository::class);
         $recipeRepo->method('findOneBy')->willReturnCallback(
             static function (array $criteria) use (&$seen, $operatorRecipe): ?ContentRecipe {
                 $seen[] = $criteria;

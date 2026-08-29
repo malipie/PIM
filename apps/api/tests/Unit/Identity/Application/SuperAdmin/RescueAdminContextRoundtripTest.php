@@ -28,7 +28,7 @@ final class RescueAdminContextRoundtripTest extends TestCase
         $filters->expects(self::once())->method('disable');
         $filters->expects(self::once())->method('enable');
 
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
         $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));

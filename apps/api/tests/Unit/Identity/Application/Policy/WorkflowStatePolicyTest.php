@@ -159,7 +159,7 @@ final class WorkflowStatePolicyTest extends TestCase
      */
     private function resolverWith(array $codes): PermissionResolverInterface
     {
-        $resolver = $this->createMock(PermissionResolverInterface::class);
+        $resolver = $this->createStub(PermissionResolverInterface::class);
         $resolver->method('resolve')->willReturn(new PermissionSet($codes));
 
         return $resolver;

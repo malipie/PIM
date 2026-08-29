@@ -43,7 +43,7 @@ final class SuperAdminContextTest extends TestCase
             ->method('disable')
             ->with(SuperAdminContext::FILTER_NAME);
 
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
         $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
@@ -63,7 +63,7 @@ final class SuperAdminContextTest extends TestCase
             ->willReturn(false);
         $filters->expects(self::never())->method('disable');
 
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
         $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
@@ -81,7 +81,7 @@ final class SuperAdminContextTest extends TestCase
         $filters->expects(self::once())->method('disable');
         $filters->expects(self::once())->method('enable')->with(SuperAdminContext::FILTER_NAME);
 
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
         $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
@@ -98,7 +98,7 @@ final class SuperAdminContextTest extends TestCase
         $filters->method('isEnabled')->willReturn(false);
         $filters->expects(self::never())->method('enable');
 
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
         $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
@@ -115,7 +115,7 @@ final class SuperAdminContextTest extends TestCase
         $filters->expects(self::once())->method('disable');
         $filters->expects(self::once())->method('enable');
 
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
         $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
@@ -133,7 +133,7 @@ final class SuperAdminContextTest extends TestCase
         $filters->expects(self::once())->method('disable');
         $filters->expects(self::once())->method('enable');
 
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
         $context = new SuperAdminContext($em, $this->createStub(RlsBypass::class));
@@ -160,9 +160,9 @@ final class SuperAdminContextTest extends TestCase
     #[Test]
     public function crossTenantModeLiftsTheRlsPolicyToo(): void
     {
-        $filters = $this->createMock(FilterCollection::class);
+        $filters = $this->createStub(FilterCollection::class);
         $filters->method('isEnabled')->willReturn(true);
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
         $rls = $this->createMock(RlsBypass::class);
@@ -180,9 +180,9 @@ final class SuperAdminContextTest extends TestCase
     #[Test]
     public function theRlsBypassIsReleasedEvenWhenTheCallbackThrows(): void
     {
-        $filters = $this->createMock(FilterCollection::class);
+        $filters = $this->createStub(FilterCollection::class);
         $filters->method('isEnabled')->willReturn(true);
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getFilters')->willReturn($filters);
 
         $rls = $this->createMock(RlsBypass::class);
