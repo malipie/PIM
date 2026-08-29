@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { WizardState } from '../types';
 import { INITIAL_WIZARD_STATE } from '../types';
@@ -47,13 +47,16 @@ describe('useRunExport', () => {
 
     const { result } = renderHook(() => useRunExport());
 
-    const error = await result.current.run(STATE).then(
-      () => null,
-      (rejected: RunError) => rejected,
-    );
-    expect(error).not.toBeNull();
-    expect(error?.status).toBe(200);
-    expect(error?.detail).toContain('memory size');
+    const outcome: { error: RunError | null } = { error: null };
+    await act(async () => {
+      outcome.error = await result.current.run(STATE).then(
+        () => null,
+        (rejected: RunError) => rejected,
+      );
+    });
+    expect(outcome.error).not.toBeNull();
+    expect(outcome.error?.status).toBe(200);
+    expect(outcome.error?.detail).toContain('memory size');
   });
 
   it('returns an async result when the backend routes the export to a worker (202)', async () => {
@@ -66,7 +69,12 @@ describe('useRunExport', () => {
 
     const { result } = renderHook(() => useRunExport());
 
-    await expect(result.current.run(STATE)).resolves.toEqual({
+    let runResult: Awaited<ReturnType<typeof result.current.run>> | null = null;
+    await act(async () => {
+      runResult = await result.current.run(STATE);
+    });
+
+    expect(runResult).toEqual({
       kind: 'async',
       sessionId: 'session-123',
     });

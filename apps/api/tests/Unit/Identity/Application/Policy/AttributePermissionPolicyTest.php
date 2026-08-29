@@ -13,8 +13,9 @@ use App\Shared\Domain\Tenant;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Doctrine\DBAL\Schema\Table;
+use LogicException;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Uid\Uuid;
 
@@ -149,7 +150,7 @@ final class AttributePermissionPolicyTest extends TestCase
 
         // First role: per-attribute Restricted. Second role: per-group Edit.
         // Most permissive wins → Edit.
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $connection->method('fetchAllAssociative')
             ->willReturnCallback(static function (string $sql, array $params = []) use ($attrId): array {
                 if (str_contains($sql, 'FROM user_role_assignments')) {
@@ -195,7 +196,7 @@ final class AttributePermissionPolicyTest extends TestCase
         $attrId = Uuid::v7();
 
         $resolver = $this->resolverWith($user, ['products.view']);
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $connection->method('fetchAllAssociative')->willReturn([]);
 
         $policy = new AttributePermissionPolicy($connection, $resolver);
@@ -330,10 +331,10 @@ final class AttributePermissionPolicyTest extends TestCase
         $alice = $this->user('alice@alpha.localhost');
         $bob = $this->user('bob@alpha.localhost');
 
-        $resolver = $this->createMock(PermissionResolverInterface::class);
+        $resolver = $this->createStub(PermissionResolverInterface::class);
         $resolver->method('resolve')->willReturn(new PermissionSet(['products.view']));
 
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $grant = AttributePermission::Edit->value;
         $connection->method('fetchAllAssociative')
             ->willReturnCallback(static function (string $sql) use ($attrId, &$grant): array {
@@ -384,8 +385,12 @@ final class AttributePermissionPolicyTest extends TestCase
      */
     private function resolverWith(User $user, array $codes): PermissionResolverInterface
     {
-        $resolver = $this->createMock(PermissionResolverInterface::class);
-        $resolver->method('resolve')->with($user)->willReturn(new PermissionSet($codes));
+        $resolver = $this->createStub(PermissionResolverInterface::class);
+        $resolver->method('resolve')->willReturnCallback(
+            static fn (User $candidate): PermissionSet => $candidate === $user
+                ? new PermissionSet($codes)
+                : throw new LogicException('Policy resolved permissions for the wrong user.'),
+        );
 
         return $resolver;
     }
@@ -408,7 +413,7 @@ final class AttributePermissionPolicyTest extends TestCase
         array &$queryLog = [],
     ): Connection {
         $queryLog = [];
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
 
         $connection->method('fetchAllAssociative')
             ->willReturnCallback(
@@ -488,14 +493,14 @@ final class AttributePermissionPolicyTest extends TestCase
      * the policy reaches its per-group / role-default SELECTs. Mirrors a
      * migrated DB where both the group table and the default column exist.
      *
-     * @param Connection&MockObject $connection
+     * @param Connection&Stub $connection
      */
     private function withSchema(Connection $connection): void
     {
         $table = $this->createStub(Table::class);
         $table->method('hasColumn')->willReturn(true);
 
-        $schemaManager = $this->createMock(AbstractSchemaManager::class);
+        $schemaManager = $this->createStub(AbstractSchemaManager::class);
         $schemaManager->method('tablesExist')->willReturn(true);
         $schemaManager->method('introspectTableByUnquotedName')->willReturn($table);
 

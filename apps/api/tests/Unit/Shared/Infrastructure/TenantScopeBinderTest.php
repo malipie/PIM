@@ -97,7 +97,7 @@ final class TenantScopeBinderTest extends TestCase
         $configuration = new Configuration();
         $configuration->addFilter('tenant', TenantFilter::class);
 
-        $em = $this->createMock(EntityManagerInterface::class);
+        $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getConfiguration')->willReturn($configuration);
         $filters = new FilterCollection($em);
         $em->method('getFilters')->willReturn($filters);
@@ -108,7 +108,7 @@ final class TenantScopeBinderTest extends TestCase
     private function recordingConnection(): Connection
     {
         $this->statements = [];
-        $connection = $this->createMock(Connection::class);
+        $connection = $this->createStub(Connection::class);
         $connection
             ->method('executeStatement')
             ->willReturnCallback(

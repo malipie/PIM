@@ -456,8 +456,8 @@ final class GetObjectTypeListSchemaHandlerTest extends TestCase
     private function groupResolver(): EffectiveAttributeGroupResolver
     {
         return new EffectiveAttributeGroupResolver(
-            $this->createMock(EffectiveAttributeGroupQueryInterface::class),
-            $this->createMock(ObjectCategoryRepositoryInterface::class),
+            $this->createStub(EffectiveAttributeGroupQueryInterface::class),
+            $this->createStub(ObjectCategoryRepositoryInterface::class),
         );
     }
 }

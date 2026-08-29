@@ -167,7 +167,7 @@ final class FieldRestrictionFilterTest extends TestCase
      */
     private function policyMap(array $byAttribute): AttributePermissionPolicy
     {
-        $policy = $this->createMock(AttributePermissionPolicy::class);
+        $policy = $this->createStub(AttributePermissionPolicy::class);
         // #2794 — the filter resolves the whole field map in one call.
         $policy->method('resolvePermissions')
             ->willReturnCallback(static function (User $_user, array $attributeIds) use ($byAttribute): array {

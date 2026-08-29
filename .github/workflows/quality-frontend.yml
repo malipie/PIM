@@ -91,7 +91,7 @@ jobs:
           pnpm --filter @pim/admin typecheck
 
       - name: Vitest
-        run: pnpm --filter @pim/admin test
+        run: bash scripts/test-frontend-stderr.sh
 
       - name: Build
         run: pnpm --filter @pim/admin build

@@ -387,7 +387,7 @@ final class ExportBuilderTest extends TestCase
         $perObjectRelationCalls = 0;
         $perObjectCategoryCalls = 0;
 
-        $values = $this->createMock(ObjectValueRepositoryInterface::class);
+        $values = $this->createStub(ObjectValueRepositoryInterface::class);
         $values->method('findByObjectIds')->willReturnCallback(static function (array $ids) use (&$valuesCalls): array {
             ++$valuesCalls;
             self::assertCount(3, $ids, 'the whole page is batched in one call');
@@ -400,7 +400,7 @@ final class ExportBuilderTest extends TestCase
             return [];
         });
 
-        $relations = $this->createMock(ObjectRelationRepositoryInterface::class);
+        $relations = $this->createStub(ObjectRelationRepositoryInterface::class);
         $relations->method('findBySourceIdsAndAttribute')->willReturnCallback(static function (array $ids) use (&$relationsCalls): array {
             ++$relationsCalls;
             self::assertCount(3, $ids, 'relations are batched for the whole page');
@@ -413,7 +413,7 @@ final class ExportBuilderTest extends TestCase
             return [];
         });
 
-        $categories = $this->createMock(ObjectCategoryRepositoryInterface::class);
+        $categories = $this->createStub(ObjectCategoryRepositoryInterface::class);
         $categories->method('findByProductIds')->willReturnCallback(static function (array $ids) use (&$categoriesCalls): array {
             ++$categoriesCalls;
             self::assertCount(3, $ids, 'categories are batched for the whole page');
