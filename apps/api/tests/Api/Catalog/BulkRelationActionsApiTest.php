@@ -8,7 +8,9 @@ use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectTypeAttribute;
+use App\Catalog\Domain\Entity\ObjectValue;
 use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Provenance;
 use App\Catalog\Domain\RelationCardinality;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
 use App\Shared\Application\TenantContext;
@@ -36,6 +38,14 @@ final class BulkRelationActionsApiTest extends CatalogApiTestCase
         $sourceIds = [$source1->getId()->toRfc4122(), $source2->getId()->toRfc4122()];
         $t1 = $target1->getId()->toRfc4122();
         $t2 = $target2->getId()->toRfc4122();
+
+        // Positive control for the closing absence assertions (#3056): a
+        // scalar value whose canonical row makes `attributes_indexed`
+        // genuinely non-empty. Without it the object's projection stays `[]`
+        // and "the relation lane did not pollute it" is trivially true — the
+        // assertion would hold even if the whole projection had been lost.
+        $scalarCode = 'bulk_scalar_'.substr($attrCode, -6);
+        $this->seedScalarValue($source1, $scalarCode, 'kept');
 
         // set_attribute → replace with [t1] on both sources.
         $set = $this->dispatch('set_attribute', $sourceIds, ['attr' => $attrCode, 'value' => [$t1]]);
@@ -66,11 +76,21 @@ final class BulkRelationActionsApiTest extends CatalogApiTestCase
         self::assertSame(2, $clear['success_count']);
         self::assertSame([], $this->relationTargets($sourceIds[0], $attrCode));
 
-        // attributesIndexed must stay free of raw relation ids.
+        // attributesIndexed must stay free of raw relation ids — asserted
+        // against a projection proven to exist by the scalar seeded above.
         $this->em()->clear();
         $fresh = $this->em()->find(CatalogObject::class, $source1->getId());
         self::assertInstanceOf(CatalogObject::class, $fresh);
-        self::assertArrayNotHasKey($attrCode, $fresh->getAttributesIndexed());
+        $indexed = $fresh->getAttributesIndexed();
+        self::assertArrayHasKey(
+            $scalarCode,
+            $indexed,
+            'Projection must survive the relation lane — otherwise the checks below assert nothing.',
+        );
+        self::assertArrayNotHasKey($attrCode, $indexed);
+        $encoded = json_encode($indexed, JSON_THROW_ON_ERROR);
+        self::assertStringNotContainsString($t1, $encoded, 'Raw target id leaked into attributesIndexed.');
+        self::assertStringNotContainsString($t2, $encoded, 'Raw target id leaked into attributesIndexed.');
     }
 
     #[Test]
@@ -170,6 +190,33 @@ final class BulkRelationActionsApiTest extends CatalogApiTestCase
         $em = $this->em();
         $em->persist($attribute);
         $em->persist(new ObjectTypeAttribute($productType, $attribute, false, 90));
+        $em->flush();
+
+        $tenantContext->clear();
+    }
+
+    /**
+     * Persist a canonical `ObjectValue` for a scalar attribute so
+     * AttributesIndexedSyncListener rebuilds `attributes_indexed` inline
+     * (single-edit path, BulkContext off). Canonical on purpose: the value
+     * survives any later rebuild-from-canon, so it stays a valid control.
+     */
+    private function seedScalarValue(CatalogObject $object, string $code, string $value): void
+    {
+        $tenant = $this->em()->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
+        \assert($tenant instanceof Tenant);
+        $tenantContext = self::getContainer()->get(TenantContext::class);
+        $tenantContext->set($tenant);
+
+        $productType = self::getContainer()->get(ObjectTypeRepositoryInterface::class)
+            ->findBuiltInByKind(ObjectKind::Product, $tenant);
+        \assert(null !== $productType);
+
+        $em = $this->em();
+        $attribute = new Attribute($code, ['en' => 'Bulk scalar'], AttributeType::Text);
+        $em->persist($attribute);
+        $em->persist(new ObjectTypeAttribute($productType, $attribute, false, 91));
+        $em->persist(new ObjectValue($object, $attribute, ['value' => $value], Provenance::Manual));
         $em->flush();
 
         $tenantContext->clear();

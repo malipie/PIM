@@ -64,6 +64,61 @@ projekcja nie powstała. Wyszło to na jaw dopiero wtedy, gdy #3053 zaczęło j�
 
 Pilnuje tego bramka `scripts/lint-async-effect-assertions.sh`.
 
+#### To samo bez udziału transportu
+
+Transport jest tylko **jednym** ze sposobów, w jaki stan potrafi nie powstać. `BulkRelationActionsApiTest`
+kończył się tak:
+
+```php
+// attributesIndexed must stay free of raw relation ids.
+self::assertArrayNotHasKey($attrCode, $fresh->getAttributesIndexed());
+```
+
+Wszystko tu jest synchroniczne — a mimo to asercja nie sprawdzała niczego: obiekt był zakładany bez
+żadnej wartości, więc `attributes_indexed` przez cały test było `[]` (zmierzone 2026-08-29).
+`assertArrayNotHasKey($cokolwiek, [])` przechodzi zawsze. Test przeszedłby także wtedy, gdyby cała
+projekcja została po drodze zgubiona.
+
+**Reguła jest więc szersza niż transport:** zanim zaasertujesz, czego w stanie NIE ma, udowodnij, że ten
+stan istnieje.
+
+### 2a. Kontrola pozytywna — druga dopuszczalna obrona
+
+Kiedy drenaż nie ma czego drenować (ścieżka jest synchroniczna), asercję nieobecności ratuje **kontrola
+pozytywna**: asercja OBECNOŚCI czegoś w tym samym stanie, w tej samej metodzie testowej.
+
+```php
+$indexed = $fresh->getAttributesIndexed();
+// Kontrola pozytywna: projekcja istnieje i przeżyła operację.
+self::assertArrayHasKey($scalarCode, $indexed, 'Projection must survive the relation lane…');
+// Dopiero teraz to zdanie mówi coś o realnej projekcji.
+self::assertArrayNotHasKey($attrCode, $indexed);
+```
+
+Kontrola musi opierać się na stanie **zbudowanym kanonicznie** (wiersz `object_values`, który
+`AttributesIndexedSyncListener` projektuje przy flushu), a nie dopisanym wprost przez
+`updateAttributeIndex()` — inaczej przeżyje tylko do pierwszej przebudowy z kanonu.
+
+Obie obrony rozpoznaje bramka: `drainAsyncTransport()` / `InMemoryTransport` w pliku albo
+`assertArrayHasKey` / `assertStringContainsString` / `assertNotEmpty` / `assertContains` w tej samej
+metodzie. `assertSame` świadomie się nie liczy — `assertSame([], $indexed)` to asercja pustki, czyli
+dokładnie ten błąd.
+
+### 2b. Jak sprawdzić, czy asercja cokolwiek znaczy
+
+Bramka jest heurystyką; rozstrzyga eksperyment. Uruchom test lokalnie (procedura:
+[`local-kernel-suites.md`](local-kernel-suites.md)) z `MESSENGER_TRANSPORT_DSN=in-memory://`, czyli tak
+jak w CI, i **zepsuj kod, którego test broni**. Asercja, która nic nie znaczy, zostanie zielona.
+
+Tak zweryfikowano oba podejrzane wpisy baseline (2026-08-29):
+
+| Test | Mutacja | Przed poprawką | Po poprawce |
+|---|---|---|---|
+| `DeleteOrphanedAttributeApiTest` | `OrphanedAttributeValuePurger` bez `rebuild()` | ❌ czerwony (asercja działała) | ❌ czerwony |
+| `DeleteOrphanedAttributeApiTest` | `rebuild()` → `updateAttributeIndex([])` | ✅ **zielony — fałszywe zielone** | ❌ czerwony (kontrola pozytywna) |
+| `BulkRelationActionsApiTest` | `BulkRelationApplier` wpisuje ID relacji do projekcji | ❌ czerwony | ❌ czerwony |
+| `BulkRelationActionsApiTest` | `BulkRelationApplier` czyści projekcję | ✅ **zielony — fałszywe zielone** | ❌ czerwony (kontrola pozytywna) |
+
 ### 3. Wyścigu „zapis synchroniczny + skutek asynchroniczny" nie odtworzysz w testach
 
 Ani `sync://` (natychmiast), ani `in-memory://` (nigdy) nie odwzorowują realnego opóźnienia workera.
