@@ -46,7 +46,14 @@ final class AgentRollbackTest extends KernelTestCase
         [$em] = $this->fixture();
         $run = $this->committedRun($em, before: null, after: ['value' => 100]);
 
+        // TEMPORARY (#3053) — probe, to be removed before merge. Reading the
+        // code did not explain why the projection survives the rollback; this
+        // prints the state at each step into the CI log.
+        $this->probe($em, 'po commit');
+
         $rolledBack = $this->approval()->rollback($run->getId());
+
+        $this->probe($em, 'po rollback');
 
         self::assertSame(AgentRunStatus::RolledBack, $rolledBack->getStatus());
 
@@ -157,6 +164,28 @@ final class AgentRollbackTest extends KernelTestCase
      * @param array<string, mixed>|null $before
      * @param array<string, mixed>      $after
      */
+    /**
+     * TEMPORARY (#3053) — dumps the canonical values, the projection and the
+     * optimistic-lock version so CI can answer what reading the code could not.
+     */
+    private function probe(EntityManagerInterface $em, string $label): void
+    {
+        $conn = $em->getConnection();
+        $row = $conn->fetchAssociative(
+            'SELECT o.id::text AS id, o.version, o.attributes_indexed::text AS indexed,'
+            .' (SELECT COUNT(*) FROM object_values ov WHERE ov.object_id = o.id) AS own_values,'
+            .' (SELECT COUNT(*) FROM object_values) AS all_values,'
+            .' (SELECT COUNT(*) FROM bulk_logs) AS logs'
+            .' FROM objects o WHERE o.code = :c',
+            ['c' => 'OBJ-1'],
+        );
+        fwrite(STDERR, \sprintf(
+            "\n[#3053][%s] %s\n",
+            $label,
+            \is_array($row) ? json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : 'BRAK WIERSZA',
+        ));
+    }
+
     private function committedRun(EntityManagerInterface $em, ?array $before, array $after): AgentRun
     {
         $object = $em->getRepository(CatalogObject::class)->findOneBy(['code' => 'OBJ-1']);

@@ -523,6 +523,7 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
     /**
      * @param array<string, list<array{code: string, before: ?array<string, mixed>, after: array<string, mixed>, locale: ?string, channel: ?string}>> $perObject
      * @param array<string, mixed>                                                                                                                    $provenanceMeta
+     *
      * @return array{0: int, 1: int, 2: int, 3: list<array{objectId: string, attributeCode: string, message: string}>}
      */
     private function writeChunks(string $tenantId, Uuid $sessionId, array $perObject, array $provenanceMeta): array
