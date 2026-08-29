@@ -117,6 +117,51 @@ final class ContentValueCommitTest extends KernelTestCase
         self::assertSame(['value' => 'Opis globalny.'], $global->getValue(), 'the global reading must stay untouched');
     }
 
+    #[Test]
+    public function aSmallBatchRefreshesTheProjectionWithoutTheWorker(): void
+    {
+        // #3053 — `object_values` commits synchronously, but the product detail
+        // endpoint reads `attributes_indexed`. That projection used to be
+        // rebuilt ONLY by the worker (import pattern), so the refetch the UI
+        // fires the moment `approve` returns read the value from BEFORE the
+        // change: the operator saw an unchanged field and had to leave the
+        // product and come back. Deliberately NO drainAsyncTransport() here —
+        // the projection has to be correct without the worker ever running.
+        // (The message is still queued; the inline pass just gets there first,
+        // and the rebuild is idempotent.)
+        $tenant = $this->createTenant();
+        [$object] = $this->seedProduct();
+        $em = $this->em();
+
+        $batchId = Uuid::v7();
+        $this->materializer()->materializeGeneratedValue(
+            $batchId,
+            Uuid::v7(),
+            $object->getId(),
+            'description',
+            'Świeża treść od agenta.',
+            meta: ['intent' => 'generate_product_description'],
+        );
+
+        $result = $this->committer()->commitAcceptedBatch($batchId, Uuid::v7(), []);
+        self::assertSame(1, $result->committedValues);
+
+        $em->clear();
+        $this->activateTenantFilter($this->reloadTenant($tenant));
+        $reloaded = $em->find(CatalogObject::class, $object->getId());
+        \assert(null !== $reloaded);
+
+        // getAttributesIndexed() is array<string, mixed>; narrow the slot before
+        // reading the envelope so PHPStan max sees a real array, not mixed.
+        $slot = $reloaded->getAttributesIndexed()['description'] ?? null;
+        self::assertIsArray($slot);
+        self::assertSame(
+            'Świeża treść od agenta.',
+            $slot['value'] ?? null,
+            'attributes_indexed must be fresh before the response returns — the UI reads the projection, not object_values',
+        );
+    }
+
     /**
      * @return array{0: CatalogObject, 1: Attribute}
      */

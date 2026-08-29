@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\PendingChanges;
 
+use App\Catalog\Application\AttributesIndexedRebuilder;
 use App\Catalog\Application\BatchValueWriter;
 use App\Catalog\Application\Bulk\BulkAddCategoryHandler;
 use App\Catalog\Application\Bulk\BulkChangeStatusHandler;
@@ -70,6 +71,26 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
 {
     private const int CHUNK = 200;
 
+    /**
+     * #3053 — batches at or below this many objects rebuild `attributes_indexed`
+     * INLINE instead of handing it to the worker.
+     *
+     * The async rebuild is the import pattern: right for 50k rows, wrong for an
+     * approval the operator is watching. `object_values` commits synchronously,
+     * but the product detail endpoint reads the denormalised projection — so the
+     * refetch fired right after `approve` returns races the worker and shows the
+     * value from BEFORE the change. The operator sees an unchanged field and has
+     * to leave the product and come back.
+     *
+     * Invisible outside production. Dev aliases `async` to `sync://`
+     * (messenger.yaml) so the rebuild is already in-band; CI pins it to
+     * `in-memory://` (quality-php.yml) so the rebuild is queued and never runs
+     * at all. Neither environment can reproduce the race, which is why two
+     * earlier attempts hardened the editor instead — the editor is where the
+     * symptom shows.
+     */
+    private const int INLINE_REBUILD_MAX_OBJECTS = 25;
+
     public function __construct(
         private EntityManagerInterface $entityManager,
         private TenantContext $tenantContext,
@@ -78,6 +99,7 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
         private BulkContext $bulkContext,
         private BulkReindexQueueInterface $reindexQueue,
         private MessageBusInterface $messageBus,
+        private AttributesIndexedRebuilder $indexedRebuilder,
         private BulkAddCategoryHandler $addCategories,
         private BulkRemoveCategoryHandler $removeCategories,
         private BulkMoveCategoryHandler $moveCategories,
@@ -183,6 +205,45 @@ final readonly class PendingBatchCommitter implements PendingBatchCommitPort
             $this->entityManager->flush();
 
             $connection->commit();
+
+            // #3053 — AFTER the commit, so the rebuild reads the values it is
+            // supposed to project. This is what makes the new value visible to
+            // the refetch the frontend fires the moment `approve` returns,
+            // instead of losing that race to the worker.
+            //
+            // Deliberately the REBUILDER, not RebuildAttributesIndexedHandler:
+            // the handler owns the message lifecycle (per-object clear, retry,
+            // reindex enqueue). Called from here that lifecycle fights the
+            // caller's — this method hands a live manager and tenant context to
+            // whatever runs next in the request.
+            //
+            // The queued message above is deliberately LEFT IN PLACE: the
+            // rebuild is idempotent — it recomputes from canonical
+            // object_values — so the worker's later pass is a cheap no-op
+            // rather than a second source of truth. Bounded to small batches so
+            // an import-scale commit never pays for it on the request thread.
+            if ([] !== $targetIds && \count($targetIds) <= self::INLINE_REBUILD_MAX_OBJECTS) {
+                foreach ($targetIds as $targetId) {
+                    $object = $this->entityManager->find(CatalogObject::class, $targetId);
+                    if ($object instanceof CatalogObject) {
+                        $this->indexedRebuilder->rebuild($object);
+                    }
+                }
+                $this->entityManager->flush();
+
+                // clear() is load-bearing and was proven by a failing test:
+                // without it the objects loaded above stay managed, and a later
+                // rollback in the same request reads its superseded guard off a
+                // STALE identity map — it saw the agent's value where the
+                // database already held a manual edit, and deleted the
+                // operator's correction (laterManualEditSurvivesRollback).
+                //
+                // The rebind is the standing companion of every clear in this
+                // method: TenantContext must not be left holding a detached
+                // Tenant for whatever runs next.
+                $this->entityManager->clear();
+                $this->tenantContext->set($this->managedTenant($tenantId));
+            }
 
             $this->reindexQueue->queueAll($targetIds);
 

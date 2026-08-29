@@ -23,6 +23,9 @@ use App\Shared\Infrastructure\Doctrine\Filter\TenantFilterConfigurator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\ReceivedStamp;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Symfony\Component\Uid\Uuid;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
@@ -47,6 +50,7 @@ final class AgentRollbackTest extends KernelTestCase
         $run = $this->committedRun($em, before: null, after: ['value' => 100]);
 
         $rolledBack = $this->approval()->rollback($run->getId());
+        $this->drainAsyncTransport();
 
         self::assertSame(AgentRunStatus::RolledBack, $rolledBack->getStatus());
 
@@ -54,7 +58,12 @@ final class AgentRollbackTest extends KernelTestCase
         $values = $conn->fetchOne('SELECT COUNT(*) FROM object_values');
         self::assertSame(0, (int) (\is_scalar($values) ? $values : -1), 'a value the agent created must be gone after rollback');
 
-        // Projection rebuilt from canon (sync:// transport runs it inline).
+        // Projection rebuilt from canon. The rebuild travels on the `async`
+        // transport, which CI pins to `in-memory://` (quality-php.yml) — the
+        // message is QUEUED there, not executed — so the drain above is what
+        // makes this assertion mean anything. Until #3053 the commit-time
+        // rebuild was queued and dropped the same way, so the projection was
+        // never populated and "does not contain price" passed for free.
         $indexed = $conn->fetchOne('SELECT attributes_indexed FROM objects WHERE code = :c', ['c' => 'OBJ-1']);
         self::assertIsString($indexed);
         self::assertStringNotContainsString('"price"', $indexed, 'attributes_indexed must follow the restored canon');
@@ -135,6 +144,23 @@ final class AgentRollbackTest extends KernelTestCase
         $em->flush();
 
         return [$em, $object, $attribute];
+    }
+
+    /**
+     * CI pins the `async` transport to `in-memory://`, so a dispatched
+     * ObjectValuesChangedMessage only queues. Replay what the worker would
+     * have consumed. Mirrors ContentValueCommitTest.
+     */
+    private function drainAsyncTransport(): void
+    {
+        $transport = self::getContainer()->get('messenger.transport.async');
+        if (!$transport instanceof InMemoryTransport) {
+            return;
+        }
+        $bus = self::getContainer()->get(MessageBusInterface::class);
+        foreach ($transport->getSent() as $envelope) {
+            $bus->dispatch($envelope->getMessage(), [new ReceivedStamp('async')]);
+        }
     }
 
     /**
