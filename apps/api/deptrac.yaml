@@ -984,27 +984,27 @@ parameters:
         App\Import\Application\Service\ImportCategoryOps:
             - App\Catalog\Domain\Entity\CatalogObject
             - App\Catalog\Domain\Entity\ObjectCategory
+            - App\Catalog\Domain\ObjectKind
+            - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
             - App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface
-        App\Import\Application\Handler\ImportRunHandler:
+        # #3024 — chunk validation/materialisation and its batch prefetch were
+        # extracted from ImportRunHandler. These six reaches are relocations of
+        # the same already-baselined tokens below; the configured pair count is
+        # unchanged and no new target dependency was introduced.
+        App\Import\Application\Service\ImportChunkPreparer:
             - App\Catalog\Application\BatchValueWriter
-            # DP-07 (#2037, ADR-0025) — cross-field rules: the prime pass loads
-            # rule-referenced attributes so compare-against-existing works when
-            # the counterpart column is absent from the mapping. Same burndown
-            # bucket as BatchValueWriter (#1466).
             - App\Catalog\Application\CrossFieldRulesValidator
+            - App\Catalog\Domain\Entity\Attribute
+            - App\Catalog\Domain\Entity\CatalogObject
             - App\Catalog\Domain\Repository\AttributeRepositoryInterface
+            - App\Asset\Domain\Repository\AssetRepositoryInterface
+        App\Import\Application\Handler\ImportRunHandler:
             # IMP2-2.6 (#1482) bulk path — suppress the per-flush sync rebuild
             # via BulkContext and dispatch the async attributes_indexed rebuild;
             # part of the #1466 Import → Catalog_Internals burndown.
             - App\Catalog\Application\BulkContext
             - App\Catalog\Application\Message\ObjectValuesChangedMessage
             - App\Catalog\Domain\Entity\Attribute
-            - App\Catalog\Domain\Entity\CatalogObject
-            - App\Catalog\Domain\Entity\ObjectType
-            - App\Catalog\Domain\ObjectKind
-            - App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface
-            # IMP2-1.8 galleries — per-chunk asset existence prefetch
-            - App\Asset\Domain\Repository\AssetRepositoryInterface
         # IMP2-1.12 media — the download handler writes the {asset_id} envelope
         # + links assets. Asset INGEST is clean via Asset\Contracts; the value
         # write reuses the same Catalog-domain touchpoints as ImportRunHandler.

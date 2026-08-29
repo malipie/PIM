@@ -6,12 +6,10 @@ namespace App\Import\Application\Handler;
 
 use App\Catalog\Contracts\AttributeType;
 use App\Catalog\Domain\Entity\Attribute;
-use App\Catalog\Domain\Entity\CatalogObject;
-use App\Catalog\Domain\ObjectKind;
 use App\Import\Application\Service\AttributeAutoCreator;
 use App\Import\Application\Service\ImportCategoryOps;
+use App\Import\Application\Service\ImportChunkPreparer;
 use App\Import\Application\Service\ImportChunkSizer;
-use App\Import\Application\Service\ImportColumnGrammar;
 use App\Import\Application\Service\ImportObjectCreator;
 use App\Import\Application\Service\ImportProgressPublisher;
 use App\Import\Application\Service\ImportRowCells;
@@ -19,7 +17,6 @@ use App\Import\Application\Service\ImportRowCountEstimator;
 use App\Import\Application\Service\ImportRowDecision;
 use App\Import\Application\Service\ImportRowReader;
 use App\Import\Application\Service\ImportUndoLogger;
-use App\Import\Application\Service\ImportValidationService;
 use App\Import\Application\Service\Media\AssetUrlResolver;
 use App\Import\Application\Service\ObjectResolver;
 use App\Import\Application\Service\OptionAutoCreator;
@@ -35,7 +32,6 @@ use App\Import\Domain\Message\ImageDownloadMessage;
 use App\Import\Domain\Message\ImportRunMessage;
 use App\Import\Domain\Repository\ImportSessionRepositoryInterface;
 use App\Import\Domain\ReservedMappingTarget;
-use App\Import\Domain\SystemColumn;
 use App\Import\Domain\ValueObject\ResolvedImportValue;
 use App\Import\Domain\ValueObject\ValidationError;
 use App\Shared\Application\AbstractBatchHandler;
@@ -44,7 +40,6 @@ use App\Shared\Application\BulkOperationLock;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Shared\Infrastructure\Messenger\Stamp\TenantStamp;
-use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Exception\ConnectionException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
@@ -161,19 +156,13 @@ final class ImportRunHandler extends AbstractBatchHandler
         EntityManagerInterface $entityManager,
         private readonly ImportSessionRepositoryInterface $sessions,
         private readonly ImportRowReader $rowReader,
-        private readonly ImportValidationService $validator,
+        private readonly ImportChunkPreparer $chunkPreparer,
         private readonly ImportObjectCreator $creator,
         private readonly OptionAutoCreator $optionAutoCreator,
         private readonly AttributeAutoCreator $attributeAutoCreator,
         private readonly ObjectResolver $objectResolver,
         private readonly RelationImportStep $relationStep,
         private readonly ImportUndoLogger $undoLogger,
-        private readonly ImportColumnGrammar $columnGrammar,
-        private readonly \App\Catalog\Application\BatchValueWriter $valueWriter,
-        private readonly \App\Catalog\Application\CrossFieldRulesValidator $crossFieldRules,
-        private readonly \App\Catalog\Domain\Repository\AttributeRepositoryInterface $attributeRepository,
-        private readonly \App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface $catalogObjects,
-        private readonly \App\Asset\Domain\Repository\AssetRepositoryInterface $assets,
         private readonly ImportProgressPublisher $progressPublisher,
         private readonly TenantContext $tenantContext,
         private readonly FilesystemOperator $importsStorage,
@@ -304,11 +293,7 @@ final class ImportRunHandler extends AbstractBatchHandler
         $sourcePath = null;
         try {
             $columnMapping = $this->resolveColumnMapping($session);
-            $attributesByCode = $this->withCrossFieldRuleAttributes(
-                $this->validator->loadAttributesByCode($tenant, $columnMapping),
-                $session,
-                $tenant,
-            );
+            $attributesByCode = $this->chunkPreparer->loadAttributesForSession($session, $tenant, $columnMapping);
             $sourcePath = $this->stageSourceFile($session, $tenant);
             // #2815 — publish the size of the job BEFORE working through it.
             // total_rows was written only after the row loop, so throughout the
@@ -387,11 +372,7 @@ final class ImportRunHandler extends AbstractBatchHandler
                     return;
                 }
 
-                $attributesByCode = $this->withCrossFieldRuleAttributes(
-                    $this->validator->loadAttributesByCode($tenant, $columnMapping),
-                    $session,
-                    $tenant,
-                );
+                $attributesByCode = $this->chunkPreparer->loadAttributesForSession($session, $tenant, $columnMapping);
                 // Throttled: at most one snapshot per ~1% of the file (force=false).
                 $this->publishProgress($session, $processed);
 
@@ -432,7 +413,11 @@ final class ImportRunHandler extends AbstractBatchHandler
                 $this->sessions->save($session);
                 $linkTenant = $session->getTenant();
                 if ($linkTenant instanceof Tenant) {
-                    $linkErrors = $this->relationStep->resolve($this->requireTargetObjectType($session)->getKind(), $linkTenant);
+                    $linkTarget = $session->getTargetObjectType();
+                    if (null === $linkTarget) {
+                        throw new RuntimeException('Catalog import session has no target object type.');
+                    }
+                    $linkErrors = $this->relationStep->resolve($linkTarget->getKind(), $linkTenant);
                     $session = $this->refreshSession($session);
                     // Extend the lock past the (potentially long) relation pass.
                     $lock->refresh();
@@ -730,203 +715,6 @@ final class ImportRunHandler extends AbstractBatchHandler
     }
 
     /**
-     * Resolves every mapped, non-system column into a {@see ResolvedImportValue}
-     * carrying the attribute code + the locale parsed from its dotted
-     * header. A list (not a flat map) keeps several localised columns that
-     * target the same attribute (`name.pl`, `name.en`) distinct (#1130).
-     *
-     * @param array<string, string|null> $cells
-     * @param array<string, string>      $columnMapping
-     *
-     * @return list<ResolvedImportValue>
-     */
-    private function materialiseValues(array $cells, array $columnMapping, Tenant $tenant): array
-    {
-        $out = [];
-        foreach ($columnMapping as $columnHeader => $attributeCode) {
-            if (SystemColumn::isSystem($columnHeader)) {
-                continue;
-            }
-            if ('' === $attributeCode || ReservedMappingTarget::isReserved($attributeCode)) {
-                continue;
-            }
-            $parsed = $this->columnGrammar->parse($columnHeader, $tenant);
-            if (null !== $parsed->unknownSuffix) {
-                // The validator already flagged the column; never write a
-                // bogus locale row (pre-1.6 silent corruption).
-                continue;
-            }
-            $out[] = new ResolvedImportValue(
-                attributeCode: $attributeCode,
-                locale: $parsed->locale,
-                rawValue: $cells[$columnHeader] ?? null,
-                channelId: $parsed->channelId,
-            );
-        }
-
-        return $out;
-    }
-
-    /**
-     * IMP2-1.9 (item 2) — flag rows whose identifier-attribute value collides,
-     * BEFORE they reach the flush. A value already used by a DIFFERENT object
-     * in the catalog (queried once per chunk via the trigger-maintained
-     * denormalised columns) blocks the row with an Error; a value that already
-     * appeared earlier in the file is a non-blocking skip (D1). Mutates the
-     * prepared rows in place.
-     *
-     * @param list<array{rowNumber: int, cells: array<string, string|null>, sku: ?string, errors: list<ValidationError>, rowOk: bool, resolvedValues: list<ResolvedImportValue>, matchKey: string, duplicateInFile: bool}> $prepared
-     * @param array<string, Attribute>                                                                                                                                                                                     $attributesByCode
-     * @param array<string, CatalogObject>                                                                                                                                                                                 $existingByKey
-     * @param array<string, array<string, int>>                                                                                                                                                                            $identifierSeenInFile
-     */
-    private function precheckIdentifiers(
-        array &$prepared,
-        array $attributesByCode,
-        array $existingByKey,
-        ImportSession $session,
-        Tenant $tenant,
-        array &$identifierSeenInFile,
-    ): void {
-        $identifierAttributes = [];
-        foreach ($attributesByCode as $code => $attribute) {
-            if (AttributeType::Identifier === $attribute->getType()) {
-                $identifierAttributes[$code] = $attribute;
-            }
-        }
-        if ([] === $identifierAttributes) {
-            return;
-        }
-
-        /** @var array<string, array<string, true>> $valuesByAttributeId */
-        $valuesByAttributeId = [];
-        foreach ($prepared as $row) {
-            if (!$row['rowOk']) {
-                continue;
-            }
-            foreach ($row['resolvedValues'] as $resolved) {
-                $attribute = $identifierAttributes[$resolved->attributeCode] ?? null;
-                $value = $resolved->rawValue;
-                if (null === $attribute || null === $value || '' === $value) {
-                    continue;
-                }
-                $valuesByAttributeId[$attribute->getId()->toRfc4122()][$value] = true;
-            }
-        }
-
-        $existingOwners = $this->fetchIdentifierOwners(
-            $tenant,
-            $this->requireTargetObjectType($session)->getId()->toRfc4122(),
-            $valuesByAttributeId,
-        );
-
-        foreach ($prepared as $index => $row) {
-            if (!$row['rowOk']) {
-                continue;
-            }
-            $ownObjectId = ($existingByKey[$row['matchKey']] ?? null)?->getId()->toRfc4122();
-            foreach ($row['resolvedValues'] as $resolved) {
-                $attribute = $identifierAttributes[$resolved->attributeCode] ?? null;
-                $value = $resolved->rawValue;
-                if (null === $attribute || null === $value || '' === $value) {
-                    continue;
-                }
-                $attrCode = $resolved->attributeCode;
-                $attrId = $attribute->getId()->toRfc4122();
-
-                $owner = $existingOwners[$attrId][$value] ?? null;
-                if (null !== $owner && $owner !== $ownObjectId) {
-                    $prepared[$index]['rowOk'] = false;
-                    $prepared[$index]['errors'][] = new ValidationError(
-                        rowNumber: $row['rowNumber'],
-                        sku: $row['sku'],
-                        errorType: ImportErrorType::InvalidValue,
-                        level: ImportLogLevel::Error,
-                        message: \sprintf('Identifier "%s" = "%s" is already used by another object.', $attrCode, $value),
-                        columnName: $attrCode,
-                        columnValue: $value,
-                    );
-
-                    continue 2;
-                }
-
-                if (isset($identifierSeenInFile[$attrCode][$value])) {
-                    $prepared[$index]['rowOk'] = false;
-                    $prepared[$index]['duplicateInFile'] = true;
-                    $prepared[$index]['errors'][] = new ValidationError(
-                        rowNumber: $row['rowNumber'],
-                        sku: $row['sku'],
-                        errorType: ImportErrorType::DuplicateSkuInFile,
-                        level: ImportLogLevel::Warning,
-                        message: \sprintf('Identifier "%s" = "%s" already appeared in the file at row %d — skipped.', $attrCode, $value, $identifierSeenInFile[$attrCode][$value]),
-                        columnName: $attrCode,
-                        columnValue: $value,
-                    );
-
-                    continue 2;
-                }
-
-                $identifierSeenInFile[$attrCode][$value] = $row['rowNumber'];
-            }
-        }
-    }
-
-    /**
-     * One bulk lookup of identifier owners for the chunk's candidate values.
-     *
-     * @param array<string, array<string, true>> $valuesByAttributeId
-     *
-     * @return array<string, array<string, string>> attributeId → (value → object_id)
-     */
-    private function fetchIdentifierOwners(Tenant $tenant, string $objectTypeId, array $valuesByAttributeId): array
-    {
-        if ([] === $valuesByAttributeId) {
-            return [];
-        }
-        $allValues = [];
-        foreach ($valuesByAttributeId as $values) {
-            foreach (array_keys($values) as $value) {
-                $allValues[$value] = true;
-            }
-        }
-
-        // Query the authoritative JSONB value (`value->>'value'`) joined to the
-        // target ObjectType rather than the trigger-maintained denormalised
-        // identifier_* columns: the JSONB is always populated (the denorm
-        // columns + partial-unique index are a production-only migration, absent
-        // in the ORM-metadata test schema), so the pre-check is correct in both.
-        $rows = $this->entityManager->getConnection()->fetchAllAssociative(
-            'SELECT ov.attribute_id AS attribute_id, ov.value->>\'value\' AS ident, ov.object_id AS object_id'
-            .' FROM object_values ov JOIN objects o ON o.id = ov.object_id'
-            .' WHERE ov.tenant_id = :tenant AND o.object_type_id = :ot'
-            .' AND ov.attribute_id IN (:attrs) AND ov.value->>\'value\' IN (:vals)',
-            [
-                'tenant' => $tenant->getId()->toRfc4122(),
-                'ot' => $objectTypeId,
-                'attrs' => array_keys($valuesByAttributeId),
-                'vals' => array_keys($allValues),
-            ],
-            [
-                'attrs' => ArrayParameterType::STRING,
-                'vals' => ArrayParameterType::STRING,
-            ],
-        );
-
-        $map = [];
-        foreach ($rows as $row) {
-            $attributeId = $row['attribute_id'];
-            $ident = $row['ident'];
-            $objectId = $row['object_id'];
-            if (!\is_scalar($attributeId) || !\is_scalar($ident) || !\is_scalar($objectId)) {
-                continue;
-            }
-            $map[(string) $attributeId][(string) $ident] = (string) $objectId;
-        }
-
-        return $map;
-    }
-
-    /**
      * IMP2-1.9 (items 3–4) — record the session outcome after a throw that may
      * have CLOSED the EntityManager (anything from flush()). Resets the manager
      * via the registry so the write lands on a fresh, open one. A
@@ -1156,61 +944,6 @@ final class ImportRunHandler extends AbstractBatchHandler
      *
      * Convention (spec §8.6): `{tenant_id}/{session_id}/{file_name}`.
      */
-    /**
-     * The CatalogObject pipeline always runs against a concrete ObjectType.
-     * Structural imports (attributes / attribute groups) carry no target and
-     * never reach this handler, so a null here is a programming error.
-     */
-    /**
-     * DP-07 (#2037, ADR-0025) — extend the primed attribute set with codes
-     * referenced by the target ObjectType's cross-field rules, so
-     * BatchValueWriter::primeChunk() loads existing counterpart values even
-     * when the rule's other side is absent from the import mapping. A code
-     * that stays unmapped only UNDER-enforces (compare skips, condition
-     * false) — never a false positive.
-     *
-     * @param array<string, Attribute> $attributesByCode
-     *
-     * @return array<string, Attribute>
-     */
-    private function withCrossFieldRuleAttributes(
-        array $attributesByCode,
-        ImportSession $session,
-        Tenant $tenant,
-    ): array {
-        $target = $session->getTargetObjectType();
-        if (!$target instanceof \App\Catalog\Domain\Entity\ObjectType) {
-            return $attributesByCode;
-        }
-
-        foreach ($this->crossFieldRules->rulesFor($target) as $rule) {
-            foreach ($rule->referencedCodes() as $code) {
-                if (isset($attributesByCode[$code])) {
-                    continue;
-                }
-                $attribute = $this->attributeRepository->findByCode($code, $tenant);
-                if ($attribute instanceof Attribute) {
-                    $attributesByCode[$code] = $attribute;
-                }
-            }
-        }
-
-        return $attributesByCode;
-    }
-
-    private function requireTargetObjectType(ImportSession $session): \App\Catalog\Domain\Entity\ObjectType
-    {
-        $target = $session->getTargetObjectType();
-        if (!$target instanceof \App\Catalog\Domain\Entity\ObjectType) {
-            throw new RuntimeException(\sprintf(
-                'Catalog import session %s has no target ObjectType.',
-                $session->getId()->toRfc4122(),
-            ));
-        }
-
-        return $target;
-    }
-
     private function stageSourceFile(ImportSession $session, Tenant $tenant): string
     {
         $remotePath = \sprintf(
@@ -1294,13 +1027,6 @@ final class ImportRunHandler extends AbstractBatchHandler
     }
 
     /**
-     * IMP2-1.3 — the row match key: the cell mapped to the configured
-     * identifier attribute, or the SKU cell by default (trimmed; the
-     * synthetic IMPORT-{row} fallback only feeds brand-new rows).
-     *
-     * @param array<string, string> $columnMapping
-     */
-    /**
      * IMP2-1.4 (#1466) — validate + resolve + write one buffered chunk.
      * Returns the number of rows consumed (== chunk size).
      *
@@ -1323,104 +1049,25 @@ final class ImportRunHandler extends AbstractBatchHandler
         array &$mediaJobs,
         int $resumeFrom = 0,
     ): int {
-        $target = $session->getTargetObjectType();
-        $identityAttributeCode = null !== $target
-            ? $this->validator->identityAttributeCode($target, $session->getMatchAttributeCode())
-            : $session->getMatchAttributeCode();
-
-        // Pass 1 — validate rows and gather match keys for the batch resolve.
-        /** @var list<array{rowNumber: int, cells: array<string, string|null>, sku: ?string, errors: list<ValidationError>, rowOk: bool, resolvedValues: list<ResolvedImportValue>, matchKey: string, duplicateInFile: bool}> $prepared */
-        $prepared = [];
-        $matchKeys = [];
-        foreach ($buffer as $entry) {
-            $rowNumber = $entry['rowNumber'];
-            $cells = $entry['cells'];
-            $errors = $this->validator->validateRow(
-                rowNumber: $rowNumber,
-                cells: $cells,
-                columnMapping: $columnMapping,
-                attributesByCode: $attributesByCode,
-                tenant: $tenant,
-                skuSeenInFile: $skuSeenInFile,
-                // #2943 — same identity rule the dry run applied, resolved from
-                // the run's own match attribute. Deriving it here rather than
-                // defaulting to `sku` is what keeps the async pass from
-                // rejecting rows the preview accepted.
-                identityAttributeCode: $identityAttributeCode,
-            );
-            $sku = $cells[$this->rowCells->skuColumnHeader($columnMapping)] ?? null;
-            $blocking = array_values(array_filter(
-                $errors,
-                static fn (ValidationError $error): bool => $error->isRowBlocking(),
-            ));
-            // IMP2-1.9 (D1) — a Warning-level DuplicateSkuInFile does not block
-            // (severity contract) but the duplicate row must be SKIPPED, not
-            // imported. Kept distinct from a hard Error, which is a row error.
-            $duplicateInFile = [] !== array_filter(
-                $errors,
-                static fn (ValidationError $error): bool => ImportErrorType::DuplicateSkuInFile === $error->errorType,
-            );
-            $rowOk = [] === $blocking && !$duplicateInFile;
-            $resolvedValues = [];
-            if ($rowOk) {
-                // IMP2-1.9 (item 5) — value materialization can throw on a
-                // pathological/junk row (e.g. a section header in the middle of
-                // the data). Degrade to a row error instead of aborting the run.
-                try {
-                    $resolvedValues = $this->materialiseValues($cells, $columnMapping, $tenant);
-                } catch (Throwable $exception) {
-                    $rowOk = false;
-                    $errors[] = new ValidationError(
-                        rowNumber: $rowNumber,
-                        sku: $sku,
-                        errorType: ImportErrorType::InvalidValue,
-                        level: ImportLogLevel::Error,
-                        message: 'Row could not be parsed: '.$exception->getMessage(),
-                        columnValue: $this->rowCells->rawRowSnippet($cells),
-                    );
-                }
-            }
-            $matchKey = $rowOk ? $this->matchKey($session, $cells, $columnMapping, $resolvedValues, $rowNumber) : '';
-            if ('' !== $matchKey) {
-                $matchKeys[] = $matchKey;
-            }
-            $prepared[] = [
-                'rowNumber' => $rowNumber,
-                'cells' => $cells,
-                'sku' => $sku,
-                'errors' => $errors,
-                'rowOk' => $rowOk,
-                'resolvedValues' => $resolvedValues,
-                'matchKey' => $matchKey,
-                'duplicateInFile' => $duplicateInFile,
-            ];
+        // Pass 1 — validate, materialise and resolve the chunk without writes.
+        $preparation = $this->chunkPreparer->prepare(
+            $session,
+            $tenant,
+            $buffer,
+            $columnMapping,
+            $attributesByCode,
+            $skuSeenInFile,
+            $identifierSeenInFile,
+        );
+        $prepared = $preparation->rows;
+        $existingByKey = $preparation->existingByKey;
+        $categoryByCode = $preparation->categoryByCode;
+        $existingAssetIds = $preparation->existingAssetIds;
+        $targetObjectType = $session->getTargetObjectType();
+        if (null === $targetObjectType) {
+            throw new RuntimeException('Catalog import session has no target object type.');
         }
 
-        $existingByKey = $this->objectResolver->resolveMany(
-            $matchKeys,
-            $this->requireTargetObjectType($session),
-            $tenant,
-            $session->getMatchAttributeCode(),
-        );
-        $this->valueWriter->primeChunk(array_values($existingByKey), $attributesByCode);
-        // IMP2-2.4 — snapshot the current values of the chunk's UPDATE targets
-        // (one query) so the undo-log can record before-state per overwritten cell.
-        $this->undoLogger->primeChunk(array_values($existingByKey));
-
-        // IMP2-1.7: resolve every distinct category code in the chunk once
-        // (per-chunk prefetch — not one SELECT per code per row).
-        $categoryByCode = $this->resolveChunkCategories($prepared, $columnMapping, $tenant);
-        // IMP2-1.8 galleries: prefetch which referenced asset ids actually
-        // exist (tenant-scoped) so the creator can drop dangling ids with a
-        // row warning — one query per chunk, mirroring the category prefetch.
-        $existingAssetIds = $this->resolveChunkAssets($prepared, $attributesByCode, $tenant);
-        // IMP2-1.9 (item 2): set-based identifier collision pre-check BEFORE the
-        // flush — a value already used in the catalog (vs-DB) blocks the row as
-        // an Error; a value duplicated earlier in the file is a skip (D1). This
-        // catches the DB partial-unique-index violation gracefully instead of
-        // letting flush() explode and close the EM.
-        $this->precheckIdentifiers($prepared, $attributesByCode, $existingByKey, $session, $tenant, $identifierSeenInFile);
-        /** @var list<array{product: CatalogObject, codes: list<string>, append: bool}> $pendingCategoryOps */
         $pendingCategoryOps = [];
 
         // Pass 2 — decide + write per row.
@@ -1471,7 +1118,7 @@ final class ImportRunHandler extends AbstractBatchHandler
 
                 if (ImportRowDecision::Create === $decision) {
                     $created = $this->creator->create(
-                        objectType: $this->requireTargetObjectType($session),
+                        objectType: $targetObjectType,
                         sku: $this->rowCells->skuFrom($row['resolvedValues'], $row['rowNumber']),
                         resolvedValues: $row['resolvedValues'],
                         attributesByCode: $attributesByCode,
@@ -1612,120 +1259,5 @@ final class ImportRunHandler extends AbstractBatchHandler
         $this->categoryOps->applyCategoryOps($pendingCategoryOps, $categoryByCode);
 
         return \count($prepared);
-    }
-
-    /**
-     * Resolve every distinct category code referenced in the chunk to its
-     * {@see CatalogObject} once. Unresolved codes are dropped (the validator
-     * emitted the per-code CategoryNotFound warning).
-     *
-     * @param list<array{rowNumber: int, cells: array<string, string|null>, sku: ?string, errors: list<ValidationError>, rowOk: bool, resolvedValues: list<ResolvedImportValue>, matchKey: string, duplicateInFile: bool}> $prepared
-     * @param array<string, string>                                                                                                                                                                                        $columnMapping
-     *
-     * @return array<string, CatalogObject>
-     */
-    private function resolveChunkCategories(array $prepared, array $columnMapping, Tenant $tenant): array
-    {
-        $codes = [];
-        foreach ($prepared as $row) {
-            if (!$row['rowOk']) {
-                continue;
-            }
-            foreach ($this->rowCells->extractCategoryCodes($row['cells'], $columnMapping) as $code) {
-                // Key to dedupe, but keep the string code as the VALUE: PHP
-                // coerces a numeric-string array key to int (e.g. an IdoSell
-                // category id "1214553885"), and an int reaching findByCode's
-                // string signature throws a TypeError that crashes the whole run.
-                $codes[$code] = $code;
-            }
-        }
-
-        $map = [];
-        foreach ($codes as $code) {
-            $category = $this->catalogObjects->findByCode($code, ObjectKind::Category, $tenant);
-            if (null !== $category) {
-                $map[$code] = $category;
-            }
-        }
-
-        return $map;
-    }
-
-    /**
-     * IMP2-1.8 galleries — collect every asset id referenced by an Asset-type
-     * cell in the chunk (pipe-split) and return the subset that exists for the
-     * tenant as a lower-cased lookup set. One query per chunk; the creator uses
-     * the set to drop dangling ids with a row warning.
-     *
-     * @param list<array{rowNumber: int, cells: array<string, string|null>, sku: ?string, errors: list<ValidationError>, rowOk: bool, resolvedValues: list<ResolvedImportValue>, matchKey: string, duplicateInFile: bool}> $prepared
-     * @param array<string, Attribute>                                                                                                                                                                                     $attributesByCode
-     *
-     * @return array<string, true>
-     */
-    private function resolveChunkAssets(array $prepared, array $attributesByCode, Tenant $tenant): array
-    {
-        $ids = [];
-        foreach ($prepared as $row) {
-            if (!$row['rowOk']) {
-                continue;
-            }
-            foreach ($row['resolvedValues'] as $resolved) {
-                $attribute = $attributesByCode[$resolved->attributeCode] ?? null;
-                if (!$attribute instanceof Attribute || AttributeType::Asset !== $attribute->getType()) {
-                    continue;
-                }
-                $raw = $resolved->rawValue;
-                if (null === $raw || '' === $raw) {
-                    continue;
-                }
-                // IMP2-1.12 — only UUID tokens are existing-asset references;
-                // URL tokens are downloaded by the media path and bare strings
-                // are unresolved. Querying a non-UUID against the uuid id column
-                // would blow up the prefetch.
-                foreach ($this->assetUrlResolver->classify($raw)['uuids'] as $id) {
-                    $ids[$id] = true;
-                }
-            }
-        }
-
-        if ([] === $ids) {
-            return [];
-        }
-
-        $set = [];
-        foreach ($this->assets->existingIds(array_keys($ids), $tenant) as $existing) {
-            $set[strtolower($existing)] = true;
-        }
-
-        return $set;
-    }
-
-    /**
-     * IMP2-1.3 — the row match key: the cell mapped to the configured
-     * identifier attribute, or the SKU cell by default (trimmed).
-     *
-     * @param array<string, string|null> $cells
-     * @param array<string, string>      $columnMapping
-     * @param list<ResolvedImportValue>  $resolvedValues
-     */
-    private function matchKey(
-        ImportSession $session,
-        array $cells,
-        array $columnMapping,
-        array $resolvedValues,
-        int $rowNumber,
-    ): string {
-        $matchCode = $session->getMatchAttributeCode();
-        if (null !== $matchCode) {
-            foreach ($columnMapping as $header => $target) {
-                if ($target === $matchCode) {
-                    return trim($cells[$header] ?? '');
-                }
-            }
-
-            return '';
-        }
-
-        return trim($this->rowCells->skuFrom($resolvedValues, $rowNumber));
     }
 }

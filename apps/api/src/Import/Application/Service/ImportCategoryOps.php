@@ -6,7 +6,10 @@ namespace App\Import\Application\Service;
 
 use App\Catalog\Domain\Entity\CatalogObject;
 use App\Catalog\Domain\Entity\ObjectCategory;
+use App\Catalog\Domain\ObjectKind;
+use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectCategoryRepositoryInterface;
+use App\Shared\Domain\Tenant;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Uuid;
 
@@ -25,8 +28,47 @@ final readonly class ImportCategoryOps
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
+        private CatalogObjectRepositoryInterface $catalogObjects,
         private ObjectCategoryRepositoryInterface $objectCategories,
+        private ImportRowCells $rowCells,
     ) {
+    }
+
+    /**
+     * Resolve every distinct category code referenced by valid prepared rows.
+     *
+     * @param list<array{rowNumber: int, cells: array<string, string|null>, sku: ?string, errors: list<\App\Import\Domain\ValueObject\ValidationError>, rowOk: bool, resolvedValues: list<\App\Import\Domain\ValueObject\ResolvedImportValue>, matchKey: string, duplicateInFile: bool}> $prepared
+     * @param array<string, string>                                                                                                                                                                                                                                                      $columnMapping
+     *
+     * @return array<string, CatalogObject>
+     */
+    public function resolveChunkCategories(
+        array $prepared,
+        array $columnMapping,
+        Tenant $tenant,
+    ): array {
+        $codes = [];
+        foreach ($prepared as $row) {
+            if (!$row['rowOk']) {
+                continue;
+            }
+            foreach ($this->rowCells->extractCategoryCodes($row['cells'], $columnMapping) as $code) {
+                // Preserve numeric-string codes as values: PHP coerces them
+                // when used as array keys, while repository lookup requires a
+                // string (regression covered by NumericCategoryCodeImportTest).
+                $codes[$code] = $code;
+            }
+        }
+
+        $map = [];
+        foreach ($codes as $code) {
+            $category = $this->catalogObjects->findByCode($code, ObjectKind::Category, $tenant);
+            if (null !== $category) {
+                $map[$code] = $category;
+            }
+        }
+
+        return $map;
     }
 
     /**
