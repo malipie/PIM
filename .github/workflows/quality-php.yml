@@ -80,6 +80,10 @@ jobs:
         working-directory: .
         run: bash scripts/lint-backup-cron.sh
 
+      - name: Lint PostgreSQL query-statistics wiring
+        working-directory: .
+        run: bash scripts/lint-postgres-query-stats.sh
+
       - name: Lint tracked env files for real secrets
         working-directory: .
         run: bash scripts/lint-tracked-secrets.sh

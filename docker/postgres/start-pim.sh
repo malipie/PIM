@@ -8,7 +8,9 @@
 #   2. Launch pim-init-backup.sh in the background. It waits until postgres is
 #      accepting connections, then idempotently creates the stanza and triggers
 #      an initial full backup. Backgrounded so it never blocks postgres start-up.
-#   3. Hand control over to the upstream `docker-entrypoint.sh postgres ...`
+#   3. Launch the idempotent runtime-role and pg_stat_statements bootstraps for
+#      fresh and existing volumes; healthchecks enforce their final contracts.
+#   4. Hand control over to the upstream `docker-entrypoint.sh postgres ...`
 #      which performs initdb on first run and then exec's postgres.
 
 set -euo pipefail
@@ -44,5 +46,10 @@ crond -b -L /dev/stderr
 # connects — on a fresh volume AND a pre-existing one. Backgrounded so it never
 # blocks postgres start-up; the operations inside are idempotent.
 /usr/local/bin/pim-init-app-role.sh &
+
+# AUD-OBS-002 (#3026): CREATE EXTENSION is per database and the upstream
+# initdb hooks do not run for existing volumes. Ensure it on every boot; the
+# database healthcheck stays red until both the preload and view are usable.
+/usr/local/bin/pim-init-query-stats.sh &
 
 exec docker-entrypoint.sh "$@"
