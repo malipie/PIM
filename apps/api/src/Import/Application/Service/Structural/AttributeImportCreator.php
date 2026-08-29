@@ -199,20 +199,38 @@ final readonly class AttributeImportCreator
         if ([] === $groupCodes) {
             return;
         }
-        $junctions = $this->em->getRepository(AttributeGroupAttribute::class);
+
+        $groupsByCode = $this->groups->findByCodes(array_values(array_unique($groupCodes)), $tenant);
+        $existingGroupIds = [];
+        if ([] !== $groupsByCode) {
+            /** @var list<AttributeGroupAttribute> $existingJunctions */
+            $existingJunctions = $this->em->createQuery(
+                'SELECT j FROM '.AttributeGroupAttribute::class.' j'
+                .' WHERE j.attribute = :attribute AND j.attributeGroup IN (:groups)',
+            )
+                ->setParameter('attribute', $attribute)
+                ->setParameter('groups', array_values($groupsByCode))
+                ->getResult();
+            foreach ($existingJunctions as $junction) {
+                $existingGroupIds[$junction->getAttributeGroup()->getId()->toRfc4122()] = true;
+            }
+        }
+
         $changed = false;
         foreach ($groupCodes as $groupCode) {
-            $group = $this->groups->findByCode($groupCode, $tenant);
+            $group = $groupsByCode[$groupCode] ?? null;
             if (!$group instanceof AttributeGroup) {
                 $result->log(ImportLogLevel::Warning, \sprintf('Pominięto nieznaną grupę "%s".', $groupCode), ImportErrorType::InvalidValue->value, 'groups', $groupCode);
 
                 continue;
             }
-            $existing = $junctions->findOneBy(['attributeGroup' => $group, 'attribute' => $attribute]);
-            if (null === $existing) {
-                $this->em->persist(new AttributeGroupAttribute($group, $attribute));
-                $changed = true;
+            $groupId = $group->getId()->toRfc4122();
+            if (isset($existingGroupIds[$groupId])) {
+                continue;
             }
+            $this->em->persist(new AttributeGroupAttribute($group, $attribute));
+            $existingGroupIds[$groupId] = true;
+            $changed = true;
         }
         if ($changed) {
             $this->em->flush();

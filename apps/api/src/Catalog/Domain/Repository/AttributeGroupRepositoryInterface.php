@@ -15,6 +15,13 @@ interface AttributeGroupRepositoryInterface
     public function findByCode(string $code, Tenant $tenant): ?AttributeGroup;
 
     /**
+     * @param list<string> $codes
+     *
+     * @return array<string, AttributeGroup> code => group
+     */
+    public function findByCodes(array $codes, Tenant $tenant): array;
+
+    /**
      * All groups owned by the tenant, ordered for deterministic export
      * (position, then code).
      *

@@ -19,6 +19,7 @@ use App\Import\Application\Service\Structural\StructuralImportRowResult;
 use App\Shared\Application\TenantContext;
 use App\Shared\Domain\Tenant;
 use App\Tests\Api\Catalog\CatalogApiTestCase;
+use App\Tests\Support\SqlQueryCounter;
 use PHPUnit\Framework\Attributes\Test;
 
 use const JSON_THROW_ON_ERROR;
@@ -83,8 +84,15 @@ final class StructuralAttributeImportTest extends CatalogApiTestCase
     {
         $tenant = $this->tenant();
         $module = $this->customObjectType($tenant, 'widgets');
+        $this->group($tenant, 'reimport_group');
 
-        $cells = ['code' => 'sku_ref', 'type' => 'text', 'label.en' => 'SKU', 'object_types' => 'widgets'];
+        $cells = [
+            'code' => 'sku_ref',
+            'type' => 'text',
+            'label.en' => 'SKU',
+            'groups' => 'reimport_group|reimport_group',
+            'object_types' => 'widgets',
+        ];
         $first = $this->creator()->create(2, $cells, $tenant);
         self::assertSame(StructuralImportRowResult::OUTCOME_CREATED, $first->outcome);
 
@@ -95,6 +103,56 @@ final class StructuralAttributeImportTest extends CatalogApiTestCase
         self::assertInstanceOf(Attribute::class, $attribute);
         // No duplicate junction on re-import.
         self::assertCount(1, $this->junctions()->findByAttribute($attribute));
+        self::assertSame(['reimport_group'], $this->groupCodesOf($attribute));
+    }
+
+    #[Test]
+    public function unknownGroupWarnsWhileKnownGroupIsStillAttached(): void
+    {
+        $tenant = $this->tenant();
+        $this->group($tenant, 'known_group');
+        $otherTenant = new Tenant('structural-other', 'Structural Other Tenant');
+        $this->em()->persist($otherTenant);
+        $this->em()->flush();
+        $this->group($otherTenant, 'does_not_exist');
+
+        $result = $this->creator()->create(2, [
+            'code' => 'group_warning',
+            'type' => 'text',
+            'groups' => 'known_group|does_not_exist',
+        ], $tenant);
+
+        self::assertSame(StructuralImportRowResult::OUTCOME_CREATED, $result->outcome);
+        $attribute = $this->attributes()->findByCode('group_warning', $tenant);
+        self::assertInstanceOf(Attribute::class, $attribute);
+        self::assertSame(['known_group'], $this->groupCodesOf($attribute));
+        self::assertNotEmpty($result->logs);
+        self::assertStringContainsString('does_not_exist', $result->logs[0]['message']);
+    }
+
+    #[Test]
+    public function groupLookupSelectCountIsConstantForOneAndOneHundredCodes(): void
+    {
+        $tenant = $this->tenant();
+        $codes = [];
+        for ($index = 1; $index <= 100; ++$index) {
+            $code = \sprintf('prefetch_group_%03d', $index);
+            $group = new AttributeGroup($code, ['en' => $code]);
+            $group->assignTenant($tenant);
+            $this->em()->persist($group);
+            $codes[] = $code;
+        }
+        $this->em()->flush();
+
+        $oneCodeQueries = $this->groupAssociationLookupQueries($tenant, 'prefetch_one', [$codes[0]]);
+        $hundredCodeQueries = $this->groupAssociationLookupQueries($tenant, 'prefetch_hundred', $codes);
+
+        self::assertSame(2, $oneCodeQueries, 'one group needs one group SELECT and one junction SELECT');
+        self::assertSame(
+            $oneCodeQueries,
+            $hundredCodeQueries,
+            'group and junction lookup SELECTs must not scale with the number of imported group codes',
+        );
     }
 
     #[Test]
@@ -179,6 +237,29 @@ final class StructuralAttributeImportTest extends CatalogApiTestCase
         )->setParameter('a', $attribute)->getSingleColumnResult();
 
         return $codes;
+    }
+
+    /**
+     * @param list<string> $groupCodes
+     */
+    private function groupAssociationLookupQueries(Tenant $tenant, string $attributeCode, array $groupCodes): int
+    {
+        $counter = self::getContainer()->get(SqlQueryCounter::class);
+        self::assertInstanceOf(SqlQueryCounter::class, $counter);
+        $counter->start();
+
+        try {
+            $result = $this->creator()->create(2, [
+                'code' => $attributeCode,
+                'type' => 'text',
+                'groups' => implode('|', $groupCodes),
+            ], $tenant);
+            self::assertSame(StructuralImportRowResult::OUTCOME_CREATED, $result->outcome);
+
+            return $counter->countMatching('/\bFROM\s+"?attribute_group(?:s|_attributes)"?\b/i');
+        } finally {
+            $counter->stop();
+        }
     }
 
     private function customObjectType(Tenant $tenant, string $code): ObjectType

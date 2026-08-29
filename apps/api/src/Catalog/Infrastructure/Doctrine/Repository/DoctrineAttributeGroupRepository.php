@@ -25,6 +25,30 @@ class DoctrineAttributeGroupRepository extends ServiceEntityRepository implement
         return $this->findOneBy(['code' => $code, 'tenant' => $tenant]);
     }
 
+    public function findByCodes(array $codes, Tenant $tenant): array
+    {
+        if ([] === $codes) {
+            return [];
+        }
+
+        /** @var list<AttributeGroup> $groups */
+        $groups = $this->createQueryBuilder('g')
+            ->andWhere('g.tenant = :tenant')
+            ->andWhere('g.code IN (:codes)')
+            ->setParameter('tenant', $tenant)
+            ->setParameter('codes', $codes)
+            ->orderBy('g.code', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        $byCode = [];
+        foreach ($groups as $group) {
+            $byCode[$group->getCode()] = $group;
+        }
+
+        return $byCode;
+    }
+
     public function findAllByTenant(Tenant $tenant): array
     {
         /** @var list<AttributeGroup> $result */
