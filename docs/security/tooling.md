@@ -20,7 +20,7 @@
 | **TypeScript noEmit** | CI (`quality-frontend.yml`) | TS type errors across `apps/admin` | `pnpm --filter @pim/admin typecheck` |
 | **Vite build smoke** | CI (`quality-frontend.yml`) | Production build succeeds without errors | `pnpm --filter @pim/admin build` |
 | **Playwright E2E** | CI (`quality-frontend.yml`) | Browser-level smoke + critical path tests | `pnpm --filter @pim/admin e2e` |
-| **pnpm audit** | CI (`audit.yml`) | Known CVE in npm deps | `pnpm audit` |
+| **pnpm audit** | CI (`audit.yml`) | Known CVE in npm deps; blocks moderate/high/critical advisories and hidden exceptions | `pnpm audit --audit-level=moderate` |
 | **OpenAPI spec drift** | CI (`quality-php.yml`) | `docs/api-spec/v{version}.json` matches `/api/docs.jsonopenapi` output (no unintentional API surface changes) | `composer openapi-export` |
 | **Commitlint (Conventional Commits)** | Husky commit-msg | Commit message format `<type>(<scope>): <subject>` per [CLAUDE.md §"Konwencje języka"](../../CLAUDE.md) | Automatic on `git commit` |
 | **Husky lint-staged** | Husky pre-commit | Runs Biome + PHPStan only on staged files (fast feedback) | Automatic on `git commit` |
@@ -28,19 +28,14 @@
 | **Gitleaks** | CI (`security-secrets.yml`) | Regex-based secrets-leak scan (AWS keys, Stripe tokens, private keys, JWT secrets) on every PR + push | n/a — auto-runs in CI |
 | **TruffleHog** | CI (`security-secrets.yml`) + Husky pre-commit (if binary installed locally) | High-entropy + verified-secret scan (catches structured tokens gitleaks would miss). **Defence in depth** alongside gitleaks. | `brew install trufflehog` then `trufflehog git file://. --since-commit=HEAD --only-verified` |
 
-### Wyjątki w `pnpm audit` (`pnpm.auditConfig.ignoreGhsas`)
+### Wyjątki w `pnpm audit`
 
-Bramka `audit.yml` puszcza `pnpm audit --audit-level=high`, więc każdy *high* zatrzymuje
-wszystkie PR-y. `package.json` trzyma listę świadomie zignorowanych advisory — ten
-rejestr wyjaśnia, dlaczego. **Każdy nowy wpis wymaga uzasadnienia tutaj**, inaczej
-lista po kilku miesiącach staje się workiem, do którego nikt nie zagląda.
-
-| GHSA | Pakiet | Dlaczego zignorowane | Kiedy zdjąć |
-|---|---|---|---|
-| `GHSA-fx2h-pf6j-xcff` | `vite` ≤6.4.2 (tranzytywnie przez `vitepress`) | Obejście `server.fs.deny` w **dev serverze Vite na Windows**. Ten vite wchodzi wyłącznie z `vitepress` (strona dokumentacji) i nigdy nie startuje jako dev server — `apps/docs` robi tylko `vitepress build` do statycznego HTML na linuksowym CI. `vitepress@1.6.4` (najnowszy stabilny) przypina vite 5; 2.x jest dopiero w alfie, więc nie ma ścieżki upgrade'u. | Gdy `vitepress` 2.x wyjdzie stabilnie — wtedy bump i usunięcie wpisu |
-
-Pozostałe wpisy pochodzą sprzed tego rejestru (#2745, #2699) i czekają na uzupełnienie
-uzasadnień przy najbliższym ticketcie maintenance.
+Bramka `audit.yml` uruchamia `pnpm audit --audit-level=moderate`, więc advisory
+*moderate*, *high* i *critical* zatrzymuje każdy PR. Ukrywanie advisory przez
+`pnpm.auditConfig.ignoreGhsas` jest zabronione i sprawdzane osobnym krokiem CI.
+Podatność trzeba usunąć przez bezpieczny upgrade lub zawężony override zależności;
+jeżeli nie ma takiej ścieżki, wymaga to osobnego ticketu bezpieczeństwa i jawnej
+zmiany polityki w CI.
 
 ### Deferred (with explicit follow-up tickets)
 
