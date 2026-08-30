@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Infrastructure\Workflow;
 
 use App\Catalog\Domain\Entity\CatalogObject;
+use App\Catalog\Domain\Service\EffectiveAttributeGroupResolver;
 use App\Workflow\Contracts\ObjectEditorialWorkflow;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Workflow\Event\GuardEvent;
@@ -41,6 +42,11 @@ final readonly class CompletenessGateGuard implements EventSubscriberInterface
         ObjectEditorialWorkflow::TRANSITION_APPROVE,
     ];
 
+    public function __construct(
+        private EffectiveAttributeGroupResolver $attributeGroups,
+    ) {
+    }
+
     public static function getSubscribedEvents(): array
     {
         return [
@@ -55,13 +61,13 @@ final readonly class CompletenessGateGuard implements EventSubscriberInterface
             return;
         }
 
-        // #2558 — a product missing its ObjectType's required attributes cannot
-        // be published, so it must not be submittable for review either (else
-        // it strands a reviewer who can never approve it). This required-fields
-        // rule is independent of the numeric publish gate below and applies
-        // whenever the type declares required attributes.
+        // #2558 — an object missing a field that is actually required in its
+        // current form cannot enter review: it would strand a reviewer who
+        // cannot approve it. Completeness rules are a separate readiness
+        // metric; they must not turn an optional form field (for example EAN)
+        // into a submission blocker.
         if (ObjectEditorialWorkflow::TRANSITION_SUBMIT_FOR_REVIEW === $event->getTransition()->getName()) {
-            $missing = $this->missingRequiredCodes($subject);
+            $missing = $this->missingRequiredFormCodes($subject);
             if ([] !== $missing) {
                 $event->addTransitionBlocker(new TransitionBlocker(
                     \sprintf('Fill the required fields before review: %s.', \implode(', ', $missing)),
@@ -118,7 +124,7 @@ final readonly class CompletenessGateGuard implements EventSubscriberInterface
             return;
         }
 
-        $missing = $this->missingRequiredCodes($subject);
+        $missing = $this->missingCompletenessCodes($subject);
 
         $event->addTransitionBlocker(new TransitionBlocker(
             \sprintf(
@@ -144,7 +150,7 @@ final readonly class CompletenessGateGuard implements EventSubscriberInterface
      *
      * @return list<string>
      */
-    private function missingRequiredCodes(CatalogObject $subject): array
+    private function missingCompletenessCodes(CatalogObject $subject): array
     {
         $rules = $subject->getObjectType()->getCompletenessRules();
         $required = \is_array($rules['required'] ?? null) ? $rules['required'] : [];
@@ -162,5 +168,37 @@ final readonly class CompletenessGateGuard implements EventSubscriberInterface
         }
 
         return $missing;
+    }
+
+    /**
+     * Required fields are defined by the effective form schema: an attribute
+     * can be required globally or only in a particular group. This mirrors the
+     * product editor's save validation, including category-derived groups.
+     *
+     * @return list<string>
+     */
+    private function missingRequiredFormCodes(CatalogObject $subject): array
+    {
+        $groups = $this->attributeGroups->resolve($subject);
+        $byGroup = $this->attributeGroups->loadGroupAttributes($groups);
+        $indexed = $subject->getAttributesIndexed();
+
+        $missing = [];
+        foreach ($byGroup as $junctions) {
+            foreach ($junctions as $junction) {
+                $attribute = $junction->getAttribute();
+                if (!$attribute->isRequired() && !$junction->isRequiredInGroup()) {
+                    continue;
+                }
+
+                $code = $attribute->getCode();
+                $value = $indexed[$code] ?? null;
+                if (null === $value || '' === $value || [] === $value) {
+                    $missing[$code] = true;
+                }
+            }
+        }
+
+        return array_keys($missing);
     }
 }

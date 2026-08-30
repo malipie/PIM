@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Api\Catalog;
 
+use App\Catalog\Contracts\AttributeType;
+use App\Catalog\Domain\Entity\Attribute;
+use App\Catalog\Domain\Entity\AttributeGroup;
+use App\Catalog\Domain\Entity\AttributeGroupAttribute;
 use App\Catalog\Domain\Entity\CatalogObject;
+use App\Catalog\Domain\Entity\ObjectTypeAttributeGroup;
 use App\Catalog\Domain\ObjectKind;
 use App\Catalog\Domain\Repository\CatalogObjectRepositoryInterface;
 use App\Catalog\Domain\Repository\ObjectTypeRepositoryInterface;
@@ -112,6 +117,7 @@ final class ObjectWorkflowCompletenessGateApiTest extends CatalogApiTestCase
     {
         // #2558 — a product missing required attributes must not enter review.
         $this->setRequired(['ean']);
+        $this->addEanToForm(required: true);
         $id = $this->seedProduct('WFL-SUBMIT-BLOCK', completenessPct: 40);
 
         $client = $this->authenticatedClient();
@@ -151,10 +157,26 @@ final class ObjectWorkflowCompletenessGateApiTest extends CatalogApiTestCase
         // Same required rule, but the product now carries the value — submit
         // proceeds (the numeric publish gate still applies later, at approve).
         $this->setRequired(['ean']);
+        $this->addEanToForm(required: true);
         $id = $this->seedProduct('WFL-SUBMIT-OK', completenessPct: 40, indexed: ['ean' => '5901234123457']);
 
         $client = $this->authenticatedClient();
         $client->request('POST', '/api/objects/'.$id.'/workflow/transitions/submit_for_review');
+        self::assertResponseIsSuccessful();
+    }
+
+    #[Test]
+    public function submitForReviewDoesNotBlockAnOptionalFormFieldListedForCompleteness(): void
+    {
+        // Regression: completeness is a publication/readiness measure, not a
+        // second, hidden required flag on the review-submission form.
+        $this->setRequired(['ean']);
+        $this->addEanToForm(required: false);
+        $id = $this->seedProduct('WFL-SUBMIT-OPTIONAL-EAN', completenessPct: 0);
+
+        $client = $this->authenticatedClient();
+        $client->request('POST', '/api/objects/'.$id.'/workflow/transitions/submit_for_review');
+
         self::assertResponseIsSuccessful();
     }
 
@@ -207,6 +229,31 @@ final class ObjectWorkflowCompletenessGateApiTest extends CatalogApiTestCase
         $type = $this->productType();
         $type->updateCompletenessRules(['required' => $required]);
         $em->flush();
+    }
+
+    private function addEanToForm(bool $required): void
+    {
+        $em = $this->em();
+        $tenant = $em->getRepository(Tenant::class)->findOneBy(['code' => self::TENANT_CODE]);
+        \assert($tenant instanceof Tenant);
+
+        $context = self::getContainer()->get(TenantContext::class);
+        $context->set($tenant);
+
+        try {
+            $group = new AttributeGroup('workflow_fields', ['en' => 'Workflow fields']);
+            $ean = new Attribute('ean', ['en' => 'EAN'], AttributeType::Text);
+            $ean->changeRequired($required);
+            $em->persist($group);
+            $em->persist($ean);
+            $em->flush();
+
+            $em->persist(new AttributeGroupAttribute($group, $ean, 1));
+            $em->persist(new ObjectTypeAttributeGroup($this->productType(), $group, 1));
+            $em->flush();
+        } finally {
+            $context->clear();
+        }
     }
 
     /**
