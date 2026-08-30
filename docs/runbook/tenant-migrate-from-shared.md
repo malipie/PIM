@@ -136,7 +136,7 @@ UUID=$(dc_t exec -T database psql -U pim -d "pim_${KOD//-/_}" -tAc "SELECT id FR
 # assets/imports/exports: prefiksem jest UUID tenanta, więc ścieżki się nie zmieniają
 docker run --rm --network pim_default \
   -e MC_HOST_t="http://$MINIO_ROOT_USER:$MINIO_ROOT_PASSWORD@minio:9000" \
-  --entrypoint mc minio/mc:latest \
+  --entrypoint mc minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 \
   mirror --overwrite "t/pim-assets/$UUID/" "t/$KOD-assets/$UUID/"
 
 dc_t exec -T api php bin/console pim:search:reindex

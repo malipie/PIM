@@ -92,6 +92,31 @@
       "matchPackageNames": ["php"],
       "automerge": false,
       "addLabels": ["platform", "needs-review"]
+    },
+    {
+      "description": "Container image updates are infrastructure changes; Compose and operational script references stay synchronized.",
+      "matchDatasources": ["docker"],
+      "addLabels": ["infra"]
+    },
+    {
+      "description": "MinIO server/client updates require the backup-restore acceptance test before merge.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["minio/minio", "minio/mc"],
+      "automerge": false,
+      "addLabels": ["needs-review"]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update immutable MinIO MC references used outside Docker Compose.",
+      "managerFilePatterns": ["/^(scripts\\/.*\\.sh|docs\\/.*\\.md)$/"],
+      "matchStrings": [
+        "minio/mc:(?<currentValue>[^@\\s\\\"']+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "depNameTemplate": "minio/mc",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
     }
   ],
   "ignorePaths": [

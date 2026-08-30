@@ -160,7 +160,7 @@ docker run --rm --network "$network" \
     -e MC_HOST_tenant="http://${root_user}:${root_password}@${endpoint#http://}" \
     -e POLICY_JSON="$policy_json" \
     --entrypoint sh \
-    minio/mc:latest -c "
+    minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 -c "
         printf '%s' \"\$POLICY_JSON\" > /tmp/policy.json
         mc mb -p tenant/${assets_bucket} || true
         mc mb -p tenant/${imports_bucket} || true
@@ -177,7 +177,7 @@ docker run --rm --network "$network" \
 # Weryfikacja: użytkownik istnieje i ma przypiętą DOKŁADNIE tę politykę.
 attached=$(docker run --rm --network "$network" \
     -e MC_HOST_tenant="http://${root_user}:${root_password}@${endpoint#http://}" \
-    minio/mc:latest admin user info tenant "$access_key" 2>/dev/null | grep -i "policy" || true)
+    minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 admin user info tenant "$access_key" 2>/dev/null | grep -i "policy" || true)
 
 if ! printf '%s' "$attached" | grep -q "$policy_name"; then
     echo "BŁĄD: polityka ${policy_name} nie jest przypięta do użytkownika ${access_key}." >&2

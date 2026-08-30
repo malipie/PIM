@@ -484,7 +484,7 @@ services:
 
   # ─── MinIO (S3-compatible object storage for assets, backups) ─────────────
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     <<: [*default_restart, *resource_limits_storage]
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
@@ -543,7 +543,7 @@ services:
   #   - pim-imports stays un-versioned on purpose: transient ingest payloads with
   #     a 7-day expiry — versioning would only pile up delete-markers.
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     depends_on:
       minio:
         condition: service_healthy
@@ -565,7 +565,7 @@ services:
 
   # ─── Mercure (SSE hub) ────────────────────────────────────────────────────
   mercure:
-    image: dunglas/mercure:latest
+    image: dunglas/mercure:v0.24.2@sha256:916834e499613d475e9ad5118cd2349875338f52d99d65b58aeff82f97ccb0c6
     <<: [*default_restart, *resource_limits_edge]
     environment:
       SERVER_NAME: ":80"
@@ -592,7 +592,7 @@ services:
   # gives k6 the same DNS view as the edge so https://pim.localhost works
   # against the same self-signed cert the rest of the stack uses.
   k6:
-    image: grafana/k6:latest
+    image: grafana/k6:2.2.0@sha256:9bd01d6941fca969cb61bb57d2da5ee9b385fe2aa8881df3798c196564d6ace6
     profiles: ["perf"]
     network_mode: "service:caddy"
     volumes:
@@ -617,7 +617,7 @@ services:
 
   # ─── Mailpit (dev mail catcher) ───────────────────────────────────────────
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.31.0@sha256:c96991d9bef73594c246d89ca81411d4e916f03e76a7d2d72fa2ab5dd3c9ce24
     <<: [*default_restart, *resource_limits_tiny]
     environment:
       MP_MAX_MESSAGES: 5000

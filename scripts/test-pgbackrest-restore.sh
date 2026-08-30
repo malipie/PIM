@@ -7,7 +7,7 @@
 #   2. Insert N marker products via the API (so the data has a known shape).
 #   3. Trigger an on-demand pgBackRest backup (skips the 1h cron wait).
 #   4. Drop those marker products to simulate data loss.
-#   5. Run scripts/pim-backup-restore.sh --type latest --no-confirm.
+#   5. Restore to the end of that backup (before the deletion WAL).
 #   6. Re-count products. Pass = post-restore count == baseline + N (markers
 #      came back from the backup).
 #
@@ -40,14 +40,25 @@ product_count() {
         | python3 -c "import sys, json; print(json.load(sys.stdin).get('totalItems', 0))"
 }
 
+product_object_type_id() {
+    local token="$1"
+    curl --silent --show-error --insecure --fail \
+        --header "authorization: Bearer ${token}" \
+        --header 'accept: application/ld+json' \
+        "${BASE_URL}/api/products?page=1&itemsPerPage=1" \
+        | python3 -c "import sys, json; data=json.load(sys.stdin); members=data.get('member', data.get('hydra:member', [])); print(members[0]['objectType']['id'])"
+}
+
 create_product() {
-    local token="$1" sku="$2" name="$3"
-    curl --silent --insecure --fail \
+    local token="$1" code="$2" object_type_id="$3"
+    local response
+    response=$(curl --silent --show-error --insecure --fail \
         --request POST "${BASE_URL}/api/products" \
         --header "authorization: Bearer ${token}" \
         --header 'content-type: application/ld+json' \
-        --data "{\"sku\":\"${sku}\",\"name\":\"${name}\"}" \
-        > /dev/null
+        --data "{\"code\":\"${code}\",\"objectTypeId\":\"${object_type_id}\",\"attributes\":{}}")
+
+    python3 -c "import sys, json; expected=sys.argv[1]; actual=json.load(sys.stdin).get('code'); assert actual == expected, f'Expected created code {expected!r}, got {actual!r}'" "${code}" <<< "${response}"
 }
 
 echo "==> Logging in as ${ADMIN_EMAIL}"
@@ -57,9 +68,12 @@ TOKEN=$(mint_token)
 BASELINE=$(product_count "${TOKEN}")
 echo "==> Baseline product count for tenant '${TENANT}': ${BASELINE}"
 
+OBJECT_TYPE_ID=$(product_object_type_id "${TOKEN}")
+[[ -n "${OBJECT_TYPE_ID}" ]] || { echo "Failed to resolve a product object type" >&2; exit 1; }
+
 echo "==> Inserting ${MARKER_COUNT} marker products with prefix '${MARKER_PREFIX}'"
 for i in $(seq 1 "${MARKER_COUNT}"); do
-    create_product "${TOKEN}" "${MARKER_PREFIX}-${i}" "Restore marker ${i}"
+    create_product "${TOKEN}" "${MARKER_PREFIX}-${i}" "${OBJECT_TYPE_ID}"
 done
 
 PRE_BACKUP=$(product_count "${TOKEN}")
@@ -84,7 +98,7 @@ docker compose exec -T -e PGPASSWORD="${POSTGRES_PASSWORD:-ChangeMeInDev}" datab
 echo "==> Simulating data loss: deleting marker products"
 docker compose exec -T -e PGPASSWORD="${POSTGRES_PASSWORD:-ChangeMeInDev}" database \
     psql -U "${POSTGRES_USER:-pim}" -d "${POSTGRES_DB:-pim}" \
-    -c "DELETE FROM products WHERE sku LIKE '${MARKER_PREFIX}-%';"
+    -c "DELETE FROM objects WHERE kind = 'product' AND code LIKE '${MARKER_PREFIX}-%';"
 
 POST_DELETE=$(product_count "${TOKEN}")
 echo "==> Post-delete product count: ${POST_DELETE} (expected ${BASELINE})"
@@ -93,8 +107,8 @@ if [[ "${POST_DELETE}" != "${BASELINE}" ]]; then
     exit 1
 fi
 
-echo "==> Running scripts/pim-backup-restore.sh --type latest --no-confirm"
-"$(dirname "$0")/pim-backup-restore.sh" --type latest --no-confirm
+echo "==> Running scripts/pim-backup-restore.sh --type immediate --no-confirm"
+bash "$(dirname "$0")/pim-backup-restore.sh" --type immediate --no-confirm
 
 echo "==> Waiting for api to settle"
 for _ in $(seq 1 30); do
