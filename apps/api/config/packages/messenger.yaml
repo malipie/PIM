@@ -83,6 +83,12 @@ framework:
                     enabled: true
                     allow_no_handlers: true
                 middleware:
+                    # AUD-OBS-003 (#3031) — stamp every dispatch with the
+                    # originating HTTP correlation id and bind it before any
+                    # worker-side middleware logs. CorrelationIdContext is a
+                    # ResetInterface service, so Messenger clears it only
+                    # after its own ack/retry/failure log has been emitted.
+                    - 'App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware'
                     # Rebinds TenantContext on async handlers (audit
                     # HIGH-002 / 2026-04-29). Sync dispatches pass
                     # through — the request listener already set the
@@ -137,6 +143,7 @@ framework:
                     enabled: true
                     allow_no_handlers: true
                 middleware:
+                    - 'App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware'
                     - 'App\Shared\Infrastructure\Messenger\TenantContextRebindingMiddleware'
                     - 'App\Shared\Infrastructure\Messenger\TenantRlsGucMiddleware'
                     - 'App\Search\Application\CatalogIndexDrainMiddleware'
