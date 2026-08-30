@@ -1,7 +1,7 @@
 name: Security audit
 
 # composer audit + pnpm audit on every PR + nightly on main.
-# Blocks merge on high/critical CVEs (failed audit returns non-zero).
+# Blocks merge on moderate/high/critical CVEs (failed audit returns non-zero).
 #
 # #2148 — composer + pnpm audit share one job (was two) so a single PR
 # run stays under the GitHub Free 20-concurrent-job cap. Both audits run
@@ -50,5 +50,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Reject hidden pnpm audit exceptions
+        run: |
+          node -e "const p = require('./package.json'); const ignored = p.pnpm?.auditConfig?.ignoreGhsas ?? []; if (ignored.length) throw new Error('pnpm audit exceptions are forbidden: ' + ignored.join(', '))"
+
       - name: pnpm audit
-        run: pnpm audit --audit-level=high
+        run: pnpm audit --audit-level=moderate

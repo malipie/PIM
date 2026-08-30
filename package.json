@@ -52,21 +52,12 @@
       "brace-expansion": ">=5.0.9",
       "fast-uri": ">=4.1.2",
       "qs": ">=6.15.2",
-      "dompurify": ">=3.4.9",
+      "dompurify": ">=3.4.14",
       "undici": ">=7.29.0 <8",
       "js-yaml": ">=4.3.1 <5",
       "nanoid@<3.3.18": ">=3.3.18",
-      "nanoid@5.1.11": ">=5.1.16 <6"
-    },
-    "auditConfig": {
-      "ignoreGhsas": [
-        "GHSA-vmh5-mc38-953g",
-        "GHSA-vxpw-j846-p89q",
-        "GHSA-hm92-r4w5-c3mj",
-        "GHSA-3jxr-9vmj-r5cp",
-        "GHSA-52cp-r559-cp3m",
-        "GHSA-fx2h-pf6j-xcff"
-      ]
+      "nanoid@5.1.11": ">=5.1.16 <6",
+      "vitepress@1.6.4>vite": "6.4.3"
     }
   },
   "dependencies": {
