@@ -284,7 +284,7 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
         }
       }
     },
-    [active, editing, selectionRect, columns, rows, colIndex, onCommit],
+    [active, editing, selectionRect, columns, rows, colIndex, onCommit, onPasteReport],
   );
 
   const widthOf = (col: ExcelColumn<T>): number | undefined => liveWidths[col.key] ?? col.width;
@@ -295,7 +295,6 @@ export function ExcelLikeGrid<T extends Record<string, unknown>>({
     };
     if (col.type === 'select') {
       return (
-        // biome-ignore lint/a11y/noAutofocus: spreadsheet cell editor must grab focus on open
         <select
           ref={(el) => {
             if (el !== null) el.focus();
