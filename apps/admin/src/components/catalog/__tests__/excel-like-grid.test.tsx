@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -163,5 +163,38 @@ describe('ExcelLikeGrid column virtualization', () => {
     const table = screen.getByRole('table');
     fireEvent.keyDown(table, { key: 'Enter' });
     expect(within(table).getByDisplayValue('r1-c1')).toBeInTheDocument();
+  });
+
+  it('uses the latest paste report callback after a rerender', async () => {
+    const user = userEvent.setup();
+    const firstOnPasteReport = vi.fn();
+    const latestOnPasteReport = vi.fn();
+    const onCommit = vi.fn();
+    const { rerender } = render(
+      <ExcelLikeGrid<Row>
+        rows={rows}
+        columns={columns}
+        onCommit={onCommit}
+        onPasteReport={firstOnPasteReport}
+      />,
+    );
+
+    await user.click(screen.getByText('r0-c0'));
+    await user.keyboard('{Escape}');
+    rerender(
+      <ExcelLikeGrid<Row>
+        rows={rows}
+        columns={columns}
+        onCommit={onCommit}
+        onPasteReport={latestOnPasteReport}
+      />,
+    );
+
+    vi.spyOn(navigator.clipboard, 'readText').mockResolvedValue('pasted');
+    fireEvent.keyDown(screen.getByRole('table'), { key: 'v', ctrlKey: true });
+
+    await waitFor(() => expect(latestOnPasteReport).toHaveBeenCalledWith(1, 0));
+    expect(firstOnPasteReport).not.toHaveBeenCalled();
+    expect(onCommit).toHaveBeenCalledWith(0, 'c0', 'pasted');
   });
 });
