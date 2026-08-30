@@ -92,10 +92,18 @@ if [[ -n "${TENANT}" ]]; then
     echo "Instancja tenanta: ${TENANT} (projekt pim-${TENANT}, stanza ${STANZA})"
 fi
 
+# macOS still ships Bash 3.2, where expanding an empty array under `set -u`
+# raises "unbound variable". Keep the always-non-empty command prefix in one
+# array so the shared-stack path works on Bash 3.2 and newer releases.
+COMPOSE_CMD=(docker compose)
+if [[ -n "${TENANT}" ]]; then
+    COMPOSE_CMD+=("${COMPOSE_ARGS[@]}")
+fi
+
 PGBACKREST_ARGS=("--stanza=${STANZA}")
 case "${TYPE}" in
     default|latest) ;;  # use the most recent backup label
-    immediate) PGBACKREST_ARGS+=("--type=immediate") ;;
+    immediate) PGBACKREST_ARGS+=("--type=immediate" "--target-action=promote") ;;
     time)
         if [[ -z "${TARGET}" ]]; then
             echo "--type time requires --target 'YYYY-MM-DD HH:MM:SS[+TZ]'" >&2
@@ -140,8 +148,8 @@ run() {
 }
 
 # 1+2. Quiesce — api first (drops connections cleanly), then postgres.
-run docker compose "${COMPOSE_ARGS[@]}" stop api
-run docker compose "${COMPOSE_ARGS[@]}" stop database
+run "${COMPOSE_CMD[@]}" stop api
+run "${COMPOSE_CMD[@]}" stop database
 
 # 3. Wipe + restore inside a one-shot container that reuses the database
 #    service's image, volumes and env vars. --entrypoint "" plus a custom
@@ -166,10 +174,10 @@ RESTORE_CMD="/usr/local/bin/pim-render-pgbackrest-conf.sh >/dev/null 2>&1 || tru
 RESTORE_CMD+="rm -rf /var/lib/postgresql/data/* /var/lib/postgresql/data/.[!.]* 2>/dev/null; "
 RESTORE_CMD+="exec su -s /bin/sh postgres -c 'pgbackrest${QUOTED_ARGS}'"
 
-run docker compose "${COMPOSE_ARGS[@]}" run --rm --no-deps --entrypoint /bin/sh database -c "${RESTORE_CMD}"
+run "${COMPOSE_CMD[@]}" run --rm --no-deps --entrypoint /bin/sh database -c "${RESTORE_CMD}"
 
 # 4. Bring postgres back. archive_command resumes as soon as postgres starts.
-run docker compose "${COMPOSE_ARGS[@]}" up -d --wait database
+run "${COMPOSE_CMD[@]}" up -d --wait database
 
 # 4b. Re-grant the runtime role. A physical restore can land the cluster with
 # the pre-W1-1 grant state (or the app role's schema grants otherwise dropped);
@@ -177,7 +185,7 @@ run docker compose "${COMPOSE_ARGS[@]}" up -d --wait database
 # "permission denied for schema public". Idempotent — safe on every restore.
 if ! ${DRY_RUN}; then
     echo "==> Re-granting pim_app (post-restore quirk)"
-    docker compose "${COMPOSE_ARGS[@]}" exec -T database psql -U "${POSTGRES_USER:-pim}" -d "${POSTGRES_DB:-pim}" <<'SQL' || true
+    "${COMPOSE_CMD[@]}" exec -T database psql -U "${POSTGRES_USER:-pim}" -d "${POSTGRES_DB:-pim}" <<'SQL' || true
 GRANT USAGE ON SCHEMA public TO pim_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO pim_app;
 GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO pim_app;
@@ -187,12 +195,12 @@ SQL
 fi
 
 # 5. Bring api back. The --wait flag blocks until healthchecks pass.
-run docker compose "${COMPOSE_ARGS[@]}" up -d --wait api
+run "${COMPOSE_CMD[@]}" up -d --wait api
 
 cat <<EOF
 
 ==> Restore complete.
     Verify with:
-      docker compose "${COMPOSE_ARGS[@]}" exec database psql -U \${POSTGRES_USER:-pim} -d \${POSTGRES_DB:-pim} -c '\\dt'
+      ${COMPOSE_CMD[*]} exec database psql -U \${POSTGRES_USER:-pim} -d \${POSTGRES_DB:-pim} -c '\\dt'
       curl -k https://pim.localhost/api/products | head
 EOF

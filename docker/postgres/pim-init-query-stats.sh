@@ -66,12 +66,22 @@ if ! owner_psql "-qAtc \"SELECT 1 WHERE 'pg_stat_statements' = ANY (
     exit 1
 fi
 
-log "ensuring pg_stat_statements extension in ${DB_NAME}"
-owner_psql '-qc "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"' >>"$LOG" 2>&1
+log "waiting for writable recovery state before ensuring pg_stat_statements in ${DB_NAME}"
+installed=false
+for _ in $(seq 1 60); do
+    if owner_psql '-qAtc "SELECT NOT pg_is_in_recovery();"' 2>>"$LOG" | grep -qx 't'; then
+        if owner_psql '-qc "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;"' >>"$LOG" 2>&1 \
+            && check; then
+            installed=true
+            break
+        fi
+    fi
+    sleep 2
+done
 
-if check; then
+if ${installed}; then
     log "extension installed and query statistics view is usable"
 else
-    log "extension health contract failed"
+    log "extension health contract failed after recovery wait"
     exit 1
 fi

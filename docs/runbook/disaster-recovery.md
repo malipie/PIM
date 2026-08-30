@@ -317,7 +317,7 @@ versioned, so the previous version is still there behind a delete-marker.
 
 ```bash
 # Helper: run mc against the live MinIO (replace creds in prod).
-MC() { docker compose run --rm --no-deps --entrypoint /bin/sh minio/mc:latest -c \
+MC() { docker compose run --rm --no-deps --entrypoint /bin/sh minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 -c \
   "mc alias set local http://minio:9000 \"$MINIO_ROOT_USER\" \"$MINIO_ROOT_PASSWORD\" >/dev/null; $*"; }
 
 # 1. List every version of the object (delete-markers + prior PUTs).
@@ -355,7 +355,7 @@ MIRROR_SOURCE_BUCKET=pim-assets-replica \
 MIRROR_TARGET_URL=http://minio:9000 MIRROR_TARGET_KEY="$MINIO_ROOT_USER" \
 MIRROR_TARGET_SECRET="$MINIO_ROOT_PASSWORD" MIRROR_TARGET_BUCKET=pim-assets \
   docker compose run --rm --no-deps -v "$PWD/scripts:/scripts:ro" \
-  --entrypoint /bin/sh minio/mc:latest /scripts/minio-mirror-assets.sh
+  --entrypoint /bin/sh minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 /scripts/minio-mirror-assets.sh
 ```
 
 **Action — restore the database (repo on a separate store survives)**

@@ -132,7 +132,7 @@ if [ -z "$a_key" ] || [ -z "$a_secret" ]; then
     skip "MinIO: A nie sięga bucketu B" "brak AWS_ASSETS_KEY/SECRET w pliku instancji A"
 else
     own="$(docker run --rm --network "$network" -e MC_HOST_x="http://${a_key}:${a_secret}@minio:9000" \
-        --entrypoint sh minio/mc:latest -c "mc ls x/${a_bucket} >/dev/null 2>&1 && echo OK || echo DENIED" 2>/dev/null | tail -1)"
+        --entrypoint sh minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 -c "mc ls x/${a_bucket} >/dev/null 2>&1 && echo OK || echo DENIED" 2>/dev/null | tail -1)"
     if [ "$own" = "OK" ]; then
         ok "kontrola pozytywna: A widzi własny bucket"
     else
@@ -140,7 +140,7 @@ else
     fi
 
     foreign="$(docker run --rm --network "$network" -e MC_HOST_x="http://${a_key}:${a_secret}@minio:9000" \
-        --entrypoint sh minio/mc:latest -c "mc ls x/${b_bucket} >/dev/null 2>&1 && echo OK || echo DENIED" 2>/dev/null | tail -1)"
+        --entrypoint sh minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 -c "mc ls x/${b_bucket} >/dev/null 2>&1 && echo OK || echo DENIED" 2>/dev/null | tail -1)"
     if [ "$foreign" = "DENIED" ]; then
         ok "A nie sięga bucketu B (odmowa)"
     else

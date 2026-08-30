@@ -81,7 +81,7 @@ docker compose exec database tail -f /var/log/pgbackrest/cron.log
 > ⚠ This destroys the current `$PGDATA`. Take a manual backup first if there
 > is anything you cannot afford to lose.
 
-### Latest backup (no replay)
+### Latest backup with all available WAL replayed
 
 ```bash
 pnpm backup:restore -- --type latest --no-confirm
@@ -89,7 +89,7 @@ pnpm backup:restore -- --type latest --no-confirm
 scripts/pim-backup-restore.sh --type latest
 ```
 
-### Stop replay as soon as the backup is consistent (fastest)
+### Restore the latest backup without replaying later changes (fastest)
 
 ```bash
 scripts/pim-backup-restore.sh --type immediate
@@ -109,9 +109,10 @@ The orchestrator will:
 2. `docker compose stop database` — clean shutdown so the WAL is consistent.
 3. `docker compose run --rm --no-deps --entrypoint /bin/sh database -c …` —
    wipes `$PGDATA` and runs `pgbackrest restore` against the existing volume.
-   For `--type time` the wrapper passes `--target-action=promote` so the
-   cluster finishes recovery **read-write** (a bare `--type=time` leaves it
-   paused in read-only hot-standby until `pg_promote()`).
+   For `--type time` and `--type immediate` the wrapper passes
+   `--target-action=promote` so the cluster finishes recovery **read-write**
+   (a bare targeted recovery can pause in read-only hot-standby until
+   `pg_promote()`).
 4. `docker compose up -d --wait database` — postgres replays WAL from the repo.
 5. **Re-grant `pim_app`** — the wrapper re-applies the runtime role's schema
    grants (idempotent). A physical restore can land the cluster missing them

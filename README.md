@@ -221,12 +221,28 @@ Uwaga do pierwszego symptomu: **HTTP 200 ≠ sukces** — smoke-testy muszą ase
 | `database` | `pim-database:local` (postgres:16-alpine + pgbackrest 2.57 + dcron) | PostgreSQL 16 + WAL archiving + hourly backup do MinIO | `pg_isready` |
 | `redis` | `redis:7-alpine` | Symfony Messenger transport + cache (AOF persistence) | `redis-cli ping` |
 | `meilisearch` | `getmeili/meilisearch:v1.13` | Full-text search | `curl /health` |
-| `minio` | `minio/minio:latest` | S3-compatible object storage (DAM + backups) | `curl /minio/health/live` |
+| `minio` | `minio/minio:RELEASE.2025-09-07T16-13-09Z` + digest | S3-compatible object storage (DAM + backups) | `curl /minio/health/live` |
 | `minio-tls` | `caddy:2-alpine` | TLS terminator dla pgBackRest → MinIO (pgBackRest hard-coduje HTTPS) | brak |
-| `minio-init` | `minio/mc:latest` | Init buckets `pim-assets` / `pim-backups` (one-shot, `restart: no`) | — |
-| `mercure` | `dunglas/mercure:latest` | SSE hub real-time (events do admin frontend) | brak |
-| `mailpit` | `axllent/mailpit:latest` | Dev mail catcher (SMTP + UI) | brak |
-| `k6` | `grafana/k6:latest` | Perf load tester (`profile: ["perf"]`, nie startuje z `pnpm stack:up`) | — |
+| `minio-init` | `minio/mc:RELEASE.2025-08-13T08-35-41Z` + digest | Init buckets `pim-assets` / `pim-backups` (one-shot, `restart: no`) | — |
+| `mercure` | `dunglas/mercure:v0.24.2` + digest | SSE hub real-time (events do admin frontend) | brak |
+| `mailpit` | `axllent/mailpit:v1.31.0` + digest | Dev mail catcher (SMTP + UI) | brak |
+| `k6` | `grafana/k6:2.2.0` + digest | Perf load tester (`profile: ["perf"]`, nie startuje z `pnpm stack:up`) | — |
+
+Obrazy wcześniej używające `latest` są przypięte w Compose i skryptach operacyjnych
+jako `wersja@sha256`. Renovate sprawdza je w poniedziałki przed 08:00; zmiany
+digest/pin/patch mogą wejść automatycznie dopiero po zielonym CI, a minor/major
+wymagają ręcznego review. PR aktualizujący MinIO/MC musi dodatkowo przejść:
+
+```bash
+docker compose config -q
+docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
+docker compose pull minio minio-init mercure mailpit
+docker compose --profile perf pull k6
+pnpm backup:test
+```
+
+`pnpm backup:test` jest obowiązkowy dla zmian MinIO/MC; w pozostałych PR-ach
+wystarcza smoke właściwej usługi i pełne CI.
 
 ## Backup & restore
 

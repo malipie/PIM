@@ -167,7 +167,7 @@ if [ "$purge_storage" = true ]; then
     # i ponowne założenie tenanta o tym samym kodzie kończy się błędem 51.
     docker run --rm --network "$network" \
         -e MC_HOST_t="http://${root_user}:${root_password}@minio:9000" \
-        --entrypoint sh minio/mc:latest -c "
+        --entrypoint sh minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 -c "
             mc rb --force t/${assets} || true
             mc rb --force t/${imports} || true
             mc rb --force t/${exports} || true

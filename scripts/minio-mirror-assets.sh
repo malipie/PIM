@@ -39,7 +39,7 @@
 #     -e MIRROR_TARGET_URL -e MIRROR_TARGET_KEY -e MIRROR_TARGET_SECRET \
 #     -e MIRROR_TARGET_BUCKET -e MIRROR_SOURCE_URL=http://minio:9000 \
 #     -e MIRROR_SOURCE_KEY=minioadmin -e MIRROR_SOURCE_SECRET=minioadmin \
-#     --entrypoint /bin/sh -v "$PWD/scripts:/scripts:ro" minio/mc:latest \
+#     --entrypoint /bin/sh -v "$PWD/scripts:/scripts:ro" minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727 \
 #     /scripts/minio-mirror-assets.sh
 #
 # In production: run this from a CronJob / cron entry against a SEPARATE MinIO
