@@ -40,12 +40,12 @@
     ]
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.4",
-    "@commitlint/cli": "^21.2.1",
-    "@commitlint/config-conventional": "^21.2.0",
+    "@biomejs/biome": "^2.5.12",
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
     "husky": "^9.1.7",
-    "lint-staged": "^17.2.0",
-    "turbo": "^2.10.7"
+    "lint-staged": "^17.4.1",
+    "turbo": "^2.10.12"
   },
   "pnpm": {
     "overrides": {
@@ -61,6 +61,6 @@
     }
   },
   "dependencies": {
-    "react-hook-form": "7.82.0"
+    "react-hook-form": "7.87.0"
   }
 }
